@@ -7,9 +7,10 @@ from typing import Any
 
 class NonUniqueParents(RuntimeError):
     """
-    This error occurs when a concept is subsumed by multiple superconcepts,
-    neither of which is subsumed by the other. This cannot be chalked up to
-    transitivity, so a tree cannot be constructed.
+    This error occurs when a concept is in a taxonomy is subsumed by multiple
+    superconcepts, neither of which is subsumed by the other. This cannot be
+    chalked up to transitivity, so a true taxonomical tree cannot be
+    constructed.
     """
 
     def __init__(self, child: Any, old: Any, new: Any):
