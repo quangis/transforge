@@ -2,13 +2,20 @@
 This module holds all the errors that might be raised. It should be exhaustive.
 """
 
+from typing import Any
+
 
 class NonUniqueParents(RuntimeError):
     """
-    This error occurs when a concept in a taxonomy has multiple subconcepts in
-    such a way that it cannot be chalked up to transitivity.
+    This error occurs when a concept is subsumed by multiple superconcepts,
+    neither of which is subsumed by the other. This cannot be chalked up to
+    transitivity, so a tree cannot be constructed.
     """
-    pass
+
+    def __init__(self, child: Any, old: Any, new: Any):
+        self.old = old
+        self.new = new
+        self.child = child
 
 
 class Cycle(RuntimeError):
