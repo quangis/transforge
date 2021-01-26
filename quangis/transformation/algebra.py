@@ -12,7 +12,7 @@ from typing import Dict
 
 from quangis.transformation.parser import make_parser, Expr
 from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
-    Sub, Contains
+    TypeClass
 
 # Some type variables for convenience
 x, y, z = (TypeVar() for _ in range(0, 3))
@@ -41,6 +41,10 @@ class CCT(TransformationAlgebra):
     """
     Core concept transformation algebra.
     """
+
+    # Typeclasses
+    Sub = partial(TypeClass, "subtype")
+    Contains = partial(TypeClass, "contains")
 
     # Entity value types
     V = partial(TypeOperator)

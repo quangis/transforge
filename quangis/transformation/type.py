@@ -28,9 +28,9 @@ class AlgebraType(ABC):
         return "{} | {{{}}}".format(
             str(self),
             ", ".join(
-                "{}: {}".format(var, typeclass)
+                "{}: {}".format(var, tc)
                 for var in set(self.variables())
-                for typeclass in var.constraints
+                for tc in var.typeclasses
             )
         )
 
@@ -43,7 +43,7 @@ class AlgebraType(ABC):
         return NotImplemented
 
     @abstractmethod
-    def constrain(self, var: TypeVar, typeclass: Typeclass):
+    def constrain(self, var: TypeVar, typeclass: TypeClass):
         return NotImplemented
 
     def fresh(self) -> AlgebraType:
@@ -71,7 +71,10 @@ class AlgebraType(ABC):
         Abuse of Python's binary OR operator, for a pleasing notation of
         typeclass constraints.
         """
-        ctx = {}
+
+        # Needs a new context because constraints will be directly added to the
+        # variables
+        ctx: Dict[TypeVar, TypeVar] = {}
         new = self._fresh(ctx)
         for old_variable, old_typeclass in constraints.items():
             new_variable = ctx[old_variable]
@@ -197,7 +200,7 @@ class TypeOperator(AlgebraType):
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeOperator:
         return TypeOperator(self.name, *(t._fresh(ctx) for t in self.types))
 
-    def constrain(self, var: TypeVar, typeclass: Typeclass) -> None:
+    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
         for t in self.types:
             t.constrain(var, typeclass)
 
@@ -217,7 +220,7 @@ class TypeVar(AlgebraType):
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
-        self.constraints = set()
+        self.typeclasses = set()
         cls.counter += 1
 
     def __str__(self) -> str:
@@ -226,64 +229,69 @@ class TypeVar(AlgebraType):
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
 
-    def constrain(self, var: TypeVar, typeclass: Typeclass) -> None:
+    def constrain(self, var: TypeVar, tc: TypeClass) -> None:
         if var == self:
-            self.constraints.add(typeclass)
+            self.typeclasses.add(tc)
 
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeVar:
         if self in ctx:
             return ctx[self]
         else:
             new = TypeVar()
-            for typeclass in self.constraints:
-                new.constrain(new, typeclass)#._fresh(ctx))
+            for tc in self.typeclasses:
+                new.typeclasses.add(tc)
             ctx[self] = new
             return new
 
 
-class Typeclass(ABC):
+class TypeClass(object):
 
-    @abstractmethod
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Typeclass:
-        return NotImplemented
+    def __init__(self, name: str, *type_parameters: AlgebraType, **kwargs):
+        self.name = name
+        self.types = type_parameters
+        self.additional = kwargs
 
-    #@abstractmethod
-    def enforce(self, t: AlgebraType) -> Optional[AlgebraType]:
+    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeClass:
+        return TypeClass(self.name, *(t._fresh(ctx) for t in self.types))
+
+    def enforce(self):
         """
         Check if a particular binding might satisfy membership of this
-        typeclass. Return a dictionary of further constraints if so, otherwise
-        return None.
+        typeclass. If such a thing would entail constraints on other variables,
+        they are added. Raises an error if typeclass constraints cannot be
+        satisfied.
         """
         return NotImplemented
 
-
-class Sub(Typeclass):
-    """
-    Typeclass for types that are subsumed by the given superclass.
-    """
-
-    def __init__(self, supertype: TypeOperator):
-        self.supertype = supertype
-
     def __str__(self) -> str:
-        return "Sub({})".format(self.supertype)
+        return "{}({})".format(self.name, ", ".join(map(str, self.types)))
 
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Sub:
-        return Sub(self.supertype._fresh(ctx))
+    def subtype(self):
+        """
+        Enforce types that are subsumed by the given superclass.
+        """
+        t1, t2 = self.types
 
+        if isinstance(t2, TypeOperator) and isinstance(t1, TypeOperator):
+            if t2.arity == 0:
+                if not t2.subtype(t1):
+                    raise RuntimeError("does not satisfy typeclass constraint")
+            else:
+                if t1.signature != t2.signature:
+                    raise RuntimeError("does not satisfy typeclass constraint")
+                for s, t in zip(t1.types, t2.types):
+                    tc = TypeClass(self.name, s, t)
+                    tc.enforce()
+        elif isinstance(t1, TypeVar):
+            pass
 
-class Contains(Typeclass):
-    """
-    Typeclass for parameterized types that contain the given value type in one
-    of their columns.
-    """
+    def contains(self):
+        """
+        Enforce parameterized types that contain the given type in one of their
+        columns.
+        """
+        t1, t2 = self.types
 
-    def __init__(self, domain: AlgebraType, at: Optional[int] = None):
-        self.domain = domain
-        self.at = at
-
-    def __str__(self) -> str:
-        return "Contains({}, at={})".format(self.domain, self.at)
-
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Contains:
-        return Contains(self.domain._fresh(ctx), self.at)
+        if isinstance(t1, TypeOperator) and isinstance(t2, TypeOperator):
+            tc = TypeClass("subtype", t1, t2.types[0])
+            tc.enforce()
