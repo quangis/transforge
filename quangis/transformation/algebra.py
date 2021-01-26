@@ -13,9 +13,8 @@ from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
 class Algebra(object):
     def __init__(
             self,
-            functions: Dict[str, AlgebraType],
-            constructors: Dict[str, AlgebraType]):
-        self.parser = make_parser(functions, constructors)
+            functions: Dict[str, AlgebraType]):
+        self.parser = make_parser(functions)
 
     def parse(self, string: str) -> Expr:
         return self.parser.parseString(string)[0]
@@ -51,7 +50,9 @@ NominalInvertedField = R(Nom, S)
 BooleanInvertedField = R(Bool, S)
 
 # Constructors are functions that introduce data of a certain type
-constructors: Dict[str, AlgebraType] = {
+functions = {
+
+    # data constructors
     "pointmeasures": R(S, Itv),
     "amountpatches": R(S, Nom),
     "contour": R(Ord, S),
@@ -63,16 +64,15 @@ constructors: Dict[str, AlgebraType] = {
     "object": R(O),
     "region": R(S),
     "in": R(Nom),
-    "count": R(Count),
+    "countV": R(Count),
     "ratioV": R(Ratio),
     "interval": R(Itv),
     "ordinal": R(Ord),
-    "nominal": R(Nom)
-}
+    "nominal": R(Nom),
 
-# Functions are type transformations in the algebra, without any particular
-# implementation
-functions = {
+    # Functions are type transformations in the algebra, without any particular
+    # implementation
+
     # functional
     "compose": (y ** z) ** (x ** y) ** (x ** z),
 
@@ -135,4 +135,4 @@ functions = {
         (R(x, Q) ** Q) ** R(x, Q, y) ** R(y, Q) | {x: Sub(V), y: Sub(V)},
 }
 
-algebra = Algebra(constructors, functions)
+algebra = Algebra(functions)
