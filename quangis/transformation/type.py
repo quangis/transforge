@@ -211,15 +211,6 @@ class TypeVar(AlgebraType):
     def __str__(self) -> str:
         return "x" + str(self.id)
 
-    def __hash__(self):
-        return self.id.__hash__()
-
-    def __eq__(self, other: object):
-        if isinstance(other, TypeVar):
-            return self.id == other.id
-        else:
-            return False
-
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
 
