@@ -39,23 +39,12 @@ class AlgebraType(ABC):
         return NotImplemented
 
     @abstractmethod
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
-        return NotImplemented
-
-    @abstractmethod
     def instantiate(self) -> AlgebraType:
         return NotImplemented
 
     @abstractmethod
     def constrain(self, var: TypeVar, typeclass: TypeClass):
         return NotImplemented
-
-    def fresh(self) -> AlgebraType:
-        """
-        Create a fresh copy of this type, with unique new variables.
-        """
-
-        return self._fresh({})
 
     def __pow__(self, other: AlgebraType) -> TypeOperator:
         """
@@ -86,6 +75,27 @@ class AlgebraType(ABC):
         #    new.constrain(new_variable, new_typeclass)
         #return new
         return self
+
+    def fresh(self, ctx: Optional[Dict[TypeVar, TypeVar]] = None) -> AlgebraType:
+        """
+        Create a fresh copy of this type, with unique new variables.
+        """
+
+        ctx = ctx or {}
+        if isinstance(self, TypeOperator):
+            return TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
+        elif isinstance(self, TypeVar):
+            if self.bound:
+                raise RuntimeError("cannot refresh bound variable")
+            elif self in ctx:
+                return ctx[self]
+            else:
+                new = TypeVar()
+                for tc in self.typeclasses:
+                    new.typeclasses.add(tc)
+                ctx[self] = new
+                return new
+        raise RuntimeError("inexhaustive pattern")
 
     def unify(self: AlgebraType, other: AlgebraType) -> None:
         """
@@ -153,8 +163,9 @@ class TypeOperator(AlgebraType):
             up = self.supertype
             return self == other or bool(up and up.subtype(other))
         else:
-            return self.signature == other.signature and \
-                all(s.subtype(t) for s, t in zip(self.types, other.types))
+            raise RuntimeError("direct subtypes can only be determined for nullary types")
+            #return self.signature == other.signature and \
+            #    all(s.subtype(t) for s, t in zip(self.types, other.types))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
@@ -175,9 +186,6 @@ class TypeOperator(AlgebraType):
             )
         else:
             return self.name
-
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeOperator:
-        return TypeOperator(self.name, *(t._fresh(ctx) for t in self.types))
 
     def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
         for t in self.types:
@@ -239,18 +247,6 @@ class TypeVar(AlgebraType):
         else:
             return self
 
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeVar:
-        if self.bound:
-            raise RuntimeError("cannot refresh bound variable")
-        elif self in ctx:
-            return ctx[self]
-        else:
-            new = TypeVar()
-            for tc in self.typeclasses:
-                new.typeclasses.add(tc)
-            ctx[self] = new
-            return new
-
 
 
 
@@ -268,8 +264,8 @@ class TypeClass(object):
         self.types = type_parameters
         self.additional = kwargs
 
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeClass:
-        return TypeClass(self.name, *(t._fresh(ctx) for t in self.types))
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeClass:
+        return TypeClass(self.name, *(t.fresh(ctx) for t in self.types))
 
     def enforce(self):
         """
