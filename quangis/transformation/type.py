@@ -2,10 +2,7 @@
 Generic type system. Inspired loosely by Hindley-Milner type inference in
 functional programming languages.
 
-Be warned: This module abuses overloading of Python's standard operators. It
-also deviates from Python's convention of using capitalized names for classes
-and lowercase for values. These decisions were made to get an interface that is
-as close as possible to its formal type system counterpart.
+Be warned: This module abuses overloading of Python's standard operators.
 """
 from __future__ import annotations
 
