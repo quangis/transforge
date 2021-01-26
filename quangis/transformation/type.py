@@ -7,7 +7,8 @@ Be warned: This module abuses overloading of Python's standard operators.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple
+from itertools import chain
+from typing import Dict, Optional, Tuple, Iterable
 
 
 class AlgebraType(ABC):
@@ -20,6 +21,19 @@ class AlgebraType(ABC):
     def __repr__(self):
         return self.__str__()
 
+    def to_str(self) -> str:
+        """
+        To string including constraints on the top level
+        """
+        return "{} | {{{}}}".format(
+            str(self),
+            ", ".join(
+                "{}: {}".format(var, typeclass)
+                for var in set(self.variables())
+                for typeclass in var.constraints
+            )
+        )
+
     @abstractmethod
     def __contains__(self, value: AlgebraType) -> bool:
         return NotImplemented
@@ -29,7 +43,7 @@ class AlgebraType(ABC):
         return NotImplemented
 
     @abstractmethod
-    def constrain(self, var: TypeVar, typeclass: TypeClass):
+    def constrain(self, var: TypeVar, typeclass: Typeclass):
         return NotImplemented
 
     def fresh(self) -> AlgebraType:
@@ -52,14 +66,18 @@ class AlgebraType(ABC):
         """
         return TypeOperator('function', self, other)
 
-    def __or__(self, constraints: Dict[TypeVar, TypeClass]) -> AlgebraType:
+    def __or__(self, constraints: Dict[TypeVar, Typeclass]) -> AlgebraType:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
-        typeclass constraints
+        typeclass constraints.
         """
-        for variable, typeclass in constraints.items():
-            self.constrain(variable, typeclass)
-        return self
+        ctx = {}
+        new = self._fresh(ctx)
+        for old_variable, old_typeclass in constraints.items():
+            new_variable = ctx[old_variable]
+            new_typeclass = old_typeclass._fresh(ctx)
+            new.constrain(new_variable, new_typeclass)
+        return new
 
     def substitute(self, subst: Dict[TypeVar, AlgebraType]) -> AlgebraType:
         if isinstance(self, TypeOperator):
@@ -100,6 +118,8 @@ class AlgebraType(ABC):
         return ctx
 
     def is_function(self) -> bool:
+        if isinstance(self, TypeOperator):
+            return self.name == 'function'
         return False
 
     def apply(self, arg: AlgebraType) -> AlgebraType:
@@ -112,6 +132,16 @@ class AlgebraType(ABC):
             return output_type.substitute(env)
         else:
             raise RuntimeError("Cannot apply an argument to non-function type")
+
+    def variables(self) -> Iterable[TypeVar]:
+        """
+        Obtain unbound variables left in the type expression.
+        """
+        if isinstance(self, TypeVar):
+            yield self
+        elif isinstance(self, TypeOperator):
+            for v in chain(*(t.variables() for t in self.types)):
+                yield v
 
 
 class TypeOperator(AlgebraType):
@@ -158,14 +188,16 @@ class TypeOperator(AlgebraType):
         if self.is_function():
             return "({0} -> {1})".format(*self.types)
         elif self.types:
-            return "{}({})".format(self.name, ", ".join(map(str, self.types)))
+            return "{}({})".format(
+                self.name, ", ".join(map(str, self.types))
+            )
         else:
             return self.name
 
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeOperator:
         return TypeOperator(self.name, *(t._fresh(ctx) for t in self.types))
 
-    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
+    def constrain(self, var: TypeVar, typeclass: Typeclass) -> None:
         for t in self.types:
             t.constrain(var, typeclass)
 
@@ -176,9 +208,6 @@ class TypeOperator(AlgebraType):
     @property
     def signature(self) -> Tuple[str, int]:
         return self.name, self.arity
-
-    def is_function(self) -> bool:
-        return self.name == 'function'
 
 
 class TypeVar(AlgebraType):
@@ -192,12 +221,12 @@ class TypeVar(AlgebraType):
         cls.counter += 1
 
     def __str__(self) -> str:
-        return "x" + str(self.id) + str(self.constraints)
+        return "x" + str(self.id)
 
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
 
-    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
+    def constrain(self, var: TypeVar, typeclass: Typeclass) -> None:
         if var == self:
             self.constraints.add(typeclass)
 
@@ -206,30 +235,55 @@ class TypeVar(AlgebraType):
             return ctx[self]
         else:
             new = TypeVar()
-            # TODO add constraints
+            for typeclass in self.constraints:
+                new.constrain(new, typeclass)#._fresh(ctx))
             ctx[self] = new
             return new
 
 
-class TypeClass(object):
-    pass
+class Typeclass(ABC):
+
+    @abstractmethod
+    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Typeclass:
+        return NotImplemented
+
+    #@abstractmethod
+    def enforce(self, t: AlgebraType) -> Optional[AlgebraType]:
+        """
+        Check if a particular binding might satisfy membership of this
+        typeclass. Return a dictionary of further constraints if so, otherwise
+        return None.
+        """
+        return NotImplemented
 
 
-class Contains(TypeClass):
+class Sub(Typeclass):
     """
-    Typeclass for relation types that contain the given value type in one of
-    their columns.
+    Typeclass for types that are subsumed by the given superclass.
+    """
+
+    def __init__(self, supertype: TypeOperator):
+        self.supertype = supertype
+
+    def __str__(self) -> str:
+        return "Sub({})".format(self.supertype)
+
+    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Sub:
+        return Sub(self.supertype._fresh(ctx))
+
+
+class Contains(Typeclass):
+    """
+    Typeclass for parameterized types that contain the given value type in one
+    of their columns.
     """
 
     def __init__(self, domain: AlgebraType, at: Optional[int] = None):
         self.domain = domain
+        self.at = at
 
+    def __str__(self) -> str:
+        return "Contains({}, at={})".format(self.domain, self.at)
 
-class Sub(TypeClass):
-    """
-    Typeclass for value types that are subsumed by the given superclass.
-    """
-
-    def __init__(self, supertype: TypeOperator):
-        pass
-
+    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Contains:
+        return Contains(self.domain._fresh(ctx), self.at)
