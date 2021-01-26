@@ -7,37 +7,15 @@ Be warned: This module abuses overloading of Python's standard operators.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 
 class AlgebraType(ABC):
     """
     Abstract base class for type operators and type variables. Note that basic
-    types are just 0-ary type operators.
+    types are just 0-ary type operators and functions are just particular 2-ary
+    type operators.
     """
-
-    def __pow__(self: AlgebraType, other: AlgebraType) -> Transformation:
-        """
-        This is an overloaded (ab)use of Python's exponentiation operator. It
-        allows us to use the infix operator ** for the arrow in function
-        signatures.
-
-        Note that this operator is one of the few that is right-to-left
-        associative, matching the conventional behaviour of the function arrow.
-        The right-bitshift operator >> (for __rshift__) would have been more
-        intuitive visually, but does not have this property.
-        """
-        return Transformation(self, other)
-
-    def __or__(a: AlgebraType, b: Dict[TypeVar, TypeClass]) -> AlgebraType:
-        """
-        """
-        #for constraint in b:
-        #    return a.constrain(b)
-        return a
-
-    #def constrain(self, constraint: TypeConstraint):
-    #    self.
 
     def __repr__(self):
         return self.__str__()
@@ -51,7 +29,7 @@ class AlgebraType(ABC):
         return NotImplemented
 
     @abstractmethod
-    def map(self, fn: Callable[[AlgebraType], AlgebraType]) -> AlgebraType:
+    def constrain(self, var: TypeVar, typeclass: TypeClass):
         return NotImplemented
 
     def fresh(self) -> AlgebraType:
@@ -60,22 +38,28 @@ class AlgebraType(ABC):
         """
 
         return self._fresh({})
-        #ctx: Dict[TypeVar, TypeVar] = {}
-#
-#        def f(t):
-#            if isinstance(t, TypeVar):
-#                if self in ctx:
-#                    return ctx[self]
-#                else:
-#                    new = TypeVar.new()
-#                    ctx[self] = new
-#                    return new
-#            return t
 
-#        return self.map(f)
+    def __pow__(self, other: AlgebraType) -> TypeOperator:
+        """
+        This is an overloaded (ab)use of Python's exponentiation operator. It
+        allows us to use the infix operator ** for the arrow in function
+        signatures.
 
-    def apply(self, arg: AlgebraType) -> AlgebraType:
-        raise RuntimeError("Cannot apply an argument to non-function type")
+        Note that this operator is one of the few that is right-to-left
+        associative, matching the conventional behaviour of the function arrow.
+        The right-bitshift operator >> (for __rshift__) would have been more
+        intuitive visually, but does not have this property.
+        """
+        return TypeOperator('function', self, other)
+
+    def __or__(self, constraints: Dict[TypeVar, TypeClass]) -> AlgebraType:
+        """
+        Abuse of Python's binary OR operator, for a pleasing notation of
+        typeclass constraints
+        """
+        for variable, typeclass in constraints.items():
+            self.constrain(variable, typeclass)
+        return self
 
     def substitute(self, subst: Dict[TypeVar, AlgebraType]) -> AlgebraType:
         if isinstance(self, TypeOperator):
@@ -93,7 +77,9 @@ class AlgebraType(ABC):
             ctx: Dict[TypeVar, AlgebraType]) -> Dict[TypeVar, AlgebraType]:
         """
         Obtain a substitution that would make these two types the same, if
-        possible. Note that subtypes on the "self" side are tolerated.
+        possible. Note that subtypes on the "self" side are tolerated: that is,
+        if self is a subtype of other, then they are considered the same, but
+        not vice versa.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
 
@@ -113,6 +99,20 @@ class AlgebraType(ABC):
             other.unify(self, ctx)
         return ctx
 
+    def is_function(self) -> bool:
+        return False
+
+    def apply(self, arg: AlgebraType) -> AlgebraType:
+        """
+        Apply an argument to a function type to get its output type.
+        """
+        if self.is_function():
+            input_type, output_type = self.types
+            env = arg.unify(input_type, {})
+            return output_type.substitute(env)
+        else:
+            raise RuntimeError("Cannot apply an argument to non-function type")
+
 
 class TypeOperator(AlgebraType):
     """
@@ -128,6 +128,8 @@ class TypeOperator(AlgebraType):
         self.types = list(types)
         self.supertype = supertype
 
+        if self.name == 'function' and self.arity != 2:
+            raise RuntimeError("functions must have 2 argument types")
         if self.types and self.supertype:
             raise RuntimeError("only nullary types may have supertypes")
 
@@ -142,7 +144,7 @@ class TypeOperator(AlgebraType):
             return self.signature == other.signature and \
                 all(s.subtype(t) for s, t in zip(self.types, other.types))
 
-    def __eq__(self, other: object):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
             return self.signature == other.signature and \
                all(s == t for s, t in zip(self.types, other.types))
@@ -153,7 +155,9 @@ class TypeOperator(AlgebraType):
         return value == self or any(value in t for t in self.types)
 
     def __str__(self) -> str:
-        if self.types:
+        if self.is_function():
+            return "({0} -> {1})".format(*self.types)
+        elif self.types:
             return "{}({})".format(self.name, ", ".join(map(str, self.types)))
         else:
             return self.name
@@ -161,8 +165,9 @@ class TypeOperator(AlgebraType):
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeOperator:
         return TypeOperator(self.name, *(t._fresh(ctx) for t in self.types))
 
-    def map(self, fn: Callable[[AlgebraType], AlgebraType]) -> AlgebraType:
-        return TypeOperator(self.name, *map(fn, self.types))
+    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
+        for t in self.types:
+            t.constrain(var, typeclass)
 
     @property
     def arity(self) -> int:
@@ -172,28 +177,8 @@ class TypeOperator(AlgebraType):
     def signature(self) -> Tuple[str, int]:
         return self.name, self.arity
 
-
-class Transformation(TypeOperator):
-
-    def __init__(self, input_type: AlgebraType, output_type: AlgebraType):
-        super().__init__("transformation", input_type, output_type)
-
-    def map(self, fn: Callable[[AlgebraType], AlgebraType]) -> AlgebraType:
-        return Transformation(*map(fn, self.types))
-
-    def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Transformation:
-        return Transformation(*(t._fresh(ctx) for t in self.types))
-
-    def __str__(self) -> str:
-        return "({0} -> {1})".format(*self.types)
-
-    def apply(self, arg: AlgebraType) -> AlgebraType:
-        """
-        Apply an argument to a function type to get its output type.
-        """
-        input_type, output_type = self.types
-        env = arg.unify(input_type, {})
-        return output_type.substitute(env)
+    def is_function(self) -> bool:
+        return self.name == 'function'
 
 
 class TypeVar(AlgebraType):
@@ -203,22 +188,25 @@ class TypeVar(AlgebraType):
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
+        self.constraints = set()
         cls.counter += 1
 
     def __str__(self) -> str:
-        return "x" + str(self.id)
+        return "x" + str(self.id) + str(self.constraints)
 
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
 
-    def map(self, fn: Callable[[AlgebraType], AlgebraType]) -> AlgebraType:
-        return fn(self)
+    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
+        if var == self:
+            self.constraints.add(typeclass)
 
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeVar:
         if self in ctx:
             return ctx[self]
         else:
             new = TypeVar()
+            # TODO add constraints
             ctx[self] = new
             return new
 
