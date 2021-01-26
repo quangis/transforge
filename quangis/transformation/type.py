@@ -18,8 +18,8 @@ class AlgebraType(ABC):
     type operators.
     """
 
-    def __repr__(self):
-        return self.__str__()
+    #def __repr__(self):
+    #    return self.__str__()
 
     def to_str(self) -> str:
         """
@@ -40,6 +40,10 @@ class AlgebraType(ABC):
 
     @abstractmethod
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
+        return NotImplemented
+
+    @abstractmethod
+    def instantiate(self) -> AlgebraType:
         return NotImplemented
 
     @abstractmethod
@@ -66,7 +70,7 @@ class AlgebraType(ABC):
         """
         return TypeOperator('function', self, other)
 
-    def __or__(self, constraints: Dict[TypeVar, Typeclass]) -> AlgebraType:
+    def __or__(self, constraints: Dict[TypeVar, TypeClass]) -> AlgebraType:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
         typeclass constraints.
@@ -74,33 +78,20 @@ class AlgebraType(ABC):
 
         # Needs a new context because constraints will be directly added to the
         # variables
-        ctx: Dict[TypeVar, TypeVar] = {}
-        new = self._fresh(ctx)
-        for old_variable, old_typeclass in constraints.items():
-            new_variable = ctx[old_variable]
-            new_typeclass = old_typeclass._fresh(ctx)
-            new.constrain(new_variable, new_typeclass)
-        return new
-
-    def substitute(self, subst: Dict[TypeVar, AlgebraType]) -> AlgebraType:
-        if isinstance(self, TypeOperator):
-            self.types = [t.substitute(subst) for t in self.types]
-        elif isinstance(self, TypeVar):
-            if self in subst:
-                return subst[self]
-        else:
-            raise RuntimeError("non-exhaustive pattern")
+        #ctx: Dict[TypeVar, TypeVar] = {}
+        #new = self._fresh(ctx)
+        #for old_variable, old_typeclass in constraints.items():
+        #    new_variable = ctx[old_variable]
+        #    new_typeclass = old_typeclass._fresh(ctx)
+        #    new.constrain(new_variable, new_typeclass)
+        #return new
         return self
 
-    def unify(
-            self: AlgebraType,
-            other: AlgebraType,
-            ctx: Dict[TypeVar, AlgebraType]) -> Dict[TypeVar, AlgebraType]:
+    def unify(self: AlgebraType, other: AlgebraType) -> None:
         """
-        Obtain a substitution that would make these two types the same, if
-        possible. Note that subtypes on the "self" side are tolerated: that is,
-        if self is a subtype of other, then they are considered the same, but
-        not vice versa.
+        Bind variables such that both types become the same. Note that subtypes
+        on the "self" side are tolerated: that is, if self is a subtype of
+        other, then they are considered the same, but not vice versa.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
 
@@ -110,31 +101,19 @@ class AlgebraType(ABC):
                 raise RuntimeError("type mismatch")
             else:
                 for x, y in zip(self.types, other.types):
-                    x.unify(y, ctx)
-        elif isinstance(self, TypeVar):
-            if self != other and self in other:
-                raise RuntimeError("recursive type")
-            else:
-                ctx[self] = other
-        elif isinstance(other, TypeVar):
-            other.unify(self, ctx)
-        return ctx
+                    x.unify(y)
+        else:
+            if isinstance(self, TypeVar):
+                if self != other and self in other:
+                    raise RuntimeError("recursive type")
+                self.bind(other)
+            elif isinstance(other, TypeVar):
+                other.unify(self)
 
     def is_function(self) -> bool:
         if isinstance(self, TypeOperator):
             return self.name == 'function'
         return False
-
-    def apply(self, arg: AlgebraType) -> AlgebraType:
-        """
-        Apply an argument to a function type to get its output type.
-        """
-        if self.is_function():
-            input_type, output_type = self.types
-            env = arg.unify(input_type, {})
-            return output_type.substitute(env)
-        else:
-            raise RuntimeError("Cannot apply an argument to non-function type")
 
     def variables(self) -> Iterable[TypeVar]:
         """
@@ -204,6 +183,21 @@ class TypeOperator(AlgebraType):
         for t in self.types:
             t.constrain(var, typeclass)
 
+    def instantiate(self) -> AlgebraType:
+        self.types = [t.instantiate() for t in self.types]
+        return self
+
+    def apply(self, arg: AlgebraType) -> AlgebraType:
+        """
+        Apply an argument to a function type to get its output type.
+        """
+        if self.is_function():
+            input_type, output_type = self.types
+            arg.unify(input_type)
+            return output_type.instantiate()
+        else:
+            raise RuntimeError("Cannot apply an argument to non-function type")
+
     @property
     def arity(self) -> int:
         return len(self.types)
@@ -220,6 +214,7 @@ class TypeVar(AlgebraType):
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
+        self.bound = None
         self.typeclasses = set()
         cls.counter += 1
 
@@ -233,8 +228,21 @@ class TypeVar(AlgebraType):
         if var == self:
             self.typeclasses.add(tc)
 
+    def bind(self, binding: AlgebraType):
+        assert (not self.bound or binding == self.bound), \
+            "binding variable multiple times"
+        self.bound = binding
+
+    def instantiate(self) -> AlgebraType:
+        if self.bound:
+            return self.bound
+        else:
+            return self
+
     def _fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeVar:
-        if self in ctx:
+        if self.bound:
+            raise RuntimeError("cannot refresh bound variable")
+        elif self in ctx:
             return ctx[self]
         else:
             new = TypeVar()
@@ -242,6 +250,15 @@ class TypeVar(AlgebraType):
                 new.typeclasses.add(tc)
             ctx[self] = new
             return new
+
+
+
+
+
+
+
+
+
 
 
 class TypeClass(object):
