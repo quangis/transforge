@@ -42,10 +42,6 @@ class AlgebraType(ABC):
     def instantiate(self) -> AlgebraType:
         return NotImplemented
 
-    @abstractmethod
-    def constrain(self, var: TypeVar, typeclass: TypeClass):
-        return NotImplemented
-
     def __pow__(self, other: AlgebraType) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
@@ -65,23 +61,25 @@ class AlgebraType(ABC):
         typeclass constraints.
         """
 
-        # Needs a new context because constraints will be directly added to the
-        # variables
-        #ctx: Dict[TypeVar, TypeVar] = {}
-        #new = self._fresh(ctx)
-        #for old_variable, old_typeclass in constraints.items():
-        #    new_variable = ctx[old_variable]
-        #    new_typeclass = old_typeclass._fresh(ctx)
-        #    new.constrain(new_variable, new_typeclass)
-        #return new
-        return self
+        # In principle, this function could return None, were it not for the
+        # fact that we need a fresh version of self: since constraints will be
+        # directly added to the variables, if we didn't do this, we'd need to
+        # bend over backwards for generic variables
+        ctx: Dict[TypeVar, TypeVar] = {}
+        new = self.fresh(ctx)
+        print(ctx)
+        for old_variable, old_typeclass in constraints.items():
+            new_variable = ctx[old_variable]
+            new_typeclass = old_typeclass.fresh(ctx)
+            new_variable.constrain(new_typeclass)
+        return new
 
     def fresh(self, ctx: Optional[Dict[TypeVar, TypeVar]] = None) -> AlgebraType:
         """
         Create a fresh copy of this type, with unique new variables.
         """
 
-        ctx = ctx or {}
+        ctx = {} if ctx is None else ctx
         if isinstance(self, TypeOperator):
             return TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
         elif isinstance(self, TypeVar):
@@ -187,12 +185,9 @@ class TypeOperator(AlgebraType):
         else:
             return self.name
 
-    def constrain(self, var: TypeVar, typeclass: TypeClass) -> None:
-        for t in self.types:
-            t.constrain(var, typeclass)
-
     def instantiate(self) -> AlgebraType:
-        self.types = [t.instantiate() for t in self.types]
+        self.types = [t.instantiate() for t in self.types] # note that it also
+        # to be instantiated on the other side
         return self
 
     def apply(self, arg: AlgebraType) -> AlgebraType:
@@ -201,7 +196,7 @@ class TypeOperator(AlgebraType):
         """
         if self.is_function():
             input_type, output_type = self.types
-            arg.unify(input_type)
+            arg.instantiate().unify(input_type.instantiate())
             return output_type.instantiate()
         else:
             raise RuntimeError("Cannot apply an argument to non-function type")
@@ -232,9 +227,8 @@ class TypeVar(AlgebraType):
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
 
-    def constrain(self, var: TypeVar, tc: TypeClass) -> None:
-        if var == self:
-            self.typeclasses.add(tc)
+    def constrain(self, tc: TypeClass) -> None:
+        self.typeclasses.add(tc)
 
     def bind(self, binding: AlgebraType):
         assert (not self.bound or binding == self.bound), \
@@ -242,6 +236,9 @@ class TypeVar(AlgebraType):
         self.bound = binding
 
     def instantiate(self) -> AlgebraType:
+        #for tc in self.typeclasses:
+        #    tc.instantiate()
+
         if self.bound:
             return self.bound
         else:
