@@ -30,9 +30,13 @@ class AlgebraType(ABC):
             ", ".join(
                 "{}: {}".format(var, tc)
                 for var in set(self.variables())
-                for tc in var.typeclasses
+                for tc in var.constraints
             )
         )
+
+    #@abstractmethod
+    #def equiv(self, other: AlgebraType) -> bool:
+    #    return NotImplemented
 
     @abstractmethod
     def __contains__(self, value: AlgebraType) -> bool:
@@ -55,7 +59,7 @@ class AlgebraType(ABC):
         """
         return TypeOperator('function', self, other)
 
-    def __or__(self, constraints: Dict[TypeVar, TypeClass]) -> AlgebraType:
+    def __or__(self, constraints: Iterable[Constraint]) -> AlgebraType:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
         typeclass constraints.
@@ -67,11 +71,11 @@ class AlgebraType(ABC):
         # bend over backwards for generic variables
         ctx: Dict[TypeVar, TypeVar] = {}
         new = self.fresh(ctx)
-        print(ctx)
-        for old_variable, old_typeclass in constraints.items():
-            new_variable = ctx[old_variable]
-            new_typeclass = old_typeclass.fresh(ctx)
-            new_variable.constrain(new_typeclass)
+
+        for constraint in constraints:
+            new_constraint = constraint.fresh(ctx)
+            for var in new_constraint.subject.variables():
+                var.constraints.add(new_constraint)
         return new
 
     def fresh(self, ctx: Optional[Dict[TypeVar, TypeVar]] = None) -> AlgebraType:
@@ -89,8 +93,8 @@ class AlgebraType(ABC):
                 return ctx[self]
             else:
                 new = TypeVar()
-                for tc in self.typeclasses:
-                    new.typeclasses.add(tc)
+                for tc in self.constraints:
+                    new.constraints.add(tc)
                 ctx[self] = new
                 return new
         raise RuntimeError("inexhaustive pattern")
@@ -125,13 +129,24 @@ class AlgebraType(ABC):
 
     def variables(self) -> Iterable[TypeVar]:
         """
-        Obtain unbound variables left in the type expression.
+        Obtain any variables left in the type expression.
         """
         if isinstance(self, TypeVar):
             yield self
         elif isinstance(self, TypeOperator):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
+
+    def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
+        """
+        Abuse the left-shift operator to create a constraint like this:
+
+            x, y = TypeVar(), TypeVar()
+            Int, Str = TypeOperator("int"), TypeOperator("str")
+            x << {Int ** y, Str ** y}
+        """
+
+        return Constraint(self, other)
 
 
 class TypeOperator(AlgebraType):
@@ -186,14 +201,15 @@ class TypeOperator(AlgebraType):
             return self.name
 
     def instantiate(self) -> AlgebraType:
-        self.types = [t.instantiate() for t in self.types] # note that it also
-        # to be instantiated on the other side
+        self.types = [t.instantiate() for t in self.types]
         return self
 
     def apply(self, arg: AlgebraType) -> AlgebraType:
         """
         Apply an argument to a function type to get its output type.
         """
+        # TODO note that we cannot apply an argument to a type variable, even
+        # though that sounds like it could be possible
         if self.is_function():
             input_type, output_type = self.types
             arg.instantiate().unify(input_type.instantiate())
@@ -218,7 +234,7 @@ class TypeVar(AlgebraType):
         cls = type(self)
         self.id = cls.counter
         self.bound = None
-        self.typeclasses = set()
+        self.constraints = set()
         cls.counter += 1
 
     def __str__(self) -> str:
@@ -226,9 +242,6 @@ class TypeVar(AlgebraType):
 
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
-
-    def constrain(self, tc: TypeClass) -> None:
-        self.typeclasses.add(tc)
 
     def bind(self, binding: AlgebraType):
         assert (not self.bound or binding == self.bound), \
@@ -245,63 +258,21 @@ class TypeVar(AlgebraType):
             return self
 
 
+class Constraint(object):
+    """
+    A constraint is a ...
+    To avoid recursive types, the typeclass may not contain any variable from
+    the type.
+    """
 
+    def __init__(self, t: AlgebraType, typeclass: Iterable[AlgebraType]):
+        self.subject = t
+        self.typeclass = list(typeclass)
 
+        # TODO check that t has at least one variable
 
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
+        return Constraint(
+            self.subject, (t.fresh(ctx) for t in self.typeclass)
+        )
 
-
-
-
-
-
-class TypeClass(object):
-
-    def __init__(self, name: str, *type_parameters: AlgebraType, **kwargs):
-        self.name = name
-        self.types = type_parameters
-        self.additional = kwargs
-
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeClass:
-        return TypeClass(self.name, *(t.fresh(ctx) for t in self.types))
-
-    def enforce(self):
-        """
-        Check if a particular binding might satisfy membership of this
-        typeclass. If such a thing would entail constraints on other variables,
-        they are added. Raises an error if typeclass constraints cannot be
-        satisfied.
-        """
-        return NotImplemented
-
-    def __str__(self) -> str:
-        return "{}({})".format(self.name, ", ".join(map(str, self.types)))
-
-    def subtype(self):
-        """
-        Enforce types that are subsumed by the given superclass.
-        """
-        t1, t2 = self.types
-
-        if isinstance(t2, TypeOperator) and isinstance(t1, TypeOperator):
-            if t2.arity == 0:
-                if not t2.subtype(t1):
-                    raise RuntimeError("does not satisfy typeclass constraint")
-            else:
-                if t1.signature != t2.signature:
-                    raise RuntimeError("does not satisfy typeclass constraint")
-                for s, t in zip(t1.types, t2.types):
-                    tc = TypeClass(self.name, s, t)
-                    tc.enforce()
-        elif isinstance(t1, TypeVar):
-            pass
-
-    def contains(self):
-        """
-        Enforce parameterized types that contain the given type in one of their
-        columns.
-        """
-        t1, t2 = self.types
-
-        if isinstance(t1, TypeOperator) and isinstance(t2, TypeOperator):
-            tc = TypeClass("subtype", t1, t2.types[0])
-            tc.enforce()

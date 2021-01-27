@@ -11,8 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Dict
 
 from quangis.transformation.parser import make_parser, Expr
-from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
-    TypeClass
+from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType
 
 # Some type variables for convenience
 x, y, z = (TypeVar() for _ in range(0, 3))
@@ -41,10 +40,6 @@ class CCT(TransformationAlgebra):
     """
     Core concept transformation algebra.
     """
-
-    # Typeclasses
-    Sub = partial(TypeClass, "subtype")
-    Contains = partial(TypeClass, "contains")
 
     # Entity value types
     V = partial(TypeOperator)
@@ -115,7 +110,7 @@ class CCT(TransformationAlgebra):
         # conversions
         "reify": R(Loc) ** Reg,
         "deify": Reg ** R(Loc),
-        "get": R(x) ** x | {x: Sub(Ent)},
+        "get": R(x) ** x | [x << [Ent]],
         "invert": R(Loc, Ord) ** R(Ord, Reg),  # TODO overload R(Loc, Nom) ** R(Reg, Nom)
         "revert": R(Ord, Reg) ** R(Loc, Ord),  # TODO overload
 
@@ -135,23 +130,23 @@ class CCT(TransformationAlgebra):
 
         # relational
         "pi1":
-            x ** y | {y: Contains(x, at=1)},
+            x ** y | [x << [R(y, TypeVar(), TypeVar())]],
         "pi2":
-            x ** y | {y: Contains(x, at=2)},
+            x ** y | [x << [R(TypeVar(), y, TypeVar())]],
         "pi3":
-            x ** y | {y: Contains(x, at=3)},
+            x ** y | [x << [R(TypeVar(), TypeVar(), y)]],
         "sigmae":
-            x ** y ** x | {x: Sub(Qlt), y: Contains(x)},
+            x ** y ** x | [x << [Qlt]],  #  y must contain x
         "sigmale":
-            x ** y ** x | {x: Sub(Ord), y: Contains(x)},
+            x ** y ** x | [x << [Ord]],  # y must contain x
         "bowtie":
-            x ** R(y) ** x | {y: Sub(Ent), x: Contains(y)},
+            x ** R(y) ** x | [y << [Ent]],  # y must contain x
         "bowtie*":
-            R(x, y, x) ** R(x, y) ** R(x, y, x) | {y: Sub(Qlt), x: Sub(Ent)},
+            R(x, y, x) ** R(x, y) ** R(x, y, x) | [y << [Qlt], x << [Ent]],
         "bowtie_":
             (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt),
         "groupbyL":
-            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt) | {x: Sub(Ent), y: Sub(Ent)},
+            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt) | [x << [Ent], y << [Ent]],
         "groupbyR":
-            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt) | {x: Sub(Ent), y: Sub(Ent)},
+            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt) | [x << [Ent], y << [Ent]],
     }
