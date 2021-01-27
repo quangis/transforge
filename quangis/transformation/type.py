@@ -97,7 +97,9 @@ class AlgebraType(ABC):
 
         ctx = {} if ctx is None else ctx
         if isinstance(self, TypeOperator):
-            return TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
+            new = TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
+            new.supertype = self.supertype
+            return new
         elif isinstance(self, TypeVar):
             if self.bound:
                 raise RuntimeError("cannot refresh bound variable")
@@ -122,7 +124,7 @@ class AlgebraType(ABC):
             if self.arity == 0 and other.arity == 0 and self.subtype(other):
                 pass
             elif self.signature != other.signature:
-                raise RuntimeError("type mismatch")
+                raise RuntimeError("type mismatch between {} and {}".format(self, other))
             else:
                 for x, y in zip(self.types, other.types):
                     x.unify(y)
