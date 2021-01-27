@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Dict, Optional, Tuple, Iterable
+from typing import Dict, Optional, Tuple, Iterable, Union
 
 
 class AlgebraType(ABC):
@@ -55,7 +55,9 @@ class AlgebraType(ABC):
         """
         return TypeOperator('function', self, other)
 
-    def __or__(self, constraints: Iterable[Constraint]) -> AlgebraType:
+    def __or__(
+            self,
+            constraints: Union[Constraint, Iterable[Constraint]]) -> AlgebraType:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
         typeclass constraints.
@@ -67,6 +69,9 @@ class AlgebraType(ABC):
         # bend over backwards for generic variables
         ctx: Dict[TypeVar, TypeVar] = {}
         new = self.fresh(ctx)
+
+        if not isinstance(constraints, Iterable):
+            constraints = (constraints,)
 
         for constraint in constraints:
             new_constraint = constraint.fresh(ctx)
