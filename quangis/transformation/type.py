@@ -18,8 +18,8 @@ class AlgebraType(ABC):
     type operators.
     """
 
-    #def __repr__(self):
-    #    return self.__str__()
+    def __repr__(self):
+        return self.__str__()
 
     def to_str(self) -> str:
         """
@@ -307,9 +307,13 @@ class Constraint(object):
 
         # Check that at least one of the typeclasses matches
         subject = self.subject.instantiate()
-        if not any(
-                subject.compatible(t.instantiate())
-                for t in self.typeclass
-                ):
+        matches = [
+            t for t in self.typeclass if
+            subject.compatible(t.instantiate())
+        ]
+
+        if len(matches) == 0:
             raise RuntimeError("violated typeclass constraint: {}".format(self))
+        elif len(matches) == 1:
+            subject.unify(matches[0])
 
