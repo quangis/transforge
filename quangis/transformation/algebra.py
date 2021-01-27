@@ -95,12 +95,12 @@ class CCT(TransformationAlgebra):
         "field": R(Loc, Ratio),
         "object": R(Obj),
         "region": R(Reg),
-        "in": R(Nom),
-        "countV": R(Count),
-        "ratioV": R(Ratio),
-        "interval": R(Itv),
-        "ordinal": R(Ord),
-        "nominal": R(Nom),
+        "in": Nom,
+        "countV": Count,
+        "ratioV": Ratio,
+        "interval": Itv,
+        "ordinal": Ord,
+        "nominal": Nom,
 
         # transformations (without implementation)
 
@@ -145,23 +145,25 @@ class CCT(TransformationAlgebra):
 
         # relational
         "pi1":
-            x ** y | [x << has(y, at=1)],
+            x ** y,# | [x << has(y, at=1)],
         "pi2":
-            x ** y | [x << has(y, at=2)],
+            x ** y,# | [x << has(y, at=2)],
         "pi3":
-            x ** y | [x << has(y, at=3)],
+            x ** y, #| [x << has(y, at=3)],
         "sigmae":
-            x ** y ** x | [x << [Qlt], y << has(x)],
+            x ** y ** x, #| [x << [Qlt], y << has(x)],
         "sigmale":
-            x ** y ** x | [x << [Ord], y << has(x)],
+            x ** y ** x, #| [x << [Ord], y << has(x)],
         "bowtie":
-            x ** R(y) ** x | [y << [Ent], y << has(x)],
-        "bowtie*":
-            R(x, y, x) ** R(x, y) ** R(x, y, x) | [y << [Qlt], x << [Ent]],
+            x ** R(y) ** x, # | [y << [Ent], y << has(x)],
+        "bowtiestar":
+            R(x, y, x) ** R(x, y) ** R(x, y, x), #| [y << [Qlt], x << [Ent]],
         "bowtie_":
             (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt),
         "groupbyL":
-            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt) | [x << [Ent], y << [Ent]],
+            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt), # | [x << [Ent], y << [Ent]],
         "groupbyR":
-            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt) | [x << [Ent], y << [Ent]],
+            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt), # | [x << [Ent], y << [Ent]],
+        "groupbyR_simpler":
+            (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z),
     }
