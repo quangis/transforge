@@ -222,8 +222,6 @@ class TypeOperator(AlgebraType):
         """
         Apply an argument to a function type to get its output type.
         """
-        # TODO note that we cannot apply an argument to a type variable, even
-        # though that sounds like it could be possible
         if self.is_function():
             input_type, output_type = self.types
             arg.instantiate().unify(input_type.instantiate())
