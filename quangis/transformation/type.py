@@ -248,8 +248,11 @@ class TypeVar(AlgebraType):
             "binding variable multiple times"
         self.bound = binding
 
+        for constraint in self.constraints:
+            constraint.enforce()
+
     def instantiate(self) -> AlgebraType:
-        #for tc in self.typeclasses:
+        #for c in self.constraints:
         #    tc.instantiate()
 
         if self.bound:
@@ -264,15 +267,46 @@ class Constraint(object):
     To avoid recursive types, the typeclass may not contain any variable from
     the type.
     """
+    # The way it works is: we assign the constraint to all variables occurring
+    # in said constraint. We don't do this immediately, but only after the
+    # user has refreshed the variables.
 
     def __init__(self, t: AlgebraType, typeclass: Iterable[AlgebraType]):
         self.subject = t
         self.typeclass = list(typeclass)
 
-        # TODO check that t has at least one variable
+        # TODO check that t has at least one variable and that none of them
+        # occur in the typeclasses
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
-            self.subject, (t.fresh(ctx) for t in self.typeclass)
+            self.subject.fresh(ctx), (t.fresh(ctx) for t in self.typeclass)
         )
+
+    def __str__(self) -> str:
+        return "{} << [{}]".format(
+            self.subject,
+            ", ".join(map(str, self.typeclass))
+        )
+
+    def enforce(self):
+
+        # Check that at least one of the typeclasses matches
+        subject = self.subject.instantiate()
+        if not any(
+                same_structure(t.instantiate(), subject)
+                for t in self.typeclass
+                ):
+            raise RuntimeError("Violated typeclass constraint")
+
+
+def same_structure(self: AlgebraType, other: AlgebraType) -> bool:
+    """
+    Test if a type is structurally equivalent to another, that is, if it is the
+    same if variables are disregarded.
+    """
+    if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+        return self.signature == other.signature and \
+            all(same_structure(s, t) for s, t in zip(self.types, other.types))
+    return True
 
