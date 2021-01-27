@@ -258,6 +258,7 @@ class TypeVar(AlgebraType):
     def bind(self, binding: AlgebraType):
         assert (not self.bound or binding == self.bound), \
             "binding variable multiple times"
+
         self.bound = binding
 
         for constraint in self.constraints:
@@ -309,6 +310,7 @@ class Constraint(object):
         )
 
     def enforce(self):
+        # should only be called once variables are non-generic
 
         # Check that at least one of the typeclasses matches
         subject = self.subject.instantiate()
@@ -319,6 +321,6 @@ class Constraint(object):
 
         if len(matches) == 0:
             raise RuntimeError("violated typeclass constraint: {}".format(self))
-        elif len(matches) == 1:
-            subject.unify(matches[0])
+        #elif len(matches) == 1:
+        #    subject.unify(matches[0])
 
