@@ -289,8 +289,15 @@ class Constraint(object):
         self.subject = t
         self.typeclass = list(typeclass)
 
-        # TODO check that t has at least one variable and that none of them
-        # occur in the typeclasses
+        variables = list(self.subject.variables())
+
+        if len(variables) == 0:
+            raise RuntimeError("subject must contain variables")
+
+        for t in self.typeclass:
+            for v in variables:
+                if v in t:
+                    raise RuntimeError("recursive type constraint")
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
