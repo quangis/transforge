@@ -34,10 +34,6 @@ class AlgebraType(ABC):
             )
         )
 
-    #@abstractmethod
-    #def equiv(self, other: AlgebraType) -> bool:
-    #    return NotImplemented
-
     @abstractmethod
     def __contains__(self, value: AlgebraType) -> bool:
         return NotImplemented
@@ -77,6 +73,17 @@ class AlgebraType(ABC):
             for var in new_constraint.subject.variables():
                 var.constraints.add(new_constraint)
         return new
+
+    def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
+        """
+        Abuse the left-shift operator to create a constraint like this:
+
+            x, y = TypeVar(), TypeVar()
+            Int, Str = TypeOperator("int"), TypeOperator("str")
+            x << [Int ** y, Str ** y]
+        """
+
+        return Constraint(self, other)
 
     def fresh(self, ctx: Optional[Dict[TypeVar, TypeVar]] = None) -> AlgebraType:
         """
@@ -127,6 +134,17 @@ class AlgebraType(ABC):
             return self.name == 'function'
         return False
 
+    def compatible(self, other: AlgebraType) -> bool:
+        """
+        Test if a type is structurally equivalent to another, that is, if
+        disregarding variables could lead to the same type. Note that subtypes
+        are *not* tolerated here, unlike during the unify operation.
+        """
+        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+            return self.signature == other.signature and \
+                all(s.compatible(t) for s, t in zip(self.types, other.types))
+        return True
+
     def variables(self) -> Iterable[TypeVar]:
         """
         Obtain any variables left in the type expression.
@@ -137,16 +155,7 @@ class AlgebraType(ABC):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
 
-    def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
-        """
-        Abuse the left-shift operator to create a constraint like this:
 
-            x, y = TypeVar(), TypeVar()
-            Int, Str = TypeOperator("int"), TypeOperator("str")
-            x << {Int ** y, Str ** y}
-        """
-
-        return Constraint(self, other)
 
 
 class TypeOperator(AlgebraType):
@@ -294,19 +303,8 @@ class Constraint(object):
         # Check that at least one of the typeclasses matches
         subject = self.subject.instantiate()
         if not any(
-                same_structure(t.instantiate(), subject)
+                subject.compatible(t.instantiate())
                 for t in self.typeclass
                 ):
-            raise RuntimeError("Violated typeclass constraint")
-
-
-def same_structure(self: AlgebraType, other: AlgebraType) -> bool:
-    """
-    Test if a type is structurally equivalent to another, that is, if it is the
-    same if variables are disregarded.
-    """
-    if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-        return self.signature == other.signature and \
-            all(same_structure(s, t) for s, t in zip(self.types, other.types))
-    return True
+            raise RuntimeError("violated typeclass constraint: {}".format(self))
 

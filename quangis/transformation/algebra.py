@@ -7,14 +7,29 @@ that is as close as possible to its formal type system counterpart.
 """
 
 from functools import partial
+from itertools import chain
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Dict, List
 
 from quangis.transformation.parser import make_parser, Expr
 from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType
 
 # Some type variables for convenience
 x, y, z = (TypeVar() for _ in range(0, 3))
+
+
+def has(t: AlgebraType, at=None) -> List[AlgebraType]:
+    """
+    Typeclass for relationship types that contain another type somewhere.
+    """
+    R = partial(TypeOperator, "R")
+    if at == 1:
+        return [R(t), R(t, TypeVar()), R(t, TypeVar(), TypeVar())]
+    elif at == 2:
+        return [R(TypeVar(), t), R(TypeVar(), t, TypeVar())]
+    elif at == 3:
+        return [R(TypeVar(), TypeVar(), t)]
+    return list(chain(*(has(t, at=i) for i in range(1, 4))))
 
 
 class TransformationAlgebra(ABC):
@@ -111,8 +126,8 @@ class CCT(TransformationAlgebra):
         "reify": R(Loc) ** Reg,
         "deify": Reg ** R(Loc),
         "get": R(x) ** x | [x << [Ent]],
-        "invert": R(Loc, Ord) ** R(Ord, Reg),  # TODO overload R(Loc, Nom) ** R(Reg, Nom)
-        "revert": R(Ord, Reg) ** R(Loc, Ord),  # TODO overload
+        "invert": x ** y | [x ** y << [R(Loc, Ord) ** R(Ord, Reg), R(Loc, Nom) ** R(Reg, Nom)]],
+        "revert": x ** y | [x ** y << [R(Ord, Reg) ** R(Loc, Ord), R(Reg, Nom) ** R(Loc, Nom)]],
 
         # quantified relations
         "oDist": R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Ratio, Obj),
@@ -130,17 +145,17 @@ class CCT(TransformationAlgebra):
 
         # relational
         "pi1":
-            x ** y | [x << [R(y, TypeVar(), TypeVar())]],
+            x ** y | [x << has(y, at=1)],
         "pi2":
-            x ** y | [x << [R(TypeVar(), y, TypeVar())]],
+            x ** y | [x << has(y, at=2)],
         "pi3":
-            x ** y | [x << [R(TypeVar(), TypeVar(), y)]],
+            x ** y | [x << has(y, at=3)],
         "sigmae":
-            x ** y ** x | [x << [Qlt]],  #  y must contain x
+            x ** y ** x | [x << [Qlt], y << has(x)],
         "sigmale":
-            x ** y ** x | [x << [Ord]],  # y must contain x
+            x ** y ** x | [x << [Ord], y << has(x)],
         "bowtie":
-            x ** R(y) ** x | [y << [Ent]],  # y must contain x
+            x ** R(y) ** x | [y << [Ent], y << has(x)],
         "bowtie*":
             R(x, y, x) ** R(x, y) ** R(x, y, x) | [y << [Qlt], x << [Ent]],
         "bowtie_":
