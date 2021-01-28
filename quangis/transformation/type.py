@@ -11,7 +11,7 @@ from itertools import chain
 from typing import Dict, Optional, Tuple, Iterable, Union
 
 
-class Fn(object):
+class Definition(object):
     """
     This class defines a function: it knows its general type and constraints,
     plus additional information that may be used by some parser, and can
@@ -22,10 +22,11 @@ class Fn(object):
             self,
             type: AlgebraType,
             *constraints: Constraint,
-            data_args: int = 0):
+            data: int = 0):
         self.type = type
         self.constraints = list(constraints)
-        self.data_args = data_args
+        self.data = data
+        self.name: Optional[str] = None
 
         # TODO make sure that every variable in the type also occurs in the
         # constraints?
@@ -35,10 +36,11 @@ class Fn(object):
         ctx: Dict[TypeVar, TypeVar] = {}
         t = self.type.fresh(ctx)
 
-        for constraint in self.constraints:
-            new_constraint = constraint.fresh(ctx)
-            for var in new_constraint.subject.variables():
-                var.constraints.add(new_constraint)
+        # Temporarily skip constraints
+        #for constraint in self.constraints:
+        #    new_constraint = constraint.fresh(ctx)
+        #    for var in new_constraint.subject.variables():
+        #        var.constraints.add(new_constraint)
 
         return t
 
@@ -82,7 +84,7 @@ class AlgebraType(ABC):
 
     def __or__(
             self,
-            constraints: Union[Constraint, Iterable[Constraint]]) -> Fn:
+            constraints: Union[Constraint, Iterable[Constraint]]) -> Definition:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
         functions with typeclass constraints.
@@ -91,7 +93,7 @@ class AlgebraType(ABC):
         if not isinstance(constraints, Iterable):
             constraints = (constraints,)
 
-        return Fn(self, *constraints)
+        return Definition(self, *constraints)
 
     def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
         """
