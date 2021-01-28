@@ -11,6 +11,44 @@ from itertools import chain
 from typing import Dict, Optional, Tuple, Iterable, Union
 
 
+class Fn(object):
+    """
+    This class defines a function: it knows its general type and constraints,
+    plus additional information that may be used by some parser, and can
+    generate fresh instances of the function.
+    """
+
+    def __init__(
+            self,
+            type: AlgebraType,
+            *constraints: Constraint,
+            data_args: int = 0):
+        self.type = type
+        self.constraints = list(constraints)
+        self.data_args = data_args
+
+        # TODO make sure that every variable in the type also occurs in the
+        # constraints?
+
+    def instance(self) -> AlgebraType:
+
+        ctx: Dict[TypeVar, TypeVar] = {}
+        t = self.type.fresh(ctx)
+
+        for constraint in self.constraints:
+            new_constraint = constraint.fresh(ctx)
+            for var in new_constraint.subject.variables():
+                var.constraints.add(new_constraint)
+
+        return t
+
+    def __str__(self) -> str:
+        return "{} | ({})".format(
+            str(self),
+            ", ".join(map(str, self.constraints))
+        )
+
+
 class AlgebraType(ABC):
     """
     Abstract base class for type operators and type variables. Note that basic
@@ -20,19 +58,6 @@ class AlgebraType(ABC):
 
     def __repr__(self):
         return self.__str__()
-
-    def to_str(self) -> str:
-        """
-        To string including constraints on the top level
-        """
-        return "{} | {{{}}}".format(
-            str(self),
-            ", ".join(
-                "{}: {}".format(var, tc)
-                for var in set(self.variables())
-                for tc in var.constraints
-            )
-        )
 
     @abstractmethod
     def __contains__(self, value: AlgebraType) -> bool:
@@ -57,27 +82,16 @@ class AlgebraType(ABC):
 
     def __or__(
             self,
-            constraints: Union[Constraint, Iterable[Constraint]]) -> AlgebraType:
+            constraints: Union[Constraint, Iterable[Constraint]]) -> Fn:
         """
         Abuse of Python's binary OR operator, for a pleasing notation of
-        typeclass constraints.
+        functions with typeclass constraints.
         """
-
-        # In principle, this function could return None, were it not for the
-        # fact that we need a fresh version of self: since constraints will be
-        # directly added to the variables, if we didn't do this, we'd need to
-        # bend over backwards for generic variables
-        ctx: Dict[TypeVar, TypeVar] = {}
-        new = self.fresh(ctx)
 
         if not isinstance(constraints, Iterable):
             constraints = (constraints,)
 
-        for constraint in constraints:
-            new_constraint = constraint.fresh(ctx)
-            for var in new_constraint.subject.variables():
-                var.constraints.add(new_constraint)
-        return new
+        return Fn(self, *constraints)
 
     def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
         """
@@ -90,12 +104,11 @@ class AlgebraType(ABC):
 
         return Constraint(self, other)
 
-    def fresh(self, ctx: Optional[Dict[TypeVar, TypeVar]] = None) -> AlgebraType:
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
         Create a fresh copy of this type, with unique new variables.
         """
 
-        ctx = {} if ctx is None else ctx
         if isinstance(self, TypeOperator):
             new = TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
             new.supertype = self.supertype
@@ -106,11 +119,11 @@ class AlgebraType(ABC):
             elif self in ctx:
                 return ctx[self]
             else:
-                new = TypeVar()
+                new2 = TypeVar()
                 for tc in self.constraints:
-                    new.constraints.add(tc)
-                ctx[self] = new
-                return new
+                    new2.constraints.add(tc)
+                ctx[self] = new2
+                return new2
         raise RuntimeError("inexhaustive pattern")
 
     def unify(self: AlgebraType, other: AlgebraType) -> None:
@@ -154,15 +167,13 @@ class AlgebraType(ABC):
 
     def variables(self) -> Iterable[TypeVar]:
         """
-        Obtain any variables left in the type expression.
+        Obtain all type variables left in the type expression.
         """
         if isinstance(self, TypeVar):
             yield self
         elif isinstance(self, TypeOperator):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
-
-
 
 
 class TypeOperator(AlgebraType):

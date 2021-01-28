@@ -12,7 +12,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List
 
 from quangis.transformation.parser import make_parser, Expr
-from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType
+from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
+    Fn
 
 # Some type variables for convenience
 x, y, z = (TypeVar() for _ in range(0, 3))
@@ -44,7 +45,7 @@ class TransformationAlgebra(ABC):
 
     @property
     @abstractmethod
-    def functions(self) -> Dict[str, AlgebraType]:
+    def functions(self) -> Dict[str, Fn]:
         return NotImplemented
 
     def parse(self, string: str) -> Expr:
@@ -85,85 +86,85 @@ class CCT(TransformationAlgebra):
     functions = {
 
         # data constructors
-        "pointmeasures": R(Reg, Itv),
-        "amountpatches": R(Reg, Nom),
-        "contour": R(Ord, Reg),
-        "objects": R(Obj, Ratio),
-        "objectregions": R(Obj, Reg),
-        "contourline": R(Itv, Reg),
-        "objectcounts": R(Obj, Count),
-        "field": R(Loc, Ratio),
-        "object": R(Obj),
-        "region": R(Reg),
-        "in": Nom,
-        "countV": Count,
-        "ratioV": Ratio,
-        "interval": Itv,
-        "ordinal": Ord,
-        "nominal": Nom,
+        "pointmeasures": R(Reg, Itv) | (),
+        "amountpatches": R(Reg, Nom) | (),
+        "contour": R(Ord, Reg) | (),
+        "objects": R(Obj, Ratio) | (),
+        "objectregions": R(Obj, Reg) | (),
+        "contourline": R(Itv, Reg) | (),
+        "objectcounts": R(Obj, Count) | (),
+        "field": R(Loc, Ratio) | (),
+        "object": R(Obj) | (),
+        "region": R(Reg) | (),
+        "in": Nom | (),
+        "countV": Count | (),
+        "ratioV": Ratio | (),
+        "interval": Itv | (),
+        "ordinal": Ord | (),
+        "nominal": Nom | (),
 
         # transformations (without implementation)
 
         # functional
-        "compose": (y ** z) ** (x ** y) ** (x ** z),
+        "compose": (y ** z) ** (x ** y) ** (x ** z) | (),
 
         # derivations
-        "ratio": Ratio ** Ratio ** Ratio,
+        "ratio": Ratio ** Ratio ** Ratio | (),
 
         # aggregations of collections
-        "count": R(Obj) ** Ratio,
-        "size": R(Loc) ** Ratio,
-        "merge": R(Reg) ** Reg,
-        "centroid": R(Loc) ** Loc,
+        "count": R(Obj) ** Ratio | (),
+        "size": R(Loc) ** Ratio | (),
+        "merge": R(Reg) ** Reg | (),
+        "centroid": R(Loc) ** Loc | (),
 
         # statistical operations
-        "avg": R(Ent, Itv) ** Itv,
-        "min": R(Ent, Ord) ** Ord,
-        "max": R(Ent, Ord) ** Ord,
-        "sum": R(Ent, Count) ** Count,
+        "avg": R(Ent, Itv) ** Itv | (),
+        "min": R(Ent, Ord) ** Ord | (),
+        "max": R(Ent, Ord) ** Ord | (),
+        "sum": R(Ent, Count) ** Count | (),
 
         # conversions
-        "reify": R(Loc) ** Reg,
-        "deify": Reg ** R(Loc),
+        "reify": R(Loc) ** Reg | (),
+        "deify": Reg ** R(Loc) | (),
         "get": R(x) ** x | [x << [Ent]],
         "invert": x ** y | [x ** y << [R(Loc, Ord) ** R(Ord, Reg), R(Loc, Nom) ** R(Reg, Nom)]],
         "revert": x ** y | [x ** y << [R(Ord, Reg) ** R(Loc, Ord), R(Reg, Nom) ** R(Loc, Nom)]],
 
         # quantified relations
-        "oDist": R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Ratio, Obj),
-        "lDist": R(Loc) ** R(Loc) ** R(Loc, Ratio, Loc),
-        "loDist": R(Loc) ** R(Obj, Reg) ** R(Loc, Ratio, Obj),
-        "oTopo": R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Nom, Obj),
-        "loTopo": R(Loc) ** R(Obj, Reg) ** R(Loc, Nom, Obj),
-        "nDist": R(Obj) ** R(Obj) ** R(Obj, Ratio, Obj) ** R(Obj, Ratio, Obj),
-        "lVis": R(Loc) ** R(Loc) ** R(Loc, Itv) ** R(Loc, Bool, Loc),
-        "interpol": R(Reg, Itv) ** R(Loc) ** R(Loc, Itv),
+        "oDist": R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Ratio, Obj) | (),
+        "lDist": R(Loc) ** R(Loc) ** R(Loc, Ratio, Loc) | (),
+        "loDist": R(Loc) ** R(Obj, Reg) ** R(Loc, Ratio, Obj) | (),
+        "oTopo": R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Nom, Obj) | (),
+        "loTopo": R(Loc) ** R(Obj, Reg) ** R(Loc, Nom, Obj) | (),
+        "nDist": R(Obj) ** R(Obj) ** R(Obj, Ratio, Obj) ** R(Obj, Ratio, Obj) | (),
+        "lVis": R(Loc) ** R(Loc) ** R(Loc, Itv) ** R(Loc, Bool, Loc) | (),
+        "interpol": R(Reg, Itv) ** R(Loc) ** R(Loc, Itv) | (),
 
         # amount operations
-        "fcont": R(Loc, Itv) ** Ratio,
-        "ocont": R(Obj, Ratio) ** Ratio,
+        "fcont": R(Loc, Itv) ** Ratio | (),
+        "ocont": R(Obj, Ratio) ** Ratio | (),
 
         # relational
         "pi1":
-            x ** y,# | [x << has(y, at=1)],
+            x ** y | (),# | [x << has(y, at=1)],
         "pi2":
-            x ** y,# | [x << has(y, at=2)],
+            x ** y | (),# | [x << has(y, at=2)],
         "pi3":
-            x ** y, #| [x << has(y, at=3)],
+            x ** y | (), #| [x << has(y, at=3)],
         "sigmae":
-            x ** y ** x, #| [x << [Qlt], y << has(x)],
+            x ** y ** x | (), #| [x << [Qlt], y << has(x)],
         "sigmale":
-            x ** y ** x, #| [x << [Ord], y << has(x)],
+            x ** y ** x | (), #| [x << [Ord], y << has(x)],
         "bowtie":
-            x ** R(y) ** x, # | [y << [Ent], y << has(x)],
+            x ** R(y) ** x | (), # | [y << [Ent], y << has(x)],
         "bowtiestar":
-            R(x, y, x) ** R(x, y) ** R(x, y, x), #| [y << [Qlt], x << [Ent]],
+            R(x, y, x) ** R(x, y) ** R(x, y, x) | (), #| [y << [Qlt], x << [Ent]],
         "bowtie_":
-            (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt),
+            (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) | (),
         "groupbyL":
-            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt), # | [x << [Ent], y << [Ent]],
+            (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt) | (), # | [x << [Ent], y << [Ent]],
         "groupbyR":
-            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt), # | [x << [Ent], y << [Ent]],
+            (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt) | (), # | [x << [Ent], y << [Ent]],
         "groupbyR_simpler":
-            (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z),
+            (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z) | (),
     }
