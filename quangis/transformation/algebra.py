@@ -6,12 +6,14 @@ classes and lowercase for values. These decisions were made to get an interface
 that is as close as possible to its formal type system counterpart.
 """
 
-from functools import partial
+from __future__ import annotations
+
+import pyparsing as pp
+from functools import partial, reduce
 from itertools import chain
 from abc import ABC
-from typing import List, Iterable
+from typing import List, Iterable, Union
 
-from quangis.transformation.parser import make_parser, Expr
 from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
     Definition
 
@@ -34,6 +36,35 @@ def has(t: AlgebraType, at=None) -> List[AlgebraType]:
     return list(chain(*(has(t, at=i) for i in range(1, 4))))
 
 
+class Expr(object):
+    """
+    An expression of a transformation algebra.
+    """
+
+    def __init__(self, tokens: List[Union[str, Expr]], type: AlgebraType):
+        self.tokens = tokens
+        self.type = type
+
+    def __str__(self) -> str:
+        if self.type.is_function():
+            return "{}".format(" ".join(map(str, self.tokens)))
+        else:
+            return "({tokens} : \033[1m{type}\033[0m)".format(
+                tokens=" ".join(map(str, self.tokens)),
+                type=str(self.type)
+            )
+
+    @staticmethod
+    def apply(fn: Expr, arg: Expr) -> Expr:
+        if isinstance(fn.type, TypeOperator):
+            res = Expr([fn, arg], fn.type.apply(arg.type))
+            fn.type = fn.type.instantiate()
+            arg.type = arg.type.instantiate()
+            return res
+        else:
+            raise RuntimeError("applying to non-function value")
+
+
 class TransformationAlgebra(ABC):
     """
     Abstract base for transformation algebras. To make a concrete
@@ -42,7 +73,7 @@ class TransformationAlgebra(ABC):
     """
 
     def __init__(self):
-        self.parser = make_parser({d.name: d for d in self.definitions()})
+        self.parser = self.make_parser()
 
     def definitions(self) -> Iterable[Definition]:
         for attr in dir(self):
@@ -52,6 +83,26 @@ class TransformationAlgebra(ABC):
                     attr = 'in'
                 val.name = attr
                 yield val
+
+    def make_parser(self) -> pp.Parser:
+
+        defs = {d.name: d for d in self.definitions()}
+
+        identifier = pp.Word(
+            pp.alphas + '_', pp.alphanums + ':_'
+        ).setName('identifier')
+
+        fn = pp.MatchFirst(
+            pp.CaselessKeyword(k) + t.data * identifier
+            if t.data else
+            pp.CaselessKeyword(k)
+            for k, t in sorted(defs.items())
+        ).setParseAction(lambda s, l, t: Expr(t, defs[t[0]].instance()))
+
+        return pp.infixNotation(
+            fn,
+            [(None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0]))]
+        )
 
     def parse(self, string: str) -> Expr:
         return self.parser.parseString(string, parseAll=True)[0]
