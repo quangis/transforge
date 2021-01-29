@@ -33,16 +33,12 @@ class Definition(object):
         self.data = data
 
     def instance(self) -> AlgebraType:
-
         ctx: Dict[TypeVar, TypeVar] = {}
         t = self.type.fresh(ctx)
-
-        # Temporarily skip constraints
-        #for constraint in self.constraints:
-        #    new_constraint = constraint.fresh(ctx)
-        #    for var in new_constraint.subject.variables():
-        #        var.constraints.add(new_constraint)
-
+        for constraint in self.constraints:
+            new_constraint = constraint.fresh(ctx)
+            for var in new_constraint.subject.variables():
+                var.constraints.add(new_constraint)
         return t
 
     @staticmethod
@@ -159,8 +155,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
 
-            if self.nullary_subtype(other) or \
-                    self.signature == other.signature:
+            if self.match(other):
                 for x, y in zip(self.types, other.types):
                     x.unify(y)
             else:
@@ -194,11 +189,11 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     def compatible(self, other: AlgebraType) -> bool:
         """
         Test if a type is structurally equivalent to another, that is, if
-        disregarding variables could lead to the same type. Note that subtypes
-        are *not* tolerated here, unlike during the unify operation.
+        disregarding variables could lead to the same type. Like for unify,
+        subtypes are tolerated here
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            return self.signature == other.signature and \
+            return self.match(other) and \
                 all(s.compatible(t) for s, t in zip(self.types, other.types))
         return True
 
@@ -222,18 +217,20 @@ class TypeOperator(AlgebraType):
         if self.supertype and (self.types or self.supertype.types):
             raise ValueError("only nullary types may have supertypes")
 
-    def nullary_subtype(self, other: TypeOperator) -> bool:
+    def match(self, other: TypeOperator, allow_subtype: bool = True) -> bool:
         """
-        Is this a nullary subtype of another?
+        Check if the top-level type operator matches another (modulo subtypes).
         """
-        return self.arity == 0 and (
-            self == other or
-            bool(self.supertype and self.supertype.nullary_subtype(other))
+        return (
+            (self.name == other.name and self.arity == other.arity) or
+            (allow_subtype and bool(
+                self.supertype and self.supertype.match(other)
+            ))
         )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
-            return self.signature == other.signature and \
+            return self.match(other, allow_subtype=False) and \
                all(s == t for s, t in zip(self.types, other.types))
         else:
             return False
@@ -256,10 +253,6 @@ class TypeOperator(AlgebraType):
     @property
     def arity(self) -> int:
         return len(self.types)
-
-    @property
-    def signature(self) -> Tuple[str, int]:
-        return self.name, self.arity
 
 
 class TypeVar(AlgebraType):
