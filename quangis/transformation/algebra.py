@@ -25,7 +25,7 @@ class Expr(object):
         if self.type.is_function():
             return f"{' '.join(str(t) for t in self.tokens)}"
         else:
-            return f"{' '.join(str(t) for t in self.tokens)} : {self.type}"
+            return f"({' '.join(str(t) for t in self.tokens)} : {self.type})"
 
     def apply(self: Expr, arg: Expr) -> Expr:
         return Expr([self, arg], self.type.apply(arg.type))
