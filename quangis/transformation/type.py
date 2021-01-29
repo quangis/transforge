@@ -6,9 +6,10 @@ Be warned: This module abuses overloading of Python's standard operators.
 """
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
+from functools import partial
 from itertools import chain
-from typing import Dict, Optional, Iterable, Union, List
+from typing import Dict, Optional, Iterable, Union, List, Callable
 
 
 class Definition(object):
@@ -75,7 +76,17 @@ class Definition(object):
         )
 
 
-class AlgebraType(ABC):
+class TypeDefiner(ABCMeta):
+    """
+    Allowing us to write TypeOperator.Int() for basic types or
+    TypeOperator.Tuple for parameterized types.
+    """
+
+    def __getattr__(self, key: str) -> Callable[..., TypeOperator]:
+        return partial(TypeOperator, key)
+
+
+class AlgebraType(ABC, metaclass=TypeDefiner):
     """
     Abstract base class for type operators and type variables. Note that basic
     types are just 0-ary type operators and functions are just particular 2-ary
@@ -219,6 +230,7 @@ class TypeOperator(AlgebraType):
             raise RuntimeError("direct subtypes can only be determined for nullary types")
             #return self.signature == other.signature and \
             #    all(s.subtype(t) for s, t in zip(self.types, other.types))
+
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):

@@ -135,22 +135,21 @@ class CCT(TransformationAlgebra):
     Core concept transformation algebra.
     """
 
-    # Entity value types
-    V = partial(TypeOperator)
-    Ent = V("entity")
-    Obj = V("object", supertype=Ent)  # O
-    Reg = V("region", supertype=Ent)  # S
-    Loc = V("location", supertype=Ent)  # L
-    Qlt = V("quality", supertype=Ent)  # Q
-    Nom = V("nominal", supertype=Qlt)
-    Bool = V("boolean", supertype=Nom)
-    Ord = V("ordinal", supertype=Nom)
-    Count = V("count", supertype=Ord)
-    Ratio = V("ratio", supertype=Count)
-    Itv = V("interval", supertype=Ratio)
+    # Types
+    Ent = TypeOperator.Ent()
+    Obj = TypeOperator.Obj(supertype=Ent)  # O
+    Reg = TypeOperator.Reg(supertype=Ent)  # S
+    Loc = TypeOperator.Loc(supertype=Ent)  # L
+    Qlt = TypeOperator.Qlt(supertype=Ent)  # Q
+    Nom = TypeOperator.Nom(supertype=Qlt)
+    Bool = TypeOperator.Bool(supertype=Nom)
+    Ord = TypeOperator.Ord(supertype=Nom)
+    Count = TypeOperator.Count(supertype=Ord)
+    Ratio = TypeOperator.Ratio(supertype=Count)
+    Itv = TypeOperator.Int(supertype=Ratio)
+    R = TypeOperator.R
 
-    # Relation types and type synonyms
-    R = partial(TypeOperator, "R")
+    # Type synonyms
     SpatialField = R(Loc, Qlt)
     InvertedField = R(Qlt, Reg)
     FieldSample = R(Reg, Qlt)
