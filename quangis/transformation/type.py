@@ -106,10 +106,6 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     def instantiate(self) -> AlgebraType:
         return NotImplemented
 
-    @abstractmethod
-    def apply(self, other: AlgebraType) -> AlgebraType:
-        return NotImplemented
-
     def __pow__(self, other: AlgebraType) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
@@ -122,6 +118,16 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         intuitive visually, but does not have this property.
         """
         return TypeOperator('function', self, other)
+
+    def variables(self) -> Iterable[TypeVar]:
+        """
+        Obtain all type variables left in the type expression.
+        """
+        if isinstance(self, TypeVar):
+            yield self
+        elif isinstance(self, TypeOperator):
+            for v in chain(*(t.variables() for t in self.types)):
+                yield v
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
@@ -163,9 +169,22 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             if isinstance(self, TypeVar):
                 if self != other and self in other:
                     raise error.RecursiveType(self, other)
-                self.bind(other)
+                a = self.binding
+                b = self.binding
+                a.bind(b)
             elif isinstance(other, TypeVar):
                 other.unify(self)
+
+    def apply(self, arg: AlgebraType) -> AlgebraType:
+        """
+        Apply an argument to a function type to get its output type.
+        """
+        if isinstance(self, TypeOperator) and self.is_function():
+            input_type, output_type = self.types
+            arg.instantiate().unify(input_type.instantiate())
+            return output_type.instantiate()
+        else:
+            raise error.NonFunctionApplication(self, arg)
 
     def is_function(self) -> bool:
         if isinstance(self, TypeOperator):
@@ -182,16 +201,6 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             return self.signature == other.signature and \
                 all(s.compatible(t) for s, t in zip(self.types, other.types))
         return True
-
-    def variables(self) -> Iterable[TypeVar]:
-        """
-        Obtain all type variables left in the type expression.
-        """
-        if isinstance(self, TypeVar):
-            yield self
-        elif isinstance(self, TypeOperator):
-            for v in chain(*(t.variables() for t in self.types)):
-                yield v
 
 
 class TypeOperator(AlgebraType):
@@ -244,17 +253,6 @@ class TypeOperator(AlgebraType):
         self.types = [t.instantiate() for t in self.types]
         return self
 
-    def apply(self, arg: AlgebraType) -> AlgebraType:
-        """
-        Apply an argument to a function type to get its output type.
-        """
-        if self.is_function():
-            input_type, output_type = self.types
-            arg.instantiate().unify(input_type.instantiate())
-            return output_type.instantiate()
-        else:
-            raise error.NonFunctionApplication(self, arg)
-
     @property
     def arity(self) -> int:
         return len(self.types)
@@ -283,15 +281,16 @@ class TypeVar(AlgebraType):
 
     def bind(self, binding: AlgebraType):
         assert (not self.bound or binding == self.bound), \
-            "binding variable multiple times"
+            f"variable {self} is already bound to {self.bound}, cannot be bound to {binding}"
 
         self.bound = binding
 
         for constraint in self.constraints:
             constraint.enforce()
 
-    def apply(self, arg: AlgebraType) -> AlgebraType:
-        raise error.NonFunctionApplication(self, arg)
+    @property
+    def binding(self) -> AlgebraType:
+        return self.bound or self
 
     def instantiate(self) -> AlgebraType:
         #for c in self.constraints:
@@ -313,21 +312,24 @@ class Constraint(object):
     # in said constraint. We don't do this immediately, but only after the
     # user has refreshed the variables.
 
-    def __init__(self, t: AlgebraType, *formats: AlgebraType):
+    def __init__(self, t: AlgebraType, *options: AlgebraType):
         self.subject = t
-        self.typeclass = list(formats)
+        self.options = list(options)
 
-        variables = list(self.subject.variables())
-
-        for t in self.typeclass:
-            for v in variables:
+        for t in self.options:
+            for v in self.subject.variables():
                 if v in t:
                     raise error.RecursiveType(v, t)
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
-            self.subject.fresh(ctx), *(t.fresh(ctx) for t in self.typeclass)
+            self.subject.fresh(ctx), *(t.fresh(ctx) for t in self.options)
         )
+
+    def variables(self) -> Iterable[TypeVar]:
+        return chain(
+            self.subject.variables(),
+            *(t.variables() for t in self.options))
 
     def enforce(self):
         # should only be called once variables are non-generic
@@ -335,7 +337,7 @@ class Constraint(object):
         # Check that at least one of the typeclasses matches
         subject = self.subject.instantiate()
         matches = [
-            t for t in self.typeclass if
+            t for t in self.options if
             subject.compatible(t.instantiate())
         ]
 
