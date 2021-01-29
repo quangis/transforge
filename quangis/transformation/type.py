@@ -75,8 +75,9 @@ class Definition(object):
 
 class TypeDefiner(ABCMeta):
     """
-    Allowing us to define types in a nice way, such as TypeOperator.Int() for
-    basic types or TypeOperator.Tuple for parameterized types.
+    Allowing us to write type definitions in an intuitive way, such as
+    TypeOperator.Int() for basic types or TypeOperator.Tuple for parameterized
+    types.
     """
     # TODO add a parameter that fixes the arity of the operator or perhaps even
     # constrains it arguments
@@ -115,12 +116,6 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         intuitive visually, but does not have this property.
         """
         return TypeOperator('function', self, other)
-
-    def constrain(self, *nargs: AlgebraType) -> Constraint:
-        """
-        Create a constraint for this type.
-        """
-        return Constraint(self, list(nargs))
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
@@ -348,4 +343,33 @@ class Constraint(object):
             raise RuntimeError("violated typeclass constraint: {}".format(self))
         #elif len(matches) == 1:
         #    subject.unify(matches[0])
+
+    @staticmethod
+    def has(
+            subject: AlgebraType,
+            op: Callable[..., TypeOperator],
+            target: AlgebraType,
+            at: int = 1):
+        """
+        Produce a constraint holding that the subject must be a type operator
+        `op` containing the target somewhere in its parameters.
+        """
+        options: List[AlgebraType] = []
+        if not at or at == 1:
+            options.extend((
+                op(target),
+                op(target, TypeVar()),
+                op(target, TypeVar(), TypeVar())
+            ))
+        if not at or at == 2:
+            options.extend((
+                op(TypeVar(), target),
+                op(TypeVar(), target, TypeVar())
+            ))
+        if not at or at == 3:
+            options.append(
+                op(TypeVar(), TypeVar(), target)
+            )
+        return Constraint(subject, *options)
+
 
