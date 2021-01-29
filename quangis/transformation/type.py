@@ -147,7 +147,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
 
-            if self.arity == 0 and other.arity == 0 and self.subtype(other):
+            if self.nullary_subtype(other):
                 pass
             elif self.signature != other.signature:
                 raise RuntimeError("type mismatch between {} and {}".format(self, other))
@@ -208,17 +208,14 @@ class TypeOperator(AlgebraType):
         if self.types and self.supertype:
             raise RuntimeError("only nullary types may have supertypes")
 
-    def subtype(self, other: TypeOperator) -> bool:
+    def nullary_subtype(self, other: TypeOperator) -> bool:
         """
-        Is this type a subtype of another?
+        Is this a nullary subtype of another?
         """
-        if self.arity == 0:
-            up = self.supertype
-            return self == other or bool(up and up.subtype(other))
-        else:
-            raise RuntimeError("direct subtypes can only be determined for nullary types")
-            #return self.signature == other.signature and \
-            #    all(s.subtype(t) for s, t in zip(self.types, other.types))
+        return self.arity == 0 and (
+            self == other or
+            bool(self.supertype and self.supertype.nullary_subtype(other))
+        )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
