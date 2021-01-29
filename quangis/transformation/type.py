@@ -13,6 +13,7 @@ from typing import Dict, Optional, Iterable, Union, List, Callable, Tuple
 
 from quangis import error
 
+
 class Definition(object):
     """
     This class defines a function: it knows its general type and constraints,
@@ -105,6 +106,10 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     def instantiate(self) -> AlgebraType:
         return NotImplemented
 
+    @abstractmethod
+    def apply(self, other: AlgebraType) -> AlgebraType:
+        return NotImplemented
+
     def __pow__(self, other: AlgebraType) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
@@ -148,13 +153,12 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
 
-            if self.nullary_subtype(other):
-                pass
-            elif self.signature != other.signature:
-                raise error.TypeMismatch(self, other)
-            else:
+            if self.nullary_subtype(other) or \
+                    self.signature == other.signature:
                 for x, y in zip(self.types, other.types):
                     x.unify(y)
+            else:
+                raise error.TypeMismatch(self, other)
         else:
             if isinstance(self, TypeVar):
                 if self != other and self in other:
@@ -272,7 +276,7 @@ class TypeVar(AlgebraType):
         cls.counter += 1
 
     def __str__(self) -> str:
-        return "x" + str(self.id)
+        return f"x{self.id}"
 
     def __contains__(self, value: AlgebraType) -> bool:
         return self == value
@@ -285,6 +289,9 @@ class TypeVar(AlgebraType):
 
         for constraint in self.constraints:
             constraint.enforce()
+
+    def apply(self, arg: AlgebraType) -> AlgebraType:
+        raise error.NonFunctionApplication(self, arg)
 
     def instantiate(self) -> AlgebraType:
         #for c in self.constraints:
@@ -342,7 +349,7 @@ class Constraint(object):
             subject: AlgebraType,
             op: Callable[..., TypeOperator],
             target: AlgebraType,
-            at: int = 1):
+            at: Optional[int] = None):
         """
         Produce a constraint holding that the subject must be a type operator
         `op` containing the target somewhere in its parameters.

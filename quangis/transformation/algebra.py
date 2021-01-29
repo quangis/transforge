@@ -9,8 +9,7 @@ from functools import reduce
 from abc import ABC, ABCMeta
 from typing import List, Iterable, Union
 
-from quangis.transformation.type import TypeOperator, AlgebraType, \
-    Definition
+from quangis.transformation.type import AlgebraType, Definition
 
 
 class Expr(object):
@@ -24,22 +23,12 @@ class Expr(object):
 
     def __str__(self) -> str:
         if self.type.is_function():
-            return "{}".format(" ".join(map(str, self.tokens)))
+            return f"{' '.join(str(t) for t in self.tokens)}"
         else:
-            return "({tokens} : \033[1m{type}\033[0m)".format(
-                tokens=" ".join(map(str, self.tokens)),
-                type=str(self.type)
-            )
+            return f"{' '.join(str(t) for t in self.tokens)} : {self.type}"
 
-    @staticmethod
-    def apply(fn: Expr, arg: Expr) -> Expr:
-        if isinstance(fn.type, TypeOperator):
-            res = Expr([fn, arg], fn.type.apply(arg.type))
-            fn.type = fn.type.instantiate()
-            arg.type = arg.type.instantiate()
-            return res
-        else:
-            raise RuntimeError("applying to non-function value")
+    def apply(self: Expr, arg: Expr) -> Expr:
+        return Expr([self, arg], self.type.apply(arg.type))
 
 
 class AutoDefine(ABCMeta):
@@ -87,17 +76,16 @@ class TransformationAlgebra(ABC, metaclass=AutoDefine):
             pp.alphas + '_', pp.alphanums + ':_'
         ).setName('identifier')
 
-        fn = pp.MatchFirst(
+        function = pp.MatchFirst(
             pp.CaselessKeyword(d.name) + d.data * identifier
             if d.data else
             pp.CaselessKeyword(d.name)
             for k, d in defs.items()
         ).setParseAction(lambda s, l, t: Expr(t, defs[t[0]].instance()))
 
-        return pp.infixNotation(
-            fn,
-            [(None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0]))]
-        )
+        return pp.infixNotation(function, [(
+            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
+        )])
 
     def parse(self, string: str) -> Expr:
         return self.parser.parseString(string, parseAll=True)[0]
