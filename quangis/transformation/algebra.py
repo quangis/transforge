@@ -9,6 +9,7 @@ from functools import reduce
 from abc import ABC, ABCMeta
 from typing import List, Iterable, Union
 
+from quangis import error
 from quangis.transformation.type import AlgebraType, Definition
 
 
@@ -28,7 +29,12 @@ class Expr(object):
             return f"({' '.join(str(t) for t in self.tokens)} : {self.type})"
 
     def apply(self: Expr, arg: Expr) -> Expr:
-        return Expr([self, arg], self.type.apply(arg.type))
+        try:
+            return Expr([self, arg], self.type.apply(arg.type))
+        except error.TypeMismatch as e:
+            e.t1 = self
+            e.t2 = arg
+            raise e
 
 
 class AutoDefine(ABCMeta):

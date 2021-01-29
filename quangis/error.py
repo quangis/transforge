@@ -49,16 +49,25 @@ class RecursiveType(AlgebraTypeError):
         self.t1 = t1
         self.t2 = t2
 
+    def __str__(self) -> str:
+        return f"Recursive type: {self.t1} and {self.t2}"
+
 
 class TypeMismatch(AlgebraTypeError):
     def __init__(self, t1, t2):
         self.t1 = t1
         self.t2 = t2
 
+    def __str__(self) -> str:
+        return f"Type mismatch: {self.t1} and {self.t2}"
+
 
 class ViolatedConstraint(AlgebraTypeError):
     def __init__(self, c):
         self.c = c
+
+    def __str__(self) -> str:
+        return f"Violated type constraint: {self.c}"
 
 
 class NonFunctionApplication(AlgebraTypeError):
@@ -66,7 +75,13 @@ class NonFunctionApplication(AlgebraTypeError):
         self.fn = fn
         self.arg = arg
 
+    def __str__(self) -> str:
+        return f"Cannot apply {self.arg} to non-function {self.fn}"
+
 
 class AlreadyBound(AlgebraTypeError):
     def __init__(self, var):
         self.var = var
+
+    def __str__(self) -> str:
+        return f"Variable {self.var} was already bound"
