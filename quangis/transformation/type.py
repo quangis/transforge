@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Dict, Optional, Tuple, Iterable, Union
+from typing import Dict, Optional, Iterable, Union, List
 
 
 class Definition(object):
@@ -20,13 +20,14 @@ class Definition(object):
 
     def __init__(
             self,
+            name: str,
             type: AlgebraType,
             *constraints: Constraint,
             data: int = 0):
+        self.name = name
         self.type = type
         self.constraints = list(constraints)
         self.data = data
-        self.name: Optional[str] = None
 
         # TODO make sure that every variable in the type also occurs in the
         # constraints?
@@ -44,10 +45,33 @@ class Definition(object):
 
         return t
 
+    @staticmethod
+    def from_tuple(
+            name: str,
+            values: Union[AlgebraType, tuple]) -> Definition:
+        """
+        This method is an alternative way of defining: it allows us to simply
+        write a tuple of relevant information. This can simplify notation.
+        """
+        if isinstance(values, AlgebraType):
+            return Definition(name, values)
+        else:
+            t = values[0]
+            constraints: List[Constraint] = []
+            data = 0
+            for v in values[1:]:
+                if isinstance(v, Constraint):
+                    constraints.append(v)
+                elif isinstance(v, int):
+                    data = v
+                else:
+                    raise ValueError("unfamiliar type for type definition")
+            return Definition(name, t, *constraints, data=data)
+
     def __str__(self) -> str:
-        return "{} | ({})".format(
-            str(self),
-            ", ".join(map(str, self.constraints))
+        return (
+            f"{self.name} : {self.type}{', ' if self.constraints else ''}"
+            f"{', '.join(str(c) for c in self.constraints)}"
         )
 
 
@@ -81,19 +105,6 @@ class AlgebraType(ABC):
         intuitive visually, but does not have this property.
         """
         return TypeOperator('function', self, other)
-
-    def __or__(
-            self,
-            constraints: Union[Constraint, Iterable[Constraint]]) -> Definition:
-        """
-        Abuse of Python's binary OR operator, for a pleasing notation of
-        functions with typeclass constraints.
-        """
-
-        if not isinstance(constraints, Iterable):
-            constraints = (constraints,)
-
-        return Definition(self, *constraints)
 
     def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
         """

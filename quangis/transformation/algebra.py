@@ -11,7 +11,7 @@ from __future__ import annotations
 import pyparsing as pp
 from functools import partial, reduce
 from itertools import chain
-from abc import ABC
+from abc import ABC, ABCMeta
 from typing import List, Iterable, Union
 
 from quangis.transformation.type import TypeOperator, TypeVar, AlgebraType, \
@@ -65,7 +65,23 @@ class Expr(object):
             raise RuntimeError("applying to non-function value")
 
 
-class TransformationAlgebra(ABC):
+class AutoDefine(ABCMeta):
+    """
+    This metaclass makes sure definitions do not have to be tediously written
+    out: any lowercase attribute containing a type, or a tuple beginning with a
+    type, will be converted into a `Definition`.
+    """
+
+    def __init__(cls, name, bases, clsdict):
+        for k, v in clsdict.items():
+            if k[0].islower() and (isinstance(v, AlgebraType) or (
+                    isinstance(v, tuple) and isinstance(v[0], AlgebraType))):
+                d = Definition.from_tuple("in" if k == "in_" else k, v)
+                setattr(cls, k, d)
+        super(AutoDefine, cls).__init__(name, bases, clsdict)
+
+
+class TransformationAlgebra(ABC, metaclass=AutoDefine):
     """
     Abstract base for transformation algebras. To make a concrete
     transformation algebra, subclass this class and add properties of type
@@ -76,13 +92,19 @@ class TransformationAlgebra(ABC):
         self.parser = self.make_parser()
 
     def definitions(self) -> Iterable[Definition]:
+        """
+        Obtain the definitions of this algebra.
+        """
         for attr in dir(self):
             val = getattr(self, attr)
             if isinstance(val, Definition):
-                if attr == 'in_':
-                    attr = 'in'
-                val.name = attr
                 yield val
+
+    def __getitem__(self, key: str):
+        if key == "in":
+            getattr(self, "in_")
+        else:
+            getattr(self, key)
 
     def make_parser(self) -> pp.Parser:
 
@@ -93,10 +115,10 @@ class TransformationAlgebra(ABC):
         ).setName('identifier')
 
         fn = pp.MatchFirst(
-            pp.CaselessKeyword(k) + t.data * identifier
-            if t.data else
-            pp.CaselessKeyword(k)
-            for k, t in sorted(defs.items())
+            pp.CaselessKeyword(d.name) + d.data * identifier
+            if d.data else
+            pp.CaselessKeyword(d.name)
+            for k, d in defs.items()
         ).setParseAction(lambda s, l, t: Expr(t, defs[t[0]].instance()))
 
         return pp.infixNotation(
@@ -142,73 +164,73 @@ class CCT(TransformationAlgebra):
     # Function type definitions
 
     # data inputs
-    pointmeasures = define(R(Reg, Itv), data=1)
-    amountpatches = define(R(Reg, Nom), data=1)
-    contour = define(R(Ord, Reg), data=1)
-    objects = define(R(Obj, Ratio), data=1)
-    objectregions = define(R(Obj, Reg), data=1)
-    contourline = define(R(Itv, Reg), data=1)
-    objectcounts = define(R(Obj, Count), data=1)
-    field = define(R(Loc, Ratio), data=1)
-    object = define(R(Obj), data=1)
-    region = define(R(Reg), data=1)
-    in_ = Nom | ()
-    countV = define(Count, data=1)
-    ratioV = define(Ratio, data=1)
-    interval = define(Itv, data=1)
-    ordinal = define(Ord, data=1)
-    nominal = define(Nom, data=1)
+    pointmeasures = define("pointmeasures", R(Reg, Itv), data=1)
+    amountpatches = define("amountpatches", R(Reg, Nom), data=1)
+    contour = define("contour", R(Ord, Reg), data=1)
+    objects = define("objects", R(Obj, Ratio), data=1)
+    objectregions = define("objectregions", R(Obj, Reg), data=1)
+    contourline = define("contourline", R(Itv, Reg), data=1)
+    objectcounts = define("objectcounts", R(Obj, Count), data=1)
+    field = define("field", R(Loc, Ratio), data=1)
+    object = define("object", R(Obj), data=1)
+    region = define("region", R(Reg), data=1)
+    in_ = Nom
+    countV = define("countV", Count, data=1)
+    ratioV = define("ratioV", Ratio, data=1)
+    interval = define("interval", Itv, data=1)
+    ordinal = define("ordinal", Ord, data=1)
+    nominal = define("nominal", Nom, data=1)
 
     # transformations (without implementation)
 
     # functional
-    compose = (y ** z) ** (x ** y) ** (x ** z) | ()
+    compose = (y ** z) ** (x ** y) ** (x ** z)
 
     # derivations
-    ratio = Ratio ** Ratio ** Ratio | ()
+    ratio = Ratio ** Ratio ** Ratio
 
     # aggregations of collections
-    count = R(Obj) ** Ratio | ()
-    size = R(Loc) ** Ratio | ()
-    merge = R(Reg) ** Reg | ()
-    centroid = R(Loc) ** Loc | ()
+    count = R(Obj) ** Ratio
+    size = R(Loc) ** Ratio
+    merge = R(Reg) ** Reg
+    centroid = R(Loc) ** Loc
 
     # statistical operations
-    avg = R(Ent, Itv) ** Itv | ()
-    min = R(Ent, Ord) ** Ord | ()
-    max = R(Ent, Ord) ** Ord | ()
-    sum = R(Ent, Count) ** Count | ()
+    avg = R(Ent, Itv) ** Itv
+    min = R(Ent, Ord) ** Ord
+    max = R(Ent, Ord) ** Ord
+    sum = R(Ent, Count) ** Count
 
     # conversions
-    reify = R(Loc) ** Reg | ()
-    deify = Reg ** R(Loc) | ()
-    get = R(x) ** x | x << [Ent]
-    invert = x ** y | x ** y << [R(Loc, Ord) ** R(Ord, Reg), R(Loc, Nom) ** R(Reg, Nom)]
-    revert = x ** y | x ** y << [R(Ord, Reg) ** R(Loc, Ord), R(Reg, Nom) ** R(Loc, Nom)]
+    reify = R(Loc) ** Reg
+    deify = Reg ** R(Loc)
+    get = R(x) ** x, x << [Ent]
+    invert = x ** y, x ** y << [R(Loc, Ord) ** R(Ord, Reg), R(Loc, Nom) ** R(Reg, Nom)]
+    revert = x ** y, x ** y << [R(Ord, Reg) ** R(Loc, Ord), R(Reg, Nom) ** R(Loc, Nom)]
 
     # quantified relations
-    oDist = R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Ratio, Obj) | ()
-    lDist = R(Loc) ** R(Loc) ** R(Loc, Ratio, Loc) | ()
-    loDist = R(Loc) ** R(Obj, Reg) ** R(Loc, Ratio, Obj) | ()
-    oTopo = R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Nom, Obj) | ()
-    loTopo = R(Loc) ** R(Obj, Reg) ** R(Loc, Nom, Obj) | ()
-    nDist = R(Obj) ** R(Obj) ** R(Obj, Ratio, Obj) ** R(Obj, Ratio, Obj) | ()
-    lVis = R(Loc) ** R(Loc) ** R(Loc, Itv) ** R(Loc, Bool, Loc) | ()
-    interpol = R(Reg, Itv) ** R(Loc) ** R(Loc, Itv) | ()
+    oDist = R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Ratio, Obj)
+    lDist = R(Loc) ** R(Loc) ** R(Loc, Ratio, Loc)
+    loDist = R(Loc) ** R(Obj, Reg) ** R(Loc, Ratio, Obj)
+    oTopo = R(Obj, Reg) ** R(Obj, Reg) ** R(Obj, Nom, Obj)
+    loTopo = R(Loc) ** R(Obj, Reg) ** R(Loc, Nom, Obj)
+    nDist = R(Obj) ** R(Obj) ** R(Obj, Ratio, Obj) ** R(Obj, Ratio, Obj)
+    lVis = R(Loc) ** R(Loc) ** R(Loc, Itv) ** R(Loc, Bool, Loc)
+    interpol = R(Reg, Itv) ** R(Loc) ** R(Loc, Itv)
 
     # amount operations
-    fcont = R(Loc, Itv) ** Ratio | ()
-    ocont = R(Obj, Ratio) ** Ratio | ()
+    fcont = R(Loc, Itv) ** Ratio
+    ocont = R(Obj, Ratio) ** Ratio
 
     # relational
-    pi1 = x ** y | () # | [x << has(y, at=1)]
-    pi2 = x ** y | () # | [x << has(y, at=2)]
-    pi3 = x ** y | () #| [x << has(y, at=3)]
-    sigmae = x ** y ** x | () #| [x << [Qlt], y << has(x)]
-    sigmale = x ** y ** x | () #| [x << [Ord], y << has(x)]
-    bowtie = x ** R(y) ** x | ()  # | [y << [Ent], y << has(x)]
-    bowtiestar = R(x, y, x) ** R(x, y) ** R(x, y, x) | () #| [y << [Qlt], x << [Ent]]
-    bowtie_ = (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) | ()
-    groupbyL = (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt) | () # | [x << [Ent], y << [Ent]]
-    groupbyR = (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt) | () # | [x << [Ent], y << [Ent]]
-    groupbyR_simpler = (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z) | ()
+    pi1 = x ** y, x << has(y, at=1)
+    pi2 = x ** y, x << has(y, at=2)
+    pi3 = x ** y, x << has(y, at=3)
+    sigmae = x ** y ** x, x << [Qlt], y << has(x)
+    sigmale = x ** y ** x, x << [Ord], y << has(x)
+    bowtie = x ** R(y) ** x, y << [Ent], y << has(x)
+    bowtiestar = R(x, y, x) ** R(x, y) ** R(x, y, x), y << [Qlt], x << [Ent]
+    bowtie_ = (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt)
+    groupbyL = (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt), x << [Ent], y << [Ent]
+    groupbyR = (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt), x << [Ent], y << [Ent]
+    groupbyR_simpler = (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z)
