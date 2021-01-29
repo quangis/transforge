@@ -30,9 +30,6 @@ class Definition(object):
         self.constraints = list(constraints)
         self.data = data
 
-        # TODO make sure that every variable in the type also occurs in the
-        # constraints?
-
     def instance(self) -> AlgebraType:
 
         ctx: Dict[TypeVar, TypeVar] = {}
