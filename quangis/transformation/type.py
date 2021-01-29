@@ -144,40 +144,36 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 return new2
         raise ValueError(f"{self} is neither a type nor a type variable")
 
-    def unify(self: AlgebraType, other: AlgebraType) -> None:
+    def unify(self, other: AlgebraType) -> None:
         """
         Bind variables such that both types become the same. Note that subtypes
         on the "self" side are tolerated: that is, if self is a subtype of
         other, then they are considered the same, but not vice versa.
         """
-        a = self.binding
-        b = other.binding
-
-        if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-            if a.match(b):
-                for x, y in zip(a.types, b.types):
+        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+            if self.match(other):
+                for x, y in zip(self.types, other.types):
                     x.unify(y)
             else:
-                raise error.TypeMismatch(a, b)
+                raise error.TypeMismatch(self, other)
         else:
+            a = self.binding(False)
+            b = other.binding(False)
             if isinstance(a, TypeVar):
                 if a != b and a in b:
                     raise error.RecursiveType(a, b)
                 a.bind(b)
-            elif isinstance(a, TypeVar):
+            elif isinstance(b, TypeVar):
                 b.unify(a)
 
     def compatible(self, other: AlgebraType) -> bool:
         """
-        Test if a type is structurally equivalent to another, that is, if
-        disregarding variables could lead to the same type. Like for unify,
-        subtypes are tolerated here
+        Test if a type is structurally consistent with another, that is, if
+        they fit together modulo variables. Subtypes allowed on the self side.
         """
-        a = self.binding
-        b = other.binding
-        if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-            return a.match(b) and \
-                all(s.compatible(t) for s, t in zip(a.types, b.types))
+        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+            return self.match(other) and \
+                all(s.compatible(t) for s, t in zip(self.types, other.types))
         return True
 
     def apply(self, arg: AlgebraType) -> AlgebraType:
@@ -186,24 +182,17 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and self.name == 'function':
             input_type, output_type = self.types
-            arg.unify(input_type)
-            return output_type.full_binding()
+            arg.binding().unify(input_type.binding())
+            return output_type.binding()
         else:
             raise error.NonFunctionApplication(self, arg)
 
-    @property
-    def binding(self) -> AlgebraType:
-        if isinstance(self, TypeVar):
-            return (self.bound and self.bound.binding) or self.bound or self
-        else:
-            return self
-
-    def full_binding(self) -> AlgebraType:
-        if isinstance(self, TypeVar):
-            return self.binding
-        elif isinstance(self, TypeOperator):
+    def binding(self, full: bool = True) -> AlgebraType:
+        if isinstance(self, TypeVar) and self.bound:
+            return self.bound.binding(full)
+        elif full and isinstance(self, TypeOperator):
             self.types: List[AlgebraType] = [
-                t.full_binding() for t in self.types]
+                t.binding(full) for t in self.types]
         return self
 
 
@@ -226,6 +215,21 @@ class TypeOperator(AlgebraType):
         if self.supertype and (self.types or self.supertype.types):
             raise ValueError("only nullary types may have supertypes")
 
+    def __str__(self) -> str:
+        if self.name == 'function':
+            return f"({self.types[0]} -> {self.types[1]})"
+        elif self.types:
+            return f'{self.name}({", ".join(str(t) for t in self.types)})'
+        else:
+            return self.name
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, TypeOperator):
+            return self.match(other, allow_subtype=False) and \
+               all(s == t for s, t in zip(self.types, other.types))
+        else:
+            return False
+
     def match(self, other: TypeOperator, allow_subtype: bool = True) -> bool:
         """
         Check if the top-level type operator matches another (modulo subtypes).
@@ -236,21 +240,6 @@ class TypeOperator(AlgebraType):
                 self.supertype and self.supertype.match(other)
             ))
         )
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, TypeOperator):
-            return self.match(other, allow_subtype=False) and \
-               all(s.binding == t.binding for s, t in zip(self.types, other.types))
-        else:
-            return False
-
-    def __str__(self) -> str:
-        if self.name == 'function':
-            return f"({self.types[0]} -> {self.types[1]})"
-        elif self.types:
-            return f'{self.name}({", ".join(str(t) for t in self.types)})'
-        else:
-            return self.name
 
     @property
     def arity(self) -> int:
@@ -283,13 +272,9 @@ class TypeVar(AlgebraType):
 
 class Constraint(object):
     """
-    A constraint is a ...
-    To avoid recursive types, the typeclass may not contain any variable from
-    the type.
+    A constraint is a set of types that must remain consistent with a subject
+    type.
     """
-    # The way it works is: we assign the constraint to all variables occurring
-    # in said constraint. We don't do this immediately, but only after the
-    # user has refreshed the variables.
 
     def __init__(self, t: AlgebraType, *options: AlgebraType):
         self.subject = t
@@ -303,14 +288,14 @@ class Constraint(object):
 
     def __str__(self) -> str:
         return (
-            f"{self.subject.binding} must be one of "
+            f"{self.subject.binding()} must be one of "
             f"[{', '.join(str(t) for t in self.initial_options)}]"
         )
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
-            self.subject.fresh(ctx), *(t.fresh(ctx) for t in self.options)
-        )
+            self.subject.fresh(ctx),
+            *(t.fresh(ctx) for t in self.options))
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
@@ -318,16 +303,15 @@ class Constraint(object):
             *(t.variables() for t in self.options))
 
     def enforce(self):
-        self.subject = self.subject.binding
         self.options = [
-            t for t in self.options if
-            self.subject.compatible(t.binding)
+            t for t in self.options
+            if self.subject.binding().compatible(t.binding())
         ]
 
         if len(self.options) == 0:
             raise error.ViolatedConstraint(self)
         elif len(self.options) == 1:
-            self.subject.unify(self.options[0])
+            self.subject.binding().unify(self.options[0].binding())
 
     @staticmethod
     def has(
