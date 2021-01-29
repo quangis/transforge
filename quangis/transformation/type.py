@@ -78,9 +78,11 @@ class Definition(object):
 
 class TypeDefiner(ABCMeta):
     """
-    Allowing us to write TypeOperator.Int() for basic types or
-    TypeOperator.Tuple for parameterized types.
+    Allowing us to define types in a nice way, such as TypeOperator.Int() for
+    basic types or TypeOperator.Tuple for parameterized types.
     """
+    # TODO add a parameter that fixes the arity of the operator or perhaps even
+    # constrains it arguments
 
     def __getattr__(self, key: str) -> Callable[..., TypeOperator]:
         return partial(TypeOperator, key)

@@ -84,8 +84,10 @@ class AutoDefine(ABCMeta):
 class TransformationAlgebra(ABC, metaclass=AutoDefine):
     """
     Abstract base for transformation algebras. To make a concrete
-    transformation algebra, subclass this class and add properties of type
-    `Definition`.
+    transformation algebra, subclass this class. Any properties (starting with
+    lowercase) that are `Definition`s or can be translated to such via
+    `Definition.from_tuple` will be considered functions of the transformation
+    algebra.
     """
 
     def __init__(self):
@@ -99,12 +101,6 @@ class TransformationAlgebra(ABC, metaclass=AutoDefine):
             val = getattr(self, attr)
             if isinstance(val, Definition):
                 yield val
-
-    def __getitem__(self, key: str):
-        if key == "in":
-            getattr(self, "in_")
-        else:
-            getattr(self, key)
 
     def make_parser(self) -> pp.Parser:
 
@@ -135,21 +131,22 @@ class CCT(TransformationAlgebra):
     Core concept transformation algebra.
     """
 
-    # Types
-    Ent = TypeOperator.Ent()
-    Obj = TypeOperator.Obj(supertype=Ent)  # O
-    Reg = TypeOperator.Reg(supertype=Ent)  # S
-    Loc = TypeOperator.Loc(supertype=Ent)  # L
-    Qlt = TypeOperator.Qlt(supertype=Ent)  # Q
-    Nom = TypeOperator.Nom(supertype=Qlt)
-    Bool = TypeOperator.Bool(supertype=Nom)
-    Ord = TypeOperator.Ord(supertype=Nom)
-    Count = TypeOperator.Count(supertype=Ord)
-    Ratio = TypeOperator.Ratio(supertype=Count)
-    Itv = TypeOperator.Int(supertype=Ratio)
+    ##########################################################################
+    # Types and type synonyms
+
+    Ent = TypeOperator("Ent")
+    Obj = TypeOperator("Obj", supertype=Ent)  # O
+    Reg = TypeOperator("Reg", supertype=Ent)  # S
+    Loc = TypeOperator("Loc", supertype=Ent)  # L
+    Qlt = TypeOperator("Qlt", supertype=Ent)  # Q
+    Nom = TypeOperator("Nom", supertype=Qlt)
+    Bool = TypeOperator("Bool", supertype=Nom)
+    Ord = TypeOperator("Ord", supertype=Nom)
+    Count = TypeOperator("Count", supertype=Ord)
+    Ratio = TypeOperator("Ratio", supertype=Count)
+    Itv = TypeOperator("Itv", supertype=Ratio)
     R = TypeOperator.R
 
-    # Type synonyms
     SpatialField = R(Loc, Qlt)
     InvertedField = R(Qlt, Reg)
     FieldSample = R(Reg, Qlt)
@@ -160,27 +157,28 @@ class CCT(TransformationAlgebra):
     NominalInvertedField = R(Nom, Reg)
     BooleanInvertedField = R(Bool, Reg)
 
-    # Function type definitions
+    ##########################################################################
+    # Data inputs
 
-    # data inputs
-    pointmeasures = define("pointmeasures", R(Reg, Itv), data=1)
-    amountpatches = define("amountpatches", R(Reg, Nom), data=1)
-    contour = define("contour", R(Ord, Reg), data=1)
-    objects = define("objects", R(Obj, Ratio), data=1)
-    objectregions = define("objectregions", R(Obj, Reg), data=1)
-    contourline = define("contourline", R(Itv, Reg), data=1)
-    objectcounts = define("objectcounts", R(Obj, Count), data=1)
-    field = define("field", R(Loc, Ratio), data=1)
-    object = define("object", R(Obj), data=1)
-    region = define("region", R(Reg), data=1)
-    in_ = Nom
-    countV = define("countV", Count, data=1)
-    ratioV = define("ratioV", Ratio, data=1)
-    interval = define("interval", Itv, data=1)
-    ordinal = define("ordinal", Ord, data=1)
-    nominal = define("nominal", Nom, data=1)
+    pointmeasures = R(Reg, Itv), 1
+    amountpatches = R(Reg, Nom), 1
+    contour = R(Ord, Reg), 1
+    objects = R(Obj, Ratio), 1
+    objectregions = R(Obj, Reg), 1
+    contourline = R(Itv, Reg), 1
+    objectcounts = R(Obj, Count), 1
+    field = R(Loc, Ratio), 1
+    object = R(Obj), 1
+    region = R(Reg), 1
+    in_ = Nom, 0
+    countV = Count, 1
+    ratioV = Ratio, 1
+    interval = Itv, 1
+    ordinal = Ord, 1
+    nominal = Nom, 1
 
-    # transformations (without implementation)
+    ##########################################################################
+    # Geographic transformations
 
     # functional
     compose = (y ** z) ** (x ** y) ** (x ** z)
@@ -199,6 +197,9 @@ class CCT(TransformationAlgebra):
     min = R(Ent, Ord) ** Ord
     max = R(Ent, Ord) ** Ord
     sum = R(Ent, Count) ** Count
+
+    ##########################################################################
+    # Geographic transformations
 
     # conversions
     reify = R(Loc) ** Reg
@@ -221,15 +222,24 @@ class CCT(TransformationAlgebra):
     fcont = R(Loc, Itv) ** Ratio
     ocont = R(Obj, Ratio) ** Ratio
 
-    # relational
+    ##########################################################################
+    # Relational transformations
+
+    # projection
     pi1 = x ** y, x << has(y, at=1)
     pi2 = x ** y, x << has(y, at=2)
     pi3 = x ** y, x << has(y, at=3)
+
+    # selection operations
     sigmae = x ** y ** x, x << [Qlt], y << has(x)
     sigmale = x ** y ** x, x << [Ord], y << has(x)
+
+    # join and set operations
     bowtie = x ** R(y) ** x, y << [Ent], y << has(x)
     bowtiestar = R(x, y, x) ** R(x, y) ** R(x, y, x), y << [Qlt], x << [Ent]
     bowtie_ = (Qlt ** Qlt ** Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt) ** R(Ent, Qlt)
+
+    # group by
     groupbyL = (R(y, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(x, Qlt), x << [Ent], y << [Ent]
     groupbyR = (R(x, Qlt) ** Qlt) ** R(x, Qlt, y) ** R(y, Qlt), x << [Ent], y << [Ent]
     groupbyR_simpler = (R(Ent) ** z) ** R(x, Qlt, y) ** R(y, z)
