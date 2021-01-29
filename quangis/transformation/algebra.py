@@ -35,6 +35,10 @@ class Expr(object):
             e.t1 = self
             e.t2 = arg
             raise e
+        except error.NonFunctionApplication as e:
+            e.fn = self
+            e.arg = arg
+            raise e
 
 
 class AutoDefine(ABCMeta):
