@@ -35,3 +35,38 @@ class DisconnectedTree(RuntimeError):
 
 class Key(KeyError):
     pass
+
+
+class AlgebraTypeError(RuntimeError):
+    """
+    This error occurs when an expression does not typecheck.
+    """
+    pass
+
+
+class RecursiveType(AlgebraTypeError):
+    def __init__(self, t1, t2):
+        self.t1 = t1
+        self.t2 = t2
+
+
+class TypeMismatch(AlgebraTypeError):
+    def __init__(self, t1, t2):
+        self.t1 = t1
+        self.t2 = t2
+
+
+class ViolatedConstraint(AlgebraTypeError):
+    def __init__(self, c):
+        self.c = c
+
+
+class NonFunctionApplication(AlgebraTypeError):
+    def __init__(self, fn, arg):
+        self.fn = fn
+        self.arg = arg
+
+
+class AlreadyBound(AlgebraTypeError):
+    def __init__(self, var):
+        self.var = var

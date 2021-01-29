@@ -11,6 +11,7 @@ from functools import partial
 from itertools import chain
 from typing import Dict, Optional, Iterable, Union, List, Callable, Tuple
 
+from quangis import error
 
 class Definition(object):
     """
@@ -63,7 +64,7 @@ class Definition(object):
                 elif isinstance(v, int):
                     data = v
                 else:
-                    raise ValueError("unfamiliar type for type definition")
+                    raise ValueError(f"cannot use type {type(v)} in Definition")
             return Definition(name, t, *constraints, data=data)
 
     def __str__(self) -> str:
@@ -128,7 +129,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             return new
         elif isinstance(self, TypeVar):
             if self.bound:
-                raise RuntimeError("cannot refresh bound variable")
+                raise error.AlreadyBound(self)
             elif self in ctx:
                 return ctx[self]
             else:
@@ -137,7 +138,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                     new2.constraints.add(tc)
                 ctx[self] = new2
                 return new2
-        raise RuntimeError("inexhaustive pattern")
+        raise ValueError(f"{self} is neither a type nor a type variable")
 
     def unify(self: AlgebraType, other: AlgebraType) -> None:
         """
@@ -150,14 +151,14 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             if self.nullary_subtype(other):
                 pass
             elif self.signature != other.signature:
-                raise RuntimeError("type mismatch between {} and {}".format(self, other))
+                raise error.TypeMismatch(self, other)
             else:
                 for x, y in zip(self.types, other.types):
                     x.unify(y)
         else:
             if isinstance(self, TypeVar):
                 if self != other and self in other:
-                    raise RuntimeError("recursive type")
+                    raise error.RecursiveType(self, other)
                 self.bind(other)
             elif isinstance(other, TypeVar):
                 other.unify(self)
@@ -204,9 +205,9 @@ class TypeOperator(AlgebraType):
         self.supertype = supertype
 
         if self.name == 'function' and self.arity != 2:
-            raise RuntimeError("functions must have 2 argument types")
-        if self.types and self.supertype:
-            raise RuntimeError("only nullary types may have supertypes")
+            raise ValueError("functions must have 2 argument types")
+        if self.supertype and (self.types or self.supertype.types):
+            raise ValueError("only nullary types may have supertypes")
 
     def nullary_subtype(self, other: TypeOperator) -> bool:
         """
@@ -229,11 +230,9 @@ class TypeOperator(AlgebraType):
 
     def __str__(self) -> str:
         if self.is_function():
-            return "({0} -> {1})".format(*self.types)
+            return f"({self.types[0]} -> {self.types[1]})"
         elif self.types:
-            return "{}({})".format(
-                self.name, ", ".join(map(str, self.types))
-            )
+            return f'{self.name}({", ".join(str(t) for t in self.types)})'
         else:
             return self.name
 
@@ -250,7 +249,7 @@ class TypeOperator(AlgebraType):
             arg.instantiate().unify(input_type.instantiate())
             return output_type.instantiate()
         else:
-            raise RuntimeError("Cannot apply an argument to non-function type")
+            raise error.NonFunctionApplication(self, arg)
 
     @property
     def arity(self) -> int:
@@ -313,13 +312,10 @@ class Constraint(object):
 
         variables = list(self.subject.variables())
 
-        if len(variables) == 0:
-            raise RuntimeError("subject must contain variables")
-
         for t in self.typeclass:
             for v in variables:
                 if v in t:
-                    raise RuntimeError("recursive type constraint")
+                    raise error.RecursiveType(v, t)
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
@@ -337,7 +333,7 @@ class Constraint(object):
         ]
 
         if len(matches) == 0:
-            raise RuntimeError("violated typeclass constraint: {}".format(self))
+            raise error.ViolatedConstraint(self)
         #elif len(matches) == 1:
         #    subject.unify(matches[0])
 
