@@ -10,7 +10,7 @@ from abc import ABC, ABCMeta
 from typing import List, Iterable, Union
 
 from quangis import error
-from quangis.transformation.type import AlgebraType, Definition
+from quangis.transformation.type import AlgebraType, Definition, TypeOperator
 
 
 class Expr(object):
@@ -23,7 +23,7 @@ class Expr(object):
         self.type = type
 
     def __str__(self) -> str:
-        if self.type.is_function():
+        if isinstance(self.type, TypeOperator) and self.type.name == 'function':
             return f"{' '.join(str(t) for t in self.tokens)}"
         else:
             return f"({' '.join(str(t) for t in self.tokens)} : {self.type})"
