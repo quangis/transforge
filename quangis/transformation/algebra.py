@@ -72,9 +72,7 @@ class TransformationAlgebra(ABC, metaclass=AutoDefine):
 
         defs = {d.name: d for d in self.definitions()}
 
-        identifier = pp.Word(
-            pp.alphas + '_', pp.alphanums + ':_'
-        ).setName('identifier')
+        identifier = pp.Word(pp.alphanums + ':_').setName('identifier')
 
         function = pp.MatchFirst(
             pp.CaselessKeyword(d.name) + d.data * identifier
