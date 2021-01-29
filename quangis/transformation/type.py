@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, ABCMeta, abstractmethod
 from functools import partial
 from itertools import chain
-from typing import Dict, Optional, Iterable, Union, List, Callable
+from typing import Dict, Optional, Iterable, Union, List, Callable, Tuple
 
 
 class Definition(object):
@@ -116,16 +116,11 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         return TypeOperator('function', self, other)
 
-    def __lshift__(self, other: Iterable[AlgebraType]) -> Constraint:
+    def constrain(self, *nargs: AlgebraType) -> Constraint:
         """
-        Abuse the left-shift operator to create a constraint like this:
-
-            x, y = TypeVar(), TypeVar()
-            Int, Str = TypeOperator("int"), TypeOperator("str")
-            x << [Int ** y, Str ** y]
+        Create a constraint for this type.
         """
-
-        return Constraint(self, other)
+        return Constraint(self, list(nargs))
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
@@ -230,7 +225,6 @@ class TypeOperator(AlgebraType):
             #return self.signature == other.signature and \
             #    all(s.subtype(t) for s, t in zip(self.types, other.types))
 
-
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
             return self.signature == other.signature and \
@@ -321,9 +315,9 @@ class Constraint(object):
     # in said constraint. We don't do this immediately, but only after the
     # user has refreshed the variables.
 
-    def __init__(self, t: AlgebraType, typeclass: Iterable[AlgebraType]):
+    def __init__(self, t: AlgebraType, *formats: AlgebraType):
         self.subject = t
-        self.typeclass = list(typeclass)
+        self.typeclass = list(formats)
 
         variables = list(self.subject.variables())
 
@@ -337,13 +331,7 @@ class Constraint(object):
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
-            self.subject.fresh(ctx), (t.fresh(ctx) for t in self.typeclass)
-        )
-
-    def __str__(self) -> str:
-        return "{} << [{}]".format(
-            self.subject,
-            ", ".join(map(str, self.typeclass))
+            self.subject.fresh(ctx), *(t.fresh(ctx) for t in self.typeclass)
         )
 
     def enforce(self):
