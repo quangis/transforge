@@ -52,7 +52,9 @@ class AutoDefine(ABCMeta):
         for k, v in clsdict.items():
             if k[0].islower() and (isinstance(v, AlgebraType) or (
                     isinstance(v, tuple) and isinstance(v[0], AlgebraType))):
-                d = Definition.from_tuple("in" if k == "in_" else k, v)
+                name = "in" if k == "in_" else k
+                args = v if isinstance(v, Iterable) else (v,)
+                d = Definition(name, *args)
                 setattr(cls, k, d)
         super(AutoDefine, cls).__init__(name, bases, clsdict)
 
@@ -61,9 +63,8 @@ class TransformationAlgebra(ABC, metaclass=AutoDefine):
     """
     Abstract base for transformation algebras. To make a concrete
     transformation algebra, subclass this class. Any properties (starting with
-    lowercase) that are `Definition`s or can be translated to such via
-    `Definition.from_tuple` will be considered functions of the transformation
-    algebra.
+    lowercase) that are `Definition`s or can be translated to such via its
+    constructor will be considered functions of the transformation algebra.
     """
 
     def __init__(self):

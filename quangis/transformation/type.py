@@ -24,13 +24,38 @@ class Definition(object):
     def __init__(
             self,
             name: str,
-            type: AlgebraType,
-            *constraints: Constraint,
-            data: int = 0):
+            t: AlgebraType,
+            *args: Union[AlgebraType, Constraint, int]):
+        """
+        Define a function type. Additional arguments are distinguished by their
+        type. This helps simplify notation: we won't have to painstakingly
+        write out every definition, and instead just provide a tuple of
+        relevant information.
+        """
+
+        types = [t]
+        constraints = []
+        number_of_data_arguments = 0
+
+        for arg in args:
+            if isinstance(arg, Constraint):
+                constraints.append(arg)
+            elif isinstance(arg, AlgebraType):
+                types.append(arg)
+            elif isinstance(arg, int):
+                number_of_data_arguments = arg
+            else:
+                raise ValueError(f"cannot use type {type(arg)} in Definition")
+
+        # if more than one type is given, consider the function overloaded
+        if len(types) > 1:
+            t = TypeVar()
+            constraints.append(t.limit(*types))
+
         self.name = name
-        self.type = type
-        self.constraints = list(constraints)
-        self.data = data
+        self.type = t
+        self.constraints = constraints
+        self.data = number_of_data_arguments
 
     def instance(self) -> AlgebraType:
         ctx: Dict[TypeVar, TypeVar] = {}
@@ -40,29 +65,6 @@ class Definition(object):
             for var in new_constraint.variables():
                 var.constraints.add(new_constraint)
         return t
-
-    @staticmethod
-    def from_tuple(
-            name: str,
-            values: Union[AlgebraType, tuple]) -> Definition:
-        """
-        This method is an alternative way of defining: it allows us to simply
-        write a tuple of relevant information. This can simplify notation.
-        """
-        if isinstance(values, AlgebraType):
-            return Definition(name, values)
-        else:
-            t = values[0]
-            constraints: List[Constraint] = []
-            data = 0
-            for v in values[1:]:
-                if isinstance(v, Constraint):
-                    constraints.append(v)
-                elif isinstance(v, int):
-                    data = v
-                else:
-                    raise ValueError(f"cannot use type {type(v)} in Definition")
-            return Definition(name, t, *constraints, data=data)
 
     def __str__(self) -> str:
         return (
@@ -298,7 +300,7 @@ class TypeVar(AlgebraType):
 
     def bind(self, binding: AlgebraType):
         assert (not self.bound or binding == self.bound), \
-            f"variable cannot be bound twice"
+            "variable cannot be bound twice"
 
         self.bound = binding
 
