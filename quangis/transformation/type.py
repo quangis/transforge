@@ -216,29 +216,24 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             self,
             op: Callable[..., TypeOperator],
             target: AlgebraType,
-            at: Optional[int] = None) -> Constraint:
+            at: Optional[int] = None,
+            min: int = 1,
+            max: int = 3) -> Constraint:
         """
         Produce a constraint ensuring that the subject must be a parameterized
-        type operator `op` that contains the target somewhere in its
-        parameters.
+        type operator `op` that contains the target at some point in its `min`
+        to `max` parameters.
         """
-        # TODO generalize
         options: List[AlgebraType] = []
-        if not at or at == 1:
-            options.extend((
-                op(target),
-                op(target, TypeVar()),
-                op(target, TypeVar(), TypeVar())
-            ))
-        if not at or at == 2:
-            options.extend((
-                op(TypeVar(), target),
-                op(TypeVar(), target, TypeVar())
-            ))
-        if not at or at == 3:
-            options.append(
-                op(TypeVar(), TypeVar(), target)
-            )
+        positions = list(range(min, max+1)) if at is None else [at]
+
+        for n in range(min, max+1):
+            for p in positions:
+                if n >= p:
+                    options.append(op(*(
+                        target if i == p else TypeVar()
+                        for i in range(min, n+1))
+                    ))
         return Constraint(self, *options)
 
 
