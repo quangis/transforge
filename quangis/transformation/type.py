@@ -195,6 +195,42 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 t.binding(full) for t in self.types]
         return self
 
+    def limit(self, *options: AlgebraType) -> Constraint:
+        """
+        Produce a constraint ensuring that the subject must be one of several
+        options.
+        """
+        return Constraint(self, *options)
+
+    def has_param(
+            self,
+            op: Callable[..., TypeOperator],
+            target: AlgebraType,
+            at: Optional[int] = None) -> Constraint:
+        """
+        Produce a constraint ensuring that the subject must be a parameterized
+        type operator `op` that contains the target somewhere in its
+        parameters.
+        """
+        # TODO generalize
+        options: List[AlgebraType] = []
+        if not at or at == 1:
+            options.extend((
+                op(target),
+                op(target, TypeVar()),
+                op(target, TypeVar(), TypeVar())
+            ))
+        if not at or at == 2:
+            options.extend((
+                op(TypeVar(), target),
+                op(TypeVar(), target, TypeVar())
+            ))
+        if not at or at == 3:
+            options.append(
+                op(TypeVar(), TypeVar(), target)
+            )
+        return Constraint(self, *options)
+
 
 class TypeOperator(AlgebraType):
     """
@@ -312,33 +348,5 @@ class Constraint(object):
             raise error.ViolatedConstraint(self)
         elif len(self.options) == 1:
             self.subject.binding().unify(self.options[0].binding())
-
-    @staticmethod
-    def has(
-            subject: AlgebraType,
-            op: Callable[..., TypeOperator],
-            target: AlgebraType,
-            at: Optional[int] = None):
-        """
-        Produce a constraint holding that the subject must be a type operator
-        `op` containing the target somewhere in its parameters.
-        """
-        options: List[AlgebraType] = []
-        if not at or at == 1:
-            options.extend((
-                op(target),
-                op(target, TypeVar()),
-                op(target, TypeVar(), TypeVar())
-            ))
-        if not at or at == 2:
-            options.extend((
-                op(TypeVar(), target),
-                op(TypeVar(), target, TypeVar())
-            ))
-        if not at or at == 3:
-            options.append(
-                op(TypeVar(), TypeVar(), target)
-            )
-        return Constraint(subject, *options)
 
 
