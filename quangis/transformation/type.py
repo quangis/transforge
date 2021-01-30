@@ -186,6 +186,14 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             input_type, output_type = self.types
             arg.binding().unify(input_type.binding())
             return output_type.binding()
+        elif isinstance(self, TypeVar):
+            input_type = TypeVar()
+            input_type.constraints.union(self.constraints)
+            output_type = TypeVar()
+            output_type.constraints.union(self.constraints)
+            fn = input_type ** output_type
+            fn.unify(self)
+            return fn.apply(arg)
         else:
             raise error.NonFunctionApplication(self, arg)
 
