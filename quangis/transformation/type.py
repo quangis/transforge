@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, ABCMeta
 from functools import partial
 from itertools import chain
-from typing import Dict, Optional, Iterable, Union, List, Callable
+from typing import Dict, Optional, Iterable, Union, List, Callable, Set
 
 from quangis import error
 
@@ -123,6 +123,12 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         elif isinstance(self, TypeOperator):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
+
+    def all_constraints(self) -> Set[Constraint]:
+        """
+        Obtain the constraints relevant on the variables.
+        """
+        return set.union(*(var.constraints for var in self.variables()))
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
