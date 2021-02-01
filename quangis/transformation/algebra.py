@@ -6,8 +6,7 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from abc import ABC, ABCMeta
-from typing import List, Iterable, Union
+from typing import List, Iterable, Union, Optional
 
 from quangis import error
 from quangis.transformation.type import AlgebraType, Definition, TypeOperator
@@ -24,7 +23,7 @@ class Expr(object):
 
     def __str__(self) -> str:
         if isinstance(self.type, TypeOperator) and self.type.name == 'function':
-            return f"{' '.join(str(t) for t in self.tokens)}"
+            return f"({' '.join(str(t) for t in self.tokens)})"
         else:
             return f"({' '.join(str(t) for t in self.tokens)} : {self.type})"
 
@@ -41,34 +40,34 @@ class Expr(object):
             raise e
 
 
-class AutoDefine(ABCMeta):
+class TransformationAlgebra(object):
     """
-    This metaclass makes sure definitions do not have to be tediously written
-    out: any lowercase attribute containing a type, or a tuple beginning with a
-    type, will be converted into a `Definition`.
-    """
-
-    def __init__(cls, name, bases, clsdict):
-        for k, v in clsdict.items():
-            if k[0].islower() and (isinstance(v, AlgebraType) or (
-                    isinstance(v, tuple) and isinstance(v[0], AlgebraType))):
-                name = "in" if k == "in_" else k
-                args = v if isinstance(v, Iterable) else (v,)
-                d = Definition(name, *args)
-                setattr(cls, k, d)
-        super(AutoDefine, cls).__init__(name, bases, clsdict)
-
-
-class TransformationAlgebra(ABC, metaclass=AutoDefine):
-    """
-    Abstract base for transformation algebras. To make a concrete
-    transformation algebra, subclass this class. Any properties (starting with
-    lowercase) that are `Definition`s or can be translated to such via its
-    constructor will be considered functions of the transformation algebra.
+    To define a transformation algebra, make an instance of this class. Any
+    properties (starting with lowercase) that are `Definition`s or can be
+    translated to such via its constructor will be considered functions of the
+    transformation algebra.
     """
 
     def __init__(self):
-        self.parser = self.make_parser()
+        self.parser: Optional[pp.Parser] = None
+
+    def __setattr__(self, prop, value):
+        """
+        Makes sure definitions do not have to be tediously written out: any
+        lowercase attribute containing a type, or a tuple beginning with a
+        type, will also be converted into a `Definition`.
+        """
+        if prop[0].islower() and (isinstance(value, AlgebraType) or (
+                    isinstance(value, tuple) and
+                    isinstance(value[0], AlgebraType))
+                ):
+            # Invalidate parser
+            self.parser = None
+            name = "in" if prop == "in_" else prop
+            args = value if isinstance(value, Iterable) else (value,)
+            super().__setattr__(prop, Definition(name, *args))
+        else:
+            super().__setattr__(prop, value)
 
     def definitions(self) -> Iterable[Definition]:
         """
@@ -97,4 +96,6 @@ class TransformationAlgebra(ABC, metaclass=AutoDefine):
         )])
 
     def parse(self, string: str) -> Expr:
+        if not self.parser:
+            self.parser = self.make_parser()
         return self.parser.parseString(string, parseAll=True)[0]
