@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Iterable, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import AlgebraType, Definition, TypeOperator
+from quangis.transformation.type import AlgebraType, Definition
 
 
 class Expr(object):
@@ -21,11 +21,17 @@ class Expr(object):
         self.tokens = tokens
         self.type = type
 
-    def __str__(self) -> str:
-        if isinstance(self.type, TypeOperator) and self.type.name == 'function':
-            return f"({' '.join(str(t) for t in self.tokens)})"
+    def __str__(self, top_level=True) -> str:
+        expr = ' '.join(
+            t if isinstance(t, str) else t.__str__(False)
+            for t in self.tokens
+        )
+        if top_level:
+            return f"{expr} : {self.type}"
+        elif len(self.tokens) == 1:
+            return f"{expr}"
         else:
-            return f"({' '.join(str(t) for t in self.tokens)} : {self.type})"
+            return f"({expr})"
 
     def apply(self: Expr, arg: Expr) -> Expr:
         try:
