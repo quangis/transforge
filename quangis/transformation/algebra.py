@@ -37,8 +37,8 @@ class Expr(object):
         try:
             return Expr([self, arg], self.type.apply(arg.type))
         except error.TypeMismatch as e:
-            e.t1 = self
-            e.t2 = arg
+            e.fn = self
+            e.arg = arg
             raise e
         except error.NonFunctionApplication as e:
             e.fn = self

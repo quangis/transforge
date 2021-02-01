@@ -57,9 +57,17 @@ class TypeMismatch(AlgebraTypeError):
     def __init__(self, t1, t2):
         self.t1 = t1
         self.t2 = t2
+        self.fn = None
+        self.arg = None
 
     def __str__(self) -> str:
-        return f"Type mismatch: {self.t1} and {self.t2}"
+        msg = []
+        msg.append(f"Could not unify \033[1m{self.t1}\033[0m "
+                   f"with \033[1m{self.t2}\033[0m")
+        if self.fn and self.arg:
+            msg.append(f" while applying \033[1m{self.arg}\033[0m "
+                       f"to \033[1m{self.fn}\033[0m.")
+        return " ".join(msg)
 
 
 class ViolatedConstraint(AlgebraTypeError):
