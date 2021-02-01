@@ -9,9 +9,25 @@ from __future__ import annotations
 from abc import ABC, ABCMeta
 from functools import partial
 from itertools import chain
+from collections import defaultdict
 from typing import Dict, Optional, Iterable, Union, List, Callable, Set
 
 from quangis import error
+
+
+class Variables(defaultdict):
+    """
+    For convenient notation, we provide a dispenser for type variables. Instead
+    of writing x, y = TypeVar(), TypeVar() to use type variables x and y, we
+    can just instantiate a var = Variables() object and get var.x, var.y on the
+    fly.
+    """
+
+    def __init__(self):
+        super().__init__(TypeVar)
+
+    def __getattr__(self, key):
+        return self[key]
 
 
 class Definition(object):
