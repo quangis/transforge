@@ -41,7 +41,20 @@ class AlgebraTypeError(RuntimeError):
     """
     This error occurs when an expression does not typecheck.
     """
-    pass
+
+    def add_expression(self, fn, arg):
+        self.fn = fn
+        self.arg = arg
+
+    def __str__(self) -> str:
+        if self.fn and self.arg:
+            return (
+                f"Error while applying:\n"
+                f"\t\033[1m{self.arg}\033[0m\n\tto\n"
+                f"\t\033[1m{self.fn}\033[0m\n"
+            )
+        else:
+            return "Typing error.\n"
 
 
 class RecursiveType(AlgebraTypeError):
@@ -50,7 +63,10 @@ class RecursiveType(AlgebraTypeError):
         self.t2 = t2
 
     def __str__(self) -> str:
-        return f"Recursive type: {self.t1} and {self.t2}"
+        return (
+            super().__str__() +
+            f"Recursive type: {self.t1} and {self.t2}"
+        )
 
 
 class TypeMismatch(AlgebraTypeError):
@@ -61,13 +77,11 @@ class TypeMismatch(AlgebraTypeError):
         self.arg = None
 
     def __str__(self) -> str:
-        msg = []
-        msg.append(f"Could not unify \033[1m{self.t1}\033[0m "
-                   f"with \033[1m{self.t2}\033[0m")
-        if self.fn and self.arg:
-            msg.append(f" while applying \033[1m{self.arg}\033[0m "
-                       f"to \033[1m{self.fn}\033[0m.")
-        return " ".join(msg)
+        return (
+            super().__str__() +
+            "Type mismatch. Could not unify:\n"
+            f"\t\033[1m{self.t1}\033[0m with \033[1m{self.t2}\033[0m"
+        )
 
 
 class ViolatedConstraint(AlgebraTypeError):
@@ -75,7 +89,10 @@ class ViolatedConstraint(AlgebraTypeError):
         self.c = c
 
     def __str__(self) -> str:
-        return f"Violated type constraint: {self.c}"
+        return (
+            super().__str__() +
+            f"Violated type constraint:\n\t{self.c}"
+        )
 
 
 class NonFunctionApplication(AlgebraTypeError):
@@ -84,7 +101,10 @@ class NonFunctionApplication(AlgebraTypeError):
         self.arg = arg
 
     def __str__(self) -> str:
-        return f"Cannot apply {self.arg} to non-function {self.fn}"
+        return (
+            super().__str__() +
+            f"Cannot apply {self.arg} to non-function {self.fn}"
+        )
 
 
 class AlreadyBound(AlgebraTypeError):
@@ -92,4 +112,7 @@ class AlreadyBound(AlgebraTypeError):
         self.var = var
 
     def __str__(self) -> str:
-        return f"Variable {self.var} was already bound"
+        return (
+            super().__str__() +
+            f"Variable {self.arg} was already bound"
+        )

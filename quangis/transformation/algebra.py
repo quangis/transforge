@@ -27,7 +27,11 @@ class Expr(object):
             for t in self.tokens
         )
         if top_level:
-            return f"{expr} : {self.type}"
+            constraints = [str(c) for c in self.type.all_constraints()]
+            if constraints:
+                return f"{expr} : {self.type} (where {', '.join(constraints)})"
+            else:
+                return f"{expr} : {self.type}"
         elif len(self.tokens) == 1:
             return f"{expr}"
         else:
@@ -36,13 +40,8 @@ class Expr(object):
     def apply(self: Expr, arg: Expr) -> Expr:
         try:
             return Expr([self, arg], self.type.apply(arg.type))
-        except error.TypeMismatch as e:
-            e.fn = self
-            e.arg = arg
-            raise e
-        except error.NonFunctionApplication as e:
-            e.fn = self
-            e.arg = arg
+        except error.AlgebraTypeError as e:
+            e.add_expression(self, arg)
             raise e
 
 
