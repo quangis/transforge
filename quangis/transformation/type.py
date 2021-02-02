@@ -144,7 +144,13 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         Obtain the constraints relevant on the variables.
         """
-        return set.union(*(var.constraints for var in self.variables()))
+        constraint_sets = list(var.constraints for var in self.variables())
+        if len(constraint_sets) > 1:
+            return set.union(*constraint_sets)
+        elif len(constraint_sets) == 1:
+            return constraint_sets[0]
+        else:
+            return set()
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
