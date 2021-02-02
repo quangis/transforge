@@ -134,11 +134,16 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         Obtain all type variables left in the type expression.
         """
-        if isinstance(self, TypeVar):
-            yield self
-        elif isinstance(self, TypeOperator):
+        if isinstance(self, TypeOperator):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
+        else:
+            a = self.binding()
+            if isinstance(a, TypeVar):
+                yield a
+            else:
+                for v in a.variables():
+                    yield v
 
     def all_constraints(self) -> Set[Constraint]:
         """
