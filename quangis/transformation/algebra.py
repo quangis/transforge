@@ -40,13 +40,8 @@ class Expr(object):
     def apply(self: Expr, arg: Expr) -> Expr:
         try:
             return Expr([self, arg], self.type.apply(arg.type))
-        except error.TypeMismatch as e:
-            e.fn = self
-            e.arg = arg
-            raise e
-        except error.NonFunctionApplication as e:
-            e.fn = self
-            e.arg = arg
+        except error.AlgebraTypeError as e:
+            e.add_expression(self, arg)
             raise e
 
 
