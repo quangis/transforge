@@ -172,9 +172,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             elif self in ctx:
                 return ctx[self]
             else:
-                new2 = TypeVar()
-                for tc in self.constraints:
-                    new2.constraints.add(tc)
+                new2 = TypeVar(self.constraints)
                 ctx[self] = new2
                 return new2
         raise ValueError(f"{self} is neither a type nor a type variable")
@@ -185,21 +183,22 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         on the "self" side are tolerated: that is, if self is a subtype of
         other, then they are considered the same, but not vice versa.
         """
-        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            if self.match(other):
-                for x, y in zip(self.types, other.types):
+        a = self.binding(False)
+        b = other.binding(False)
+        if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
+            if a.match(b):
+                for x, y in zip(a.types, b.types):
                     x.unify(y)
             else:
-                raise error.TypeMismatch(self, other)
+                raise error.TypeMismatch(a, b)
         else:
-            a = self.binding(False)
-            b = other.binding(False)
+            if (isinstance(a, TypeOperator) and b in a) or \
+                    (isinstance(b, TypeOperator) and a in b):
+                raise error.RecursiveType(a, b)
             if isinstance(a, TypeVar):
-                if a != b and a in b:
-                    raise error.RecursiveType(a, b)
                 a.bind(b)
             elif isinstance(b, TypeVar):
-                b.unify(a)
+                b.bind(a)
 
     def compatible(self, other: AlgebraType) -> bool:
         """
@@ -231,6 +230,11 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             raise error.NonFunctionApplication(self, arg)
 
     def binding(self, full: bool = True) -> AlgebraType:
+        """
+        Obtain a version of this type with all the bound variables replaced
+        with their bindings. As a side-effect, replaces the types in type
+        operator parameters.
+        """
         if isinstance(self, TypeVar) and self.bound:
             return self.bound.binding(full)
         elif full and isinstance(self, TypeOperator):
@@ -324,11 +328,11 @@ class TypeVar(AlgebraType):
 
     counter = 0
 
-    def __init__(self):
+    def __init__(self, constraints: Iterable[Constraint] = ()):
         cls = type(self)
         self.id = cls.counter
-        self.bound = None
-        self.constraints = set()
+        self.bound: Optional[AlgebraType] = None
+        self.constraints = set(constraints)
         cls.counter += 1
 
     def __str__(self) -> str:
@@ -377,9 +381,10 @@ class Constraint(object):
             *(t.variables() for t in self.options))
 
     def enforce(self):
+        self.subject = self.subject.binding(True)
         self.options = [
             t for t in self.options
-            if self.subject.binding().compatible(t.binding())
+            if self.subject.compatible(t.binding())
         ]
 
         if len(self.options) == 0:
