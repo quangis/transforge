@@ -130,6 +130,12 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         return TypeOperator('function', self, other)
 
+    def is_resolved(self) -> bool:
+        """
+        Test if every variable in this type is resolved.
+        """
+        return all(var.bound is None for var in self.variables())
+
     def variables(self) -> Iterable[TypeVar]:
         """
         Obtain all type variables left in the type expression.
@@ -138,7 +144,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             for v in chain(*(t.variables() for t in self.types)):
                 yield v
         else:
-            a = self.binding()
+            a = self.resolve(full=False)
             if isinstance(a, TypeVar):
                 yield a
             else:
@@ -147,7 +153,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
 
     def all_constraints(self) -> Set[Constraint]:
         """
-        Obtain the constraints relevant on the variables.
+        Obtain the constraints relevant on the variables of this expression.
         """
         constraint_sets = list(var.constraints for var in self.variables())
         if len(constraint_sets) > 1:
@@ -161,7 +167,6 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         Create a fresh copy of this type, with unique new variables.
         """
-
         if isinstance(self, TypeOperator):
             new = TypeOperator(self.name, *(t.fresh(ctx) for t in self.types))
             new.supertype = self.supertype
@@ -183,8 +188,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         on the "self" side are tolerated: that is, if self is a subtype of
         other, then they are considered the same, but not vice versa.
         """
-        a = self.binding(False)
-        b = other.binding(False)
+        a = self.resolve(False)
+        b = other.resolve(False)
         if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
             if a.match(b):
                 for x, y in zip(a.types, b.types):
@@ -195,7 +200,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             if (isinstance(a, TypeOperator) and b in a) or \
                     (isinstance(b, TypeOperator) and a in b):
                 raise error.RecursiveType(a, b)
-            if isinstance(a, TypeVar):
+            elif isinstance(a, TypeVar):
                 a.bind(b)
             elif isinstance(b, TypeVar):
                 b.bind(a)
@@ -216,8 +221,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and self.name == 'function':
             input_type, output_type = self.types
-            arg.binding().unify(input_type.binding())
-            return output_type.binding()
+            arg.resolve().unify(input_type.resolve())
+            return output_type.resolve()
         elif isinstance(self, TypeVar):
             input_type = TypeVar()
             input_type.constraints.union(self.constraints)
@@ -229,18 +234,20 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         else:
             raise error.NonFunctionApplication(self, arg)
 
-    def binding(self, full: bool = True) -> AlgebraType:
+    def resolve(self, full: bool = True) -> AlgebraType:
         """
         Obtain a version of this type with all the bound variables replaced
-        with their bindings. As a side-effect, replaces the types in type
-        operator parameters.
+        with their bindings. When `full`, as a side-effect, replaces the types
+        in type operator parameters.
         """
         if isinstance(self, TypeVar) and self.bound:
-            return self.bound.binding(full)
+            return self.bound.resolve(full)
         elif full and isinstance(self, TypeOperator):
             self.types: List[AlgebraType] = [
-                t.binding(full) for t in self.types]
+                t.resolve(full) for t in self.types]
         return self
+
+    # constraints #############################################################
 
     def limit(self, *options: AlgebraType) -> Constraint:
         """
@@ -325,6 +332,11 @@ class TypeOperator(AlgebraType):
 
 
 class TypeVar(AlgebraType):
+    """
+    Type variable. Note that any bindings and constraints are bound to the
+    actual object instance, so make a fresh copy before applying them if the
+    variable is not supposed to be a concrete instance.
+    """
 
     counter = 0
 
@@ -338,13 +350,19 @@ class TypeVar(AlgebraType):
     def __str__(self) -> str:
         return f"x{self.id}"
 
-    def bind(self, binding: AlgebraType):
+    def bind(self, binding: AlgebraType) -> None:
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
         self.bound = binding
 
+        for var in binding.variables():
+            var.constraints.union(self.constraints)
+
         for constraint in self.constraints:
+            constraint.enforce()
+
+        for constraint in binding.all_constraints():
             constraint.enforce()
 
 
@@ -366,7 +384,7 @@ class Constraint(object):
 
     def __str__(self) -> str:
         return (
-            f"{self.subject.binding()} must be one of "
+            f"{self.subject.resolve()} must be one of "
             f"[{', '.join(str(t) for t in self.initial_options)}]"
         )
 
@@ -380,16 +398,16 @@ class Constraint(object):
             self.subject.variables(),
             *(t.variables() for t in self.options))
 
-    def enforce(self):
-        self.subject = self.subject.binding(True)
+    def enforce(self) -> None:
+        self.subject = self.subject.resolve(True)
         self.options = [
             t for t in self.options
-            if self.subject.compatible(t.binding())
+            if self.subject.compatible(t.resolve())
         ]
 
         if len(self.options) == 0:
             raise error.ViolatedConstraint(self)
         elif len(self.options) == 1:
-            self.subject.binding().unify(self.options[0].binding())
+            self.subject.resolve().unify(self.options[0].resolve())
 
 
