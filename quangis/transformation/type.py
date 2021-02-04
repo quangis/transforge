@@ -20,13 +20,15 @@ class Variables(defaultdict):
     For convenient notation, we provide a dispenser for type variables. Instead
     of writing x, y = TypeVar(), TypeVar() to use type variables x and y, we
     can just instantiate a var = Variables() object and get var.x, var.y on the
-    fly.
+    fly. To get a wildcard variable, use 'var._'.
     """
 
     def __init__(self):
         super().__init__(TypeVar)
 
     def __getattr__(self, key):
+        if key == '_':
+            return TypeVar()
         return self[key]
 
 
