@@ -105,14 +105,3 @@ class NonFunctionApplication(AlgebraTypeError):
             super().__str__() +
             f"Cannot apply {self.arg} to non-function {self.fn}"
         )
-
-
-class AlreadyBound(AlgebraTypeError):
-    def __init__(self, var):
-        self.var = var
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"Variable {self.arg} was already bound"
-        )

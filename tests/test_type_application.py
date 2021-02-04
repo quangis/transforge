@@ -150,6 +150,15 @@ class TestType(unittest.TestCase):
             Int,
             result=Int)
 
+    def test_overloaded_function(self):
+        self.apply(
+            (Str ** Int, Int ** Str),
+            Int,
+            result=Str)
+
+    # If you have a function that takes Any ** Any but you get an Int ** Int,
+    # that is fine. But what if it affects a binding somewhere down the stream?
+
 
 if __name__ == '__main__':
     unittest.main()
