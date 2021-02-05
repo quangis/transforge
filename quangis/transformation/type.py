@@ -217,7 +217,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     def compatible(self, other: AlgebraType, allow_subtype: bool = False) -> bool:
         """
         Test if a type is structurally consistent with another, that is, if
-        they fit together modulo variables. Subtypes allowed on the self side.
+        they fit together modulo variables. Subtypes may be allowed on the self
+        side.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
             return self.match(other, allow_subtype) and all(
@@ -232,9 +233,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and self.name == 'function':
             input_type, output_type = self.types
-            constraints = arg.unify(input_type)
-            for c in constraints:
-                c.enforce()
+            for constraint in arg.unify(input_type):
+                constraint.enforce()
             return output_type.resolve()
         #elif isinstance(self, TypeVar):
         #    input_type, output_type = TypeVar(), TypeVar()
@@ -274,6 +274,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             self,
             op: Callable[..., TypeOperator],
             target: AlgebraType,
+            allow_subtype: bool = False,
             at: Optional[int] = None,
             min: int = 1,
             max: int = 3) -> Constraint:
@@ -292,7 +293,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                         target if i == p else TypeVar()
                         for i in range(min, n+1))
                     ))
-        return Constraint(self, *patterns)
+        return Constraint(self, *patterns, allow_subtype=allow_subtype)
 
 
 class TypeOperator(AlgebraType):
@@ -368,6 +369,8 @@ class TypeVar(AlgebraType):
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
+        for var in binding.variables():
+            var.constraints = set.union(var.constraints, self.constraints)
         self.bound = binding
 
 
