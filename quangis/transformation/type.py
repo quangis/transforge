@@ -28,7 +28,7 @@ class Variables(defaultdict):
 
     def __getattr__(self, key):
         if key == '_':
-            return TypeVar()
+            return TypeVar(wildcard=True)
         return self[key]
 
 
@@ -181,7 +181,9 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             if self in ctx:
                 return ctx[self]
             else:
-                new = TypeVar(c.fresh(ctx) for c in self.constraints)
+                new = TypeVar(
+                    (c.fresh(ctx) for c in self.constraints),
+                    wildcard=self.wildcard)
                 ctx[self] = new
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
@@ -290,7 +292,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             for p in positions:
                 if n >= p:
                     patterns.append(op(*(
-                        target if i == p else TypeVar()
+                        target if i == p else TypeVar(wildcard=True)
                         for i in range(min, n+1))
                     ))
         return Constraint(self, *patterns, allow_subtype=allow_subtype)
@@ -355,15 +357,19 @@ class TypeVar(AlgebraType):
 
     counter = 0
 
-    def __init__(self, constraints: Iterable[Constraint] = ()):
+    def __init__(
+            self,
+            constraints: Iterable[Constraint] = (),
+            wildcard: bool = False):
         cls = type(self)
         self.id = cls.counter
         self.bound: Optional[AlgebraType] = None
         self.constraints = set(constraints)
+        self.wildcard = wildcard
         cls.counter += 1
 
     def __str__(self) -> str:
-        return f"x{self.id}"
+        return "_" if self.wildcard else f"x{self.id}"
 
     def bind(self, binding: AlgebraType) -> None:
         assert (not self.bound or binding == self.bound), \
@@ -387,7 +393,6 @@ class Constraint(object):
             allow_subtype: bool = False):
         self.subject = t
         self.patterns = list(patterns)
-        self.initial_patterns = list(patterns)
         self.allow_subtype = allow_subtype
 
         # In general, a recursivity check would need to inspect a web of
@@ -397,10 +402,8 @@ class Constraint(object):
     def __str__(self) -> str:
         return (
             f"{self.subject} must be "
-            +
-            ("a subtype of " if self.allow_subtype else "")
-            +
-            f"{' or '.join(str(t.resolve()) for t in self.initial_patterns)}"
+            f"{'a subtype of' if self.allow_subtype else ''} "
+            f"{' or '.join(str(t) for t in self.patterns)}"
         )
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
@@ -420,11 +423,7 @@ class Constraint(object):
 
     def enforce(self) -> None:
         self.resolve()
-
-        self.patterns = [
-            t for t in self.patterns
-            if self.subject.compatible(t, self.allow_subtype)
-        ]
-
-        if len(self.patterns) == 0:
+        if not any(
+                self.subject.compatible(t, self.allow_subtype)
+                for t in self.patterns):
             raise error.ViolatedConstraint(self)
