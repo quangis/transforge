@@ -199,7 +199,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
                 if a.match(b):
                     for x, y in zip(a.types, b.types):
-                        result.union(x.unify(y))
+                        result = result.union(x.unify(y))
                 else:
                     raise error.TypeMismatch(a, b)
             else:
@@ -208,20 +208,21 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                     raise error.RecursiveType(a, b)
                 elif isinstance(a, TypeVar) and a != b:
                     a.bind(b)
-                    result.union(a.constraints)
+                    result = result.union(a.constraints)
                 elif isinstance(b, TypeVar) and a != b:
                     b.bind(a)
-                    result.union(b.constraints)
+                    result = result.union(b.constraints)
         return result
 
-    def compatible(self, other: AlgebraType, allow_subtype: bool = True) -> bool:
+    def compatible(self, other: AlgebraType, allow_subtype: bool = False) -> bool:
         """
         Test if a type is structurally consistent with another, that is, if
         they fit together modulo variables. Subtypes allowed on the self side.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            return self.match(other, allow_subtype) and \
-                all(s.compatible(t) for s, t in zip(self.types, other.types))
+            return self.match(other, allow_subtype) and all(
+                s.compatible(t, allow_subtype)
+                for s, t in zip(self.types, other.types))
         else:
             return True
 
@@ -235,11 +236,11 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
             for c in constraints:
                 c.enforce()
             return output_type.resolve()
-        elif isinstance(self, TypeVar):
-            input_type, output_type = TypeVar(), TypeVar()
-            fn = input_type ** output_type
-            self.bind(fn)
-            return fn.apply(arg)
+        #elif isinstance(self, TypeVar):
+        #    input_type, output_type = TypeVar(), TypeVar()
+        #    fn = input_type ** output_type
+        #    self.bind(fn)
+        #    return fn.apply(arg)
         else:
             raise error.NonFunctionApplication(self, arg)
 
@@ -262,6 +263,12 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         options.
         """
         return Constraint(self, *patterns)
+
+    def subtype(self, *patterns: AlgebraType) -> Constraint:
+        """
+        Ensure that the subject is a subtype of something else.
+        """
+        return Constraint(self, *patterns, allow_subtype=True)
 
     def has_param(
             self,
@@ -329,7 +336,7 @@ class TypeOperator(AlgebraType):
         return (
             (self.name == other.name and self.arity == other.arity) or
             (allow_subtype and bool(
-                self.supertype and self.supertype.match(other)
+                self.supertype and self.supertype.match(other, allow_subtype)
             ))
         )
 
@@ -370,10 +377,15 @@ class Constraint(object):
     consistent with its subject type.
     """
 
-    def __init__(self, t: AlgebraType, *patterns: AlgebraType):
+    def __init__(
+            self,
+            t: AlgebraType,
+            *patterns: AlgebraType,
+            allow_subtype: bool = False):
         self.subject = t
         self.patterns = list(patterns)
         self.initial_patterns = list(patterns)
+        self.allow_subtype = allow_subtype
 
         # In general, a recursivity check would need to inspect a web of
         # interdependencies --- and anyway, it isn't needed because we will not
@@ -382,13 +394,17 @@ class Constraint(object):
     def __str__(self) -> str:
         return (
             f"{self.subject} must be "
+            +
+            ("a subtype of " if self.allow_subtype else "")
+            +
             f"{' or '.join(str(t.resolve()) for t in self.initial_patterns)}"
         )
 
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
         return Constraint(
             self.subject.fresh(ctx),
-            *(t.fresh(ctx) for t in self.patterns))
+            *(t.fresh(ctx) for t in self.patterns),
+            allow_subtype=self.allow_subtype)
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
@@ -404,7 +420,7 @@ class Constraint(object):
 
         self.patterns = [
             t for t in self.patterns
-            if self.subject.compatible(t)
+            if self.subject.compatible(t, self.allow_subtype)
         ]
 
         if len(self.patterns) == 0:
