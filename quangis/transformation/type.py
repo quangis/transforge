@@ -1,9 +1,21 @@
 """
 Generic type system. Inspired loosely by Hindley-Milner type inference in
 functional programming languages.
-
-Be warned: This module abuses overloading of Python's standard operators.
 """
+# This module abuses overloading of Python's standard operators. A more urgent
+# warning: objects are intricately linked, meaning that changes may have
+# unforeseen side-effects. However, this should be limited to this particular
+# module, as long as it is used in the intended way.
+#
+# A primer: Applying an argument A to a function B -> C works by trying to bind
+# type variables in such a way that A becomes equal to B. Type variables are
+# created once, and binding them happens on the objects themselves. That is why
+# we copy fresh instances of generic type expressions before using them or
+# adding constraints to them. Type operators encompass all other type
+# components: basic types, parameterized types and functions. For them,
+# pointers are not as meaningful. Constraints are added to relevant variables
+# and checked whenever that variable is bound. To understand the module, start
+# by reading the methods of the AlgebraType class.
 from __future__ import annotations
 
 from abc import ABC, ABCMeta
@@ -18,9 +30,11 @@ from quangis import error
 class Variables(defaultdict):
     """
     For convenient notation, we provide a dispenser for type variables. Instead
-    of writing x, y = TypeVar(), TypeVar() to use type variables x and y, we
-    can just instantiate a var = Variables() object and get var.x, var.y on the
-    fly. To get a wildcard variable, use 'var._'.
+    of writing x = TypeVar() to introduce type variable x every time, we can
+    just instantiate a var = Variables() object and get var.x, var.y on the
+    fly. To get a wildcard variable, use 'var._'; the assumption is that a
+    wildcard will never be used anywhere else, so it will return a new type
+    variable every time.
     """
 
     def __init__(self):
@@ -35,8 +49,7 @@ class Variables(defaultdict):
 class Definition(object):
     """
     This class defines a function: it knows its general type and constraints,
-    plus additional information that may be used by some parser, and can
-    generate fresh instances of the function.
+    and can generate fresh instances.
     """
 
     def __init__(
@@ -51,24 +64,16 @@ class Definition(object):
         relevant information.
         """
 
-        types = [t]
         constraints = []
         number_of_data_arguments = 0
 
         for arg in args:
             if isinstance(arg, Constraint):
                 constraints.append(arg)
-            #elif isinstance(arg, AlgebraType):
-            #    types.append(arg)
             elif isinstance(arg, int):
                 number_of_data_arguments = arg
             else:
-                raise ValueError(f"cannot use type {type(arg)} in Definition")
-
-        # if more than one type is given, consider the function overloaded
-        if len(types) > 1:
-            t = TypeVar()
-            constraints.append(t.limit(*types))
+                raise ValueError(f"cannot use extra {type(arg)} in Definition")
 
         self.name = name
         self.type = t
@@ -140,7 +145,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
 
     def variables(self) -> Iterable[TypeVar]:
         """
-        Obtain all type variables left in the type expression.
+        Obtain all type variables currently in the type expression.
         """
         if isinstance(self, TypeOperator):
             for v in chain(*(t.variables() for t in self.types)):
@@ -153,24 +158,10 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 for v in a.variables():
                     yield v
 
-    def all_constraints(self) -> Set[Constraint]:
-        """
-        Obtain the constraints relevant on the variables of this expression.
-        """
-        constraint_sets = list(var.constraints for var in self.variables())
-        if len(constraint_sets) > 1:
-            return set.union(*constraint_sets)
-        elif len(constraint_sets) == 1:
-            return constraint_sets[0]
-        else:
-            return set()
-
     def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> AlgebraType:
         """
         Create a fresh copy of this type, with unique new variables.
         """
-        assert self.is_resolved(), \
-            "Cannot create a copy of a type with bound variables"
 
         if isinstance(self, TypeOperator):
             return TypeOperator(
@@ -178,6 +169,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 *(t.fresh(ctx) for t in self.types),
                 supertype=self.supertype)
         elif isinstance(self, TypeVar):
+            assert self.is_resolved(), \
+                "Cannot create a copy of a type with bound variables"
             if self in ctx:
                 return ctx[self]
             else:
@@ -191,8 +184,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     def unify(self, other: AlgebraType) -> Set[Constraint]:
         """
         Bind variables such that both types become the same. Binding is a
-        side-effect; use resolve() to consolidate. Return a set of constraints
-        that are triggered by the bindings.
+        side-effect; use resolve() to consolidate the bindings. Returns a set
+        of constraints whose enforcement should be triggered as a result.
         """
         result: Set[Constraint] = set()
         a = self.resolve(full=False)
@@ -202,6 +195,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 if a.match(b):
                     for x, y in zip(a.types, b.types):
                         result = result.union(x.unify(y))
+                        x.unify(y)
                 else:
                     raise error.TypeMismatch(a, b)
             else:
@@ -216,19 +210,6 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                     result = result.union(b.constraints)
         return result
 
-    def compatible(self, other: AlgebraType, allow_subtype: bool = False) -> bool:
-        """
-        Test if a type is structurally consistent with another, that is, if
-        they fit together modulo variables. Subtypes may be allowed on the self
-        side.
-        """
-        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            return self.match(other, allow_subtype) and all(
-                s.compatible(t, allow_subtype)
-                for s, t in zip(self.types, other.types))
-        else:
-            return True
-
     def apply(self, arg: AlgebraType) -> AlgebraType:
         """
         Apply an argument to a function type to get its resolved output type.
@@ -236,47 +217,61 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         if isinstance(self, TypeOperator) and self.name == 'function':
             input_type, output_type = self.types
             for constraint in arg.unify(input_type):
+                constraint.resolve()
                 constraint.enforce()
             return output_type.resolve()
-        #elif isinstance(self, TypeVar):
-        #    input_type, output_type = TypeVar(), TypeVar()
-        #    fn = input_type ** output_type
-        #    self.bind(fn)
-        #    return fn.apply(arg)
         else:
             raise error.NonFunctionApplication(self, arg)
 
     def resolve(self, full: bool = True) -> AlgebraType:
         """
-        Obtain a version of this type with the bound variable replaced with its
-        binding. When `full`, do so recursively.
+        A `full` resolve obtains a version of this type with all bound
+        variables replaced with their bindings. Otherwise, just resolve the
+        current variable.
         """
         if isinstance(self, TypeVar) and self.bound:
             return self.bound.resolve(full)
         elif full and isinstance(self, TypeOperator):
-            self.types = [t.resolve(full) for t in self.types]
+            return TypeOperator(
+                self.name,
+                *(t.resolve(full) for t in self.types),
+                supertype=self.supertype)
         return self
 
-    # constraints #############################################################
+    def compatible(
+            self,
+            other: AlgebraType,
+            allow_subtype: bool = False) -> bool:
+        """
+        Is the type structurally consistent with another, that is, do they
+        'fit', modulo variables. Subtypes may be allowed on the self side.
+        """
+        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+            return self.match(other, allow_subtype) and all(
+                s.compatible(t, allow_subtype)
+                for s, t in zip(self.types, other.types))
+        return True
 
-    def limit(self, *patterns: AlgebraType) -> Constraint:
-        """
-        Produce a constraint ensuring that the subject must be one of several
-        options.
-        """
-        return Constraint(self, *patterns)
+    # constraints #############################################################
 
     def subtype(self, *patterns: AlgebraType) -> Constraint:
         """
         Ensure that the subject is a subtype of something else.
         """
-        return Constraint(self, *patterns, allow_subtype=True)
+        return self.is_(*patterns, subtype=True)
 
-    def has_param(
+    def is_(self, *patterns: AlgebraType, subtype: bool = False) -> Constraint:
+        """
+        Ensure that the subject is one of several options. Subtypes may be
+        allowed.
+        """
+        return Constraint(self, *patterns, allow_subtype=subtype)
+
+    def has(
             self,
             op: Callable[..., TypeOperator],
             target: AlgebraType,
-            allow_subtype: bool = False,
+            subtype: bool = False,
             at: Optional[int] = None,
             min: int = 1,
             max: int = 3) -> Constraint:
@@ -295,7 +290,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                         target if i == p else TypeVar(wildcard=True)
                         for i in range(min, n+1))
                     ))
-        return Constraint(self, *patterns, allow_subtype=allow_subtype)
+        return Constraint(self, *patterns, allow_subtype=subtype)
 
 
 class TypeOperator(AlgebraType):
@@ -375,8 +370,14 @@ class TypeVar(AlgebraType):
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
+        # Once a variable has been bound, its constraints must carry over to
+        # the variables in its binding. Consider a variable x that is
+        # constrained to T(A) or T(B); and it has now been bound to T(z). This
+        # can work, but only if binding z will still trigger the check that the
+        # initial constraint still holds.
         for var in binding.variables():
             var.constraints = set.union(var.constraints, self.constraints)
+
         self.bound = binding
 
 
@@ -422,7 +423,6 @@ class Constraint(object):
         self.patterns = [t.resolve(full=True) for t in self.patterns]
 
     def enforce(self) -> None:
-        self.resolve()
         if not any(
                 self.subject.compatible(t, self.allow_subtype)
                 for t in self.patterns):

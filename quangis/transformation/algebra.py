@@ -27,7 +27,11 @@ class Expr(object):
             for t in self.tokens
         )
         if top_level:
-            constraints = [str(c) for c in self.type.all_constraints()]
+            constraints = set(
+                str(constraint)
+                for var in self.type.variables()
+                for constraint in var.constraints
+            )
             if constraints:
                 return f"{expr} : {self.type} (where {', '.join(constraints)})"
             else:
