@@ -75,6 +75,15 @@ class Definition(object):
             else:
                 raise ValueError(f"cannot use extra {type(arg)} in Definition")
 
+        bound_variables = set(t.variables())
+        for constraint in constraints:
+            if not all(
+                    var.wildcard or var in bound_variables
+                    for var in constraint.variables()):
+                raise ValueError(
+                    "all variables in a constraint must be bound by "
+                    "an occurrence in the accompanying type signature")
+
         self.name = name
         self.type = t
         self.constraints = constraints
