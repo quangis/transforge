@@ -190,20 +190,17 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
 
-    def unify(self, other: AlgebraType) -> Set[Constraint]:
+    def unify(self, other: AlgebraType) -> None:
         """
         Bind variables such that both types become the same. Binding is a
-        side-effect; use resolve() to consolidate the bindings. Returns a set
-        of constraints whose enforcement should be triggered as a result.
+        side-effect; use resolve() to consolidate the bindings.
         """
-        result: Set[Constraint] = set()
         a = self.resolve(full=False)
         b = other.resolve(full=False)
         if a is not b:
             if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
                 if a.match(b):
                     for x, y in zip(a.types, b.types):
-                        result = result.union(x.unify(y))
                         x.unify(y)
                 else:
                     raise error.TypeMismatch(a, b)
@@ -213,11 +210,8 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
                     raise error.RecursiveType(a, b)
                 elif isinstance(a, TypeVar) and a != b:
                     a.bind(b)
-                    result = result.union(a.constraints)
                 elif isinstance(b, TypeVar) and a != b:
                     b.bind(a)
-                    result = result.union(b.constraints)
-        return result
 
     def apply(self, arg: AlgebraType) -> AlgebraType:
         """
@@ -225,9 +219,7 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
         """
         if isinstance(self, TypeOperator) and self.name == 'function':
             input_type, output_type = self.types
-            for constraint in arg.unify(input_type):
-                constraint.resolve()
-                constraint.enforce()
+            arg.unify(input_type)
             return output_type.resolve()
         else:
             raise error.NonFunctionApplication(self, arg)
@@ -388,6 +380,10 @@ class TypeVar(AlgebraType):
             var.constraints = set.union(var.constraints, self.constraints)
 
         self.bound = binding
+
+        for constraint in self.constraints:
+            constraint.resolve()
+            constraint.enforce()
 
 
 class Constraint(object):
