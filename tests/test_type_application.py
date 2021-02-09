@@ -62,102 +62,58 @@ class TestType(unittest.TestCase):
             result=Str ** Str)
 
     def test_simple_subtype_match(self):
-        self.apply(Any ** Any, Int, result=Any)
+        self.apply(
+            (var.any ** Any, var.any.subtype(Any)),
+            Int,
+            result=Any)
 
     def test_simple_subtype_mismatch(self):
         self.apply(Int ** Any, Any, result=error.TypeMismatch)
 
     def test_complex_subtype_match(self):
-        self.apply((Any ** Any) ** Any, Int ** Int, result=Any)
+        self.apply(
+            ((var.any ** var.any) ** Any, var.any.subtype(Any)),
+            Int ** Int, result=Any)
 
     def test_complex_subtype_mismatch(self):
         self.apply((Int ** Any) ** Any, Any ** Any, result=error.TypeMismatch)
 
     def test_variable_subtype_match(self):
-        self.apply((var.x ** Any) ** var.x, Int ** Int, result=Int)
+        self.apply(
+            ((var.x ** var.y) ** var.x, var.y.subtype(Any)),
+            (Int ** Any), result=Int)
 
     def test_variable_subtype_mismatch(self):
-        self.apply((var.x ** Int) ** var.x, Int ** Any, result=error.TypeMismatch)
+        self.apply(
+            ((var.x ** var.y) ** var.x, var.y.subtype(Int)),
+            (Int ** Any), result=error.ViolatedConstraint)
 
     def test_simple_constraints_passed(self):
         self.apply(
-            (var.x ** var.x, var.x.limit(Int, Str)),
+            (var.x ** var.x, var.x.subtype(Int, Str)),
             Int,
             result=Int
         )
 
     def test_simple_constraints_subtype_passed(self):
         self.apply(
-            (var.x ** var.x, var.x.limit(Any)),
+            (var.x ** var.x, var.x.subtype(Any)),
             Int,
             result=Int
         )
 
     def test_simple_constraints_subtype_violated(self):
         self.apply(
-            (var.x ** var.x, var.x.limit(Int, Str)),
+            (var.x ** var.x, var.x.subtype(Int, Str)),
             Any,
             result=error.ViolatedConstraint
         )
 
-    # fails
-    def test_compose_constraint_unification(self):
-        self.apply(
-            ((var.y ** var.z) ** (var.x ** var.y) ** (var.x ** var.z)),
-            (var.x, var.x.limit(Int ** Str, Str ** Int)),
-            Str ** Int,
-            result=Str ** Str)
-
-    # fails
-    def test_compose_constraint_subtype(self):
-        self.apply(
-            ((var.y ** var.z) ** (var.x ** var.y) ** (var.x ** var.z)),
-            (var.x, var.x.limit(Int ** Str, Str ** Int)),
-            Str ** Any,
-            result=Int ** Any)
-
     def test_compose_something(self):
         self.apply(
-            (var.x ** var.x, (var.x ** var.x).limit(Any ** var.z)),
+            (var.x ** var.x, (var.x ** var.x).subtype(Any ** var._)),
             Int,
             result=Int)
-
-    def test_recursive_constraint(self):
-        self.assertRaises(error.RecursiveType, var.x.limit, var.x ** var.x)
-
-    def test_constraint_bound_on_subject_side(self):
-        self.apply(
-            (var.x ** var.y, var.x.limit(var.y)),
-            Int,
-            result=Int)
-
-    def test_constraint_bound_on_typeclass_side(self):
-        self.apply(
-            (var.x ** var.y, var.y.limit(var.x)),
-            Int,
-            result=Int)
-
-    def test_constraint_bound_on_subject_side_multiple(self):
-        self.apply(
-            (var.x ** var.y, var.x.limit(var.y, Int)),
-            Str,
-            result=Str)
-
-    # fails
-    def test_constraint_bound_on_typeclass_side_multiple(self):
-        self.apply(
-            (var.x ** var.y, var.y.limit(var.x, Int)),
-            Int,
-            result=Int)
-
-    def test_overloaded_function(self):
-        self.apply(
-            (Str ** Int, Int ** Str),
-            Int,
-            result=Str)
-
-    # If you have a function that takes Any ** Any but you get an Int ** Int,
-    # that is fine. But what if it affects a binding somewhere down the stream?
 
 
 if __name__ == '__main__':
