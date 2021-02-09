@@ -4,10 +4,10 @@ from quangis import error
 from quangis.transformation.type import TypeOperator, Variables, Definition
 
 var = Variables()
-Any = TypeOperator.Any()
-Int = TypeOperator.Int(supertype=Any)
-Str = TypeOperator.Str(supertype=Any)
-T = TypeOperator.T
+Any = TypeOperator("Any")
+Int = TypeOperator("Int", supertype=Any)
+Str = TypeOperator("Str", supertype=Any)
+T = TypeOperator.parameterized("T", 1)
 
 
 class TestType(unittest.TestCase):

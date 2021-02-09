@@ -18,7 +18,7 @@ functional programming languages.
 # by reading the methods of the AlgebraType class.
 from __future__ import annotations
 
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from functools import partial
 from itertools import chain
 from collections import defaultdict
@@ -105,20 +105,7 @@ class Definition(object):
         )
 
 
-class TypeDefiner(ABCMeta):
-    """
-    Allowing us to write type definitions in an intuitive way, such as
-    TypeOperator.Int() for basic types or TypeOperator.Tuple for parameterized
-    types.
-    """
-    # TODO add a parameter that fixes the arity of the operator or perhaps even
-    # constrains it arguments
-
-    def __getattr__(self, key: str) -> Callable[..., TypeOperator]:
-        return partial(TypeOperator, key)
-
-
-class AlgebraType(ABC, metaclass=TypeDefiner):
+class AlgebraType(ABC):
     """
     Abstract base class for type operators and type variables. Note that basic
     types are just 0-ary type operators and functions are just particular 2-ary
@@ -317,6 +304,25 @@ class TypeOperator(AlgebraType):
     @property
     def arity(self) -> int:
         return len(self.types)
+
+    @staticmethod
+    def parameterized(
+            name: str,
+            arity: int = 0) -> Callable[..., TypeOperator]:
+        """
+        Allowing us to define parameterized types in an intuitive way, while
+        optionally fixing the arity of the operator.
+        """
+        if arity > 0:
+            def f(*params):
+                if len(params) != arity:
+                    raise TypeError(
+                        f"type operator {name} has arity {arity}, "
+                        f"but was given {len(params)} parameter(s)")
+                return TypeOperator(name, *params)
+            return f
+        else:
+            return partial(TypeOperator)
 
 
 class TypeVar(AlgebraType):
