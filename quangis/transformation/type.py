@@ -18,11 +18,11 @@ functional programming languages.
 # by reading the methods of the AlgebraType class.
 from __future__ import annotations
 
-from abc import ABC, ABCMeta
+from abc import ABC, ABCMeta, abstractmethod
 from functools import partial
 from itertools import chain
 from collections import defaultdict
-from typing import Dict, Optional, Iterable, Union, List, Callable, Set
+from typing import Dict, Optional, Iterable, Union, List, Callable
 
 from quangis import error
 
@@ -256,42 +256,17 @@ class AlgebraType(ABC, metaclass=TypeDefiner):
     # constraints #############################################################
 
     def subtype(self, *patterns: AlgebraType) -> Constraint:
-        """
-        Ensure that the subject is a subtype of something else.
-        """
-        return self.is_(*patterns, subtype=True)
+        return MembershipConstraint(self, *patterns, allow_subtype=True)
 
-    def is_(self, *patterns: AlgebraType, subtype: bool = False) -> Constraint:
-        """
-        Ensure that the subject is one of several options. Subtypes may be
-        allowed.
-        """
-        return Constraint(self, *patterns, allow_subtype=subtype)
+    def member(self, *patterns: AlgebraType) -> Constraint:
+        return MembershipConstraint(self, *patterns, allow_subtype=False)
 
-    def has(
-            self,
-            op: Callable[..., TypeOperator],
-            target: AlgebraType,
+    def param(
+            self, target: AlgebraType,
             subtype: bool = False,
-            at: Optional[int] = None,
-            min: int = 1,
-            max: int = 3) -> Constraint:
-        """
-        Produce a constraint ensuring that the subject must be a parameterized
-        type operator `op` that contains the target at some point in its `min`
-        to `max` parameters.
-        """
-        patterns: List[AlgebraType] = []
-        positions = list(range(min, max+1)) if at is None else [at]
-
-        for n in range(min, max+1):
-            for p in positions:
-                if n >= p:
-                    patterns.append(op(*(
-                        target if i == p else TypeVar(wildcard=True)
-                        for i in range(min, n+1))
-                    ))
-        return Constraint(self, *patterns, allow_subtype=subtype)
+            at: Optional[int] = None) -> Constraint:
+        return ParameterConstraint(
+            self, target, position=at, allow_subtype=subtype)
 
 
 class TypeOperator(AlgebraType):
@@ -386,37 +361,20 @@ class TypeVar(AlgebraType):
             constraint.enforce()
 
 
-class Constraint(object):
+class Constraint(ABC):
     """
-    A constraint is a set of types, at least one of which must always remain
-    consistent with its subject type.
+    A constraint enforces that its subject type always remains consistent with
+    whatever condition it represents.
     """
 
     def __init__(
             self,
-            t: AlgebraType,
+            type: AlgebraType,
             *patterns: AlgebraType,
             allow_subtype: bool = False):
-        self.subject = t
+        self.subject = type
         self.patterns = list(patterns)
         self.allow_subtype = allow_subtype
-
-        # In general, a recursivity check would need to inspect a web of
-        # interdependencies --- and anyway, it isn't needed because we will not
-        # unify, only check
-
-    def __str__(self) -> str:
-        return (
-            f"{self.subject} must be "
-            f"{'a subtype of' if self.allow_subtype else ''} "
-            f"{' or '.join(str(t) for t in self.patterns)}"
-        )
-
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Constraint:
-        return Constraint(
-            self.subject.fresh(ctx),
-            *(t.fresh(ctx) for t in self.patterns),
-            allow_subtype=self.allow_subtype)
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
@@ -427,8 +385,85 @@ class Constraint(object):
         self.subject = self.subject.resolve(full=True)
         self.patterns = [t.resolve(full=True) for t in self.patterns]
 
+    @abstractmethod
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]):
+        return NotImplemented
+
+    @abstractmethod
+    def enforce(self) -> None:
+        """
+        Check that the resolved constraint is still satisfied.
+        """
+        raise NotImplementedError
+
+
+class MembershipConstraint(Constraint):
+    """
+    A membership constraint checks that the subject is one of the given types.
+    """
+
+    def __str__(self) -> str:
+        return (
+            f"{self.subject} must be "
+            f"{'a subtype of' if self.allow_subtype else ''} "
+            f"{' or '.join(str(t) for t in self.patterns)}"
+        )
+
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> MembershipConstraint:
+        return MembershipConstraint(
+            self.subject.fresh(ctx),
+            *(t.fresh(ctx) for t in self.patterns),
+            allow_subtype=self.allow_subtype)
+
     def enforce(self) -> None:
         if not any(
-                self.subject.compatible(t, self.allow_subtype)
-                for t in self.patterns):
+                self.subject.compatible(pattern, self.allow_subtype)
+                for pattern in self.patterns):
+            raise error.ViolatedConstraint(self)
+
+
+class ParameterConstraint(Constraint):
+    """
+    A parameter constraint checks that the subject is a parameterized type with
+    one of the given types occurring somewhere in its parameters.
+    """
+
+    def __init__(
+            self,
+            *nargs,
+            position: Optional[int] = None,
+            **kwargs):
+        self.position = position
+        super().__init__(*nargs, **kwargs)
+
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> ParameterConstraint:
+        return ParameterConstraint(
+            self.subject.fresh(ctx),
+            *(t.fresh(ctx) for t in self.patterns),
+            allow_subtype=self.allow_subtype,
+            position=self.position)
+
+    def __str__(self) -> str:
+        return (
+            f"{self.subject} must have "
+            f"{'a subtype of ' if self.allow_subtype else ''}"
+            f"{' or '.join(str(t) for t in self.patterns)} as parameter"
+            f"{'' if self.position is None else ' at #' + str(self.position)}"
+        )
+
+    def compatible(self, pattern: AlgebraType) -> bool:
+        if isinstance(self.subject, TypeOperator):
+            if self.position is None:
+                return any(
+                    param.compatible(pattern, self.allow_subtype)
+                    for param in self.subject.types)
+            elif self.position-1 < len(self.subject.types):
+                return self.subject.types[self.position-1].compatible(
+                    pattern, self.allow_subtype)
+            return False
+        else:
+            return True
+
+    def enforce(self) -> None:
+        if not any(self.compatible(pattern) for pattern in self.patterns):
             raise error.ViolatedConstraint(self)
