@@ -117,7 +117,7 @@ class Term(ABC):
     def __contains__(self, value: Term) -> bool:
         return value == self or (
             isinstance(self, TypeOperator) and
-            any(value in t for t in self.types))
+            any(value in t for t in self.params))
 
     def __pow__(self, other: Term) -> TypeOperator:
         """
@@ -143,7 +143,7 @@ class Term(ABC):
         Obtain all type variables currently in the type expression.
         """
         if isinstance(self, TypeOperator):
-            for v in chain(*(t.variables() for t in self.types)):
+            for v in chain(*(t.variables() for t in self.params)):
                 yield v
         else:
             a = self.resolve(full=False)
@@ -161,7 +161,7 @@ class Term(ABC):
         if isinstance(self, TypeOperator):
             return TypeOperator(
                 self.name,
-                *(t.fresh(ctx) for t in self.types),
+                *(t.fresh(ctx) for t in self.params),
                 supertype=self.supertype)
         elif isinstance(self, TypeVar):
             assert self.is_resolved(), \
@@ -186,7 +186,7 @@ class Term(ABC):
         if a is not b:
             if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
                 if a.match(b):
-                    for x, y in zip(a.types, b.types):
+                    for x, y in zip(a.params, b.params):
                         x.unify(y)
                 else:
                     raise error.TypeMismatch(a, b)
@@ -204,7 +204,7 @@ class Term(ABC):
         Apply an argument to a function type to get its resolved output type.
         """
         if isinstance(self, TypeOperator) and self.name == 'function':
-            input_type, output_type = self.types
+            input_type, output_type = self.params
             arg.unify(input_type)
             return output_type.resolve()
         else:
@@ -221,7 +221,7 @@ class Term(ABC):
         elif full and isinstance(self, TypeOperator):
             return TypeOperator(
                 self.name,
-                *(t.resolve(full) for t in self.types),
+                *(t.resolve(full) for t in self.params),
                 supertype=self.supertype)
         return self
 
@@ -236,7 +236,7 @@ class Term(ABC):
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
             return self.match(other, allow_subtype) and all(
                 s.compatible(t, allow_subtype)
-                for s, t in zip(self.types, other.types))
+                for s, t in zip(self.params, other.params))
         return True
 
     # constraints #############################################################
@@ -263,29 +263,29 @@ class TypeOperator(Term):
     def __init__(
             self,
             name: str,
-            *types: Term,
+            *params: Term,
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype = supertype
-        self.types: List[Term] = list(types)
+        self.params: List[Term] = list(params)
 
         if self.name == 'function' and self.arity != 2:
             raise ValueError("functions must have 2 argument types")
-        if self.supertype and (self.types or self.supertype.types):
+        if self.supertype and (self.params or self.supertype.params):
             raise ValueError("only nullary types may have supertypes")
 
     def __str__(self) -> str:
         if self.name == 'function':
-            return f"({self.types[0]} ** {self.types[1]})"
-        elif self.types:
-            return f'{self.name}({", ".join(str(t) for t in self.types)})'
+            return f"({self.params[0]} ** {self.params[1]})"
+        elif self.params:
+            return f'{self.name}({", ".join(str(t) for t in self.params)})'
         else:
             return self.name
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
             return self.match(other, allow_subtype=False) and \
-               all(s == t for s, t in zip(self.types, other.types))
+               all(s == t for s, t in zip(self.params, other.params))
         else:
             return False
 
@@ -302,7 +302,7 @@ class TypeOperator(Term):
 
     @property
     def arity(self) -> int:
-        return len(self.types)
+        return len(self.params)
 
     @staticmethod
     def parameterized(
@@ -461,9 +461,9 @@ class ParameterConstraint(Constraint):
             if self.position is None:
                 return any(
                     param.compatible(pattern, self.allow_subtype)
-                    for param in self.subject.types)
-            elif self.position-1 < len(self.subject.types):
-                return self.subject.types[self.position-1].compatible(
+                    for param in self.subject.params)
+            elif self.position-1 < len(self.subject.params):
+                return self.subject.params[self.position-1].compatible(
                     pattern, self.allow_subtype)
             return False
         else:
