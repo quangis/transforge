@@ -14,7 +14,7 @@ functional programming languages.
 # expressions before using them or adding constraints to them. This means that
 # pointers are somewhat interwoven --- keep this in mind.
 # To understand the module, I recommend you start by reading the methods of the
-# Term class.
+# TypeTerm class.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -54,7 +54,7 @@ class Definition(object):
     def __init__(
             self,
             name: str,
-            t: Term,
+            t: TypeTerm,
             *args: Union[Constraint, int]):
         """
         Define a function type. Additional arguments are distinguished by their
@@ -88,7 +88,7 @@ class Definition(object):
         self.constraints = constraints
         self.data = number_of_data_arguments
 
-    def instance(self) -> Term:
+    def instance(self) -> TypeTerm:
         ctx: Dict[TypeVar, TypeVar] = {}
         t = self.type.fresh(ctx)
         for constraint in self.constraints:
@@ -104,7 +104,7 @@ class Definition(object):
         )
 
 
-class Term(ABC):
+class TypeTerm(ABC):
     """
     Abstract base class for type operators and type variables. Note that basic
     types are just 0-ary type operators and functions are just particular 2-ary
@@ -114,12 +114,12 @@ class Term(ABC):
     def __repr__(self):
         return self.__str__()
 
-    def __contains__(self, value: Term) -> bool:
+    def __contains__(self, value: TypeTerm) -> bool:
         return value == self or (
             isinstance(self, TypeOperator) and
             any(value in t for t in self.params))
 
-    def __pow__(self, other: Term) -> TypeOperator:
+    def __pow__(self, other: TypeTerm) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
         allows us to use the infix operator ** for the arrow in function
@@ -153,7 +153,7 @@ class Term(ABC):
                 for v in a.variables():
                     yield v
 
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Term:
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeTerm:
         """
         Create a fresh copy of this type, with unique new variables.
         """
@@ -176,7 +176,7 @@ class Term(ABC):
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
 
-    def unify(self, other: Term) -> None:
+    def unify(self, other: TypeTerm) -> None:
         """
         Bind variables such that both types become the same. Binding is a
         side-effect; use resolve() to consolidate the bindings.
@@ -199,7 +199,7 @@ class Term(ABC):
                 elif isinstance(b, TypeVar) and a != b:
                     b.bind(a)
 
-    def apply(self, arg: Term) -> Term:
+    def apply(self, arg: TypeTerm) -> TypeTerm:
         """
         Apply an argument to a function type to get its resolved output type.
         """
@@ -210,7 +210,7 @@ class Term(ABC):
         else:
             raise error.NonFunctionApplication(self, arg)
 
-    def resolve(self, full: bool = True) -> Term:
+    def resolve(self, full: bool = True) -> TypeTerm:
         """
         A `full` resolve obtains a version of this type with all bound
         variables replaced with their bindings. Otherwise, just resolve the
@@ -227,7 +227,7 @@ class Term(ABC):
 
     def compatible(
             self,
-            other: Term,
+            other: TypeTerm,
             allow_subtype: bool = False) -> bool:
         """
         Is the type structurally consistent with another, that is, do they
@@ -241,21 +241,21 @@ class Term(ABC):
 
     # constraints #############################################################
 
-    def subtype(self, *patterns: Term) -> Constraint:
+    def subtype(self, *patterns: TypeTerm) -> Constraint:
         return MembershipConstraint(self, *patterns, allow_subtype=True)
 
-    def member(self, *patterns: Term) -> Constraint:
+    def member(self, *patterns: TypeTerm) -> Constraint:
         return MembershipConstraint(self, *patterns, allow_subtype=False)
 
     def param(
-            self, target: Term,
+            self, target: TypeTerm,
             subtype: bool = False,
             at: Optional[int] = None) -> Constraint:
         return ParameterConstraint(
             self, target, position=at, allow_subtype=subtype)
 
 
-class TypeOperator(Term):
+class TypeOperator(TypeTerm):
     """
     n-ary type constructor.
     """
@@ -263,11 +263,11 @@ class TypeOperator(Term):
     def __init__(
             self,
             name: str,
-            *params: Term,
+            *params: TypeTerm,
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype = supertype
-        self.params: List[Term] = list(params)
+        self.params: List[TypeTerm] = list(params)
 
         if self.name == 'function' and self.arity != 2:
             raise ValueError("functions must have 2 argument types")
@@ -324,7 +324,7 @@ class TypeOperator(Term):
             return partial(TypeOperator)
 
 
-class TypeVar(Term):
+class TypeVar(TypeTerm):
     """
     Type variable. Note that any bindings and constraints are bound to the
     actual object instance, so make a fresh copy before applying them if the
@@ -339,7 +339,7 @@ class TypeVar(Term):
             wildcard: bool = False):
         cls = type(self)
         self.id = cls.counter
-        self.bound: Optional[Term] = None
+        self.bound: Optional[TypeTerm] = None
         self.constraints = set(constraints)
         self.wildcard = wildcard
         cls.counter += 1
@@ -347,7 +347,7 @@ class TypeVar(Term):
     def __str__(self) -> str:
         return "_" if self.wildcard else f"x{self.id}"
 
-    def bind(self, binding: Term) -> None:
+    def bind(self, binding: TypeTerm) -> None:
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
@@ -374,8 +374,8 @@ class Constraint(ABC):
 
     def __init__(
             self,
-            type: Term,
-            *patterns: Term,
+            type: TypeTerm,
+            *patterns: TypeTerm,
             allow_subtype: bool = False):
         self.subject = type
         self.patterns = list(patterns)
@@ -456,7 +456,7 @@ class ParameterConstraint(Constraint):
             f"{'' if self.position is None else ' at #' + str(self.position)}"
         )
 
-    def compatible(self, pattern: Term) -> bool:
+    def compatible(self, pattern: TypeTerm) -> bool:
         if isinstance(self.subject, TypeOperator):
             if self.position is None:
                 return any(
