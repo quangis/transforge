@@ -86,8 +86,12 @@ class Definition(object):
 
     def __call__(self, *others: Definition) -> Definition:
         return reduce(
-            lambda fn, arg: fn.instance().apply(arg.instance()),
-            others, self)
+            lambda fn, arg: fn.apply(arg.instance()),
+            others,
+            self.instance())
+
+    def __repr__(self) -> str:
+        return str(self)
 
     def __str__(self) -> str:
         return f"{self.name} : {self.type}"
@@ -118,7 +122,7 @@ class QTypeTerm(object):
         if self.constraints:
             return f"{self.plain} such that {', '.join(str(c) for c in self.constraints)}"
         else:
-            return str(self.type)
+            return str(self.plain)
 
     def apply(self, arg: QTypeTerm) -> QTypeTerm:
         """
@@ -129,8 +133,9 @@ class QTypeTerm(object):
             arg.plain.unify(input_type)
             return QTypeTerm(
                 output_type.resolve(),
-                (constraint.resolve()
-                    for constraint in chain(self.constraints, arg.constraints))
+                (constraint
+                    for constraint in chain(self.constraints, arg.constraints)
+                    if not constraint.fulfilled())
             )
         else:
             raise error.NonFunctionApplication(self.plain, arg)
@@ -398,6 +403,10 @@ class Constraint(ABC):
     @abstractmethod
     def fresh(self, ctx: Dict[TypeVar, TypeVar]):
         return NotImplemented
+
+    def fulfilled(self) -> bool:
+        self.resolve(True)
+        return not any(not var.wildcard for var in self.variables())
 
     @abstractmethod
     def enforce(self) -> None:
