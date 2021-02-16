@@ -18,7 +18,7 @@ functional programming languages.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from functools import partial
+from functools import partial, reduce
 from itertools import chain
 from collections import defaultdict
 from typing import Dict, Optional, Iterable, Union, List, Callable
@@ -83,6 +83,11 @@ class Definition(object):
         return QTypeTerm(
             self.type.plain.fresh(ctx),
             (c.fresh(ctx) for c in self.type.constraints))
+
+    def __call__(self, *others: Definition) -> Definition:
+        return reduce(
+            lambda fn, arg: fn.instance().apply(arg.instance()),
+            others, self)
 
     def __str__(self) -> str:
         return f"{self.name} : {self.type}"
