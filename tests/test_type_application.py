@@ -37,7 +37,7 @@ class TestType(unittest.TestCase):
         if isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result, f.apply, x)
         else:
-            self.assertEqual(f.apply(x), result)
+            self.assertEqual(f.apply(x).plain, result)
 
     def test_apply_non_function(self):
         self.apply(Int, Int, result=error.NonFunctionApplication)

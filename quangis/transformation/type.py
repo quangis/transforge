@@ -54,7 +54,7 @@ class Definition(object):
     def __init__(
             self,
             name: str,
-            t: TypeTerm,
+            type: TypeTerm,
             *args: Union[Constraint, int]):
         """
         Define a function type. Additional arguments are distinguished by their
@@ -74,34 +74,61 @@ class Definition(object):
             else:
                 raise ValueError(f"cannot use extra {type(arg)} in Definition")
 
-        bound_variables = set(t.variables())
-        for constraint in constraints:
-            if not all(
-                    var.wildcard or var in bound_variables
-                    for var in constraint.variables()):
-                raise ValueError(
-                    "all variables in a constraint must be bound by "
-                    "an occurrence in the accompanying type signature")
-
         self.name = name
-        self.type = t
-        self.constraints = constraints
+        self.type = QTypeTerm(type, constraints)
         self.data = number_of_data_arguments
 
-    def instance(self) -> TypeTerm:
+    def instance(self) -> QTypeTerm:
         ctx: Dict[TypeVar, TypeVar] = {}
-        t = self.type.fresh(ctx)
-        for constraint in self.constraints:
-            new_constraint = constraint.fresh(ctx)
-            for var in new_constraint.variables():
-                var.constraints.add(new_constraint)
-        return t
+        return QTypeTerm(
+            self.type.plain.fresh(ctx),
+            (c.fresh(ctx) for c in self.type.constraints))
 
     def __str__(self) -> str:
-        return (
-            f"{self.name} : {self.type}{', ' if self.constraints else ''}"
-            f"{', '.join(str(c) for c in self.constraints)}"
-        )
+        return f"{self.name} : {self.type}"
+
+
+class QTypeTerm(object):
+    """
+    A constrained type term.
+    """
+
+    def __init__(self, type: TypeTerm, constraints: Iterable[Constraint] = ()):
+        self.plain = type
+        self.constraints = list(constraints)
+
+        # bound_variables = set(self.plain.variables())
+        # for constraint in self.constraints:
+        #    if not all(
+        #            var.wildcard or var in bound_variables
+        #            for var in constraint.variables()):
+        #        raise ValueError(
+        #            "all variables in a constraint must be bound by "
+        #            "an occurrence in the accompanying type signature")
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if self.constraints:
+            return f"{self.plain} such that {', '.join(str(c) for c in self.constraints)}"
+        else:
+            return str(self.type)
+
+    def apply(self, arg: QTypeTerm) -> QTypeTerm:
+        """
+        Apply an argument to a function type to get its resolved output type.
+        """
+        if isinstance(self.plain, TypeOperator) and self.plain.name == 'function':
+            input_type, output_type = self.plain.params
+            arg.plain.unify(input_type)
+            return QTypeTerm(
+                output_type.resolve(),
+                (constraint.resolve()
+                    for constraint in chain(self.constraints, arg.constraints))
+            )
+        else:
+            raise error.NonFunctionApplication(self.plain, arg)
 
 
 class TypeTerm(ABC):
@@ -169,9 +196,7 @@ class TypeTerm(ABC):
             if self in ctx:
                 return ctx[self]
             else:
-                new = TypeVar(
-                    (c.fresh(ctx) for c in self.constraints),
-                    wildcard=self.wildcard)
+                new = TypeVar(wildcard=self.wildcard)
                 ctx[self] = new
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
@@ -198,17 +223,6 @@ class TypeTerm(ABC):
                     a.bind(b)
                 elif isinstance(b, TypeVar) and a != b:
                     b.bind(a)
-
-    def apply(self, arg: TypeTerm) -> TypeTerm:
-        """
-        Apply an argument to a function type to get its resolved output type.
-        """
-        if isinstance(self, TypeOperator) and self.name == 'function':
-            input_type, output_type = self.params
-            arg.unify(input_type)
-            return output_type.resolve()
-        else:
-            raise error.NonFunctionApplication(self, arg)
 
     def resolve(self, full: bool = True) -> TypeTerm:
         """
@@ -333,14 +347,10 @@ class TypeVar(TypeTerm):
 
     counter = 0
 
-    def __init__(
-            self,
-            constraints: Iterable[Constraint] = (),
-            wildcard: bool = False):
+    def __init__(self, wildcard: bool = False):
         cls = type(self)
         self.id = cls.counter
         self.bound: Optional[TypeTerm] = None
-        self.constraints = set(constraints)
         self.wildcard = wildcard
         cls.counter += 1
 
@@ -351,19 +361,7 @@ class TypeVar(TypeTerm):
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
-        # Once a variable has been bound, its constraints must carry over to
-        # the variables in its binding. Consider a variable x that is
-        # constrained to T(A) or T(B); and it has now been bound to T(z). This
-        # can work, but only if binding z will still trigger the check that the
-        # initial constraint still holds.
-        for var in binding.variables():
-            var.constraints = set.union(var.constraints, self.constraints)
-
         self.bound = binding
-
-        for constraint in self.constraints:
-            constraint.resolve()
-            constraint.enforce()
 
 
 class Constraint(ABC):
@@ -386,9 +384,11 @@ class Constraint(ABC):
             self.subject.variables(),
             *(t.variables() for t in self.patterns))
 
-    def resolve(self) -> None:
-        self.subject = self.subject.resolve(full=True)
-        self.patterns = [t.resolve(full=True) for t in self.patterns]
+    def resolve(self, full: bool = True) -> Constraint:
+        self.subject = self.subject.resolve(full)
+        self.patterns = [t.resolve(full) for t in self.patterns]
+        self.enforce()
+        return self
 
     @abstractmethod
     def fresh(self, ctx: Dict[TypeVar, TypeVar]):

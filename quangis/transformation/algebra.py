@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Iterable, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import TypeTerm, Definition
+from quangis.transformation.type import TypeTerm, QTypeTerm, Definition
 
 
 class Expr(object):
@@ -17,7 +17,7 @@ class Expr(object):
     An expression of a transformation algebra.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: TypeTerm):
+    def __init__(self, tokens: List[Union[str, Expr]], type: QTypeTerm):
         self.tokens = tokens
         self.type = type
 
@@ -27,15 +27,7 @@ class Expr(object):
             for t in self.tokens
         )
         if top_level:
-            constraints = set(
-                str(constraint)
-                for var in self.type.variables()
-                for constraint in var.constraints
-            )
-            if constraints:
-                return f"{expr} : {self.type} (where {', '.join(constraints)})"
-            else:
-                return f"{expr} : {self.type}"
+            return f"{expr} : {self.type}"
         elif len(self.tokens) == 1:
             return f"{expr}"
         else:
