@@ -84,11 +84,8 @@ class Definition(object):
             self.type.plain.fresh(ctx),
             (c.fresh(ctx) for c in self.type.constraints))
 
-    def __call__(self, *others: Definition) -> Definition:
-        return reduce(
-            lambda fn, arg: fn.apply(arg.instance()),
-            others,
-            self.instance())
+    def __call__(self, *args: Definition) -> QTypeTerm:
+        return self.instance().__call__(*map(Definition.instance, args))
 
     def __repr__(self) -> str:
         return str(self)
@@ -123,6 +120,9 @@ class QTypeTerm(object):
             return f"{self.plain} such that {', '.join(str(c) for c in self.constraints)}"
         else:
             return str(self.plain)
+
+    def __call__(self, *args: QTypeTerm) -> QTypeTerm:
+        return reduce(QTypeTerm.apply, args, self)
 
     def apply(self, arg: QTypeTerm) -> QTypeTerm:
         """
