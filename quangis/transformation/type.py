@@ -79,10 +79,7 @@ class Definition(object):
         self.data = number_of_data_arguments
 
     def instance(self) -> QTypeTerm:
-        ctx: Dict[TypeVar, TypeVar] = {}
-        return QTypeTerm(
-            self.type.plain.fresh(ctx),
-            (c.fresh(ctx) for c in self.type.constraints))
+        return self.type.fresh({})
 
     def __call__(self, *args: Definition) -> QTypeTerm:
         return self.instance().__call__(*map(Definition.instance, args))
@@ -123,6 +120,12 @@ class QTypeTerm(object):
 
     def __call__(self, *args: QTypeTerm) -> QTypeTerm:
         return reduce(QTypeTerm.apply, args, self)
+
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> QTypeTerm:
+        return QTypeTerm(
+            self.plain.fresh(ctx),
+            (constraint.fresh(ctx) for constraint in self.constraints)
+        )
 
     def apply(self, arg: QTypeTerm) -> QTypeTerm:
         """
