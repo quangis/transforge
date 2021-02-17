@@ -303,7 +303,10 @@ class TypeOperator(TypeTerm):
 
     def __str__(self) -> str:
         if self.name == 'function':
-            return f"({self.params[0]} ** {self.params[1]})"
+            inT, outT = self.params
+            if isinstance(inT, TypeOperator) and inT.name == 'function':
+                return f"({inT}) ** {outT}"
+            return f"{inT} ** {outT}"
         elif self.params:
             return f'{self.name}({", ".join(str(t) for t in self.params)})'
         else:
