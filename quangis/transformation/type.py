@@ -266,6 +266,25 @@ class TypeTerm(ABC):
                 for s, t in zip(self.params, other.params))
         return True
 
+    def subtypes(self, other: TypeTerm) -> bool:
+        """
+        Is this a subtype of another type?
+        """
+        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+            if self.name == 'function' and other.name == 'function':
+                return (
+                    self.params[0].subtypes(other.params[0]) and
+                    other.params[1].subtypes(self.params[1])
+                )
+            return (
+                (
+                    (self.name == other.name and self.arity == other.arity) or
+                    (bool(self.supertype and self.supertype.subtypes(other)))
+                ) and
+                all(s.subtypes(t) for s, t in zip(self.params, other.params))
+            )
+        return False
+
     # constraints #############################################################
 
     def subtype(self, *patterns: TypeTerm) -> Constraint:
