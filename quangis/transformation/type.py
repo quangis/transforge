@@ -17,6 +17,7 @@ functional programming languages.
 # TypeTerm class.
 from __future__ import annotations
 
+from enum import Enum
 from abc import ABC, abstractmethod
 from functools import partial, reduce
 from itertools import chain
@@ -24,6 +25,12 @@ from collections import defaultdict
 from typing import Dict, Optional, Iterable, Union, List, Callable
 
 from quangis import error
+
+
+class Variance(Enum):
+    INVARIANT = 0
+    COVARIANT = 1
+    CONTRAVARIANT = 2
 
 
 class Variables(defaultdict):
@@ -170,7 +177,11 @@ class TypeTerm(ABC):
         The right-bitshift operator >> (for __rshift__) would have been more
         intuitive visually, but does not have this property.
         """
-        return TypeOperator('function', self, other)
+        return TypeOperator(
+            'function',
+            (Variance.CONTRAVARIANT, Variance.COVARIANT),
+            self,
+            other)
 
     def is_resolved(self) -> bool:
         """
@@ -201,6 +212,7 @@ class TypeTerm(ABC):
         if isinstance(self, TypeOperator):
             return TypeOperator(
                 self.name,
+                self.variance,
                 *(t.fresh(ctx) for t in self.params),
                 supertype=self.supertype)
         elif isinstance(self, TypeVar):
@@ -248,6 +260,7 @@ class TypeTerm(ABC):
         elif full and isinstance(self, TypeOperator):
             return TypeOperator(
                 self.name,
+                self.variance,
                 *(t.resolve(full) for t in self.params),
                 supertype=self.supertype)
         return self
@@ -288,17 +301,17 @@ class TypeTerm(ABC):
     # constraints #############################################################
 
     def subtype(self, *patterns: TypeTerm) -> Constraint:
-        return MembershipConstraint(self, *patterns, allow_subtype=True)
+        return NoConstraint(self, *patterns, allow_subtype=True)
 
     def member(self, *patterns: TypeTerm) -> Constraint:
-        return MembershipConstraint(self, *patterns, allow_subtype=False)
+        return NoConstraint(self, *patterns, allow_subtype=False)
 
     def param(
             self, target: TypeTerm,
             subtype: bool = False,
             at: Optional[int] = None) -> Constraint:
-        return ParameterConstraint(
-            self, target, position=at, allow_subtype=subtype)
+        return NoConstraint(
+            self, target) #  , position=at, allow_subtype=subtype)
 
 
 class TypeOperator(TypeTerm):
@@ -309,12 +322,16 @@ class TypeOperator(TypeTerm):
     def __init__(
             self,
             name: str,
+            variance: Iterable[Variance] = (),
             *params: TypeTerm,
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype = supertype
+        self.variance = list(variance)
         self.params: List[TypeTerm] = list(params)
 
+        if len(self.params) != len(self.variance):
+            raise ValueError("every parameter must have a variance")
         if self.name == 'function' and self.arity != 2:
             raise ValueError("functions must have 2 argument types")
         if self.supertype and (self.params or self.supertype.params):
@@ -356,21 +373,18 @@ class TypeOperator(TypeTerm):
     @staticmethod
     def parameterized(
             name: str,
-            arity: int = 0) -> Callable[..., TypeOperator]:
+            *variance: Variance) -> Callable[..., TypeOperator]:
         """
         Allowing us to define parameterized types in an intuitive way, while
         optionally fixing the arity of the operator.
         """
-        if arity > 0:
-            def f(*params):
-                if len(params) != arity:
-                    raise TypeError(
-                        f"type operator {name} has arity {arity}, "
-                        f"but was given {len(params)} parameter(s)")
-                return TypeOperator(name, *params)
-            return f
-        else:
-            return partial(TypeOperator)
+        def f(*params):
+            if len(params) != len(variance):
+                raise TypeError(
+                    f"type operator {name} has arity {len(variance)}, "
+                    f"but was given {len(params)} parameter(s)")
+            return TypeOperator(name, variance, *params)
+        return f
 
 
 class TypeVar(TypeTerm):
@@ -439,6 +453,20 @@ class Constraint(ABC):
         Check that the resolved constraint is still satisfied.
         """
         raise NotImplementedError
+
+
+class NoConstraint(Constraint):
+    """
+    Temporarily shut off other constraints.
+    """
+
+    def fresh(self, ctx) -> NoConstraint:
+        return NoConstraint(
+            self.subject.fresh(ctx),
+            (*(t.fresh(ctx) for t in self.patterns)))
+
+    def enforce(self) -> None:
+        pass
 
 
 class MembershipConstraint(Constraint):
