@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from enum import Enum
 from abc import ABC, abstractmethod
-from functools import partial, reduce
+from functools import reduce
 from itertools import chain
 from collections import defaultdict
 from typing import Dict, Optional, Iterable, Union, List, Callable
@@ -27,7 +27,24 @@ from typing import Dict, Optional, Iterable, Union, List, Callable
 from quangis import error
 
 
+class Unification(object):
+    """
+    A unification is a set of substitutions and subtype constraints that would
+    make two type terms equal to eachother.
+    """
+    pass
+
+
 class Variance(Enum):
+    """
+    The variance of a type parameter indicates how subtype relations of
+    compound types relate to their constituent types. For example, a function
+    type α₁ → β₁ is contravariant in its input parameter (consider that a
+    subtype α₂ → β₂ ≤ α₁ → β₁ must be just as liberal or more in what input it
+    accepts, e.g. α₁ ≤ α₂) and covariant in its output parameter (it must be
+    just as conservative or more in what output it produces, e.g. β₂ ≤ β₁).
+    """
+
     INVARIANT = 0
     COVARIANT = 1
     CONTRAVARIANT = 2
