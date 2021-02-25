@@ -1,13 +1,13 @@
 import unittest
 
 from quangis import error
-from quangis.transformation.type import TypeOperator, Variables, Definition
+from quangis.transformation.type import TypeConstructor, Variance, Variables, Definition
 
 var = Variables()
-Any = TypeOperator("Any")
-Int = TypeOperator("Int", supertype=Any)
-Str = TypeOperator("Str", supertype=Any)
-T = TypeOperator.parameterized("T", 1)
+Any = TypeConstructor("Any")()
+Int = TypeConstructor("Int", supertype=Any)()
+Str = TypeConstructor("Str", supertype=Any)()
+T = TypeConstructor("T", Variance.COVARIANT)
 
 
 class TestType(unittest.TestCase):

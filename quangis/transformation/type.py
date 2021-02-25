@@ -155,7 +155,7 @@ class QTypeTerm(object):
         """
         Apply an argument to a function type to get its resolved output type.
         """
-        if isinstance(self.plain, TypeOperator) and self.plain.name == 'function':
+        if isinstance(self.plain, TypeOperator) and self.plain.constructor == Function:
             input_type, output_type = self.plain.params
             arg.plain.unify(input_type)
             return QTypeTerm(
@@ -194,11 +194,7 @@ class TypeTerm(ABC):
         The right-bitshift operator >> (for __rshift__) would have been more
         intuitive visually, but does not have this property.
         """
-        return TypeOperator(
-            'function',
-            (Variance.CONTRAVARIANT, Variance.COVARIANT),
-            self,
-            other)
+        return TypeOperator(Function, self, other)
 
     def is_resolved(self) -> bool:
         """
@@ -228,10 +224,8 @@ class TypeTerm(ABC):
 
         if isinstance(self, TypeOperator):
             return TypeOperator(
-                self.name,
-                self.variance,
-                *(t.fresh(ctx) for t in self.params),
-                supertype=self.supertype)
+                self.constructor,
+                *(t.fresh(ctx) for t in self.params))
         elif isinstance(self, TypeVar):
             assert self.is_resolved(), \
                 "Cannot create a copy of a type with bound variables"
@@ -252,7 +246,7 @@ class TypeTerm(ABC):
         b = other.resolve(full=False)
         if a is not b:
             if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-                if a.match(b):
+                if a.constructor == b.constructor:
                     for x, y in zip(a.params, b.params):
                         x.unify(y)
                 else:
@@ -276,10 +270,8 @@ class TypeTerm(ABC):
             return self.bound.resolve(full)
         elif full and isinstance(self, TypeOperator):
             return TypeOperator(
-                self.name,
-                self.variance,
-                *(t.resolve(full) for t in self.params),
-                supertype=self.supertype)
+                self.constructor,
+                *(t.resolve(full) for t in self.params))
         return self
 
     def compatible(
@@ -291,7 +283,7 @@ class TypeTerm(ABC):
         'fit', modulo variables. Subtypes may be allowed on the self side.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            return self.match(other, allow_subtype) and all(
+            return self.constructor == other.constructor and all(
                 s.compatible(t, allow_subtype)
                 for s, t in zip(self.params, other.params))
         return True
@@ -331,77 +323,89 @@ class TypeTerm(ABC):
             self, target) #  , position=at, allow_subtype=subtype)
 
 
-class TypeOperator(TypeTerm):
+class TypeConstructor(object):
     """
-    n-ary type constructor.
+    An n-ary type constructor.
     """
 
     def __init__(
             self,
             name: str,
-            variance: Iterable[Variance] = (),
-            *params: TypeTerm,
-            supertype: Optional[TypeOperator] = None):
+            *variance: Variance,
+            supertype: Union[None, TypeConstructor, TypeOperator] = None):
         self.name = name
-        self.supertype = supertype
         self.variance = list(variance)
-        self.params: List[TypeTerm] = list(params)
 
-        if len(self.params) != len(self.variance):
-            raise ValueError("every parameter must have a variance")
-        if self.name == 'function' and self.arity != 2:
-            raise ValueError("functions must have 2 argument types")
-        if self.supertype and (self.params or self.supertype.params):
-            raise ValueError("only nullary types may have supertypes")
+        self.supertype: Optional[TypeConstructor] = None
+        if isinstance(supertype, TypeOperator):
+            self.supertype = supertype.constructor
+        else:
+            self.supertype = supertype
 
     def __str__(self) -> str:
-        if self.name == 'function':
+        return self.name
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, TypeConstructor) and
+            self.name == other.name
+            and self.variance == other.variance)
+
+    def __le__(self, other: TypeConstructor) -> bool:
+        return self == other or self < other
+
+    def __lt__(self, other: TypeConstructor) -> bool:
+        return bool(self.supertype and self.supertype <= other)
+
+    def __call__(self, *params) -> TypeOperator:
+        return TypeOperator(self, *params)
+
+    @property
+    def arity(self):
+        return len(self.variance)
+
+
+class TypeOperator(TypeTerm):
+    """
+    An instance of an n-ary type constructor.
+    """
+
+    def __init__(self, constructor: TypeConstructor, *params: TypeTerm):
+        self.constructor = constructor
+        self.params: List[TypeTerm] = list(params)
+
+        if len(self.params) != self.constructor.arity:
+            raise ValueError
+
+    def __str__(self) -> str:
+        if self.constructor.name == 'function':
             inT, outT = self.params
-            if isinstance(inT, TypeOperator) and inT.name == 'function':
+            if isinstance(inT, TypeOperator) and inT.constructor == Function:
                 return f"({inT}) ** {outT}"
             return f"{inT} ** {outT}"
         elif self.params:
-            return f'{self.name}({", ".join(str(t) for t in self.params)})'
+            return f'{self.constructor}({", ".join(str(t) for t in self.params)})'
         else:
-            return self.name
+            return str(self.constructor)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TypeOperator):
-            return self.match(other, allow_subtype=False) and \
+            return self.constructor == other.constructor and \
                all(s == t for s, t in zip(self.params, other.params))
         else:
             return False
 
-    def match(self, other: TypeOperator, allow_subtype: bool = False) -> bool:
-        """
-        Check if the top-level type operator matches another.
-        """
-        return (
-            (self.name == other.name and self.arity == other.arity) or
-            (allow_subtype and bool(
-                self.supertype and self.supertype.match(other, allow_subtype)
-            ))
-        )
+    @property
+    def name(self) -> str:
+        return self.constructor.name
+
+    @property
+    def supertype(self) -> Optional[TypeConstructor]:
+        return self.constructor.supertype
 
     @property
     def arity(self) -> int:
         return len(self.params)
-
-    @staticmethod
-    def parameterized(
-            name: str,
-            *variance: Variance) -> Callable[..., TypeOperator]:
-        """
-        Allowing us to define parameterized types in an intuitive way, while
-        optionally fixing the arity of the operator.
-        """
-        def f(*params):
-            if len(params) != len(variance):
-                raise TypeError(
-                    f"type operator {name} has arity {len(variance)}, "
-                    f"but was given {len(params)} parameter(s)")
-            return TypeOperator(name, variance, *params)
-        return f
 
 
 class TypeVar(TypeTerm):
@@ -428,6 +432,12 @@ class TypeVar(TypeTerm):
             "variable cannot be bound twice"
 
         self.bound = binding
+
+
+Function = TypeConstructor(
+    'Function',
+    Variance.CONTRAVARIANT,
+    Variance.COVARIANT)
 
 
 class Constraint(ABC):
