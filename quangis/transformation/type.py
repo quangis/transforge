@@ -22,17 +22,9 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from collections import defaultdict
-from typing import Dict, Optional, Iterable, Union, List, Callable
+from typing import Dict, Optional, Iterable, Union, List, Set, Tuple
 
 from quangis import error
-
-
-class Unification(object):
-    """
-    A unification is a set of substitutions and subtype constraints that would
-    make two type terms equal to eachother.
-    """
-    pass
 
 
 class Variance(Enum):
@@ -45,9 +37,70 @@ class Variance(Enum):
     just as conservative or more in what output it produces, e.g. β₂ ≤ β₁).
     """
 
-    INVARIANT = 0
-    COVARIANT = 1
-    CONTRAVARIANT = 2
+    COVARIANT = 0
+    CONTRAVARIANT = 1
+
+
+class SubtypeConstraints(object):
+    """
+    Subtype constraints that cannot be violated for two terms to be considered
+    unifiable.
+    """
+
+    def __init__(self):
+        self.upper: Dict[TypeVar, TypeConstructor] = dict()
+        self.lower: Dict[TypeVar, TypeConstructor] = dict()
+
+    def subtype(self, a: TypeTerm, b: TypeTerm) -> None:
+        """
+        Make sure that a is equal to, or a subtype of b. Like unification, but
+        instead of just a substitution of variables to terms, also produces
+        lower and upper bounds on subtypes that it must respect.
+        """
+        a = a.resolve(False)  # self.resolve(a)
+        b = b.resolve(False)  # self.resolve(b)
+
+        if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
+            if a.constructor.basic and a.constructor <= b.constructor:
+                pass
+            elif a.constructor == b.constructor:
+                for v, x, y in zip(a.constructor.variance, a.params, b.params):
+                    if v == Variance.COVARIANT:
+                        self.subtype(x, y)
+                    elif v == Variance.CONTRAVARIANT:
+                        self.subtype(y, x)
+            else:
+                raise error.TypeMismatch(a, b)
+
+        elif isinstance(a, TypeVar) and isinstance(b, TypeVar) and a is not b:
+            a.bind(b)
+
+        elif isinstance(a, TypeVar) and isinstance(b, TypeOperator):
+            if a in b:
+                raise error.RecursiveType(a, b)
+            elif b.constructor.basic:
+                self.upper[a] = b.constructor
+
+                if a not in self.lower or b.constructor <= self.upper[a]:
+                    self.upper[a] = b.constructor
+                else:
+                    error.TypeMismatch(a, b)  # subtype constraint failed
+
+            else:
+                a.bind(b.skeleton())
+                self.subtype(a, b)
+
+        elif isinstance(a, TypeOperator) and isinstance(b, TypeVar):
+            if b in a:
+                raise error.RecursiveType(b, a)
+            elif a.constructor.basic:
+                if b not in self.lower or self.lower[b] <= a.constructor:
+                    self.lower[b] = a.constructor
+                else:
+                    error.TypeMismatch(b, a)  # subtype constraint failed
+            else:
+                b.bind(a.skeleton())
+                self.subtype(a, b)
 
 
 class Variables(defaultdict):
@@ -157,7 +210,11 @@ class QTypeTerm(object):
         """
         if isinstance(self.plain, TypeOperator) and self.plain.constructor == Function:
             input_type, output_type = self.plain.params
-            arg.plain.unify(input_type)
+
+            s = SubtypeConstraints()
+            s.subtype(arg.plain, input_type)
+
+#            arg.plain.unify(input_type)
             return QTypeTerm(
                 output_type.resolve(),
                 (constraint
@@ -283,29 +340,27 @@ class TypeTerm(ABC):
         'fit', modulo variables. Subtypes may be allowed on the self side.
         """
         if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            return self.constructor == other.constructor and all(
-                s.compatible(t, allow_subtype)
-                for s, t in zip(self.params, other.params))
+            return (
+                self.constructor <= other.constructor and
+                all(s.compatible(t, allow_subtype)
+                    for s, t in zip(self.params, other.params))
+            )
         return True
 
-    def subtypes(self, other: TypeTerm) -> bool:
+    def skeleton(self) -> TypeTerm:
         """
-        Is this a subtype of another type?
+        Create a copy of this operator, substituting fresh variables for basic
+        types.
         """
-        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
-            if self.name == 'function' and other.name == 'function':
-                return (
-                    self.params[0].subtypes(other.params[0]) and
-                    other.params[1].subtypes(self.params[1])
-                )
-            return (
-                (
-                    (self.name == other.name and self.arity == other.arity) or
-                    (bool(self.supertype and self.supertype.subtypes(other)))
-                ) and
-                all(s.subtypes(t) for s, t in zip(self.params, other.params))
-            )
-        return False
+        if isinstance(self, TypeOperator):
+            if self.constructor.basic:
+                return TypeVar()
+            else:
+                return TypeOperator(
+                    self.constructor,
+                    *(p.skeleton() for p in self.params))
+        else:
+            return self
 
     # constraints #############################################################
 
@@ -320,7 +375,7 @@ class TypeTerm(ABC):
             subtype: bool = False,
             at: Optional[int] = None) -> Constraint:
         return NoConstraint(
-            self, target) #  , position=at, allow_subtype=subtype)
+            self, target)  # , position=at, allow_subtype=subtype)
 
 
 class TypeConstructor(object):
@@ -342,6 +397,9 @@ class TypeConstructor(object):
         else:
             self.supertype = supertype
 
+        if self.variance and self.supertype:
+            raise ValueError("only nullary types can have direct supertypes")
+
     def __str__(self) -> str:
         return self.name
 
@@ -361,7 +419,11 @@ class TypeConstructor(object):
         return TypeOperator(self, *params)
 
     @property
-    def arity(self):
+    def basic(self) -> bool:
+        return self.arity == 0
+
+    @property
+    def arity(self) -> int:
         return len(self.variance)
 
 
@@ -394,18 +456,6 @@ class TypeOperator(TypeTerm):
                all(s == t for s, t in zip(self.params, other.params))
         else:
             return False
-
-    @property
-    def name(self) -> str:
-        return self.constructor.name
-
-    @property
-    def supertype(self) -> Optional[TypeConstructor]:
-        return self.constructor.supertype
-
-    @property
-    def arity(self) -> int:
-        return len(self.params)
 
 
 class TypeVar(TypeTerm):
