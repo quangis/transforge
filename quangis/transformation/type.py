@@ -51,6 +51,29 @@ class SubtypeConstraints(object):
         self.upper: Dict[TypeVar, TypeConstructor] = dict()
         self.lower: Dict[TypeVar, TypeConstructor] = dict()
 
+    def consolidate(self, t: TypeTerm, low: bool = True) -> TypeTerm:
+        if isinstance(t, TypeVar):
+            if low and t in self.lower:
+                return TypeOperator(self.lower[t])
+            elif not low and t in self.upper:
+                return TypeOperator(self.upper[t])
+            elif t in self.lower:
+                return TypeOperator(self.lower[t])
+            elif t in self.upper:
+                return TypeOperator(self.upper[t])
+            else:
+                return t
+        elif isinstance(t, TypeOperator):
+            return TypeOperator(
+                t.constructor,
+                *(
+                    self.consolidate(p, low ^ (v == Variance.CONTRAVARIANT))
+                    for v, p in zip(t.constructor.variance, t.params)
+                )
+            )
+        else:
+            raise ValueError
+
     def subtype(self, a: TypeTerm, b: TypeTerm) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like unification, but
@@ -216,7 +239,7 @@ class QTypeTerm(object):
 
 #            arg.plain.unify(input_type)
             return QTypeTerm(
-                output_type.resolve(),
+                s.consolidate(output_type.resolve()),
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
                     if not constraint.fulfilled())
@@ -440,7 +463,7 @@ class TypeOperator(TypeTerm):
             raise ValueError
 
     def __str__(self) -> str:
-        if self.constructor.name == 'function':
+        if self.constructor == Function:
             inT, outT = self.params
             if isinstance(inT, TypeOperator) and inT.constructor == Function:
                 return f"({inT}) ** {outT}"
