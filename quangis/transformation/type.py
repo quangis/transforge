@@ -22,7 +22,8 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from collections import defaultdict
-from typing import Dict, Optional, Iterable, Union, List, Set, Tuple
+from typing import Dict, Optional, Iterable, Union, List, Tuple
+from typing_extensions import Literal
 
 from quangis import error
 
@@ -67,18 +68,57 @@ class SubtypeConstraints(object):
             return TypeOperator(
                 t.constructor,
                 *(
-                    self.consolidate(p, low ^ (v == Variance.CONTRAVARIANT))
+                    self.consolidate(p, low ^ (v == Variance.COVARIANT))
                     for v, p in zip(t.constructor.variance, t.params)
                 )
             )
         else:
             raise ValueError
 
+    def union(self, other: SubtypeConstraints) -> SubtypeConstraints:
+        pass
+
+    def constrain(
+            self,
+            var: TypeVar,
+            new: TypeConstructor,
+            target: Literal['upper', 'lower']) -> None:
+
+        lower = self.lower.get(var, new)
+        upper = self.upper.get(var, new)
+
+        if target == 'lower':
+            # lower bound higher than the upper bound fails
+            if upper < new:
+                raise error.SubtypeMismatch(new, upper)
+
+            # lower bound lower than the current lower bound is ignored
+            elif new <= lower:
+                pass
+
+            # tightening the lower bound
+            elif lower < new:
+                getattr(self, target)[var] = new
+
+            # new bound from another lineage (neither sub- nor supertype) fails
+            else:
+                raise error.SubtypeMismatch(lower, new)
+
+        elif target == 'upper':  # symmetric
+            if new < lower:
+                raise error.SubtypeMismatch(lower, new)
+            elif upper <= new:
+                pass
+            elif new < upper:
+                getattr(self, target)[var] = new
+            else:
+                raise error.SubtypeMismatch(new, upper)
+
     def subtype(self, a: TypeTerm, b: TypeTerm) -> None:
         """
-        Make sure that a is equal to, or a subtype of b. Like unification, but
-        instead of just a substitution of variables to terms, also produces
-        lower and upper bounds on subtypes that it must respect.
+        Make sure that a is equal to, or a subtype of b. Like normal
+        unification, but instead of just a substitution of variables to terms,
+        also produces lower and upper bounds on subtypes that it must respect.
         """
         a = a.resolve(False)  # self.resolve(a)
         b = b.resolve(False)  # self.resolve(b)
@@ -97,18 +137,13 @@ class SubtypeConstraints(object):
 
         elif isinstance(a, TypeVar) and isinstance(b, TypeVar) and a is not b:
             a.bind(b)
+            # also combine the subtype constraints on these variables
 
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperator):
             if a in b:
                 raise error.RecursiveType(a, b)
             elif b.constructor.basic:
-                self.upper[a] = b.constructor
-
-                if a not in self.lower or b.constructor <= self.upper[a]:
-                    self.upper[a] = b.constructor
-                else:
-                    error.TypeMismatch(a, b)  # subtype constraint failed
-
+                self.constrain(a, b.constructor, 'upper')
             else:
                 a.bind(b.skeleton())
                 self.subtype(a, b)
@@ -117,10 +152,7 @@ class SubtypeConstraints(object):
             if b in a:
                 raise error.RecursiveType(b, a)
             elif a.constructor.basic:
-                if b not in self.lower or self.lower[b] <= a.constructor:
-                    self.lower[b] = a.constructor
-                else:
-                    error.TypeMismatch(b, a)  # subtype constraint failed
+                self.constrain(b, a.constructor, 'lower')
             else:
                 b.bind(a.skeleton())
                 self.subtype(a, b)
