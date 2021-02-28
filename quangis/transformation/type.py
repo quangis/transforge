@@ -75,8 +75,13 @@ class SubtypeConstraints(object):
         else:
             raise ValueError
 
-    def union(self, other: SubtypeConstraints) -> SubtypeConstraints:
-        pass
+    def __add__(self, other: SubtypeConstraints) -> SubtypeConstraints:
+        s = SubtypeConstraints()
+        for var, c in chain(self.lower.items(), other.lower.items()):
+            s.constrain(var, c, target='lower')
+        for var, c in chain(self.upper.items(), other.upper.items()):
+            s.constrain(var, c, target='upper')
+        return s
 
     def constrain(
             self,
@@ -93,11 +98,11 @@ class SubtypeConstraints(object):
                 raise error.SubtypeMismatch(new, upper)
 
             # lower bound lower than the current lower bound is ignored
-            elif new <= lower:
+            elif new < lower:
                 pass
 
             # tightening the lower bound
-            elif lower < new:
+            elif lower <= new:
                 getattr(self, target)[var] = new
 
             # new bound from another lineage (neither sub- nor supertype) fails
@@ -107,14 +112,14 @@ class SubtypeConstraints(object):
         elif target == 'upper':  # symmetric
             if new < lower:
                 raise error.SubtypeMismatch(lower, new)
-            elif upper <= new:
+            elif upper < new:
                 pass
-            elif new < upper:
+            elif new <= upper:
                 getattr(self, target)[var] = new
             else:
                 raise error.SubtypeMismatch(new, upper)
 
-    def subtype(self, a: PlainType, b: PlainType) -> None:
+    def unify(self, a: PlainType, b: PlainType) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -129,9 +134,9 @@ class SubtypeConstraints(object):
             elif a.constructor == b.constructor:
                 for v, x, y in zip(a.constructor.variance, a.params, b.params):
                     if v == Variance.COVARIANT:
-                        self.subtype(x, y)
+                        self.unify(x, y)
                     elif v == Variance.CONTRAVARIANT:
-                        self.subtype(y, x)
+                        self.unify(y, x)
             else:
                 raise error.TypeMismatch(a, b)
 
@@ -157,7 +162,7 @@ class SubtypeConstraints(object):
                 self.constrain(a, b.constructor, 'upper')
             else:
                 a.bind(b.skeleton())
-                self.subtype(a, b)
+                self.unify(a, b)
 
         elif isinstance(a, TypeOperator) and isinstance(b, TypeVar):
             if b in a:
@@ -166,7 +171,7 @@ class SubtypeConstraints(object):
                 self.constrain(b, a.constructor, 'lower')
             else:
                 b.bind(a.skeleton())
-                self.subtype(a, b)
+                self.unify(a, b)
 
 
 class Variables(defaultdict):
@@ -239,27 +244,25 @@ class Type(object):
     A top-level type term decorated with constraints.
     """
 
-    def __init__(self, t: PlainType, constraints: Iterable[Constraint] = ()):
+    def __init__(
+            self,
+            t: PlainType,
+            constraints: Iterable[Constraint] = (),
+            subtypes: Optional[SubtypeConstraints] = None):
         self.plain = t
         self.constraints = list(constraints)
-
-        # bound_variables = set(self.plain.variables())
-        # for constraint in self.constraints:
-        #    if not all(
-        #            var.wildcard or var in bound_variables
-        #            for var in constraint.variables()):
-        #        raise ValueError(
-        #            "all variables in a constraint must be bound by "
-        #            "an occurrence in the accompanying type signature")
+        self.subtypes = subtypes or SubtypeConstraints()
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
+        result = ""
         if self.constraints:
-            return f"{self.plain} such that {', '.join(str(c) for c in self.constraints)}"
+            result = f"{self.plain} such that {', '.join(str(c) for c in self.constraints)}"
         else:
-            return str(self.plain)
+            result = str(self.plain)
+        return result
 
     def __call__(self, *args: Union[Type, PlainType]) -> Type:
         return reduce(
@@ -271,17 +274,23 @@ class Type(object):
         """
         Apply an argument to a function type to get its resolved output type.
         """
+
         if isinstance(self.plain, TypeOperator) and self.plain.constructor == Function:
             input_type, output_type = self.plain.params
 
-            s = SubtypeConstraints()
-            s.subtype(arg.plain, input_type)
+            #print('Applying', arg, 'to', self)
+            s = self.subtypes + arg.subtypes
+            s.unify(arg.plain, input_type)
+            #print('Lower', s.lower)
+            #print('Upper', s.upper)
 
             return Type(
-                s.consolidate(output_type.resolve()),
+                #s.consolidate(output_type.resolve()),
+                output_type.resolve(),
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
-                    if not constraint.fulfilled())
+                    if not constraint.fulfilled()),
+                s
             )
         else:
             raise error.NonFunctionApplication(self.plain, arg)
@@ -361,29 +370,6 @@ class PlainType(ABC):
                 ctx[self] = new
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
-
-    def unify(self, other: PlainType) -> None:
-        """
-        Bind variables such that both types become the same. Binding is a
-        side-effect; use resolve() to consolidate the bindings.
-        """
-        a = self.resolve(full=False)
-        b = other.resolve(full=False)
-        if a is not b:
-            if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-                if a.constructor == b.constructor:
-                    for x, y in zip(a.params, b.params):
-                        x.unify(y)
-                else:
-                    raise error.TypeMismatch(a, b)
-            else:
-                if (isinstance(a, TypeOperator) and b in a) or \
-                        (isinstance(b, TypeOperator) and a in b):
-                    raise error.RecursiveType(a, b)
-                elif isinstance(a, TypeVar) and a != b:
-                    a.bind(b)
-                elif isinstance(b, TypeVar) and a != b:
-                    b.bind(a)
 
     def resolve(self, full: bool = True) -> PlainType:
         """
@@ -470,6 +456,9 @@ class TypeConstructor(object):
 
         if self.variance and self.supertype:
             raise ValueError("only nullary types can have direct supertypes")
+
+    def __repr__(self) -> str:
+        return str(self)
 
     def __str__(self) -> str:
         return self.name
