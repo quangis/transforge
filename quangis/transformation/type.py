@@ -96,8 +96,8 @@ class Definition(object):
     def instance(self) -> Type:
         return self.type.fresh({})
 
-    def __call__(self, *args: Definition) -> Type:
-        return self.instance().__call__(*map(Definition.instance, args))
+    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
+        return self.instance().__call__(*args)
 
     def __repr__(self) -> str:
         return str(self)
@@ -130,11 +130,17 @@ class Type(object):
 
         return ', '.join(res)
 
-    def __call__(self, *args: Union[Type, PlainType]) -> Type:
-        return reduce(
-            Type.apply,
-            (Type(a) if isinstance(a, PlainType) else a for a in args),
-            self)
+    @staticmethod
+    def coerce(x: Union[Type, PlainType, Definition]) -> Type:
+        if isinstance(x, PlainType):
+            return Type(x)
+        elif isinstance(x, Definition):
+            return x.instance()
+        else:
+            return x
+
+    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
+        return reduce(Type.apply, (Type.coerce(a) for a in args), self)
 
     def apply(self, arg: Type) -> Type:
         """
@@ -312,7 +318,7 @@ class PlainType(ABC):
                 b.bind(a.skeleton())
                 b.unify(a)
 
-    def __call__(self, *args: Union[Type, PlainType]) -> Type:
+    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
         return Type(self).__call__(*args)
 
     # constraints #############################################################
