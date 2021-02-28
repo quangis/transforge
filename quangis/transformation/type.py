@@ -137,7 +137,18 @@ class SubtypeConstraints(object):
 
         elif isinstance(a, TypeVar) and isinstance(b, TypeVar) and a is not b:
             a.bind(b)
-            # also combine the subtype constraints on these variables
+            a_sub = self.lower.get(a)
+            a_sup = self.upper.get(a)
+            b_sub = self.lower.get(b)
+            b_sup = self.upper.get(b)
+            if a_sub:
+                self.constrain(b, a_sub, 'lower')
+            if a_sup:
+                self.constrain(b, a_sup, 'upper')
+            if b_sub:
+                self.constrain(a, b_sub, 'lower')
+            if b_sup:
+                self.constrain(a, b_sup, 'upper')
 
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperator):
             if a in b:
