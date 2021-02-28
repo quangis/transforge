@@ -261,14 +261,11 @@ class Type(object):
         else:
             return str(self.plain)
 
-    def __call__(self, *args: Type) -> Type:
-        return reduce(Type.apply, args, self)
-
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Type:
-        return Type(
-            self.plain.fresh(ctx),
-            (constraint.fresh(ctx) for constraint in self.constraints)
-        )
+    def __call__(self, *args: Union[Type, PlainType]) -> Type:
+        return reduce(
+            Type.apply,
+            (Type(a) if isinstance(a, PlainType) else a for a in args),
+            self)
 
     def apply(self, arg: Type) -> Type:
         """
@@ -280,7 +277,6 @@ class Type(object):
             s = SubtypeConstraints()
             s.subtype(arg.plain, input_type)
 
-#            arg.plain.unify(input_type)
             return Type(
                 s.consolidate(output_type.resolve()),
                 (constraint
@@ -289,6 +285,12 @@ class Type(object):
             )
         else:
             raise error.NonFunctionApplication(self.plain, arg)
+
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Type:
+        return Type(
+            self.plain.fresh(ctx),
+            (constraint.fresh(ctx) for constraint in self.constraints)
+        )
 
 
 class PlainType(ABC):
@@ -427,6 +429,9 @@ class PlainType(ABC):
                     *(p.skeleton() for p in self.params))
         else:
             return self
+
+    def __call__(self, *args: Union[Type, PlainType]) -> Type:
+        return Type(self).__call__(*args)
 
     # constraints #############################################################
 
