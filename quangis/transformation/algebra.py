@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Iterable, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import PlainType, Type, Definition
+from quangis.transformation.type import Type, Definition
 
 
 class Expr(object):
@@ -58,17 +58,18 @@ class TransformationAlgebra(object):
         lowercase attribute containing a type, or a tuple beginning with a
         type, will also be converted into a `Definition`.
         """
-        if prop[0].islower() and (isinstance(value, PlainType) or (
-                    isinstance(value, tuple) and
-                    isinstance(value[0], PlainType))
-                ):
-            # Invalidate parser
-            self.parser = None
+        if prop[0].islower() and prop != "parser":
+            self.parser = None  # Invalidate parser
+
             name = "in" if prop == "in_" else prop
             args = value if isinstance(value, Iterable) else (value,)
-            super().__setattr__(prop, Definition(name, *args))
-        else:
-            super().__setattr__(prop, value)
+
+            try:
+                value = Definition(name, *args)
+            except ValueError:
+                pass
+
+        super().__setattr__(prop, value)
 
     def definitions(self) -> Iterable[Definition]:
         """

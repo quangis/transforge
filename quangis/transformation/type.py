@@ -69,7 +69,7 @@ class Definition(object):
     def __init__(
             self,
             name: str,
-            t: PlainType,
+            t: Union[Type, PlainType, Definition],
             *args: Union[Constraint, int]):
         """
         Define a function type. Additional arguments are distinguished by their
@@ -90,7 +90,8 @@ class Definition(object):
                 raise ValueError(f"cannot use extra {type(arg)} in Definition")
 
         self.name = name
-        self.type = Type(t, constraints)
+        self.type = Type.coerce(t)
+        self.type.constraints.extend(constraints)
         self.data = number_of_data_arguments
 
     def instance(self) -> Type:
@@ -136,8 +137,10 @@ class Type(object):
             return Type(x)
         elif isinstance(x, Definition):
             return x.instance()
-        else:
+        elif isinstance(x, Type):
             return x
+        else:
+            raise ValueError(f"Cannot convert a {type(x)} to a Type")
 
     def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
         return reduce(Type.apply, (Type.coerce(a) for a in args), self)
