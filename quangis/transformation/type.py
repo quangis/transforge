@@ -119,10 +119,16 @@ class Type(object):
         return str(self)
 
     def __str__(self) -> str:
-        res = str(self.plain)
+        res = [str(self.plain)]
+
         if self.constraints:
-            res = f"{res} | {', '.join(str(c) for c in self.constraints)}"
-        return res
+            res.append(', '.join(str(c) for c in self.constraints))
+
+        for v in self.plain.variables():
+            if v.lower or v.upper:
+                res.append(f"{v.lower or '?'} <= {v} <= {v.upper or '?'}")
+
+        return ', '.join(res)
 
     def __call__(self, *args: Union[Type, PlainType]) -> Type:
         return reduce(
