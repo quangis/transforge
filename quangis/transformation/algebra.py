@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Iterable, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import TypeTerm, QTypeTerm, Definition
+from quangis.transformation.type import PlainType, Type, Definition
 
 
 class Expr(object):
@@ -17,7 +17,7 @@ class Expr(object):
     An expression of a transformation algebra.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: QTypeTerm):
+    def __init__(self, tokens: List[Union[str, Expr]], type: Type):
         self.tokens = tokens
         self.type = type
 
@@ -58,9 +58,9 @@ class TransformationAlgebra(object):
         lowercase attribute containing a type, or a tuple beginning with a
         type, will also be converted into a `Definition`.
         """
-        if prop[0].islower() and (isinstance(value, TypeTerm) or (
+        if prop[0].islower() and (isinstance(value, PlainType) or (
                     isinstance(value, tuple) and
-                    isinstance(value[0], TypeTerm))
+                    isinstance(value[0], PlainType))
                 ):
             # Invalidate parser
             self.parser = None

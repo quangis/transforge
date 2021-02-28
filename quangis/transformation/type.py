@@ -14,7 +14,7 @@ functional programming languages.
 # expressions before using them or adding constraints to them. This means that
 # pointers are somewhat interwoven --- keep this in mind.
 # To understand the module, I recommend you start by reading the methods of the
-# TypeTerm class.
+# PlainType class.
 from __future__ import annotations
 
 from enum import Enum
@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from collections import defaultdict
-from typing import Dict, Optional, Iterable, Union, List, Tuple
+from typing import Dict, Optional, Iterable, Union, List
 from typing_extensions import Literal
 
 from quangis import error
@@ -52,7 +52,7 @@ class SubtypeConstraints(object):
         self.upper: Dict[TypeVar, TypeConstructor] = dict()
         self.lower: Dict[TypeVar, TypeConstructor] = dict()
 
-    def consolidate(self, t: TypeTerm, low: bool = True) -> TypeTerm:
+    def consolidate(self, t: PlainType, low: bool = True) -> PlainType:
         if isinstance(t, TypeVar):
             if low and t in self.lower:
                 return TypeOperator(self.lower[t])
@@ -114,7 +114,7 @@ class SubtypeConstraints(object):
             else:
                 raise error.SubtypeMismatch(new, upper)
 
-    def subtype(self, a: TypeTerm, b: TypeTerm) -> None:
+    def subtype(self, a: PlainType, b: PlainType) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -197,7 +197,7 @@ class Definition(object):
     def __init__(
             self,
             name: str,
-            type: TypeTerm,
+            t: PlainType,
             *args: Union[Constraint, int]):
         """
         Define a function type. Additional arguments are distinguished by their
@@ -218,13 +218,13 @@ class Definition(object):
                 raise ValueError(f"cannot use extra {type(arg)} in Definition")
 
         self.name = name
-        self.type = QTypeTerm(type, constraints)
+        self.type = Type(t, constraints)
         self.data = number_of_data_arguments
 
-    def instance(self) -> QTypeTerm:
+    def instance(self) -> Type:
         return self.type.fresh({})
 
-    def __call__(self, *args: Definition) -> QTypeTerm:
+    def __call__(self, *args: Definition) -> Type:
         return self.instance().__call__(*map(Definition.instance, args))
 
     def __repr__(self) -> str:
@@ -234,13 +234,13 @@ class Definition(object):
         return f"{self.name} : {self.type}"
 
 
-class QTypeTerm(object):
+class Type(object):
     """
-    A constrained type term.
+    A top-level type term decorated with constraints.
     """
 
-    def __init__(self, type: TypeTerm, constraints: Iterable[Constraint] = ()):
-        self.plain = type
+    def __init__(self, t: PlainType, constraints: Iterable[Constraint] = ()):
+        self.plain = t
         self.constraints = list(constraints)
 
         # bound_variables = set(self.plain.variables())
@@ -261,16 +261,16 @@ class QTypeTerm(object):
         else:
             return str(self.plain)
 
-    def __call__(self, *args: QTypeTerm) -> QTypeTerm:
-        return reduce(QTypeTerm.apply, args, self)
+    def __call__(self, *args: Type) -> Type:
+        return reduce(Type.apply, args, self)
 
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> QTypeTerm:
-        return QTypeTerm(
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Type:
+        return Type(
             self.plain.fresh(ctx),
             (constraint.fresh(ctx) for constraint in self.constraints)
         )
 
-    def apply(self, arg: QTypeTerm) -> QTypeTerm:
+    def apply(self, arg: Type) -> Type:
         """
         Apply an argument to a function type to get its resolved output type.
         """
@@ -281,7 +281,7 @@ class QTypeTerm(object):
             s.subtype(arg.plain, input_type)
 
 #            arg.plain.unify(input_type)
-            return QTypeTerm(
+            return Type(
                 s.consolidate(output_type.resolve()),
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
@@ -291,7 +291,7 @@ class QTypeTerm(object):
             raise error.NonFunctionApplication(self.plain, arg)
 
 
-class TypeTerm(ABC):
+class PlainType(ABC):
     """
     Abstract base class for type operators and type variables. Note that basic
     types are just 0-ary type operators and functions are just particular 2-ary
@@ -301,12 +301,12 @@ class TypeTerm(ABC):
     def __repr__(self):
         return self.__str__()
 
-    def __contains__(self, value: TypeTerm) -> bool:
+    def __contains__(self, value: PlainType) -> bool:
         return value == self or (
             isinstance(self, TypeOperator) and
             any(value in t for t in self.params))
 
-    def __pow__(self, other: TypeTerm) -> TypeOperator:
+    def __pow__(self, other: PlainType) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
         allows us to use the infix operator ** for the arrow in function
@@ -340,7 +340,7 @@ class TypeTerm(ABC):
                 for v in a.variables():
                     yield v
 
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> TypeTerm:
+    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> PlainType:
         """
         Create a fresh copy of this type, with unique new variables.
         """
@@ -360,7 +360,7 @@ class TypeTerm(ABC):
                 return new
         raise ValueError(f"{self} is neither a type nor a type variable")
 
-    def unify(self, other: TypeTerm) -> None:
+    def unify(self, other: PlainType) -> None:
         """
         Bind variables such that both types become the same. Binding is a
         side-effect; use resolve() to consolidate the bindings.
@@ -383,7 +383,7 @@ class TypeTerm(ABC):
                 elif isinstance(b, TypeVar) and a != b:
                     b.bind(a)
 
-    def resolve(self, full: bool = True) -> TypeTerm:
+    def resolve(self, full: bool = True) -> PlainType:
         """
         A `full` resolve obtains a version of this type with all bound
         variables replaced with their bindings. Otherwise, just resolve the
@@ -399,7 +399,7 @@ class TypeTerm(ABC):
 
     def compatible(
             self,
-            other: TypeTerm,
+            other: PlainType,
             allow_subtype: bool = False) -> bool:
         """
         Is the type structurally consistent with another, that is, do they
@@ -413,7 +413,7 @@ class TypeTerm(ABC):
             )
         return True
 
-    def skeleton(self) -> TypeTerm:
+    def skeleton(self) -> PlainType:
         """
         Create a copy of this operator, substituting fresh variables for basic
         types.
@@ -430,14 +430,14 @@ class TypeTerm(ABC):
 
     # constraints #############################################################
 
-    def subtype(self, *patterns: TypeTerm) -> Constraint:
+    def subtype(self, *patterns: PlainType) -> Constraint:
         return NoConstraint(self, *patterns, allow_subtype=True)
 
-    def member(self, *patterns: TypeTerm) -> Constraint:
+    def member(self, *patterns: PlainType) -> Constraint:
         return NoConstraint(self, *patterns, allow_subtype=False)
 
     def param(
-            self, target: TypeTerm,
+            self, target: PlainType,
             subtype: bool = False,
             at: Optional[int] = None) -> Constraint:
         return NoConstraint(
@@ -493,14 +493,14 @@ class TypeConstructor(object):
         return len(self.variance)
 
 
-class TypeOperator(TypeTerm):
+class TypeOperator(PlainType):
     """
     An instance of an n-ary type constructor.
     """
 
-    def __init__(self, constructor: TypeConstructor, *params: TypeTerm):
+    def __init__(self, constructor: TypeConstructor, *params: PlainType):
         self.constructor = constructor
-        self.params: List[TypeTerm] = list(params)
+        self.params: List[PlainType] = list(params)
 
         if len(self.params) != self.constructor.arity:
             raise ValueError
@@ -524,7 +524,7 @@ class TypeOperator(TypeTerm):
             return False
 
 
-class TypeVar(TypeTerm):
+class TypeVar(PlainType):
     """
     Type variable. Note that any bindings and constraints are bound to the
     actual object instance, so make a fresh copy before applying them if the
@@ -536,14 +536,14 @@ class TypeVar(TypeTerm):
     def __init__(self, wildcard: bool = False):
         cls = type(self)
         self.id = cls.counter
-        self.bound: Optional[TypeTerm] = None
+        self.bound: Optional[PlainType] = None
         self.wildcard = wildcard
         cls.counter += 1
 
     def __str__(self) -> str:
         return "_" if self.wildcard else f"x{self.id}"
 
-    def bind(self, binding: TypeTerm) -> None:
+    def bind(self, binding: PlainType) -> None:
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
@@ -564,8 +564,8 @@ class Constraint(ABC):
 
     def __init__(
             self,
-            type: TypeTerm,
-            *patterns: TypeTerm,
+            type: PlainType,
+            *patterns: PlainType,
             allow_subtype: bool = False):
         self.subject = type
         self.patterns = list(patterns)
@@ -666,7 +666,7 @@ class ParameterConstraint(Constraint):
             f"{'' if self.position is None else ' at #' + str(self.position)}"
         )
 
-    def compatible(self, pattern: TypeTerm) -> bool:
+    def compatible(self, pattern: PlainType) -> bool:
         if isinstance(self.subject, TypeOperator):
             if self.position is None:
                 return any(
