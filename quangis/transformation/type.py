@@ -145,13 +145,9 @@ class Type(object):
             input_type, output_type = self.plain.params
             arg_type = arg.plain
 
-            #print('Applying', arg, 'to', self)
             arg_type.unify(input_type)
-            #print('Lower', s.lower)
-            #print('Upper', s.upper)
 
             return Type(
-                #s.consolidate(output_type.resolve()),
                 output_type.resolve(),
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
@@ -283,8 +279,9 @@ class PlainType(ABC):
         b = other.resolve(False)
 
         if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-            if a.constructor.basic and a.constructor <= b.constructor:
-                pass
+            if a.constructor.basic:
+                if not (a.constructor <= b.constructor):
+                    raise error.SubtypeMismatch(a, b)
             elif a.constructor == b.constructor:
                 for v, x, y in zip(a.constructor.variance, a.params, b.params):
                     if v == Variance.COVARIANT:
