@@ -148,7 +148,7 @@ class Type(object):
             arg_type.unify(input_type)
 
             return Type(
-                output_type.resolve(),
+                output_type,
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
                     if not constraint.fulfilled())
@@ -291,7 +291,7 @@ class PlainType(ABC):
             else:
                 raise error.TypeMismatch(a, b)
 
-        elif isinstance(a, TypeVar) and isinstance(b, TypeVar) and a is not b:
+        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
             a.bind(b)
 
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperator):
@@ -439,17 +439,18 @@ class TypeVar(PlainType):
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
-        self.bound = binding
+        if binding is not self:
+            self.bound = binding
 
-        if isinstance(binding, TypeVar):
-            if self.lower:
-                binding.above(self.lower)
-            if self.upper:
-                binding.below(self.upper)
-            if binding.lower:
-                self.above(binding.lower)
-            if binding.upper:
-                self.below(binding.upper)
+            if isinstance(binding, TypeVar):
+                if self.lower:
+                    binding.above(self.lower)
+                if self.upper:
+                    binding.below(self.upper)
+                if binding.lower:
+                    self.above(binding.lower)
+                if binding.upper:
+                    self.below(binding.upper)
 
     def above(self, new: TypeConstructor) -> None:
         """
