@@ -14,7 +14,7 @@ functional programming languages.
 # expressions before using them or adding constraints to them. This means that
 # pointers are somewhat interwoven --- keep this in mind.
 # To understand the module, I recommend you start by reading the methods of the
-# PlainType class.
+# Term class.
 from __future__ import annotations
 
 from enum import Enum
@@ -97,7 +97,7 @@ class Type(object):
     A top-level type term decorated with constraints.
     """
 
-    def __init__(self, t: PlainType, constraints: Iterable[Constraint] = ()):
+    def __init__(self, t: Term, constraints: Iterable[Constraint] = ()):
         self.plain = t
         self.constraints = list(constraints)
 
@@ -124,7 +124,7 @@ class Type(object):
         Apply an argument to a function type to get its resolved output type.
         """
 
-        if isinstance(self.plain, TypeOperator) and self.plain.constructor == Function:
+        if isinstance(self.plain, OperatorTerm) and self.plain.operator == Function:
             input_type, output_type = self.plain.params
             arg_type = arg.plain
 
@@ -140,22 +140,22 @@ class Type(object):
             raise error.NonFunctionApplication(self.plain, arg)
 
 
-class PlainType(ABC):
+class Term(ABC):
     """
-    Abstract base class for type operators and type variables. Note that basic
-    types are just 0-ary type operators and functions are just particular 2-ary
-    type operators.
+    Abstract base class for plain type terms (operator terms and type
+    variables) without constraints. Note that basic types are just 0-ary type
+    operators and functions are just particular 2-ary type operators.
     """
 
     def __repr__(self):
         return self.__str__()
 
-    def __contains__(self, value: PlainType) -> bool:
+    def __contains__(self, value: Term) -> bool:
         return value == self or (
-            isinstance(self, TypeOperator) and
+            isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
 
-    def __pow__(self, other: Union[PlainType, TypeConstructor]) -> TypeOperator:
+    def __pow__(self, other: Union[Term, Operator]) -> OperatorTerm:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
         allows us to use the infix operator ** for the arrow in function
@@ -168,69 +168,69 @@ class PlainType(ABC):
         """
         return Function(
             self,
-            other() if isinstance(other, TypeConstructor) else other)
+            other() if isinstance(other, Operator) else other)
 
-    def variables(self) -> Iterable[TypeVar]:
+    def variables(self) -> Iterable[VariableTerm]:
         """
         Obtain all type variables currently in the type expression.
         """
-        if isinstance(self, TypeOperator):
+        if isinstance(self, OperatorTerm):
             for v in chain(*(t.variables() for t in self.params)):
                 yield v
         else:
             a = self.resolve(full=False)
-            if isinstance(a, TypeVar):
+            if isinstance(a, VariableTerm):
                 yield a
             else:
                 for v in a.variables():
                     yield v
 
-    def resolve(self, full: bool = True) -> PlainType:
+    def resolve(self, full: bool = True) -> Term:
         """
         A `full` resolve obtains a version of this type with all bound
         variables replaced with their bindings. Otherwise, just resolve the
         current variable.
         """
-        if isinstance(self, TypeVar) and self.bound:
+        if isinstance(self, VariableTerm) and self.bound:
             return self.bound.resolve(full)
-        elif full and isinstance(self, TypeOperator):
-            return TypeOperator(
-                self.constructor,
+        elif full and isinstance(self, OperatorTerm):
+            return OperatorTerm(
+                self.operator,
                 *(t.resolve(full) for t in self.params))
         return self
 
     def compatible(
             self,
-            other: PlainType,
+            other: Term,
             allow_subtype: bool = False) -> bool:
         """
         Is the type structurally consistent with another, that is, do they
         'fit', modulo variables. Subtypes may be allowed on the self side.
         """
-        if isinstance(self, TypeOperator) and isinstance(other, TypeOperator):
+        if isinstance(self, OperatorTerm) and isinstance(other, OperatorTerm):
             return (
-                self.constructor <= other.constructor and
+                self.operator <= other.operator and
                 all(s.compatible(t, allow_subtype)
                     for s, t in zip(self.params, other.params))
             )
         return True
 
-    def skeleton(self) -> PlainType:
+    def skeleton(self) -> Term:
         """
         Create a copy of this operator, substituting fresh variables for basic
         types.
         """
-        if isinstance(self, TypeOperator):
-            if self.constructor.basic:
-                return TypeVar()
+        if isinstance(self, OperatorTerm):
+            if self.operator.basic:
+                return VariableTerm()
             else:
-                return TypeOperator(
-                    self.constructor,
+                return OperatorTerm(
+                    self.operator,
                     *(p.skeleton() for p in self.params))
         else:
             return self
 
-    def unify(self, other: PlainType) -> None:
+    def unify(self, other: Term) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -239,12 +239,12 @@ class PlainType(ABC):
         a = self.resolve(False)
         b = other.resolve(False)
 
-        if isinstance(a, TypeOperator) and isinstance(b, TypeOperator):
-            if a.constructor.basic:
-                if not (a.constructor <= b.constructor):
+        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
+            if a.operator.basic:
+                if not (a.operator <= b.operator):
                     raise error.SubtypeMismatch(a, b)
-            elif a.constructor == b.constructor:
-                for v, x, y in zip(a.constructor.variance, a.params, b.params):
+            elif a.operator == b.operator:
+                for v, x, y in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.COVARIANT:
                         x.unify(y)
                     elif v == Variance.CONTRAVARIANT:
@@ -252,23 +252,23 @@ class PlainType(ABC):
             else:
                 raise error.TypeMismatch(a, b)
 
-        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
+        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
             a.bind(b)
 
-        elif isinstance(a, TypeVar) and isinstance(b, TypeOperator):
+        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
             if a in b:
                 raise error.RecursiveType(a, b)
-            elif b.constructor.basic:
-                a.below(b.constructor)
+            elif b.operator.basic:
+                a.below(b.operator)
             else:
                 a.bind(b.skeleton())
                 a.unify(b)
 
-        elif isinstance(a, TypeOperator) and isinstance(b, TypeVar):
+        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b in a:
                 raise error.RecursiveType(b, a)
-            elif a.constructor.basic:
-                b.above(a.constructor)
+            elif a.operator.basic:
+                b.above(a.operator)
             else:
                 b.bind(a.skeleton())
                 b.unify(a)
@@ -278,21 +278,21 @@ class PlainType(ABC):
 
     # constraints #############################################################
 
-    def subtype(self, *patterns: PlainType) -> Constraint:
+    def subtype(self, *patterns: Term) -> Constraint:
         return NoConstraint(self, *patterns, allow_subtype=True)
 
-    def member(self, *patterns: PlainType) -> Constraint:
+    def member(self, *patterns: Term) -> Constraint:
         return NoConstraint(self, *patterns, allow_subtype=False)
 
     def param(
-            self, target: PlainType,
+            self, target: Term,
             subtype: bool = False,
             at: Optional[int] = None) -> Constraint:
         return NoConstraint(
             self, target)  # , position=at, allow_subtype=subtype)
 
 
-class TypeConstructor(object):
+class Operator(object):
     """
     An n-ary type constructor.
     """
@@ -301,9 +301,9 @@ class TypeConstructor(object):
             self,
             name: str,
             params: Union[int, Iterable[Variance]] = 0,
-            supertype: Optional[TypeConstructor] = None):
+            supertype: Optional[Operator] = None):
         self.name = name
-        self.supertype: Optional[TypeConstructor] = supertype
+        self.supertype: Optional[Operator] = supertype
 
         if isinstance(params, int):
             self.variance = list(Variance.COVARIANT for _ in range(params))
@@ -322,93 +322,94 @@ class TypeConstructor(object):
 
     def __eq__(self, other: object) -> bool:
         return (
-            isinstance(other, TypeConstructor) and
+            isinstance(other, Operator) and
             self.name == other.name
             and self.variance == other.variance)
 
-    def __le__(self, other: TypeConstructor) -> bool:
+    def __le__(self, other: Operator) -> bool:
         return self == other or self < other
 
-    def __lt__(self, other: TypeConstructor) -> bool:
+    def __lt__(self, other: Operator) -> bool:
         return bool(self.supertype and self.supertype <= other)
 
-    def __call__(self, *params) -> TypeOperator:
-        return TypeOperator(self, *params)
+    def __call__(self, *params) -> OperatorTerm:
+        return OperatorTerm(self, *params)
 
-    def __pow__(self, other: Union[PlainType, TypeConstructor]) -> TypeOperator:
+    def __pow__(self, other: Union[Term, Operator]) -> OperatorTerm:
         return self().__pow__(other)
 
     @property
     def basic(self) -> bool:
         return self.arity == 0
 
+    @property
+    def compound(self) -> bool:
+        return not self.basic
 
-class TypeOperator(PlainType):
+
+class OperatorTerm(Term):
     """
     An instance of an n-ary type constructor.
     """
 
     def __init__(
             self,
-            constructor: TypeConstructor,
-            *params: Union[PlainType, TypeConstructor]):
-        self.constructor = constructor
-        self.params: List[PlainType] = list(
-            p() if isinstance(p, TypeConstructor) else p for p in params)
+            operator: Operator,
+            *params: Union[Term, Operator]):
+        self.operator = operator
+        self.params: List[Term] = list(
+            p() if isinstance(p, Operator) else p for p in params)
 
-        if len(self.params) != self.constructor.arity:
+        if len(self.params) != self.operator.arity:
             raise ValueError(
-                f"{self.constructor} takes {self.constructor.arity}"
+                f"{self.operator} takes {self.operator.arity}"
                 f"parameters; {len(self.params)} given"
             )
 
     def __str__(self) -> str:
-        if self.constructor == Function:
+        if self.operator == Function:
             inT, outT = self.params
-            if isinstance(inT, TypeOperator) and inT.constructor == Function:
+            if isinstance(inT, OperatorTerm) and inT.operator == Function:
                 return f"({inT}) ** {outT}"
             return f"{inT} ** {outT}"
         elif self.params:
-            return f'{self.constructor}({", ".join(str(t) for t in self.params)})'
+            return f'{self.operator}({", ".join(str(t) for t in self.params)})'
         else:
-            return str(self.constructor)
+            return str(self.operator)
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, TypeOperator):
-            return self.constructor == other.constructor and \
+        if isinstance(other, OperatorTerm):
+            return self.operator == other.operator and \
                all(s == t for s, t in zip(self.params, other.params))
         else:
             return False
 
 
-class TypeVar(PlainType):
+class VariableTerm(Term):
     """
-    Type variable. Note that any bindings and constraints are bound to the
-    actual object instance, so make a fresh copy before applying them if the
-    variable is not supposed to be a concrete instance.
+    Type variable.
     """
-
     counter = 0
 
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
-        self.bound: Optional[PlainType] = None
-        self.lower: Optional[TypeConstructor] = None
-        self.upper: Optional[TypeConstructor] = None
+        self.bound: Optional[Term] = None
+        self.lower: Optional[Operator] = None
+        self.upper: Optional[Operator] = None
         cls.counter += 1
 
     def __str__(self) -> str:
         return f"x{self.id}"
 
-    def bind(self, binding: PlainType) -> None:
+    def bind(self, binding: Term) -> None:
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
         if binding is not self:
             self.bound = binding
 
-            if isinstance(binding, TypeVar):
+            if isinstance(binding, VariableTerm):
                 if self.lower:
                     binding.above(self.lower)
                 if self.upper:
@@ -418,7 +419,7 @@ class TypeVar(PlainType):
                 if binding.upper:
                     self.below(binding.upper)
 
-    def above(self, new: TypeConstructor) -> None:
+    def above(self, new: Operator) -> None:
         """
         Constrain this variable to be a basic type with the given type as lower
         bound.
@@ -441,7 +442,7 @@ class TypeVar(PlainType):
         else:
             raise error.SubtypeMismatch(lower, new)
 
-    def below(self, new: TypeConstructor) -> None:
+    def below(self, new: Operator) -> None:
         """
         Constrain this variable to be a basic type with the given subtype as
         upper bound.
@@ -459,7 +460,7 @@ class TypeVar(PlainType):
 
 
 "The special constructor for function types."
-Function = TypeConstructor(
+Function = Operator(
     'Function',
     params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
 )
@@ -467,34 +468,31 @@ Function = TypeConstructor(
 "A shortcut for writing function signatures."
 Σ = Signature
 
-"A shortcut for writing type constructors."
-τ = TypeConstructor
-
 "A union type for anything that can act as a schematic type."
 TypeSchema = Union[
     Type,
-    PlainType,
-    TypeConstructor,
+    Term,
+    Operator,
     Signature,
     Callable[..., Type],
-    Callable[..., PlainType]]
+    Callable[..., Term]]
 
 
 def instance(schema: TypeSchema) -> Type:
     """
     Turn anything that can act as a type schema into an instance of that type.
     """
-    if isinstance(schema, PlainType):
+    if isinstance(schema, Term):
         return Type(schema)
     elif isinstance(schema, Type):
         return schema
     elif isinstance(schema, Signature):
         return schema.instance()
-    elif isinstance(schema, TypeConstructor):
+    elif isinstance(schema, Operator):
         return instance(schema())
     elif callable(schema):
         n = len(signature(schema).parameters)
-        return instance(schema(*(TypeVar() for _ in range(n))))
+        return instance(schema(*(VariableTerm() for _ in range(n))))
     else:
         raise ValueError(f"Cannot convert a {type(schema)} to a Type")
 
@@ -507,14 +505,14 @@ class Constraint(ABC):
 
     def __init__(
             self,
-            type: PlainType,
-            *patterns: PlainType,
+            type: Term,
+            *patterns: Term,
             allow_subtype: bool = False):
         self.subject = type
         self.patterns = list(patterns)
         self.allow_subtype = allow_subtype
 
-    def variables(self) -> Iterable[TypeVar]:
+    def variables(self) -> Iterable[VariableTerm]:
         return chain(
             self.subject.variables(),
             *(t.variables() for t in self.patterns))
@@ -526,7 +524,7 @@ class Constraint(ABC):
         return self
 
     @abstractmethod
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]):
+    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]):
         return NotImplemented
 
     def fulfilled(self) -> bool:
@@ -567,7 +565,7 @@ class MembershipConstraint(Constraint):
             f"{' or '.join(str(t) for t in self.patterns)}"
         )
 
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> MembershipConstraint:
+    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]) -> MembershipConstraint:
         return MembershipConstraint(
             self.subject.fresh(ctx),
             *(t.fresh(ctx) for t in self.patterns),
@@ -594,7 +592,7 @@ class ParameterConstraint(Constraint):
         self.position = position
         super().__init__(*nargs, **kwargs)
 
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> ParameterConstraint:
+    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]) -> ParameterConstraint:
         return ParameterConstraint(
             self.subject.fresh(ctx),
             *(t.fresh(ctx) for t in self.patterns),
@@ -609,8 +607,8 @@ class ParameterConstraint(Constraint):
             f"{'' if self.position is None else ' at #' + str(self.position)}"
         )
 
-    def compatible(self, pattern: PlainType) -> bool:
-        if isinstance(self.subject, TypeOperator):
+    def compatible(self, pattern: Term) -> bool:
+        if isinstance(self.subject, OperatorTerm):
             if self.position is None:
                 return any(
                     param.compatible(pattern, self.allow_subtype)
