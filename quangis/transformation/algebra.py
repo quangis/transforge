@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from typing import List, Iterable, Union, Optional
+from typing import List, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import TypeTerm, QTypeTerm, Definition
+from quangis.transformation.type import Type, Signature
 
 
 class Expr(object):
@@ -17,7 +17,7 @@ class Expr(object):
     An expression of a transformation algebra.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: QTypeTerm):
+    def __init__(self, tokens: List[Union[str, Expr]], type: Type):
         self.tokens = tokens
         self.type = type
 
@@ -42,55 +42,20 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    """
-    To define a transformation algebra, make an instance of this class. Any
-    properties (starting with lowercase) that are `Definition`s or can be
-    translated to such via its constructor will be considered functions of the
-    transformation algebra.
-    """
-
-    def __init__(self):
+    def __init__(self, **functions: Signature):
+        self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
-    def __setattr__(self, prop, value):
-        """
-        Makes sure definitions do not have to be tediously written out: any
-        lowercase attribute containing a type, or a tuple beginning with a
-        type, will also be converted into a `Definition`.
-        """
-        if prop[0].islower() and (isinstance(value, TypeTerm) or (
-                    isinstance(value, tuple) and
-                    isinstance(value[0], TypeTerm))
-                ):
-            # Invalidate parser
-            self.parser = None
-            name = "in" if prop == "in_" else prop
-            args = value if isinstance(value, Iterable) else (value,)
-            super().__setattr__(prop, Definition(name, *args))
-        else:
-            super().__setattr__(prop, value)
-
-    def definitions(self) -> Iterable[Definition]:
-        """
-        Obtain the definitions of this algebra.
-        """
-        for attr in dir(self):
-            val = getattr(self, attr)
-            if isinstance(val, Definition):
-                yield val
-
-    def make_parser(self) -> pp.Parser:
-
-        defs = {d.name: d for d in self.definitions()}
-
+    def generate_parser(self) -> pp.Parser:
+        sigs = self.functions
         identifier = pp.Word(pp.alphanums + ':_').setName('identifier')
 
         function = pp.MatchFirst(
-            pp.CaselessKeyword(d.name) + d.data * identifier
-            if d.data else
-            pp.CaselessKeyword(d.name)
-            for k, d in defs.items()
-        ).setParseAction(lambda s, l, t: Expr(t, defs[t[0]].instance()))
+            pp.CaselessKeyword(k) + d.data_args * identifier
+            if d.data_args else
+            pp.CaselessKeyword(k)
+            for k, d in sigs.items()
+        ).setParseAction(lambda s, l, t: Expr(t, sigs[t[0]].instance()))
 
         return pp.infixNotation(function, [(
             None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
@@ -98,5 +63,5 @@ class TransformationAlgebra(object):
 
     def parse(self, string: str) -> Expr:
         if not self.parser:
-            self.parser = self.make_parser()
+            self.parser = self.generate_parser()
         return self.parser.parseString(string, parseAll=True)[0]

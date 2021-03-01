@@ -84,6 +84,21 @@ class TypeMismatch(AlgebraTypeError):
         )
 
 
+class SubtypeMismatch(AlgebraTypeError):
+    def __init__(self, c1, c2):
+        self.c1 = c1
+        self.c2 = c2
+        self.fn = None
+        self.arg = None
+
+    def __str__(self) -> str:
+        return (
+            super().__str__() +
+            "Subtype mismatch. Could not satisfy:\n"
+            f"\t\033[1m{self.c1}\033[0m <= \033[1m{self.c2}\033[0m"
+        )
+
+
 class ViolatedConstraint(AlgebraTypeError):
     def __init__(self, c):
         self.c = c
