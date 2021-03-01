@@ -44,14 +44,10 @@ class Variance(Enum):
 class Signature(object):
     """
     This class provides the definition of a *signature* for a function or for
-    data: it knows its schematic type, and can generate fresh instances,
-    possibly containing fresh variables.
+    data: it knows its schematic type, and can generate fresh instances.
     """
 
-    def __init__(
-            self,
-            schema: TypeSchema,
-            data_args: int = 0):
+    def __init__(self, schema: TypeSchema, data_args: int = 0):
         self.type = schema
         self.data_args = data_args
 
