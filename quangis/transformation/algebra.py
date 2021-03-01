@@ -65,7 +65,7 @@ class TransformationAlgebra(object):
             args = value if isinstance(value, Iterable) else (value,)
 
             try:
-                value = Signature(t=args[0], name=name)#, *(args[1:]))
+                value = Signature(schema=args[0], name=name)#, *(args[1:]))
             except ValueError:
                 pass
 

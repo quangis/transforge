@@ -22,7 +22,6 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from collections import defaultdict
 from typing import Dict, Optional, Iterable, Union, List, Callable
 
 from quangis import error
@@ -42,35 +41,16 @@ class Variance(Enum):
     CONTRAVARIANT = 1
 
 
-class Variables(defaultdict):
-    """
-    For convenient notation, we provide a dispenser for type variables. Instead
-    of writing x = TypeVar() to introduce type variable x every time, we can
-    just instantiate a var = Variables() object and get var.x, var.y on the
-    fly. To get a wildcard variable, use 'var._'; the assumption is that a
-    wildcard will never be used anywhere else, so it will return a new type
-    variable every time.
-    """
-
-    def __init__(self):
-        super().__init__(TypeVar)
-
-    def __getattr__(self, key):
-        if key == '_':
-            return TypeVar(wildcard=True)
-        return self[key]
-
-
 class Signature(object):
     """
     This class provides the definition of a *signature* for a function or for
-    data: it knows its general type and constraints, and can generate fresh
+    data: it knows its schematic type and constraints, and can generate fresh
     instances, possibly containing fresh variables.
     """
 
     def __init__(
             self,
-            t: Typish,
+            schema: TypeSchema,
             name: str = "anonymous",
             *args: Union[Constraint, int]):
         """
@@ -92,14 +72,17 @@ class Signature(object):
                 raise ValueError(f"cannot use extra {type(arg)} in Signature")
 
         self.name = name
-        self.type = Type.coerce(t)
-        self.type.constraints.extend(constraints)
+        self.type = schema
+        # self.type.constraints.extend(constraints)
         self.data = number_of_data_arguments
 
     def instance(self) -> Type:
-        return self.type.fresh({})
+        """
+        Get an instance of the type represented by this function schema.
+        """
+        return instance(self.type)
 
-    def __call__(self, *args: Typish) -> Type:
+    def __call__(self, *args: TypeSchema) -> Type:
         return self.instance().__call__(*args)
 
     def __repr__(self) -> str:
@@ -133,22 +116,8 @@ class Type(object):
 
         return ', '.join(res)
 
-    @staticmethod
-    def coerce(t: Typish) -> Type:
-        if isinstance(t, PlainType):
-            return Type(t)
-        elif isinstance(t, Signature):
-            return t.instance()
-        elif isinstance(t, Type):
-            return t
-        elif callable(t):
-            n = len(signature(t).parameters)
-            return Type.coerce(t(*(TypeVar() for _ in range(n))))  # bind fresh variables
-        else:
-            raise ValueError(f"Cannot convert a {type(t)} to a Type")
-
-    def __call__(self, *args: Typish) -> Type:
-        return reduce(Type.apply, (Type.coerce(a) for a in args), self)
+    def __call__(self, *args: TypeSchema) -> Type:
+        return reduce(Type.apply, (instance(a) for a in args), self)
 
     def apply(self, arg: Type) -> Type:
         """
@@ -169,12 +138,6 @@ class Type(object):
             )
         else:
             raise error.NonFunctionApplication(self.plain, arg)
-
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> Type:
-        return Type(
-            self.plain.fresh(ctx),
-            (constraint.fresh(ctx) for constraint in self.constraints)
-        )
 
 
 class PlainType(ABC):
@@ -219,24 +182,6 @@ class PlainType(ABC):
             else:
                 for v in a.variables():
                     yield v
-
-    def fresh(self, ctx: Dict[TypeVar, TypeVar]) -> PlainType:
-        """
-        Create a fresh copy of this type, with unique new variables.
-        """
-
-        if isinstance(self, TypeOperator):
-            return TypeOperator(
-                self.constructor,
-                *(t.fresh(ctx) for t in self.params))
-        elif isinstance(self, TypeVar):
-            if self in ctx:
-                return ctx[self]
-            else:
-                new = TypeVar(wildcard=self.wildcard)
-                ctx[self] = new
-                return new
-        raise ValueError(f"{self} is neither a type nor a type variable")
 
     def resolve(self, full: bool = True) -> PlainType:
         """
@@ -326,7 +271,7 @@ class PlainType(ABC):
                 b.bind(a.skeleton())
                 b.unify(a)
 
-    def __call__(self, *args: Typish) -> Type:
+    def __call__(self, *args: TypeSchema) -> Type:
         return Type(self).__call__(*args)
 
     # constraints #############################################################
@@ -437,17 +382,16 @@ class TypeVar(PlainType):
 
     counter = 0
 
-    def __init__(self, wildcard: bool = False):
+    def __init__(self):
         cls = type(self)
         self.id = cls.counter
         self.bound: Optional[PlainType] = None
         self.lower: Optional[TypeConstructor] = None
         self.upper: Optional[TypeConstructor] = None
-        self.wildcard = wildcard
         cls.counter += 1
 
     def __str__(self) -> str:
-        return "_" if self.wildcard else f"x{self.id}"
+        return f"x{self.id}"
 
     def bind(self, binding: PlainType) -> None:
         assert (not self.bound or binding == self.bound), \
@@ -518,7 +462,30 @@ Function = TypeConstructor(
 "A shortcut for writing type constructors."
 τ = TypeConstructor
 
-Typish = Union[Type, PlainType, Signature, Callable[..., Type]]
+"A union type for anything that can act as a schematic type."
+TypeSchema = Union[
+    Type,
+    PlainType,
+    Signature,
+    Callable[..., Type],
+    Callable[..., PlainType]]
+
+
+def instance(schema: TypeSchema) -> Type:
+    """
+    Turn anything that can act as a type schema into an instance of that type.
+    """
+    if isinstance(schema, PlainType):
+        return Type(schema)
+    elif isinstance(schema, Type):
+        return schema
+    elif isinstance(schema, Signature):
+        return schema.instance()
+    elif callable(schema):
+        n = len(signature(schema).parameters)
+        return instance(schema(*(TypeVar() for _ in range(n))))
+    else:
+        raise ValueError(f"Cannot convert a {type(schema)} to a Type")
 
 
 class Constraint(ABC):
