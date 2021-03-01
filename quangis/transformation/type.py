@@ -144,7 +144,7 @@ class Term(ABC):
 
     def __or__(self, other: Union[Constraint, Iterable[Constraint]]) -> Type:
         """
-        Another abuse of Python's operators, allowing for us to add constraints
+        Another abuse of Python's operators, allowing us to add constraints
         to plain types using the | operator.
         """
         return Type(
@@ -180,29 +180,23 @@ class Term(ABC):
                 *(t.resolve(full) for t in self.params))
         return self
 
-    def specify(self, prefer_lower: bool = True) -> Term:
+    def specify(self, prefer_lower: bool = True) -> None:
         """
-        Consolidate all variables with subtype constraints into the most
-        specific basic type possible.
+        Bind all variables with subtype constraints into to the most specific
+        basic type possible.
         """
         if isinstance(self, OperatorTerm):
-            return OperatorTerm(
-                self.operator,
-                *(p.specify(prefer_lower ^ (v == Variance.CONTRAVARIANT))
-                    for v, p in zip(self.operator.variance, self.params))
-            )
+            for v, p in zip(self.operator.variance, self.params):
+                p.specify(prefer_lower ^ (v == Variance.CONTRAVARIANT))
         elif isinstance(self, VariableTerm):
             if prefer_lower and self.lower:
-                return OperatorTerm(self.lower)
+                self.bind(OperatorTerm(self.lower))
             elif not prefer_lower and self.upper:
-                return OperatorTerm(self.upper)
+                self.bind(OperatorTerm(self.upper))
             elif self.lower is not None:  # TODO not sure it makes sense to
-                return OperatorTerm(self.lower)  # accept lower bounds when
+                self.bind(OperatorTerm(self.lower))  # accept lower bounds when
             elif self.upper is not None:  # we want upper bounds. need for
-                return OperatorTerm(self.upper)  # lattice subtype structure?
-            else:
-                return self
-        raise ValueError
+                self.bind(OperatorTerm(self.upper))  # lattice subtype?
 
     def compatible(
             self,
@@ -240,6 +234,9 @@ class Term(ABC):
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
         also produces lower and upper bounds on subtypes that it must respect.
+
+        Resulting constraints are a side-effect; use resolve() and specify() to
+        consolidate.
         """
         a = self.resolve(False)
         b = other.resolve(False)
@@ -280,21 +277,6 @@ class Term(ABC):
 
     def __call__(self, *args: TypeSchema) -> Type:
         return Type(self).__call__(*args)
-
-    # constraints #############################################################
-
-    def subtype(self, *patterns: Term) -> Constraint:
-        return NoConstraint(self, *patterns, allow_subtype=True)
-
-    def member(self, *patterns: Term) -> Constraint:
-        return NoConstraint(self, *patterns, allow_subtype=False)
-
-    def param(
-            self, target: Term,
-            subtype: bool = False,
-            at: Optional[int] = None) -> Constraint:
-        return NoConstraint(
-            self, target)  # , position=at, allow_subtype=subtype)
 
 
 class Operator(object):
@@ -424,6 +406,13 @@ class VariableTerm(Term):
                 if binding.upper:
                     self.below(binding.upper)
 
+            # might not be necessary, but keeping it in as a sanity check
+            elif isinstance(binding, OperatorTerm) and binding.operator.basic:
+                if self.lower is not None and binding.operator < self.lower:
+                    raise error.SubtypeMismatch(binding, self)
+                if self.upper is not None and self.upper < binding.operator:
+                    raise error.SubtypeMismatch(self, binding)
+
     def above(self, new: Operator) -> None:
         """
         Constrain this variable to be a basic type with the given type as lower
@@ -470,7 +459,7 @@ Function = Operator(
     params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
 )
 
-"A shortcut for writing function signatures."
+"A shortcut for writing function or data signatures."
 Σ = Signature
 
 "A union type for anything that can act as a schematic type."
@@ -544,13 +533,13 @@ class Constraint(ABC):
         raise NotImplementedError
 
 
-class NoConstraint(Constraint):
+class Subtype(Constraint):
     """
     Temporarily shut off other constraints.
     """
 
-    def fresh(self, ctx) -> NoConstraint:
-        return NoConstraint(
+    def fresh(self, ctx) -> Subtype:
+        return Subtype(
             self.subject.fresh(ctx),
             (*(t.fresh(ctx) for t in self.patterns)))
 
