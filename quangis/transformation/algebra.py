@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Iterable, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import Type, Definition
+from quangis.transformation.type import Type, Signature
 
 
 class Expr(object):
@@ -44,7 +44,7 @@ class Expr(object):
 class TransformationAlgebra(object):
     """
     To define a transformation algebra, make an instance of this class. Any
-    properties (starting with lowercase) that are `Definition`s or can be
+    properties (starting with lowercase) that are `Signature`s or can be
     translated to such via its constructor will be considered functions of the
     transformation algebra.
     """
@@ -56,7 +56,7 @@ class TransformationAlgebra(object):
         """
         Makes sure definitions do not have to be tediously written out: any
         lowercase attribute containing a type, or a tuple beginning with a
-        type, will also be converted into a `Definition`.
+        type, will also be converted into a `Signature`.
         """
         if prop[0].islower() and prop != "parser":
             self.parser = None  # Invalidate parser
@@ -65,19 +65,19 @@ class TransformationAlgebra(object):
             args = value if isinstance(value, Iterable) else (value,)
 
             try:
-                value = Definition(name, *args)
+                value = Signature(t=args[0], name=name)#, *(args[1:]))
             except ValueError:
                 pass
 
         super().__setattr__(prop, value)
 
-    def definitions(self) -> Iterable[Definition]:
+    def definitions(self) -> Iterable[Signature]:
         """
         Obtain the definitions of this algebra.
         """
         for attr in dir(self):
             val = getattr(self, attr)
-            if isinstance(val, Definition):
+            if isinstance(val, Signature):
                 yield val
 
     def make_parser(self) -> pp.Parser:

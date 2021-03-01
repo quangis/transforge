@@ -21,8 +21,9 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
+from inspect import signature
 from collections import defaultdict
-from typing import Dict, Optional, Iterable, Union, List
+from typing import Dict, Optional, Iterable, Union, List, Callable
 
 from quangis import error
 
@@ -60,16 +61,17 @@ class Variables(defaultdict):
         return self[key]
 
 
-class Definition(object):
+class Signature(object):
     """
-    This class defines a function: it knows its general type and constraints,
-    and can generate fresh instances.
+    This class provides the definition of a *signature* for a function or for
+    data: it knows its general type and constraints, and can generate fresh
+    instances, possibly containing fresh variables.
     """
 
     def __init__(
             self,
-            name: str,
-            t: Union[Type, PlainType, Definition],
+            t: Typish,
+            name: str = "anonymous",
             *args: Union[Constraint, int]):
         """
         Define a function type. Additional arguments are distinguished by their
@@ -87,7 +89,7 @@ class Definition(object):
             elif isinstance(arg, int):
                 number_of_data_arguments = arg
             else:
-                raise ValueError(f"cannot use extra {type(arg)} in Definition")
+                raise ValueError(f"cannot use extra {type(arg)} in Signature")
 
         self.name = name
         self.type = Type.coerce(t)
@@ -97,7 +99,7 @@ class Definition(object):
     def instance(self) -> Type:
         return self.type.fresh({})
 
-    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
+    def __call__(self, *args: Typish) -> Type:
         return self.instance().__call__(*args)
 
     def __repr__(self) -> str:
@@ -132,17 +134,20 @@ class Type(object):
         return ', '.join(res)
 
     @staticmethod
-    def coerce(x: Union[Type, PlainType, Definition]) -> Type:
-        if isinstance(x, PlainType):
-            return Type(x)
-        elif isinstance(x, Definition):
-            return x.instance()
-        elif isinstance(x, Type):
-            return x
+    def coerce(t: Typish) -> Type:
+        if isinstance(t, PlainType):
+            return Type(t)
+        elif isinstance(t, Signature):
+            return t.instance()
+        elif isinstance(t, Type):
+            return t
+        elif callable(t):
+            n = len(signature(t).parameters)
+            return Type.coerce(t(*(TypeVar() for _ in range(n))))  # bind fresh variables
         else:
-            raise ValueError(f"Cannot convert a {type(x)} to a Type")
+            raise ValueError(f"Cannot convert a {type(t)} to a Type")
 
-    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
+    def __call__(self, *args: Typish) -> Type:
         return reduce(Type.apply, (Type.coerce(a) for a in args), self)
 
     def apply(self, arg: Type) -> Type:
@@ -321,7 +326,7 @@ class PlainType(ABC):
                 b.bind(a.skeleton())
                 b.unify(a)
 
-    def __call__(self, *args: Union[Type, PlainType, Definition]) -> Type:
+    def __call__(self, *args: Typish) -> Type:
         return Type(self).__call__(*args)
 
     # constraints #############################################################
@@ -501,10 +506,19 @@ class TypeVar(PlainType):
             raise error.SubtypeMismatch(new, upper)
 
 
+"The special constructor for function types."
 Function = TypeConstructor(
     'Function',
     Variance.CONTRAVARIANT,
     Variance.COVARIANT)
+
+"A shortcut for writing function signatures."
+Σ = Signature
+
+"A shortcut for writing type constructors."
+τ = TypeConstructor
+
+Typish = Union[Type, PlainType, Signature, Callable[..., Type]]
 
 
 class Constraint(ABC):
