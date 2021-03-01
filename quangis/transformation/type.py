@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from typing import Dict, Optional, Iterable, Union, List, Callable
+from typing import Optional, Iterable, Union, List, Callable
 
 from quangis import error
 
@@ -41,21 +41,38 @@ class Variance(Enum):
     CONTRAVARIANT = 1
 
 
-class Signature(object):
+class Schema(object):
     """
-    This class provides the definition of a *signature* for a function or for
-    data: it knows its schematic type, and can generate fresh instances.
+    This class provides the definition of a *schema* for function and data
+    signatures: it knows its schematic type, and can generate fresh instances.
     """
 
     def __init__(self, schema: TypeSchema, data_args: int = 0):
-        self.type = schema
+        self.schema = schema
         self.data_args = data_args
 
     def instance(self) -> Type:
         """
+        Turn anything that can act as a type schema into an instance of that type.
+        """
+        """
         Get an instance of the type represented by this function schema.
         """
-        return instance(self.type)
+        s = self.schema
+
+        if isinstance(s, Term):
+            return Type(s)
+        elif isinstance(s, Type):
+            return s
+        elif isinstance(s, Schema):
+            return s.instance()
+        elif isinstance(s, Operator):
+            return s()
+        elif callable(s):
+            n = len(signature(s).parameters)
+            return Schema(s(*(VariableTerm() for _ in range(n)))).instance()
+        else:
+            raise ValueError(f"Cannot convert a {type(s)} to a Type")
 
     def __call__(self, *args: TypeSchema) -> Type:
         return self.instance().__call__(*args)
@@ -86,7 +103,7 @@ class Type(object):
         return ', '.join(res)
 
     def __call__(self, *args: TypeSchema) -> Type:
-        return reduce(Type.apply, (instance(a) for a in args), self)
+        return reduce(Type.apply, (Schema(a).instance() for a in args), self)
 
     def apply(self, arg: Type) -> Type:
         """
@@ -470,35 +487,16 @@ Function = Operator(
 )
 
 "A shortcut for writing function or data signatures."
-Σ = Signature
+Σ = Schema
 
 "A union type for anything that can act as a schematic type."
 TypeSchema = Union[
     Type,
     Term,
     Operator,
-    Signature,
+    Schema,
     Callable[..., Type],
     Callable[..., Term]]
-
-
-def instance(schema: TypeSchema) -> Type:
-    """
-    Turn anything that can act as a type schema into an instance of that type.
-    """
-    if isinstance(schema, Term):
-        return Type(schema)
-    elif isinstance(schema, Type):
-        return schema
-    elif isinstance(schema, Signature):
-        return schema.instance()
-    elif isinstance(schema, Operator):
-        return instance(schema())
-    elif callable(schema):
-        n = len(signature(schema).parameters)
-        return instance(schema(*(VariableTerm() for _ in range(n))))
-    else:
-        raise ValueError(f"Cannot convert a {type(schema)} to a Type")
 
 
 class Constraint(ABC):

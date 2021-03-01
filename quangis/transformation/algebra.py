@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import Type, Signature
+from quangis.transformation.type import Type, Schema
 
 
 class Expr(object):
@@ -42,7 +42,7 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, **functions: Signature):
+    def __init__(self, **functions: Schema):
         self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
