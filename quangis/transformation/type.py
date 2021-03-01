@@ -155,7 +155,7 @@ class PlainType(ABC):
             isinstance(self, TypeOperator) and
             any(value in t for t in self.params))
 
-    def __pow__(self, other: PlainType) -> TypeOperator:
+    def __pow__(self, other: Union[PlainType, TypeConstructor]) -> TypeOperator:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
         allows us to use the infix operator ** for the arrow in function
@@ -166,7 +166,9 @@ class PlainType(ABC):
         The right-bitshift operator >> (for __rshift__) would have been more
         intuitive visually, but does not have this property.
         """
-        return TypeOperator(Function, self, other)
+        return Function(
+            self,
+            other() if isinstance(other, TypeConstructor) else other)
 
     def variables(self) -> Iterable[TypeVar]:
         """
@@ -299,15 +301,10 @@ class TypeConstructor(object):
             self,
             name: str,
             *variance: Variance,
-            supertype: Union[None, TypeConstructor, TypeOperator] = None):
+            supertype: Optional[TypeConstructor] = None):
         self.name = name
         self.variance = list(variance)
-
-        self.supertype: Optional[TypeConstructor] = None
-        if isinstance(supertype, TypeOperator):
-            self.supertype = supertype.constructor
-        else:
-            self.supertype = supertype
+        self.supertype: Optional[TypeConstructor] = supertype
 
         if self.supertype and not self.basic:
             raise ValueError("only nullary types can have direct supertypes")
@@ -333,6 +330,9 @@ class TypeConstructor(object):
     def __call__(self, *params) -> TypeOperator:
         return TypeOperator(self, *params)
 
+    def __pow__(self, other: Union[PlainType, TypeConstructor]) -> TypeOperator:
+        return self().__pow__(other)
+
     @property
     def basic(self) -> bool:
         return self.arity == 0
@@ -347,12 +347,19 @@ class TypeOperator(PlainType):
     An instance of an n-ary type constructor.
     """
 
-    def __init__(self, constructor: TypeConstructor, *params: PlainType):
+    def __init__(
+            self,
+            constructor: TypeConstructor,
+            *params: Union[PlainType, TypeConstructor]):
         self.constructor = constructor
-        self.params: List[PlainType] = list(params)
+        self.params: List[PlainType] = list(
+            p() if isinstance(p, TypeConstructor) else p for p in params)
 
         if len(self.params) != self.constructor.arity:
-            raise ValueError
+            raise ValueError(
+                f"{self.constructor} takes {self.constructor.arity}"
+                f"parameters; {len(self.params)} given"
+            )
 
     def __str__(self) -> str:
         if self.constructor == Function:
@@ -466,6 +473,7 @@ Function = TypeConstructor(
 TypeSchema = Union[
     Type,
     PlainType,
+    TypeConstructor,
     Signature,
     Callable[..., Type],
     Callable[..., PlainType]]
@@ -481,6 +489,8 @@ def instance(schema: TypeSchema) -> Type:
         return schema
     elif isinstance(schema, Signature):
         return schema.instance()
+    elif isinstance(schema, TypeConstructor):
+        return instance(schema())
     elif callable(schema):
         n = len(signature(schema).parameters)
         return instance(schema(*(TypeVar() for _ in range(n))))
