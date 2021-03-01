@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from typing import List, Union, Optional, Dict
+from typing import List, Union, Optional
 
 from quangis import error
 from quangis.transformation.type import Type, Signature
@@ -42,7 +42,7 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, functions: Dict[str, Signature]):
+    def __init__(self, **functions: Signature):
         self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
