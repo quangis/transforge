@@ -188,7 +188,7 @@ class Term(ABC):
         if isinstance(self, OperatorTerm):
             return OperatorTerm(
                 self.operator,
-                *(p.specify(prefer_lower ^ (v == Variance.COVARIANT))
+                *(p.specify(prefer_lower ^ (v == Variance.CONTRAVARIANT))
                     for v, p in zip(self.operator.variance, self.params))
             )
         elif isinstance(self, VariableTerm):
@@ -196,10 +196,10 @@ class Term(ABC):
                 return OperatorTerm(self.lower)
             elif not prefer_lower and self.upper:
                 return OperatorTerm(self.upper)
-            elif self.lower is not None:
-                return OperatorTerm(self.lower)
-            elif self.upper is not None:
-                return OperatorTerm(self.upper)
+            elif self.lower is not None:  # TODO not sure it makes sense to
+                return OperatorTerm(self.lower)  # accept lower bounds when
+            elif self.upper is not None:  # we want upper bounds. need for
+                return OperatorTerm(self.upper)  # lattice subtype structure?
             else:
                 return self
         raise ValueError
