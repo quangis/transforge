@@ -104,9 +104,8 @@ class Type(object):
 
             return Type(
                 output_type.resolve(),
-                (constraint
-                    for constraint in chain(self.constraints, arg.constraints)
-                    if not constraint.fulfilled())
+                (c for c in chain(self.constraints, arg.constraints)
+                    if c.enforce())
             )
         else:
             raise error.NonFunctionApplication(self.plain, arg)
@@ -198,22 +197,6 @@ class Term(ABC):
             elif self.upper is not None:  # we want upper bounds. need for
                 self.bind(OperatorTerm(self.upper))  # lattice subtype?
 
-    def compatible(
-            self,
-            other: Term,
-            allow_subtype: bool = False) -> bool:
-        """
-        Is the type structurally consistent with another, that is, do they
-        'fit', modulo variables. Subtypes may be allowed on the self side.
-        """
-        if isinstance(self, OperatorTerm) and isinstance(other, OperatorTerm):
-            return (
-                self.operator <= other.operator and
-                all(s.compatible(t, allow_subtype)
-                    for s, t in zip(self.params, other.params))
-            )
-        return True
-
     def skeleton(self) -> Term:
         """
         Create a copy of this operator, substituting fresh variables for basic
@@ -228,6 +211,33 @@ class Term(ABC):
                     *(p.skeleton() for p in self.params))
         else:
             return self
+
+    def subtype(self, other: Term) -> Optional[bool]:
+        """
+        Return true if self is definitely a subtype of other, False if it is
+        definitely not, and None if there is not enough information.
+        """
+        a = self.resolve(False)
+        b = other.resolve(False)
+        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
+            if a.operator.basic:
+                return a.operator <= b.operator
+            elif a.operator != b.operator:
+                return False
+            else:
+                result = True
+                for v, s, t in zip(a.operator.variance, a.params, b.params):
+                    if v == Variance.COVARIANT:
+                        r = s.subtype(t)
+                    else:
+                        r = t.subtype(s)
+
+                    if r is None:
+                        return None
+                    else:
+                        result &= r
+                return result
+        return None
 
     def unify(self, other: Term) -> None:
         """
@@ -497,123 +507,74 @@ class Constraint(ABC):
     whatever condition it represents.
     """
 
-    def __init__(
-            self,
-            type: Term,
-            *patterns: Term,
-            allow_subtype: bool = False):
-        self.subject = type
-        self.patterns = list(patterns)
-        self.allow_subtype = allow_subtype
+    def __init__(self, *patterns: Union[Term, Operator], **kwargs):
+        self.patterns = list(
+            p() if isinstance(p, Operator) else p for p in patterns
+        )
+        self.kwargs = kwargs
 
-    def variables(self) -> Iterable[VariableTerm]:
-        return chain(
-            self.subject.variables(),
-            *(t.variables() for t in self.patterns))
-
-    def resolve(self, full: bool = True) -> Constraint:
-        self.subject = self.subject.resolve(full)
-        self.patterns = [t.resolve(full) for t in self.patterns]
-        self.enforce()
-        return self
+    def __str__(self) -> str:
+        return (
+            f"{type(self).__name__}"
+            f"({', '.join(str(p) for p in self.patterns)}, "
+            f"{', '.join(f'{k}={v}' for k, v in self.kwargs.items())})"
+        )
 
     @abstractmethod
-    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]):
-        return NotImplemented
-
-    def fulfilled(self) -> bool:
-        self.resolve(True)
-        return not any(not var.wildcard for var in self.variables())
-
-    @abstractmethod
-    def enforce(self) -> None:
+    def enforce(self) -> bool:
         """
-        Check that the resolved constraint is still satisfied.
+        Check that the resolved constraint has not been violated. Return False
+        if it has also been completely fulfilled and need not be enforced any
+        longer.
         """
         raise NotImplementedError
 
 
 class Subtype(Constraint):
     """
-    Temporarily shut off other constraints.
+    Check that its first pattern is a subtype of at least one of its other
+    patterns.
     """
 
-    def fresh(self, ctx) -> Subtype:
-        return Subtype(
-            self.subject.fresh(ctx),
-            (*(t.fresh(ctx) for t in self.patterns)))
+    def enforce(self) -> bool:
+        subject = self.patterns[0]
+        for other in self.patterns[1:]:
+            status = subject.subtype(other)
+            if status is True:
+                return False
+            elif status is None:
+                return True
+        raise error.ViolatedConstraint(self)
 
-    def enforce(self) -> None:
-        pass
+
+Member = Subtype
 
 
-class MembershipConstraint(Constraint):
+class Param(Constraint):
     """
-    A membership constraint checks that the subject is one of the given types.
+    Check that its first pattern is a compound type with one of the given types
+    occurring somewhere in its parameters.
     """
 
-    def __str__(self) -> str:
-        return (
-            f"{self.subject} must be "
-            f"{'a subtype of' if self.allow_subtype else ''} "
-            f"{' or '.join(str(t) for t in self.patterns)}"
-        )
-
-    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]) -> MembershipConstraint:
-        return MembershipConstraint(
-            self.subject.fresh(ctx),
-            *(t.fresh(ctx) for t in self.patterns),
-            allow_subtype=self.allow_subtype)
-
-    def enforce(self) -> None:
-        if not any(
-                self.subject.compatible(pattern, self.allow_subtype)
-                for pattern in self.patterns):
+    def enforce(self) -> bool:
+        subject = self.patterns[0]
+        position = self.kwargs.get('at')
+        if isinstance(subject, OperatorTerm):
+            if position is None:
+                for p in subject.params:
+                    for other in self.patterns[1:]:
+                        status = p.subtype(other)
+                        if status is True:
+                            return False
+                        elif status is None:
+                            return True
+            elif position-1 < len(subject.params):
+                p = subject.params[position-1]
+                for other in self.patterns[1:]:
+                    status = p.subtype(other)
+                    if status is True:
+                        return False
+                    elif status is None:
+                        return True
             raise error.ViolatedConstraint(self)
-
-
-class ParameterConstraint(Constraint):
-    """
-    A parameter constraint checks that the subject is a parameterized type with
-    one of the given types occurring somewhere in its parameters.
-    """
-
-    def __init__(
-            self,
-            *nargs,
-            position: Optional[int] = None,
-            **kwargs):
-        self.position = position
-        super().__init__(*nargs, **kwargs)
-
-    def fresh(self, ctx: Dict[VariableTerm, VariableTerm]) -> ParameterConstraint:
-        return ParameterConstraint(
-            self.subject.fresh(ctx),
-            *(t.fresh(ctx) for t in self.patterns),
-            allow_subtype=self.allow_subtype,
-            position=self.position)
-
-    def __str__(self) -> str:
-        return (
-            f"{self.subject} must have "
-            f"{'a subtype of ' if self.allow_subtype else ''}"
-            f"{' or '.join(str(t) for t in self.patterns)} as parameter"
-            f"{'' if self.position is None else ' at #' + str(self.position)}"
-        )
-
-    def compatible(self, pattern: Term) -> bool:
-        if isinstance(self.subject, OperatorTerm):
-            if self.position is None:
-                return any(
-                    param.compatible(pattern, self.allow_subtype)
-                    for param in self.subject.params)
-            elif self.position-1 < len(self.subject.params):
-                return self.subject.params[self.position-1].compatible(
-                    pattern, self.allow_subtype)
-            return False
-        else:
-            return True
-
-    def enforce(self) -> None:
-        if not any(self.compatible(pattern) for pattern in self.patterns):
-            raise error.ViolatedConstraint(self)
+        return True
