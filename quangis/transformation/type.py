@@ -44,37 +44,16 @@ class Variance(Enum):
 class Signature(object):
     """
     This class provides the definition of a *signature* for a function or for
-    data: it knows its schematic type and constraints, and can generate fresh
-    instances, possibly containing fresh variables.
+    data: it knows its schematic type, and can generate fresh instances,
+    possibly containing fresh variables.
     """
 
     def __init__(
             self,
             schema: TypeSchema,
-            name: str = "anonymous",
-            *args: Union[Constraint, int]):
-        """
-        Define a function type. Additional arguments are distinguished by their
-        type. This helps simplify notation: we won't have to painstakingly
-        write out every definition, and instead just provide a tuple of
-        relevant information.
-        """
-
-        constraints = []
-        number_of_data_arguments = 0
-
-        for arg in args:
-            if isinstance(arg, Constraint):
-                constraints.append(arg)
-            elif isinstance(arg, int):
-                number_of_data_arguments = arg
-            else:
-                raise ValueError(f"cannot use extra {type(arg)} in Signature")
-
-        self.name = name
+            data_args: int = 0):
         self.type = schema
-        # self.type.constraints.extend(constraints)
-        self.data = number_of_data_arguments
+        self.data_args = data_args
 
     def instance(self) -> Type:
         """
@@ -84,12 +63,6 @@ class Signature(object):
 
     def __call__(self, *args: TypeSchema) -> Type:
         return self.instance().__call__(*args)
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        return f"{self.name} : {self.type}"
 
 
 class Type(object):
@@ -124,7 +97,8 @@ class Type(object):
         Apply an argument to a function type to get its resolved output type.
         """
 
-        if isinstance(self.plain, OperatorTerm) and self.plain.operator == Function:
+        if isinstance(self.plain, OperatorTerm) and \
+                self.plain.operator == Function:
             input_type, output_type = self.plain.params
             arg_type = arg.plain
 
@@ -169,6 +143,15 @@ class Term(ABC):
         return Function(
             self,
             other() if isinstance(other, Operator) else other)
+
+    def __or__(self, other: Union[Constraint, Iterable[Constraint]]) -> Type:
+        """
+        Another abuse of Python's operators, allowing for us to add constraints
+        to plain types using the | operator.
+        """
+        return Type(
+            self,
+            (other,) if isinstance(other, Constraint) else other)
 
     def variables(self) -> Iterable[VariableTerm]:
         """
