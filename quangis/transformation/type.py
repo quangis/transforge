@@ -66,8 +66,8 @@ class Type(object):
     A top-level type term decorated with constraints.
     """
 
-    def __init__(self, t: Term, constraints: Iterable[Constraint] = ()):
-        self.plain = t
+    def __init__(self, plain: Term, constraints: Iterable[Constraint] = ()):
+        self.plain = plain
         self.constraints = list(constraints)
 
     def __repr__(self) -> str:
@@ -93,15 +93,17 @@ class Type(object):
         Apply an argument to a function type to get its resolved output type.
         """
 
-        if isinstance(self.plain, OperatorTerm) and \
-                self.plain.operator == Function:
-            input_type, output_type = self.plain.params
-            arg_type = arg.plain
+        f: Term = self.plain
+        if isinstance(self.plain, VariableTerm):
+            f = VariableTerm() ** VariableTerm()
+            self.plain.bind(f)
 
-            arg_type.unify(input_type)
+        if isinstance(f, OperatorTerm) and f.operator == Function:
+            input_type, output_type = f.params
+            arg.plain.unify(input_type)
 
             return Type(
-                output_type,
+                output_type.resolve(),
                 (constraint
                     for constraint in chain(self.constraints, arg.constraints)
                     if not constraint.fulfilled())
