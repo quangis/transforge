@@ -300,11 +300,16 @@ class TypeConstructor(object):
     def __init__(
             self,
             name: str,
-            *variance: Variance,
+            params: Union[int, Iterable[Variance]] = 0,
             supertype: Optional[TypeConstructor] = None):
         self.name = name
-        self.variance = list(variance)
         self.supertype: Optional[TypeConstructor] = supertype
+
+        if isinstance(params, int):
+            self.variance = list(Variance.COVARIANT for _ in range(params))
+        else:
+            self.variance = list(params)
+        self.arity = len(self.variance)
 
         if self.supertype and not self.basic:
             raise ValueError("only nullary types can have direct supertypes")
@@ -336,10 +341,6 @@ class TypeConstructor(object):
     @property
     def basic(self) -> bool:
         return self.arity == 0
-
-    @property
-    def arity(self) -> int:
-        return len(self.variance)
 
 
 class TypeOperator(PlainType):
@@ -460,8 +461,8 @@ class TypeVar(PlainType):
 "The special constructor for function types."
 Function = TypeConstructor(
     'Function',
-    Variance.CONTRAVARIANT,
-    Variance.COVARIANT)
+    params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
+)
 
 "A shortcut for writing function signatures."
 Σ = Signature
