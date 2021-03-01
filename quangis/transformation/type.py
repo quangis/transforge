@@ -180,6 +180,30 @@ class Term(ABC):
                 *(t.resolve(full) for t in self.params))
         return self
 
+    def specify(self, prefer_lower: bool = True) -> Term:
+        """
+        Consolidate all variables with subtype constraints into the most
+        specific basic type possible.
+        """
+        if isinstance(self, OperatorTerm):
+            return OperatorTerm(
+                self.operator,
+                *(p.specify(prefer_lower ^ (v == Variance.COVARIANT))
+                    for v, p in zip(self.operator.variance, self.params))
+            )
+        elif isinstance(self, VariableTerm):
+            if prefer_lower and self.lower:
+                return OperatorTerm(self.lower)
+            elif not prefer_lower and self.upper:
+                return OperatorTerm(self.upper)
+            elif self.lower is not None:
+                return OperatorTerm(self.lower)
+            elif self.upper is not None:
+                return OperatorTerm(self.upper)
+            else:
+                return self
+        raise ValueError
+
     def compatible(
             self,
             other: Term,
