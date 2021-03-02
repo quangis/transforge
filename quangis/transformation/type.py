@@ -41,40 +41,34 @@ class Variance(Enum):
     CONTRAVARIANT = 1
 
 
-class Schema(object):
+class Type(ABC):
+    """
+    The base class for anything that can be treated as a (schematic) type.
+    """
+
+    @abstractmethod
+    def instance(self) -> Term:
+        return NotImplemented
+
+
+class Schema(Type):
     """
     This class provides the definition of a *schema* for function and data
     signatures: it knows its schematic type, and can generate fresh instances.
     """
 
-    def __init__(self, schema: TypeSchema):
+    def __init__(self, schema: Callable[..., Type]):
         self.schema = schema
+        self.n = len(signature(schema).parameters)
 
     def instance(self) -> Term:
-        """
-        Get an instance of the type represented by this type schema.
-        """
-        s = self.schema
+        return self.schema(*(VariableTerm() for _ in range(self.n))).instance()
 
-        if isinstance(s, PlainTerm):
-            return Term(s)
-        elif isinstance(s, Term):
-            return s
-        elif isinstance(s, Schema):
-            return s.instance()
-        elif isinstance(s, Operator):
-            return Term(s())
-        elif callable(s):
-            n = len(signature(s).parameters)
-            return Schema(s(*(VariableTerm() for _ in range(n)))).instance()
-        else:
-            raise ValueError(f"Cannot convert a {type(s)} to a Term")
-
-    def __call__(self, *args: TypeSchema) -> Term:
+    def __call__(self, *args: Type) -> Term:
         return self.instance().__call__(*args)
 
 
-class Term(object):
+class Term(Type):
     """
     A top-level type term decorated with constraints.
     """
@@ -98,8 +92,11 @@ class Term(object):
 
         return ', '.join(res)
 
-    def __call__(self, *args: TypeSchema) -> Term:
-        return reduce(Term.apply, (Schema(a).instance() for a in args), self)
+    def __call__(self, *args: Type) -> Term:
+        return reduce(Term.apply, (a.instance() for a in args), self)
+
+    def instance(self) -> Term:
+        return self
 
     def apply(self, arg: Term) -> Term:
         """
@@ -124,7 +121,7 @@ class Term(object):
             raise error.NonFunctionApplication(self.plain, arg)
 
 
-class PlainTerm(ABC):
+class PlainTerm(Type):
     """
     Abstract base class for plain type terms (operator terms and type
     variables) without constraints. Note that basic types are just 0-ary type
@@ -282,7 +279,7 @@ class PlainTerm(ABC):
 
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
             if a in b:
-                raise error.RecursiveTerm(a, b)
+                raise error.RecursiveType(a, b)
             elif b.operator.basic:
                 a.below(b.operator)
             else:
@@ -291,18 +288,21 @@ class PlainTerm(ABC):
 
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b in a:
-                raise error.RecursiveTerm(b, a)
+                raise error.RecursiveType(b, a)
             elif a.operator.basic:
                 b.above(a.operator)
             else:
                 b.bind(a.skeleton())
                 b.unify(a)
 
-    def __call__(self, *args: TypeSchema) -> Term:
+    def instance(self) -> Term:
+        return Term(self)
+
+    def __call__(self, *args: Type) -> Term:
         return Term(self).__call__(*args)
 
 
-class Operator(object):
+class Operator(Type):
     """
     An n-ary type constructor.
     """
@@ -348,6 +348,9 @@ class Operator(object):
     def __pow__(self, other: Union[PlainTerm, Operator]) -> OperatorTerm:
         return self().__pow__(other)
 
+    def instance(self) -> Term:
+        return Term(self())
+
     @property
     def basic(self) -> bool:
         return self.arity == 0
@@ -372,7 +375,7 @@ class OperatorTerm(PlainTerm):
 
         if len(self.params) != self.operator.arity:
             raise ValueError(
-                f"{self.operator} takes {self.operator.arity}"
+                f"{self.operator} takes {self.operator.arity} "
                 f"parameters; {len(self.params)} given"
             )
 
@@ -484,15 +487,6 @@ Function = Operator(
 
 "A shortcut for writing function or data signatures."
 Σ = Schema
-
-"A union type for anything that can act as a schematic type."
-TypeSchema = Union[
-    Term,
-    PlainTerm,
-    Operator,
-    Schema,
-    Callable[..., Term],
-    Callable[..., PlainTerm]]
 
 
 class Constraint(ABC):

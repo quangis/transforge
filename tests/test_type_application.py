@@ -1,12 +1,13 @@
 import unittest
 
 from quangis import error
-from quangis.transformation.type import Operator, Σ, instance
+from quangis.transformation.type import Operator, Σ, Subtype
 
 Any = Operator('Any')
-Bool = Operator('Bool', supertype=Any)
-Str = Operator('Str', supertype=Any)
-Int = Operator('Int', supertype=Any)
+Ord = Operator('Ord', supertype=Any)
+Bool = Operator('Bool', supertype=Ord)
+Str = Operator('Str', supertype=Ord)
+Int = Operator('Int', supertype=Ord)
 UInt = Operator('UInt', supertype=Int)
 T = Operator('T', 1)
 
@@ -23,41 +24,41 @@ class TestType(unittest.TestCase):
         else:
             self.assertEqual(
                 f(x).plain.specify(),
-                instance(result).plain.specify())
+                result.instance().plain.specify())
 
     def test_apply_non_function(self):
-        self.apply(Σ(Int), Σ(Int), error.NonFunctionApplication)
+        self.apply(Int.instance(), Int, error.NonFunctionApplication)
 
     def test_basic_match(self):
-        f = Σ(Int ** Str)
+        f = Int ** Str
         self.apply(f, Int, Str)
 
     def test_basic_mismatch(self):
-        f = Σ(Int ** Str)
+        f = Int ** Str
         self.apply(f, Str, error.SubtypeMismatch)
 
     def test_basic_sub_match(self):
-        f = Σ(Any ** Str)
+        f = Any ** Str
         self.apply(f, Int, Str)
 
     def test_basic_sub_mismatch(self):
-        f = Σ(Int ** Str)
+        f = Int ** Str
         self.apply(f, Any, error.SubtypeMismatch)
 
     def test_compound_match(self):
-        f = Σ(T(Int) ** Str)
+        f = T(Int) ** Str
         self.apply(f, T(Int), Str)
 
     def test_compound_mismatch(self):
-        f = Σ(T(Int) ** Str)
+        f = T(Int) ** Str
         self.apply(f, T(Str), error.SubtypeMismatch)
 
     def test_compound_sub_match(self):
-        f = Σ(T(Any) ** Str)
+        f = T(Any) ** Str
         self.apply(f, T(Int), Str)
 
     def test_compound_sub_mismatch(self):
-        f = Σ(T(Int) ** Str)
+        f = T(Int) ** Str
         self.apply(f, T(Any), error.SubtypeMismatch)
 
     def test_variable(self):
@@ -107,13 +108,13 @@ class TestType(unittest.TestCase):
 
     def test_weird(self):
         swap = Σ(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
-        f = Σ(Int ** Int ** Int)
+        f = Int ** Int ** Int
         x = UInt
         self.apply(swap(f, x), x, Int)
 
     def test_functions_as_arguments(self):
         id = Σ(lambda x: x ** x)
-        f = Σ(Int ** Int)
+        f = Int ** Int
         x = UInt
         self.apply(id(f), x, Int)
 
@@ -125,6 +126,11 @@ class TestType(unittest.TestCase):
         self.apply(leq(UInt), Int, Bool)
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq(Int), Bool, error.SubtypeMismatch)
+
+    def test_order_of_subtype_application_with_constraints(self):
+        leq = Σ(lambda α: α ** α ** Bool | Subtype(α, Ord))
+        self.apply(leq(Int), UInt, Bool)
+        self.apply(leq, Any, error.ViolatedConstraint)
 
 
 if __name__ == '__main__':
