@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple, Any, Dict
 
 from quangis import error
 from quangis.transformation.type import Term, Schema
@@ -42,20 +42,22 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, **functions: Schema):
+    def __init__(self, **functions: Tuple[Schema, int]):
         self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
     def generate_parser(self) -> pp.Parser:
-        sigs = self.functions
+
         identifier = pp.Word(pp.alphanums + ':_').setName('identifier')
 
         function = pp.MatchFirst(
-            pp.CaselessKeyword(k) + d.data_args * identifier
-            if d.data_args else
-            pp.CaselessKeyword(k)
-            for k, d in sigs.items()
-        ).setParseAction(lambda s, l, t: Expr(t, sigs[t[0]].instance()))
+            pp.CaselessKeyword(keyword) + data_args * identifier
+            if data_args else
+            pp.CaselessKeyword(keyword)
+            for keyword, (signature, data_args) in self.functions.items()
+        ).setParseAction(
+            lambda s, l, t: Expr(t, self.functions[t[0]][0].instance())
+        )
 
         return pp.infixNotation(function, [(
             None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
@@ -65,3 +67,17 @@ class TransformationAlgebra(object):
         if not self.parser:
             self.parser = self.generate_parser()
         return self.parser.parseString(string, parseAll=True)[0]
+
+    def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
+        """
+        Create an transformation algebra from any dictionary, filtering out the
+        relevant keys.
+        """
+        algebra = TransformationAlgebra()
+        for k, v in obj.items():
+            if isinstance(v, Schema):
+                algebra.functions[k] = v, 0
+            elif isinstance(v, tuple) and len(v) == 2 \
+                    and isinstance(v[0], Schema) and isinstance(v[1], int):
+                algebra.functions[k] = v
+        return algebra

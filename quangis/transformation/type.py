@@ -47,9 +47,8 @@ class Schema(object):
     signatures: it knows its schematic type, and can generate fresh instances.
     """
 
-    def __init__(self, schema: TypeSchema, data_args: int = 0):
+    def __init__(self, schema: TypeSchema):
         self.schema = schema
-        self.data_args = data_args
 
     def instance(self) -> Term:
         """
