@@ -1,7 +1,7 @@
 import unittest
 
 from quangis import error
-from quangis.transformation.type import Operator, Σ, Subtype
+from quangis.transformation.type import Operator, Schema, Subtype
 
 Any = Operator('Any')
 Ord = Operator('Ord', supertype=Any)
@@ -23,8 +23,8 @@ class TestType(unittest.TestCase):
             self.assertRaises(result, f, x)
         else:
             self.assertEqual(
-                f(x).plain.specify(),
-                result.instance().plain.specify())
+                f(x).finalize(),
+                result.finalize())
 
     def test_apply_non_function(self):
         self.apply(Int.instance(), Int, error.NonFunctionApplication)
@@ -62,27 +62,27 @@ class TestType(unittest.TestCase):
         self.apply(f, T(Any), error.SubtypeMismatch)
 
     def test_variable(self):
-        wrap = Σ(lambda α: α ** T(α))
+        wrap = Schema(lambda α: α ** T(α))
         self.apply(wrap, Int, T(Int))
 
     def test_compose(self):
-        compose = Σ(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
+        compose = Schema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
         self.apply(
             compose(Int ** Str), Str ** Int,
             Str ** Str)
 
     def test_compose_subtype(self):
-        compose = Σ(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
+        compose = Schema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
         self.apply(
             compose(Int ** Str), Str ** UInt,
             Str ** Str)
 
     def test_variable_subtype_match(self):
-        f = Σ(lambda x: (x ** Any) ** x)
+        f = Schema(lambda x: (x ** Any) ** x)
         self.apply(f, Int ** Int, Int)
 
     def test_variable_subtype_mismatch(self):
-        f = Σ(lambda x: (x ** Int) ** x)
+        f = Schema(lambda x: (x ** Int) ** x)
         self.apply(f, Int ** Any, error.SubtypeMismatch)
 
 #    def test_simple_constraints_passed(self):
@@ -107,13 +107,13 @@ class TestType(unittest.TestCase):
 #        )
 
     def test_weird(self):
-        swap = Σ(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
+        swap = Schema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
         f = Int ** Int ** Int
         x = UInt
         self.apply(swap(f, x), x, Int)
 
     def test_functions_as_arguments(self):
-        id = Σ(lambda x: x ** x)
+        id = Schema(lambda x: x ** x)
         f = Int ** Int
         x = UInt
         self.apply(id(f), x, Int)
@@ -122,13 +122,13 @@ class TestType(unittest.TestCase):
         """
         This test is inspired by Traytel et al (2011).
         """
-        leq = Σ(lambda α: α ** α ** Bool)
+        leq = Schema(lambda α: α ** α ** Bool)
         self.apply(leq(UInt), Int, Bool)
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq(Int), Bool, error.SubtypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
-        leq = Σ(lambda α: α ** α ** Bool | Subtype(α, Ord))
+        leq = Schema(lambda α: α ** α ** Bool | Subtype(α, Ord))
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq, Any, error.ViolatedConstraint)
 

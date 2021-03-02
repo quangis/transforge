@@ -50,6 +50,14 @@ class Type(ABC):
     def instance(self) -> Term:
         return NotImplemented
 
+    def finalize(self) -> PlainTerm:
+        # TODO this is a mess
+        t = self.instance()
+        t.plain.specify()
+        for c in t.constraints:
+            c.enforce()
+        return t.plain.resolve()
+
 
 class Schema(Type):
     """
