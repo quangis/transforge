@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Union, Optional
 
 from quangis import error
-from quangis.transformation.type import Type, Schema
+from quangis.transformation.type import Term, Schema
 
 
 class Expr(object):
@@ -17,7 +17,7 @@ class Expr(object):
     An expression of a transformation algebra.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: Type):
+    def __init__(self, tokens: List[Union[str, Expr]], type: Term):
         self.tokens = tokens
         self.type = type
 

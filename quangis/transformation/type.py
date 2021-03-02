@@ -2,7 +2,7 @@
 Generic type system. Inspired loosely by Hindley-Milner type inference in
 functional programming languages.
 """
-# A primer: A type consists of type operators and type variables. Type
+# A primer: A type consists of type operators and type variables. Term
 # operators encompass basic types, parameterized types and functions. When
 # applying an argument of type A to a function of type B ** C, the algorithm
 # tries to bind variables in such a way that A becomes equal to B. Constraints
@@ -51,31 +51,31 @@ class Schema(object):
         self.schema = schema
         self.data_args = data_args
 
-    def instance(self) -> Type:
+    def instance(self) -> Term:
         """
         Get an instance of the type represented by this type schema.
         """
         s = self.schema
 
         if isinstance(s, PlainTerm):
-            return Type(s)
-        elif isinstance(s, Type):
+            return Term(s)
+        elif isinstance(s, Term):
             return s
         elif isinstance(s, Schema):
             return s.instance()
         elif isinstance(s, Operator):
-            return Type(s())
+            return Term(s())
         elif callable(s):
             n = len(signature(s).parameters)
             return Schema(s(*(VariableTerm() for _ in range(n)))).instance()
         else:
-            raise ValueError(f"Cannot convert a {type(s)} to a Type")
+            raise ValueError(f"Cannot convert a {type(s)} to a Term")
 
-    def __call__(self, *args: TypeSchema) -> Type:
+    def __call__(self, *args: TypeSchema) -> Term:
         return self.instance().__call__(*args)
 
 
-class Type(object):
+class Term(object):
     """
     A top-level type term decorated with constraints.
     """
@@ -99,10 +99,10 @@ class Type(object):
 
         return ', '.join(res)
 
-    def __call__(self, *args: TypeSchema) -> Type:
-        return reduce(Type.apply, (Schema(a).instance() for a in args), self)
+    def __call__(self, *args: TypeSchema) -> Term:
+        return reduce(Term.apply, (Schema(a).instance() for a in args), self)
 
-    def apply(self, arg: Type) -> Type:
+    def apply(self, arg: Term) -> Term:
         """
         Apply an argument to a function type to get its resolved output type.
         """
@@ -116,7 +116,7 @@ class Type(object):
             input_type, output_type = f.params
             arg.plain.unify(input_type)
 
-            return Type(
+            return Term(
                 output_type.resolve(),
                 (c for c in chain(self.constraints, arg.constraints)
                     if c.enforce())
@@ -155,12 +155,12 @@ class PlainTerm(ABC):
             self,
             other() if isinstance(other, Operator) else other)
 
-    def __or__(self, other: Union[Constraint, Iterable[Constraint]]) -> Type:
+    def __or__(self, other: Union[Constraint, Iterable[Constraint]]) -> Term:
         """
         Another abuse of Python's operators, allowing us to add constraints
         to plain types using the | operator.
         """
-        return Type(
+        return Term(
             self,
             (other,) if isinstance(other, Constraint) else other)
 
@@ -283,7 +283,7 @@ class PlainTerm(ABC):
 
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
             if a in b:
-                raise error.RecursiveType(a, b)
+                raise error.RecursiveTerm(a, b)
             elif b.operator.basic:
                 a.below(b.operator)
             else:
@@ -292,15 +292,15 @@ class PlainTerm(ABC):
 
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b in a:
-                raise error.RecursiveType(b, a)
+                raise error.RecursiveTerm(b, a)
             elif a.operator.basic:
                 b.above(a.operator)
             else:
                 b.bind(a.skeleton())
                 b.unify(a)
 
-    def __call__(self, *args: TypeSchema) -> Type:
-        return Type(self).__call__(*args)
+    def __call__(self, *args: TypeSchema) -> Term:
+        return Term(self).__call__(*args)
 
 
 class Operator(object):
@@ -398,7 +398,7 @@ class OperatorTerm(PlainTerm):
 
 class VariableTerm(PlainTerm):
     """
-    Type variable.
+    Term variable.
     """
     counter = 0
 
@@ -488,11 +488,11 @@ Function = Operator(
 
 "A union type for anything that can act as a schematic type."
 TypeSchema = Union[
-    Type,
+    Term,
     PlainTerm,
     Operator,
     Schema,
-    Callable[..., Type],
+    Callable[..., Term],
     Callable[..., PlainTerm]]
 
 
