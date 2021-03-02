@@ -65,12 +65,22 @@ class Schema(Type):
     signatures: it knows its schematic type, and can generate fresh instances.
     """
 
-    def __init__(self, schema: Callable[..., Type]):
+    def __init__(self, schema: Union[Type, Callable[..., Type]]):
         self.schema = schema
-        self.n = len(signature(schema).parameters)
+        if callable(schema):
+            self.variables = len(signature(schema).parameters)
+        else:
+            self.variables = 0
+            self.schema = schema.instance()
 
     def instance(self) -> Term:
-        return self.schema(*(VariableTerm() for _ in range(self.n))).instance()
+        if isinstance(self.schema, Term):
+            return self.schema
+        elif callable(self.schema):
+            return self.schema(
+                *(VariableTerm() for _ in range(self.variables))
+            ).instance()
+        raise ValueError
 
     def __call__(self, *args: Type) -> Term:
         return self.instance().__call__(*args)
