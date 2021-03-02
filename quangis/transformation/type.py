@@ -14,7 +14,7 @@ functional programming languages.
 # expressions before using them or adding constraints to them. This means that
 # pointers are somewhat interwoven --- keep this in mind.
 # To understand the module, I recommend you start by reading the methods of the
-# Term class.
+# PlainTerm class.
 from __future__ import annotations
 
 from enum import Enum
@@ -53,21 +53,18 @@ class Schema(object):
 
     def instance(self) -> Type:
         """
-        Turn anything that can act as a type schema into an instance of that type.
-        """
-        """
-        Get an instance of the type represented by this function schema.
+        Get an instance of the type represented by this type schema.
         """
         s = self.schema
 
-        if isinstance(s, Term):
+        if isinstance(s, PlainTerm):
             return Type(s)
         elif isinstance(s, Type):
             return s
         elif isinstance(s, Schema):
             return s.instance()
         elif isinstance(s, Operator):
-            return s()
+            return Type(s())
         elif callable(s):
             n = len(signature(s).parameters)
             return Schema(s(*(VariableTerm() for _ in range(n)))).instance()
@@ -83,7 +80,7 @@ class Type(object):
     A top-level type term decorated with constraints.
     """
 
-    def __init__(self, plain: Term, constraints: Iterable[Constraint] = ()):
+    def __init__(self, plain: PlainTerm, constraints: Iterable[Constraint] = ()):
         self.plain = plain
         self.constraints = list(constraints)
 
@@ -110,7 +107,7 @@ class Type(object):
         Apply an argument to a function type to get its resolved output type.
         """
 
-        f: Term = self.plain
+        f: PlainTerm = self.plain
         if isinstance(self.plain, VariableTerm):
             f = VariableTerm() ** VariableTerm()
             self.plain.bind(f)
@@ -128,7 +125,7 @@ class Type(object):
             raise error.NonFunctionApplication(self.plain, arg)
 
 
-class Term(ABC):
+class PlainTerm(ABC):
     """
     Abstract base class for plain type terms (operator terms and type
     variables) without constraints. Note that basic types are just 0-ary type
@@ -138,12 +135,12 @@ class Term(ABC):
     def __repr__(self):
         return self.__str__()
 
-    def __contains__(self, value: Term) -> bool:
+    def __contains__(self, value: PlainTerm) -> bool:
         return value == self or (
             isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
 
-    def __pow__(self, other: Union[Term, Operator]) -> OperatorTerm:
+    def __pow__(self, other: Union[PlainTerm, Operator]) -> OperatorTerm:
         """
         This is an overloaded (ab)use of Python's exponentiation operator. It
         allows us to use the infix operator ** for the arrow in function
@@ -182,7 +179,7 @@ class Term(ABC):
                 for v in a.variables():
                     yield v
 
-    def resolve(self, full: bool = True) -> Term:
+    def resolve(self, full: bool = True) -> PlainTerm:
         """
         A `full` resolve obtains a version of this type with all bound
         variables replaced with their bindings. Otherwise, just resolve the
@@ -214,7 +211,7 @@ class Term(ABC):
             elif self.upper is not None:  # we want upper bounds. need for
                 self.bind(OperatorTerm(self.upper))  # lattice subtype?
 
-    def skeleton(self) -> Term:
+    def skeleton(self) -> PlainTerm:
         """
         Create a copy of this operator, substituting fresh variables for basic
         types.
@@ -229,7 +226,7 @@ class Term(ABC):
         else:
             return self
 
-    def subtype(self, other: Term) -> Optional[bool]:
+    def subtype(self, other: PlainTerm) -> Optional[bool]:
         """
         Return true if self is definitely a subtype of other, False if it is
         definitely not, and None if there is not enough information.
@@ -256,7 +253,7 @@ class Term(ABC):
                 return result
         return None
 
-    def unify(self, other: Term) -> None:
+    def unify(self, other: PlainTerm) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -349,7 +346,7 @@ class Operator(object):
     def __call__(self, *params) -> OperatorTerm:
         return OperatorTerm(self, *params)
 
-    def __pow__(self, other: Union[Term, Operator]) -> OperatorTerm:
+    def __pow__(self, other: Union[PlainTerm, Operator]) -> OperatorTerm:
         return self().__pow__(other)
 
     @property
@@ -361,7 +358,7 @@ class Operator(object):
         return not self.basic
 
 
-class OperatorTerm(Term):
+class OperatorTerm(PlainTerm):
     """
     An instance of an n-ary type constructor.
     """
@@ -369,9 +366,9 @@ class OperatorTerm(Term):
     def __init__(
             self,
             operator: Operator,
-            *params: Union[Term, Operator]):
+            *params: Union[PlainTerm, Operator]):
         self.operator = operator
-        self.params: List[Term] = list(
+        self.params: List[PlainTerm] = list(
             p() if isinstance(p, Operator) else p for p in params)
 
         if len(self.params) != self.operator.arity:
@@ -399,7 +396,7 @@ class OperatorTerm(Term):
             return False
 
 
-class VariableTerm(Term):
+class VariableTerm(PlainTerm):
     """
     Type variable.
     """
@@ -408,7 +405,7 @@ class VariableTerm(Term):
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
-        self.bound: Optional[Term] = None
+        self.bound: Optional[PlainTerm] = None
         self.lower: Optional[Operator] = None
         self.upper: Optional[Operator] = None
         cls.counter += 1
@@ -416,7 +413,7 @@ class VariableTerm(Term):
     def __str__(self) -> str:
         return f"x{self.id}"
 
-    def bind(self, binding: Term) -> None:
+    def bind(self, binding: PlainTerm) -> None:
         assert (not self.bound or binding == self.bound), \
             "variable cannot be bound twice"
 
@@ -492,11 +489,11 @@ Function = Operator(
 "A union type for anything that can act as a schematic type."
 TypeSchema = Union[
     Type,
-    Term,
+    PlainTerm,
     Operator,
     Schema,
     Callable[..., Type],
-    Callable[..., Term]]
+    Callable[..., PlainTerm]]
 
 
 class Constraint(ABC):
@@ -505,7 +502,7 @@ class Constraint(ABC):
     whatever condition it represents.
     """
 
-    def __init__(self, *patterns: Union[Term, Operator], **kwargs):
+    def __init__(self, *patterns: Union[PlainTerm, Operator], **kwargs):
         self.patterns = list(
             p() if isinstance(p, Operator) else p for p in patterns
         )
