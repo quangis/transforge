@@ -9,7 +9,7 @@ from functools import reduce
 from typing import List, Union, Optional, Tuple, Any, Dict
 
 from quangis import error
-from quangis.transformation.type import Term, Schema
+from quangis.transformation.type import Term, Type
 
 
 class Expr(object):
@@ -42,7 +42,7 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, **functions: Tuple[Schema, int]):
+    def __init__(self, **functions: Tuple[Type, int]):
         self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
@@ -68,6 +68,7 @@ class TransformationAlgebra(object):
             self.parser = self.generate_parser()
         return self.parser.parseString(string, parseAll=True)[0]
 
+    @staticmethod
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
         """
         Create an transformation algebra from any dictionary, filtering out the
@@ -75,9 +76,9 @@ class TransformationAlgebra(object):
         """
         algebra = TransformationAlgebra()
         for k, v in obj.items():
-            if isinstance(v, Schema):
+            if isinstance(v, Type):
                 algebra.functions[k] = v, 0
             elif isinstance(v, tuple) and len(v) == 2 \
-                    and isinstance(v[0], Schema) and isinstance(v[1], int):
-                algebra.functions[k] = v
+                    and isinstance(v[0], Type) and isinstance(v[1], int):
+                algebra.functions[k] = v[0], v[1]
         return algebra
