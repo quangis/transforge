@@ -393,7 +393,7 @@ class OperatorTerm(PlainTerm):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, OperatorTerm):
             return self.operator == other.operator and \
-               all(s == t for s, t in zip(self.params, other.params))
+                all(s == t for s, t in zip(self.params, other.params))
         else:
             return False
 
@@ -485,9 +485,6 @@ Function = Operator(
     params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
 )
 
-"A shortcut for writing function or data signatures."
-Σ = Schema
-
 
 class Constraint(ABC):
     """
@@ -556,8 +553,8 @@ class Param(Constraint):
                             return False
                         elif status is None:
                             return True
-            elif position-1 < len(subject.params):
-                p = subject.params[position-1]
+            elif position - 1 < len(subject.params):
+                p = subject.params[position - 1]
                 for other in self.patterns[1:]:
                     status = p.subtype(other)
                     if status is True:
