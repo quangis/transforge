@@ -107,7 +107,7 @@ class Term(Type):
     A top-level type term decorated with constraints.
     """
 
-    def __init__(self, plain: PlainTerm, constraints: Iterable[Constraint] = ()):
+    def __init__(self, plain: PlainTerm, *constraints: Constraint):
         self.plain = plain
         self.constraints = list(constraints)
 
@@ -128,6 +128,9 @@ class Term(Type):
 
         return ' | '.join(res)
 
+    def __or__(self, other: Constraint) -> Term:
+        return Term(self.plain, other, *self.constraints)
+
     def __call__(self, *args: Type) -> Term:
         return reduce(Term.apply, (a.instance() for a in args), self)
 
@@ -137,7 +140,7 @@ class Term(Type):
     def resolve(self) -> Term:
         return Term(
             self.plain.resolve(),
-            (c for c in self.constraints if c.enforce())
+            *(c for c in self.constraints if c.enforce())
         )
 
     def apply(self, arg: Term) -> Term:
@@ -156,7 +159,7 @@ class Term(Type):
             x.unify_subtype(f.params[0])
             return Term(
                 f.params[1],
-                (c for c in chain(self.constraints, arg.constraints)
+                *(c for c in chain(self.constraints, arg.constraints)
                     if c.enforce())
             )
         else:
@@ -193,14 +196,12 @@ class PlainTerm(Type):
             self,
             other() if isinstance(other, Operator) else other)
 
-    def __or__(self, other: Union[Constraint, Iterable[Constraint]]) -> Term:
+    def __or__(self, other: Constraint) -> Term:
         """
         Another abuse of Python's operators, allowing us to add constraints
         to plain types using the | operator.
         """
-        return Term(
-            self,
-            (other,) if isinstance(other, Constraint) else other)
+        return Term(self, other)
 
     def variables(self) -> Iterable[VariableTerm]:
         """
