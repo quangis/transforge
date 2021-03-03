@@ -495,6 +495,21 @@ class VariableTerm(PlainTerm):
         else:
             raise error.SubtypeMismatch(new, upper)
 
+    @staticmethod
+    def names(number: int, ascii: bool = False) -> Iterable[str]:
+        """
+        Produce some suitable variable names.
+        """
+        base = "xyzvuw" if ascii else "τσαβγφψ"
+        for i in range(number):
+            if number < len(base):
+                yield base[i]
+            else:
+                j = str(i + 1)
+                if not ascii:
+                    j = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in j)
+                yield base[0] + j
+
 
 "The special constructor for function types."
 Function = Operator(
@@ -580,3 +595,6 @@ class Param(Constraint):
                         return True
             raise error.ViolatedConstraint(self)
         return True
+
+
+
