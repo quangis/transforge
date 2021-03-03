@@ -311,10 +311,13 @@ class PlainTerm(Type):
                 b.unify(a.skeleton())
                 b.unify_subtype(a)
 
-    def resolve(self, prefer_lower: bool = True) -> PlainTerm:
+    def resolve(
+            self,
+            resolve_subtypes: bool = True,
+            prefer_lower: bool = True) -> PlainTerm:
         """
         Obtain a version of this type with all unified variables substituted
-        and all subtypes resolved to their most specific type.
+        and optionally all subtypes resolved to their most specific type.
         """
         a = self.follow()
 
@@ -325,6 +328,8 @@ class PlainTerm(Type):
                     for v, p in zip(a.operator.variance, a.params))
             )
         elif isinstance(a, VariableTerm):
+            if not resolve_subtypes:
+                return a
             if prefer_lower and a.lower:
                 a.unify(a.lower())
             elif not prefer_lower and a.upper:
@@ -554,12 +559,19 @@ class Constraint(ABC):
         self.kwargs = kwargs
 
     def __str__(self) -> str:
+        c = self.resolve()
         args = ', '.join(chain(
-            (str(p) for p in self.patterns),
-            (f"{k}={v}" for k, v in self.kwargs.items())
+            (str(p) for p in c.patterns),
+            (f"{k}={v}" for k, v in c.kwargs.items())
         ))
 
-        return (f"{type(self).__name__}({args})")
+        return (f"{type(c).__name__}({args})")
+
+    def resolve(self) -> Constraint:
+        cls = type(self)
+        return cls(
+            *(p.resolve(resolve_subtypes=False) for p in self.patterns),
+            **self.kwargs)
 
     @abstractmethod
     def enforce(self) -> bool:
