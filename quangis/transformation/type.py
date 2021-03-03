@@ -628,15 +628,15 @@ class Param(Constraint):
             if position is None:
                 for p in subject.params:
                     for other in self.patterns[1:]:
-                        status = p.subtype(other)
+                        status = p.follow().subtype(other.follow())
                         if status is True:
                             return False
                         elif status is None:
                             return True
             elif position - 1 < len(subject.params):
-                p = subject.params[position - 1]
+                p = subject.params[position - 1].follow()
                 for other in self.patterns[1:]:
-                    status = p.subtype(other)
+                    status = p.subtype(other.follow())
                     if status is True:
                         return False
                     elif status is None:
