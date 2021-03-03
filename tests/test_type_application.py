@@ -23,8 +23,8 @@ class TestType(unittest.TestCase):
             self.assertRaises(result, f, x)
         else:
             self.assertEqual(
-                f(x).finalize(),
-                result.finalize())
+                f(x).resolve().plain,
+                result.instance().resolve().plain)
 
     def test_apply_non_function(self):
         self.apply(Int.instance(), Int, error.NonFunctionApplication)

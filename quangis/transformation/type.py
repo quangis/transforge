@@ -50,14 +50,6 @@ class Type(ABC):
     def instance(self) -> Term:
         return NotImplemented
 
-    def finalize(self) -> PlainTerm:
-        # TODO this is a mess
-        t = self.instance()
-        t.plain.specify()
-        for c in t.constraints:
-            c.enforce()
-        return t.plain.resolve()
-
 
 class Schema(Type):
     """
@@ -116,26 +108,33 @@ class Term(Type):
     def instance(self) -> Term:
         return self
 
+    def resolve(self) -> Term:
+        return Term(
+            self.plain.resolve(),
+            (c for c in self.constraints if c.enforce())
+        )
+
     def apply(self, arg: Term) -> Term:
         """
-        Apply an argument to a function type to get its resolved output type.
+        Apply an argument to a function type to get its output type.
         """
 
-        f: PlainTerm = self.plain
-        if isinstance(self.plain, VariableTerm):
-            self.plain.unify(VariableTerm() ** VariableTerm())
+        f = self.plain.follow()
+        x = arg.plain.follow()
+
+        if isinstance(f, VariableTerm):
+            f.unify(VariableTerm() ** VariableTerm())
+            f = f.follow()
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
-            input_type, output_type = f.params
-            arg.plain.unify_subtype(input_type)
-
+            x.unify_subtype(f.params[0])
             return Term(
-                output_type.resolve(),
+                f.params[1],
                 (c for c in chain(self.constraints, arg.constraints)
                     if c.enforce())
             )
         else:
-            raise error.NonFunctionApplication(self.plain, arg)
+            raise error.NonFunctionApplication(f, x)
 
 
 class PlainTerm(Type):
@@ -185,26 +184,12 @@ class PlainTerm(Type):
             for v in chain(*(t.variables() for t in self.params)):
                 yield v
         else:
-            a = self.resolve(full=False)
+            a = self.follow()
             if isinstance(a, VariableTerm):
                 yield a
             else:
                 for v in a.variables():
                     yield v
-
-    def resolve(self, full: bool = True) -> PlainTerm:
-        """
-        A `full` resolve obtains a version of this type with all bound
-        variables replaced with their bindings. Otherwise, just resolve the
-        current variable.
-        """
-        if isinstance(self, VariableTerm):
-            return self.follow()
-        elif full and isinstance(self, OperatorTerm):
-            return OperatorTerm(
-                self.operator,
-                *(t.resolve(full) for t in self.params))
-        return self
 
     def follow(self) -> PlainTerm:
         """
@@ -213,24 +198,6 @@ class PlainTerm(Type):
         if isinstance(self, VariableTerm) and self.unified:
             return self.unified.follow()
         return self
-
-    def specify(self, prefer_lower: bool = True) -> None:
-        """
-        Bind all variables with subtype constraints into to the most specific
-        basic type possible.
-        """
-        if isinstance(self, OperatorTerm):
-            for v, p in zip(self.operator.variance, self.params):
-                p.specify(prefer_lower ^ (v == Variance.CONTRAVARIANT))
-        elif isinstance(self, VariableTerm):
-            if prefer_lower and self.lower:
-                self.unify(self.lower())
-            elif not prefer_lower and self.upper:
-                self.unify(self.upper())
-            elif self.lower:  # TODO not sure it makes sense to
-                self.unify(self.lower())  # accept lower bounds when
-            elif self.upper:  # we want upper bounds. need for
-                self.unify(self.upper())  # lattice subtype?
 
     def skeleton(self) -> PlainTerm:
         """
@@ -252,8 +219,9 @@ class PlainTerm(Type):
         Return true if self is definitely a subtype of other, False if it is
         definitely not, and None if there is not enough information.
         """
-        a = self.resolve(False)
-        b = other.resolve(False)
+        a = self.follow()
+        b = other.follow()
+
         if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
             if a.operator.basic:
                 return a.operator <= b.operator
@@ -280,11 +248,11 @@ class PlainTerm(Type):
         unification, but instead of just a substitution of variables to terms,
         also produces lower and upper bounds on subtypes that it must respect.
 
-        Resulting constraints are a side-effect; use resolve() and specify() to
-        consolidate.
+        Resulting constraints are a side-effect; use resolve() to consolidate
+        equality.
         """
-        a = self.resolve(False)
-        b = other.resolve(False)
+        a = self.follow()
+        b = other.follow()
 
         if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
             if a.operator.basic:
@@ -319,6 +287,31 @@ class PlainTerm(Type):
             else:
                 b.unify(a.skeleton())
                 b.unify_subtype(a)
+
+    def resolve(self, prefer_lower: bool = True) -> PlainTerm:
+        """
+        Obtain a version of this type with all unified variables substituted
+        and all subtypes resolved to their most specific type.
+        """
+        a = self.follow()
+
+        if isinstance(a, OperatorTerm):
+            return OperatorTerm(
+                a.operator,
+                *(p.resolve(prefer_lower ^ (v == Variance.CONTRAVARIANT))
+                    for v, p in zip(a.operator.variance, a.params))
+            )
+        elif isinstance(a, VariableTerm):
+            if prefer_lower and a.lower:
+                a.unify(a.lower())
+            elif not prefer_lower and a.upper:
+                a.unify(a.upper())
+            elif a.lower:  # TODO not sure it makes sense to accept lower
+                a.unify(a.lower())  # bounds when we want upper bounds. need
+            elif a.upper:  # for a lattice subtyping structure?
+                a.unify(a.upper())
+            return a.follow()
+        raise ValueError
 
     def instance(self) -> Term:
         return Term(self)
