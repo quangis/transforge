@@ -21,11 +21,11 @@ class TestType(unittest.TestCase):
 
         if isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result,
-                lambda x: f.instance().apply(x).resolve(),
+                lambda x: f(x).instance().resolve(),
                 x.instance())
         else:
             self.assertEqual(
-                f.instance().apply(x.instance()).resolve().plain,
+                f(x).instance().resolve().plain,
                 result.instance().resolve().plain)
 
     def test_apply_non_function(self):

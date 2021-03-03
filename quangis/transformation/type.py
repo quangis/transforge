@@ -50,6 +50,48 @@ class Type(ABC):
     def instance(self) -> Term:
         return NotImplemented
 
+    def schematic(self) -> Schema:
+        if isinstance(self, Schema):
+            return self
+        elif isinstance(self, Term):
+            return Schema(lambda: self.instance())
+        elif isinstance(self, PlainTerm):
+            return Schema(lambda: self.instance())
+        elif isinstance(self, Operator):
+            return Schema(lambda: self.instance())
+        raise ValueError
+
+    def __pow__(self, other: Type) -> Schema:
+        """
+        This is an overloaded (ab)use of Python's exponentiation operator. It
+        allows us to use the infix operator ** for the arrow in function
+        signatures.
+
+        Note that this operator is one of the few that is right-to-left
+        associative, matching the conventional behaviour of the function arrow.
+        The right-bitshift operator >> (for __rshift__) would have been more
+        intuitive visually, but does not have this property.
+        """
+        return Schema.abstraction(self.schematic(), other.schematic())
+
+    def __call__(self, *args: Type) -> Schema:
+        """
+        This allows us to apply two schematic types to eachother by calling the
+        function type with its argument type.
+        """
+        return reduce(
+            Schema.application,
+            (a.schematic() for a in args),
+            self.schematic())
+
+    def __or__(self, constraint: Constraint) -> Schema:
+        """
+        Another abuse of Python's operators, allowing us to add constraints by
+        using the | operator.
+        """
+        return self.schematic()
+        #return Schema.constrain(self.schematic(), constraint)
+
 
 class Schema(Type):
     """
@@ -57,49 +99,63 @@ class Schema(Type):
     signatures: it knows its schematic type, and can generate fresh instances.
     """
 
-    def __init__(self, schema: Union[Type, Callable[..., Type]]):
-        self.schema = schema
-        if callable(schema):
-            self.variables = len(signature(schema).parameters)
-        else:
-            self.variables = 0
-            self.schema = schema.instance()
+    def __init__(self, schema: Callable[..., Union[Schema, Term]]):
+        self.variables = len(signature(schema).parameters)
+
+        def f(*args: VariableTerm) -> Term:
+            signature(schema).bind(*args)
+            return schema(*args).instance()
+            raise ValueError(f"{signature(x)}")
+
+        self.schema = f
+
+    def __str__(self) -> str:
+        return str(self.instance())
+
+    def using(self, *variables: VariableTerm) -> Term:
+        if len(variables) == self.variables:
+            return self.schema(*variables)
+        raise ValueError(f"{len(variables), self.variables}")
 
     def instance(self) -> Term:
-        if isinstance(self.schema, Term):
-            return self.schema
-        elif callable(self.schema):
-            return self.schema(
-                *(VariableTerm() for _ in range(self.variables))
-            ).instance()
-        raise ValueError
+        return self.using(*(VariableTerm() for _ in range(self.variables)))
 
     @staticmethod
-    def combine(*schemata: Schema) -> Callable[..., List[Term]]:
-        # TODO work in progress for combining schemata into one
-
-        n = sum(s.variables for s in schemata)
+    def abstraction(i: Schema, o: Schema) -> Schema:
         params = [
             Parameter(v, Parameter.POSITIONAL_ONLY)
-            for v in VariableTerm.names(n, ascii=True, idx=True)]
+            for v in VariableTerm.names(i.variables + o.variables)]
         sig = Signature(params)
 
-        def f(*args):
+        def schema(*args: VariableTerm) -> Term:
             sig.bind(*args)
-            result = []
-            i = 0
-            for schema in schemata:
-                n = i + schema.variables + 1
-                result.append(schema(args[i:n]))
-                i = n
-            return result
+            i1 = i.using(*args[:i.variables])
+            o1 = o.using(*args[i.variables:])
+            return Term(
+                Function(i1.plain, o1.plain),
+                *(i1.constraints + o1.constraints)
+            )
 
-        f.__signature__ = signature(f).replace(  # type: ignore
+        schema.__signature__ = signature(schema).replace(  # type: ignore
             parameters=params)
-        return f
+        return Schema(schema)
 
-    def __call__(self, *args: Type) -> Term:
-        return self.instance().__call__(*args)
+    @staticmethod
+    def application(f: Schema, x: Schema) -> Schema:
+        params = [
+            Parameter(v, Parameter.POSITIONAL_ONLY)
+            for v in VariableTerm.names(f.variables + x.variables)]
+        sig = Signature(params)
+
+        def schema(*args: VariableTerm) -> Term:
+            sig.bind(*args)
+            f1 = f.using(*args[:f.variables])
+            x1 = x.using(*args[f.variables:])
+            return f1.apply(x1)
+
+        schema.__signature__ = signature(schema).replace(  # type: ignore
+            parameters=params)
+        return Schema(schema)
 
 
 class Term(Type):
@@ -134,12 +190,6 @@ class Term(Type):
 
         return ' | '.join(res)
 
-    def __or__(self, other: Constraint) -> Term:
-        return Term(self.plain, other, *self.constraints)
-
-    def __call__(self, *args: Type) -> Term:
-        return reduce(Term.apply, (a.instance() for a in args), self)
-
     def instance(self) -> Term:
         return self
 
@@ -158,7 +208,7 @@ class Term(Type):
         x = arg.plain.follow()
 
         if isinstance(f, VariableTerm):
-            f.unify(VariableTerm() ** VariableTerm())
+            f.unify(Function(VariableTerm(), VariableTerm()))
             f = f.follow()
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
@@ -186,28 +236,6 @@ class PlainTerm(Type):
         return value == self or (
             isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
-
-    def __pow__(self, other: Union[PlainTerm, Operator]) -> OperatorTerm:
-        """
-        This is an overloaded (ab)use of Python's exponentiation operator. It
-        allows us to use the infix operator ** for the arrow in function
-        signatures.
-
-        Note that this operator is one of the few that is right-to-left
-        associative, matching the conventional behaviour of the function arrow.
-        The right-bitshift operator >> (for __rshift__) would have been more
-        intuitive visually, but does not have this property.
-        """
-        return Function(
-            self,
-            other() if isinstance(other, Operator) else other)
-
-    def __or__(self, other: Constraint) -> Term:
-        """
-        Another abuse of Python's operators, allowing us to add constraints
-        to plain types using the | operator.
-        """
-        return Term(self, other)
 
     def variables(self) -> Iterable[VariableTerm]:
         """
@@ -351,9 +379,6 @@ class PlainTerm(Type):
     def instance(self) -> Term:
         return Term(self)
 
-    def __call__(self, *args: Type) -> Term:
-        return Term(self).__call__(*args)
-
 
 class Operator(Type):
     """
@@ -395,11 +420,8 @@ class Operator(Type):
     def __lt__(self, other: Operator) -> bool:
         return bool(self.supertype and self.supertype <= other)
 
-    def __call__(self, *params) -> OperatorTerm:
+    def __call__(self, *params) -> OperatorTerm:  # type: ignore
         return OperatorTerm(self, *params)
-
-    def __pow__(self, other: Union[PlainTerm, Operator]) -> OperatorTerm:
-        return self().__pow__(other)
 
     def instance(self) -> Term:
         return Term(self())
@@ -531,17 +553,17 @@ class VariableTerm(PlainTerm):
             raise error.SubtypeMismatch(new, upper)
 
     @staticmethod
-    def names(n: int, ascii: bool = False, idx: bool = False) -> Iterable[str]:
+    def names(n: int, unicode: bool = False) -> Iterable[str]:
         """
         Produce some suitable variable names.
         """
-        base = "xyzvuw" if ascii else "τσαβγφψ"
+        base = "τσαβγφψ" if unicode else "xyzvuw"
         for i in range(n):
-            if not idx and n < len(base):
+            if n < len(base):
                 yield base[i]
             else:
                 j = str(i + 1)
-                if not ascii:
+                if unicode:
                     j = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in j)
                 yield base[0] + j
 
@@ -643,6 +665,3 @@ class Param(Constraint):
                         return True
             raise error.ViolatedConstraint(self)
         return True
-
-
-
