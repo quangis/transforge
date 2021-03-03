@@ -109,7 +109,13 @@ class Term(Type):
 
     def __init__(self, plain: PlainTerm, *constraints: Constraint):
         self.plain = plain
-        self.constraints = list(constraints)
+        self.constraints = []
+
+        for c in constraints:
+            if isinstance(c, Subtype):
+                c.patterns[0].unify_subtype(c.patterns[1])
+            else:
+                self.constraints.append(c)
 
     def __repr__(self) -> str:
         return str(self)
@@ -584,6 +590,14 @@ class Constraint(ABC):
 
 
 class Subtype(Constraint):
+    def __init__(self, p1, p2):
+        super().__init__(p1, p2)
+
+    def enforce(self) -> bool:
+        raise NotImplementedError
+
+
+class Member(Constraint):
     """
     Check that its first pattern is a subtype of at least one of its other
     patterns.
@@ -598,9 +612,6 @@ class Subtype(Constraint):
             elif status is None:
                 return True
         raise error.ViolatedConstraint(self)
-
-
-Member = Subtype
 
 
 class Param(Constraint):
