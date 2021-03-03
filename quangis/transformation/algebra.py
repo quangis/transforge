@@ -80,14 +80,16 @@ class TransformationAlgebra(object):
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
         """
         Create an transformation algebra from any dictionary, filtering out the
-        relevant keys.
+        relevant keys. Relevant keys are those that start with a lowercase
+        symbol and are either a Type or a tuple starting with a Type.
         """
         algebra = TransformationAlgebra()
         for k, v in obj.items():
-            k = k.rstrip("_")
-            if isinstance(v, Type):
-                algebra.functions[k] = v, 0
-            elif isinstance(v, tuple) and len(v) == 2 \
-                    and isinstance(v[0], Type) and isinstance(v[1], int):
-                algebra.functions[k] = v[0], v[1]
+            if k[0].islower():
+                k = k.rstrip("_")
+                if isinstance(v, Type):
+                    algebra.functions[k] = v, 0
+                elif isinstance(v, tuple) and len(v) == 2 \
+                        and isinstance(v[0], Type) and isinstance(v[1], int):
+                    algebra.functions[k] = v[0], v[1]
         return algebra
