@@ -554,11 +554,12 @@ class Constraint(ABC):
         self.kwargs = kwargs
 
     def __str__(self) -> str:
-        return (
-            f"{type(self).__name__}"
-            f"({', '.join(str(p) for p in self.patterns)}, "
-            f"{', '.join(f'{k}={v}' for k, v in self.kwargs.items())})"
-        )
+        args = ', '.join(chain(
+            (str(p) for p in self.patterns),
+            (f"{k}={v}" for k, v in self.kwargs.items())
+        ))
+
+        return (f"{type(self).__name__}({args})")
 
     @abstractmethod
     def enforce(self) -> bool:

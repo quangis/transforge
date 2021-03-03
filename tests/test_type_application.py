@@ -20,10 +20,12 @@ class TestType(unittest.TestCase):
         """
 
         if isinstance(result, type) and issubclass(result, Exception):
-            self.assertRaises(result, f, x)
+            self.assertRaises(result,
+                lambda x: f.instance().apply(x).resolve(),
+                x.instance())
         else:
             self.assertEqual(
-                f(x).resolve().plain,
+                f.instance().apply(x.instance()).resolve().plain,
                 result.instance().resolve().plain)
 
     def test_apply_non_function(self):
@@ -84,27 +86,6 @@ class TestType(unittest.TestCase):
     def test_variable_subtype_mismatch(self):
         f = Schema(lambda x: (x ** Int) ** x)
         self.apply(f, Int ** Any, error.SubtypeMismatch)
-
-#    def test_simple_constraints_passed(self):
-#        self.apply(
-#            (var.x ** var.x, var.x.subtype(Int, Str)),
-#            Int,
-#            result=Int
-#        )
-#
-#    def test_simple_constraints_subtype_passed(self):
-#        self.apply(
-#            (var.x ** var.x, var.x.subtype(Any)),
-#            Int,
-#            result=Int
-#        )
-#
-#    def test_simple_constraints_subtype_violated(self):
-#        self.apply(
-#            (var.x ** var.x, var.x.subtype(Int, Str)),
-#            Any,
-#            result=error.ViolatedConstraint
-#        )
 
     def test_weird(self):
         swap = Schema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
