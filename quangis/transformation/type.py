@@ -123,12 +123,11 @@ class Term(Type):
 
         f: PlainTerm = self.plain
         if isinstance(self.plain, VariableTerm):
-            f = VariableTerm() ** VariableTerm()
-            self.plain.bind(f)
+            self.plain.unify(VariableTerm() ** VariableTerm())
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
             input_type, output_type = f.params
-            arg.plain.unify(input_type)
+            arg.plain.unify_subtype(input_type)
 
             return Term(
                 output_type.resolve(),
@@ -199,12 +198,20 @@ class PlainTerm(Type):
         variables replaced with their bindings. Otherwise, just resolve the
         current variable.
         """
-        if isinstance(self, VariableTerm) and self.bound:
-            return self.bound.resolve(full)
+        if isinstance(self, VariableTerm):
+            return self.follow()
         elif full and isinstance(self, OperatorTerm):
             return OperatorTerm(
                 self.operator,
                 *(t.resolve(full) for t in self.params))
+        return self
+
+    def follow(self) -> PlainTerm:
+        """
+        Follow a unification until the nearest operator.
+        """
+        if isinstance(self, VariableTerm) and self.unified:
+            return self.unified.follow()
         return self
 
     def specify(self, prefer_lower: bool = True) -> None:
@@ -217,13 +224,13 @@ class PlainTerm(Type):
                 p.specify(prefer_lower ^ (v == Variance.CONTRAVARIANT))
         elif isinstance(self, VariableTerm):
             if prefer_lower and self.lower:
-                self.bind(OperatorTerm(self.lower))
+                self.unify(self.lower())
             elif not prefer_lower and self.upper:
-                self.bind(OperatorTerm(self.upper))
-            elif self.lower is not None:  # TODO not sure it makes sense to
-                self.bind(OperatorTerm(self.lower))  # accept lower bounds when
-            elif self.upper is not None:  # we want upper bounds. need for
-                self.bind(OperatorTerm(self.upper))  # lattice subtype?
+                self.unify(self.upper())
+            elif self.lower:  # TODO not sure it makes sense to
+                self.unify(self.lower())  # accept lower bounds when
+            elif self.upper:  # we want upper bounds. need for
+                self.unify(self.upper())  # lattice subtype?
 
     def skeleton(self) -> PlainTerm:
         """
@@ -267,7 +274,7 @@ class PlainTerm(Type):
                 return result
         return None
 
-    def unify(self, other: PlainTerm) -> None:
+    def unify_subtype(self, other: PlainTerm) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -286,14 +293,14 @@ class PlainTerm(Type):
             elif a.operator == b.operator:
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.COVARIANT:
-                        x.unify(y)
+                        x.unify_subtype(y)
                     elif v == Variance.CONTRAVARIANT:
-                        y.unify(x)
+                        y.unify_subtype(x)
             else:
                 raise error.TypeMismatch(a, b)
 
         elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
-            a.bind(b)
+            a.unify(b)
 
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
             if a in b:
@@ -301,8 +308,8 @@ class PlainTerm(Type):
             elif b.operator.basic:
                 a.below(b.operator)
             else:
-                a.bind(b.skeleton())
-                a.unify(b)
+                a.unify(b.skeleton())
+                a.unify_subtype(b)
 
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b in a:
@@ -310,8 +317,8 @@ class PlainTerm(Type):
             elif a.operator.basic:
                 b.above(a.operator)
             else:
-                b.bind(a.skeleton())
-                b.unify(a)
+                b.unify(a.skeleton())
+                b.unify_subtype(a)
 
     def instance(self) -> Term:
         return Term(self)
@@ -425,37 +432,36 @@ class VariableTerm(PlainTerm):
     def __init__(self):
         cls = type(self)
         self.id = cls.counter
-        self.bound: Optional[PlainTerm] = None
         self.lower: Optional[Operator] = None
+        self.unified: Optional[PlainTerm] = None
         self.upper: Optional[Operator] = None
         cls.counter += 1
 
     def __str__(self) -> str:
         return f"x{self.id}"
 
-    def bind(self, binding: PlainTerm) -> None:
-        assert (not self.bound or binding == self.bound), \
-            "variable cannot be bound twice"
+    def unify(self, t: PlainTerm) -> None:
+        assert (not self.unified or t == self.unified), \
+            "variable cannot be unified twice"
 
-        if binding is not self:
-            self.bound = binding
+        if self is not t:
+            self.unified = t
 
-            if isinstance(binding, VariableTerm):
+            if isinstance(t, VariableTerm):
                 if self.lower:
-                    binding.above(self.lower)
+                    t.above(self.lower)
                 if self.upper:
-                    binding.below(self.upper)
-                if binding.lower:
-                    self.above(binding.lower)
-                if binding.upper:
-                    self.below(binding.upper)
+                    t.below(self.upper)
+                if t.lower:
+                    self.above(t.lower)
+                if t.upper:
+                    self.below(t.upper)
 
-            # might not be necessary, but keeping it in as a sanity check
-            elif isinstance(binding, OperatorTerm) and binding.operator.basic:
-                if self.lower is not None and binding.operator < self.lower:
-                    raise error.SubtypeMismatch(binding, self)
-                if self.upper is not None and self.upper < binding.operator:
-                    raise error.SubtypeMismatch(self, binding)
+            elif isinstance(t, OperatorTerm) and t.operator.basic:
+                if self.lower is not None and t.operator < self.lower:
+                    raise error.SubtypeMismatch(t, self)
+                if self.upper is not None and self.upper < t.operator:
+                    raise error.SubtypeMismatch(self, t)
 
     def above(self, new: Operator) -> None:
         """
