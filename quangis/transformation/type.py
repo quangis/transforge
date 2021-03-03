@@ -21,7 +21,7 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
-from inspect import signature
+from inspect import signature, Signature, Parameter
 from typing import Optional, Iterable, Union, List, Callable
 
 from quangis import error
@@ -73,6 +73,30 @@ class Schema(Type):
                 *(VariableTerm() for _ in range(self.variables))
             ).instance()
         raise ValueError
+
+    @staticmethod
+    def combine(*schemata: Schema) -> Callable[..., List[Term]]:
+        # TODO work in progress for combining schemata into one
+
+        n = sum(s.variables for s in schemata)
+        params = [
+            Parameter(v, Parameter.POSITIONAL_ONLY)
+            for v in VariableTerm.names(n, ascii=True, idx=True)]
+        sig = Signature(params)
+
+        def f(*args):
+            sig.bind(*args)
+            result = []
+            i = 0
+            for schema in schemata:
+                n = i + schema.variables + 1
+                result.append(schema(args[i:n]))
+                i = n
+            return result
+
+        f.__signature__ = signature(f).replace(  # type: ignore
+            parameters=params)
+        return f
 
     def __call__(self, *args: Type) -> Term:
         return self.instance().__call__(*args)
@@ -496,13 +520,13 @@ class VariableTerm(PlainTerm):
             raise error.SubtypeMismatch(new, upper)
 
     @staticmethod
-    def names(number: int, ascii: bool = False) -> Iterable[str]:
+    def names(n: int, ascii: bool = False, idx: bool = False) -> Iterable[str]:
         """
         Produce some suitable variable names.
         """
         base = "xyzvuw" if ascii else "τσαβγφψ"
-        for i in range(number):
-            if number < len(base):
+        for i in range(n):
+            if not idx and n < len(base):
                 yield base[i]
             else:
                 j = str(i + 1)
