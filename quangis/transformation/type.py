@@ -53,13 +53,7 @@ class Type(ABC):
     def schematic(self) -> Schema:
         if isinstance(self, Schema):
             return self
-        elif isinstance(self, Term):
-            return Schema(lambda: self.instance())
-        elif isinstance(self, PlainTerm):
-            return Schema(lambda: self.instance())
-        elif isinstance(self, Operator):
-            return Schema(lambda: self.instance())
-        raise ValueError
+        return Schema(lambda: self.instance())
 
     def __pow__(self, other: Type) -> Schema:
         """
@@ -72,25 +66,33 @@ class Type(ABC):
         The right-bitshift operator >> (for __rshift__) would have been more
         intuitive visually, but does not have this property.
         """
-        return Schema.abstraction(self.schematic(), other.schematic())
+        return Schema.abstract(self.schematic(), other.schematic())
 
     def __call__(self, *args: Type) -> Schema:
         """
         This allows us to apply two schematic types to eachother by calling the
         function type with its argument type.
         """
-        return reduce(
-            Schema.application,
-            (a.schematic() for a in args),
-            self.schematic())
+        return reduce(Schema.apply,
+            (a.schematic() for a in args), self.schematic())
 
     def __or__(self, constraint: Constraint) -> Schema:
         """
         Another abuse of Python's operators, allowing us to add constraints by
         using the | operator.
         """
-        return self.schematic()
-        #return Schema.constrain(self.schematic(), constraint)
+
+        s = self.schematic()
+
+        def f(*args):
+            signature(s.schema).bind(*args)
+            t = s.using(*args)
+            return Term(t.plain, constraint, *t.constraints)
+
+        f.__signature__ = signature(f).replace(  # type: ignore
+            parameters=list(signature(s.schema).parameters.values()))
+
+        return Schema(f)
 
 
 class Schema(Type):
@@ -98,64 +100,48 @@ class Schema(Type):
     This class provides the definition of a *schema* for function and data
     signatures: it knows its schematic type, and can generate fresh instances.
     """
+    # Bit magical. Sorry.
 
-    def __init__(self, schema: Callable[..., Union[Schema, Term]]):
+    def __init__(self, schema: Callable[..., Type]):
         self.variables = len(signature(schema).parameters)
-
-        def f(*args: VariableTerm) -> Term:
-            signature(schema).bind(*args)
-            return schema(*args).instance()
-            raise ValueError(f"{signature(x)}")
-
-        self.schema = f
+        self.schema = schema
 
     def __str__(self) -> str:
         return str(self.instance())
 
     def using(self, *variables: VariableTerm) -> Term:
         if len(variables) == self.variables:
-            return self.schema(*variables)
-        raise ValueError(f"{len(variables), self.variables}")
+            return self.schema(*variables).instance()
+        raise ValueError(
+            f"schema needs {len(variables)}, supplied {self.variables}")
 
     def instance(self) -> Term:
         return self.using(*(VariableTerm() for _ in range(self.variables)))
 
-    @staticmethod
-    def abstraction(i: Schema, o: Schema) -> Schema:
+    def combine(self, other: Schema, f: Callable[..., Term]) -> Schema:
         params = [
             Parameter(v, Parameter.POSITIONAL_ONLY)
-            for v in VariableTerm.names(i.variables + o.variables)]
+            for v in VariableTerm.names(self.variables + other.variables)]
         sig = Signature(params)
 
         def schema(*args: VariableTerm) -> Term:
             sig.bind(*args)
-            i1 = i.using(*args[:i.variables])
-            o1 = o.using(*args[i.variables:])
-            return Term(
-                Function(i1.plain, o1.plain),
-                *(i1.constraints + o1.constraints)
-            )
+            return f(*(
+                self.using(*args[:self.variables]),
+                other.using(*args[self.variables:])
+            ))
 
         schema.__signature__ = signature(schema).replace(  # type: ignore
             parameters=params)
         return Schema(schema)
 
-    @staticmethod
-    def application(f: Schema, x: Schema) -> Schema:
-        params = [
-            Parameter(v, Parameter.POSITIONAL_ONLY)
-            for v in VariableTerm.names(f.variables + x.variables)]
-        sig = Signature(params)
+    def abstract(self, other: Schema) -> Schema:
+        return self.combine(other, lambda a, b: Term(
+            Function(a.plain, b.plain), *(a.constraints + b.constraints)
+        ))
 
-        def schema(*args: VariableTerm) -> Term:
-            sig.bind(*args)
-            f1 = f.using(*args[:f.variables])
-            x1 = x.using(*args[f.variables:])
-            return f1.apply(x1)
-
-        schema.__signature__ = signature(schema).replace(  # type: ignore
-            parameters=params)
-        return Schema(schema)
+    def apply(self, other: Schema) -> Schema:
+        return self.combine(other, lambda a, b: a.apply(b))
 
 
 class Term(Type):
