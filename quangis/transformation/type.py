@@ -117,14 +117,16 @@ class Term(Type):
     def __str__(self) -> str:
         res = [str(self.plain)]
 
-        if self.constraints:
-            res.append(', '.join(str(c) for c in self.constraints))
+        for c in self.constraints:
+            res.append(str(c))
 
         for v in self.plain.variables():
-            if v.lower or v.upper:
-                res.append(f"{v.lower or '?'} <= {v} <= {v.upper or '?'}")
+            if v.lower:
+                res.append(f"{v.lower} <= {v}")
+            if v.upper:
+                res.append(f"{v} <= {v.upper}")
 
-        return ', '.join(res)
+        return ' | '.join(res)
 
     def __call__(self, *args: Type) -> Term:
         return reduce(Term.apply, (a.instance() for a in args), self)
@@ -204,16 +206,12 @@ class PlainTerm(Type):
         """
         Obtain all type variables currently in the type expression.
         """
-        if isinstance(self, OperatorTerm):
+        a = self.follow()
+        if isinstance(a, VariableTerm):
+            yield a
+        elif isinstance(self, OperatorTerm):
             for v in chain(*(t.variables() for t in self.params)):
                 yield v
-        else:
-            a = self.follow()
-            if isinstance(a, VariableTerm):
-                yield a
-            else:
-                for v in a.variables():
-                    yield v
 
     def follow(self) -> PlainTerm:
         """
