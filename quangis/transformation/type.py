@@ -330,7 +330,8 @@ class PlainTerm(Type):
         if isinstance(a, OperatorTerm):
             return OperatorTerm(
                 a.operator,
-                *(p.resolve(prefer_lower ^ (v == Variance.CONTRAVARIANT))
+                *(p.resolve(resolve_subtypes,
+                    prefer_lower ^ (v == Variance.CONTRAVARIANT))
                     for v, p in zip(a.operator.variance, a.params))
             )
         elif isinstance(a, VariableTerm):
@@ -621,7 +622,7 @@ class Param(Constraint):
     """
 
     def enforce(self) -> bool:
-        subject = self.patterns[0]
+        subject = self.patterns[0].follow()
         position = self.kwargs.get('at')
         if isinstance(subject, OperatorTerm):
             if position is None:

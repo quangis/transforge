@@ -111,7 +111,7 @@ class TestType(unittest.TestCase):
     def test_order_of_subtype_application_with_constraints(self):
         leq = Schema(lambda α: α ** α ** Bool | Subtype(α, Ord))
         self.apply(leq(Int), UInt, Bool)
-        self.apply(leq, Any, error.ViolatedConstraint)
+        self.apply(leq, Any, error.SubtypeMismatch)
 
 
 if __name__ == '__main__':
