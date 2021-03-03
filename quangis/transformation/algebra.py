@@ -33,6 +33,12 @@ class Expr(object):
         else:
             return f"({expr})"
 
+    def resolve(self) -> None:
+        self.type = self.type.resolve()
+        for token in self.tokens:
+            if isinstance(token, Expr):
+                token.resolve()
+
     def apply(self: Expr, arg: Expr) -> Expr:
         try:
             return Expr([self, arg], self.type.apply(arg.type))
@@ -66,7 +72,9 @@ class TransformationAlgebra(object):
     def parse(self, string: str) -> Expr:
         if not self.parser:
             self.parser = self.generate_parser()
-        return self.parser.parseString(string, parseAll=True)[0]
+        expr = self.parser.parseString(string, parseAll=True)[0]
+        expr.resolve()
+        return expr
 
     @staticmethod
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
@@ -76,6 +84,7 @@ class TransformationAlgebra(object):
         """
         algebra = TransformationAlgebra()
         for k, v in obj.items():
+            k = k.rstrip("_")
             if isinstance(v, Type):
                 algebra.functions[k] = v, 0
             elif isinstance(v, tuple) and len(v) == 2 \
