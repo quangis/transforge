@@ -106,6 +106,9 @@ class Schema(Type):
         self.variables = len(signature(schema).parameters)
         self.schema = schema
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __str__(self) -> str:
         return str(self.instance())
 
@@ -465,16 +468,17 @@ class VariableTerm(PlainTerm):
     """
     counter = 0
 
-    def __init__(self):
+    def __init__(self, name: Optional[str] = None):
         cls = type(self)
         self.id = cls.counter
+        self.name = name
         self.lower: Optional[Operator] = None
         self.unified: Optional[PlainTerm] = None
         self.upper: Optional[Operator] = None
         cls.counter += 1
 
     def __str__(self) -> str:
-        return f"x{self.id}"
+        return self.name or f"_{self.id}"
 
     def unify(self, t: PlainTerm) -> None:
         assert (not self.unified or t == self.unified), \
@@ -488,10 +492,9 @@ class VariableTerm(PlainTerm):
                     t.above(self.lower)
                 if self.upper:
                     t.below(self.upper)
-                if t.lower:
-                    self.above(t.lower)
-                if t.upper:
-                    self.below(t.upper)
+
+                if t.lower == t.upper and t.lower is not None:
+                    t.unify(t.lower())
 
             elif isinstance(t, OperatorTerm) and t.operator.basic:
                 if self.lower is not None and t.operator < self.lower:
@@ -543,15 +546,9 @@ class VariableTerm(PlainTerm):
         """
         Produce some suitable variable names.
         """
-        base = "τσαβγφψ" if unicode else "xyzvuw"
+        base = "τσαβγφψ" if unicode else "xyzuvw"
         for i in range(n):
-            if n < len(base):
-                yield base[i]
-            else:
-                j = str(i + 1)
-                if unicode:
-                    j = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in j)
-                yield base[0] + j
+            yield base[i] if n < len(base) else base[0] + str(i + 1)
 
 
 "The special constructor for function types."
