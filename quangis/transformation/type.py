@@ -193,9 +193,9 @@ class Term(Type):
         Signature().bind(*args, **kwargs)
         return self
 
-    def resolve(self) -> Term:
+    def resolve(self, force: bool = False) -> Term:
         return Term(
-            self.plain.resolve(),
+            self.plain.resolve(force=force),
             *(c for c in self.constraints if c.enforce())
         )
 
@@ -214,7 +214,7 @@ class Term(Type):
         if isinstance(f, OperatorTerm) and f.operator == Function:
             x.unify_subtype(f.params[0])
             return Term(
-                f.params[1],
+                f.params[1].resolve(),
                 *(c for c in chain(self.constraints, arg.constraints)
                     if c.enforce())
             )
@@ -347,19 +347,28 @@ class PlainTerm(Type):
 
     def resolve(
             self,
+            force: bool = False,
             resolve_subtypes: bool = True,
             prefer_lower: bool = True) -> PlainTerm:
         """
         Obtain a version of this type with all unified variables substituted
         and optionally all subtypes resolved to their most specific type.
+
+        If `force`d, then variables that should be unified with their lower
+        bounds may also be unified with their upper bounds and vice versa. This
+        is not technically sound, but it can help to quickly avoid variables.
+        Note that if the subtype structure is a lattice, this can be avoided by
+        unifying with the supremum or infimum.
         """
         a = self.follow()
 
         if isinstance(a, OperatorTerm):
             return OperatorTerm(
                 a.operator,
-                *(p.resolve(resolve_subtypes,
-                    prefer_lower ^ (v == Variance.CONTRAVARIANT))
+                *(p.resolve(
+                    resolve_subtypes=resolve_subtypes,
+                    prefer_lower=prefer_lower ^ (v == Variance.CONTRAVARIANT),
+                    force=force)
                     for v, p in zip(a.operator.variance, a.params))
             )
         elif isinstance(a, VariableTerm):
@@ -369,10 +378,11 @@ class PlainTerm(Type):
                 a.unify(a.lower())
             elif not prefer_lower and a.upper:
                 a.unify(a.upper())
-            elif a.lower:  # TODO not sure it makes sense to accept lower
-                a.unify(a.lower())  # bounds when we want upper bounds. need
-            elif a.upper:  # for a lattice subtyping structure?
-                a.unify(a.upper())
+            elif force:
+                if a.upper:
+                    a.unify(a.upper())
+                elif a.lower:
+                    a.unify(a.lower())
             return a.follow()
         raise ValueError
 
