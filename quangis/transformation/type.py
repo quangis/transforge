@@ -20,7 +20,7 @@ from __future__ import annotations
 from enum import Enum
 from abc import ABC, abstractmethod
 from functools import reduce
-from itertools import chain
+from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
 from typing import Optional, Iterable, Union, List, Callable
 
@@ -47,52 +47,77 @@ class Type(ABC):
     """
 
     @abstractmethod
-    def instance(self) -> Term:
+    def instance(self, *arg: VariableTerm, **kwargs: VariableTerm) -> Term:
         return NotImplemented
 
-    def schematic(self) -> Schema:
-        if isinstance(self, Schema):
-            return self
-        return Schema(lambda: self.instance())
-
-    def __pow__(self, other: Type) -> Schema:
+    def __pow__(self, other: Type) -> Type:
         """
-        This is an overloaded (ab)use of Python's exponentiation operator. It
-        allows us to use the infix operator ** for the arrow in function
-        signatures.
+        Function abstraction. This is an overloaded (ab)use of Python's
+        exponentiation operator. It allows us to use the infix operator ** for
+        the arrow in function signatures.
 
         Note that this operator is one of the few that is right-to-left
         associative, matching the conventional behaviour of the function arrow.
         The right-bitshift operator >> (for __rshift__) would have been more
         intuitive visually, but does not have this property.
         """
-        return Schema.abstract(self.schematic(), other.schematic())
 
-    def __call__(self, *args: Type) -> Schema:
-        """
-        This allows us to apply two schematic types to eachother by calling the
-        function type with its argument type.
-        """
-        return reduce(Schema.apply,
-            (a.schematic() for a in args), self.schematic())
+        return Type.combine(self, other, by=lambda a, b:
+            Term(Function(a.plain, b.plain), *(a.constraints + b.constraints))
+        )
 
-    def __or__(self, constraint: Constraint) -> Schema:
+    def __call__(self, *args: Type) -> Type:
+        """
+        Function application. This allows us to apply two types to eachother by
+        calling the function type with its argument type.
+        """
+        return Type.combine(self, *args, by=lambda x, *xs:
+            reduce(Term.apply, xs, x)
+        )
+
+    def __or__(self, constraint: Constraint) -> Type:
         """
         Another abuse of Python's operators, allowing us to add constraints by
         using the | operator.
         """
+        return self
+        # t = self.instance()
+        # return Schema(Term(t.plain, constraint, *t.constraints)
 
-        s = self.schematic()
+    @staticmethod
+    def combine(*types: Type, by: Callable[..., Term]) -> Type:
+        """
+        Combine several types into a single (possibly schematic) type using a
+        function that combines instances of those types into a single term.
+        """
 
-        def f(*args):
-            signature(s.schema).bind(*args)
-            t = s.using(*args)
-            return Term(t.plain, constraint, *t.constraints)
+        if any(isinstance(t, Schema) for t in types):
+            # A new schematic variable for every such one needed by arguments
+            n_vars = [t.n_vars if isinstance(t, Schema) else 0 for t in types]
+            names = list(VariableTerm.names(sum(n_vars)))
+            params = [
+                Parameter(v, Parameter.POSITIONAL_OR_KEYWORD) for v in names]
+            sig = Signature(params)
 
-        f.__signature__ = signature(f).replace(  # type: ignore
-            parameters=list(signature(s.schema).parameters.values()))
+            # Divvy up the new parameters for all the argument types
+            types_with_varnames = [
+                (t, names[i:i + δ])
+                for t, i, δ in zip(types, accumulate([0] + n_vars), n_vars)
+            ]
 
-        return Schema(f)
+            # Combine into a new schema
+            def σ(*args: VariableTerm, **kwargs: VariableTerm) -> Term:
+                binding = sig.bind(*args, **kwargs)
+                return by(*(
+                    t.instance(*(binding.arguments[v] for v in varnames))
+                    for t, varnames in types_with_varnames
+                ))
+            σ.__signature__ = (  # type: ignore
+                signature(σ).replace(parameters=params))
+
+            return Schema(σ)
+        else:
+            return by(*(t.instance() for t in types))
 
 
 class Schema(Type):
@@ -100,11 +125,11 @@ class Schema(Type):
     This class provides the definition of a *schema* for function and data
     signatures: it knows its schematic type, and can generate fresh instances.
     """
-    # Bit magical. Sorry.
 
     def __init__(self, schema: Callable[..., Type]):
-        self.variables = len(signature(schema).parameters)
         self.schema = schema
+        self.signature = signature(schema)
+        self.n_vars = len(self.signature.parameters)
 
     def __repr__(self) -> str:
         return str(self)
@@ -112,39 +137,17 @@ class Schema(Type):
     def __str__(self) -> str:
         return str(self.instance())
 
-    def using(self, *variables: VariableTerm) -> Term:
-        if len(variables) == self.variables:
-            return self.schema(*variables).instance()
-        raise ValueError(
-            f"schema needs {len(variables)}, supplied {self.variables}")
-
-    def instance(self) -> Term:
-        return self.using(*(VariableTerm() for _ in range(self.variables)))
-
-    def combine(self, other: Schema, f: Callable[..., Term]) -> Schema:
-        params = [
-            Parameter(v, Parameter.POSITIONAL_ONLY)
-            for v in VariableTerm.names(self.variables + other.variables)]
-        sig = Signature(params)
-
-        def schema(*args: VariableTerm) -> Term:
-            sig.bind(*args)
-            return f(*(
-                self.using(*args[:self.variables]),
-                other.using(*args[self.variables:])
-            ))
-
-        schema.__signature__ = signature(schema).replace(  # type: ignore
-            parameters=params)
-        return Schema(schema)
-
-    def abstract(self, other: Schema) -> Schema:
-        return self.combine(other, lambda a, b: Term(
-            Function(a.plain, b.plain), *(a.constraints + b.constraints)
-        ))
-
-    def apply(self, other: Schema) -> Schema:
-        return self.combine(other, lambda a, b: a.apply(b))
+    def instance(self, *args: VariableTerm, **kwargs: VariableTerm) -> Term:
+        """
+        Create an instance of this schema. Optionally bind schematic variables
+        to concrete variables; non-bound variables will get automatically
+        assigned a concrete variable.
+        """
+        binding = self.signature.bind_partial(*args, **kwargs)
+        for param in self.signature.parameters:
+            if param not in binding.arguments:
+                binding.arguments[param] = VariableTerm()
+        return self.schema(*binding.args, **binding.kwargs).instance()
 
 
 class Term(Type):
@@ -179,7 +182,8 @@ class Term(Type):
 
         return ' | '.join(res)
 
-    def instance(self) -> Term:
+    def instance(self, *args, **kwargs) -> Term:
+        Signature().bind(*args, **kwargs)
         return self
 
     def resolve(self) -> Term:
@@ -365,7 +369,8 @@ class PlainTerm(Type):
             return a.follow()
         raise ValueError
 
-    def instance(self) -> Term:
+    def instance(self, *args, **kwargs) -> Term:
+        Signature().bind(*args, **kwargs)
         return Term(self)
 
 
@@ -412,7 +417,8 @@ class Operator(Type):
     def __call__(self, *params) -> OperatorTerm:  # type: ignore
         return OperatorTerm(self, *params)
 
-    def instance(self) -> Term:
+    def instance(self, *args, **kwargs) -> Term:
+        Signature().bind(*args, **kwargs)
         return Term(self())
 
     @property
