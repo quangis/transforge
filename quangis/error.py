@@ -80,7 +80,7 @@ class TypeMismatch(AlgebraTypeError):
         return (
             super().__str__() +
             "Type mismatch. Could not unify:\n"
-            f"\t\033[1m{self.t1}\033[0m with \033[1m{self.t2}\033[0m"
+            f"\t{self.t1} with {self.t2}"
         )
 
 
@@ -95,7 +95,7 @@ class SubtypeMismatch(AlgebraTypeError):
         return (
             super().__str__() +
             "Subtype mismatch. Could not satisfy:\n"
-            f"\t\033[1m{self.c1}\033[0m <= \033[1m{self.c2}\033[0m"
+            f"\t{self.c1} <= {self.c2}"
         )
 
 
