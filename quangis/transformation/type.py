@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
-from typing import Optional, Iterable, Union, Callable
+from typing import Optional, Iterable, Union, Callable, Tuple
 
 from quangis import error
 
@@ -66,12 +66,17 @@ class Type(ABC):
             Term(Function(a.plain, b.plain), *(a.constraints + b.constraints))
         )
 
-    def __call__(self, *args: Type) -> Type:
+    def __call__(self, *args: Union[Tuple[Type, int], Type]) -> Type:
         """
         Function application. This allows us to apply two types to eachother by
         calling the function type with its argument type.
         """
-        return Type.combine(self, *args, by=lambda x, *xs:
+        # This is only to accept tuples, because sometimes we define a
+        # signature with a tuple. Now we don't have to think about something
+        # like pi1(objectregions[0]). Might become unnecessary.
+        args1 = (t[0] if isinstance(t, tuple) else t for t in args)
+
+        return Type.combine(self, *args1, by=lambda x, *xs:
             reduce(Term.apply, xs, x)
         )
 
