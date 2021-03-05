@@ -80,9 +80,15 @@ class Type(ABC):
         Another abuse of Python's operators, allowing us to add constraints by
         using the | operator.
         """
-        return self
-        # t = self.instance()
-        # return Schema(Term(t.plain, constraint, *t.constraints)
+        if isinstance(self, Schema):
+            def σ(*args, **kwargs):
+                t = self.instance(*args, **kwargs)
+                return Term(t.plain, constraint, *t.constraints)
+            σ.__signature__ = self.signature  # type: ignore
+            return Schema(σ)
+        else:
+            t = self.instance()
+            return Term(t.plain, constraint, *t.constraints)
 
     @staticmethod
     def combine(*types: Type, by: Callable[..., Term]) -> Type:
