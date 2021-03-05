@@ -135,7 +135,8 @@ class Schema(Type):
         return str(self)
 
     def __str__(self) -> str:
-        return str(self.instance())
+        return str(self.instance(*(
+            VariableTerm(v) for v in self.signature.parameters)))
 
     def instance(self, *args: VariableTerm, **kwargs: VariableTerm) -> Term:
         """
