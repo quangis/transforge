@@ -18,15 +18,18 @@ class TestType(unittest.TestCase):
         """
         Test the application of an argument to a function.
         """
+        f = f.instance()
+        x = x.instance()
 
         if isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result,
-                lambda x: f(x).instance().resolve(),
+                lambda x: f(x).resolve(),
                 x.instance())
         else:
-            self.assertEqual(
-                f(x).instance().resolve().plain,
-                result.instance().resolve().plain)
+            actual = f(x).resolve().plain
+            expected = result.instance().plain
+            self.assertEqual(type(actual), type(expected))
+            self.assertEqual(actual, expected)
 
     def test_apply_non_function(self):
         self.apply(Int.instance(), Int, error.NonFunctionApplication)

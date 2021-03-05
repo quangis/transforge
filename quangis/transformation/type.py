@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
-from typing import Optional, Iterable, Union, List, Callable
+from typing import Optional, Iterable, Union, Callable
 
 from quangis import error
 
@@ -128,8 +128,8 @@ class Type(ABC):
 
 class Schema(Type):
     """
-    This class provides the definition of a *schema* for function and data
-    signatures: it knows its schematic type, and can generate fresh instances.
+    Provides a definition of a *schema* for function and data signatures, that
+    is, a type containing some schematic type variable.
     """
 
     def __init__(self, schema: Callable[..., Type]):
@@ -426,7 +426,7 @@ class Operator(Type):
 
     def instance(self, *args, **kwargs) -> Term:
         Signature().bind(*args, **kwargs)
-        return Term(self())
+        return Term(OperatorTerm(self))
 
     @property
     def basic(self) -> bool:
@@ -442,18 +442,15 @@ class OperatorTerm(PlainTerm):
     An instance of an n-ary type constructor.
     """
 
-    def __init__(
-            self,
-            operator: Operator,
-            *params: Union[PlainTerm, Operator]):
-        self.operator = operator
-        self.params: List[PlainTerm] = list(
-            p() if isinstance(p, Operator) else p for p in params)
+    def __init__(self, op: Operator, *params: Union[PlainTerm, Operator]):
+        self.operator = op
+        self.params = [p() if isinstance(p, Operator) else p for p in params]
 
         if len(self.params) != self.operator.arity:
             raise ValueError(
                 f"{self.operator} takes {self.operator.arity} "
-                f"parameters; {len(self.params)} given"
+                f"parameter{'' if self.operator.arity == 1 else 's'}; "
+                f"{len(self.params)} given"
             )
 
     def __str__(self) -> str:
