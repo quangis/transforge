@@ -75,11 +75,14 @@ class Type(ABC):
             reduce(Term.apply, xs, x)
         )
 
-    def __or__(self, constraint: Constraint) -> Type:
+    def __or__(self, constraint: Optional[Constraint]) -> Type:
         """
         Another abuse of Python's operators, allowing us to add constraints by
         using the | operator.
         """
+        if not constraint:
+            return self
+
         if isinstance(self, Schema):
             def σ(*args, **kwargs):
                 t = self.instance(*args, **kwargs)
@@ -89,6 +92,12 @@ class Type(ABC):
         else:
             t = self.instance()
             return Term(t.plain, constraint, *t.constraints)
+
+    def __lshift__(self, other: Type) -> None:
+        """
+        Write down subtype relations using <<.
+        """
+        self.instance().plain.unify_subtype(other.instance().plain)
 
     @staticmethod
     def combine(*types: Type, by: Callable[..., Term]) -> Type:
@@ -167,10 +176,7 @@ class Term(Type):
         self.constraints = []
 
         for c in constraints:
-            if isinstance(c, Subtype):
-                c.patterns[0].unify_subtype(c.patterns[1])
-            else:
-                self.constraints.append(c)
+            self.constraints.append(c)
 
     def __repr__(self) -> str:
         return str(self)
@@ -181,11 +187,11 @@ class Term(Type):
         for c in self.constraints:
             res.append(str(c))
 
-        for v in self.plain.variables():
+        for v in set(self.plain.variables()):
             if v.lower:
-                res.append(f"{v.lower} <= {v}")
+                res.append(f"{v.lower} << {v}")
             if v.upper:
-                res.append(f"{v} <= {v.upper}")
+                res.append(f"{v} << {v.upper}")
 
         return ' | '.join(res)
 
@@ -612,14 +618,6 @@ class Constraint(ABC):
         if it has also been completely fulfilled and need not be enforced any
         longer.
         """
-        raise NotImplementedError
-
-
-class Subtype(Constraint):
-    def __init__(self, p1, p2):
-        super().__init__(p1, p2)
-
-    def enforce(self) -> bool:
         raise NotImplementedError
 
 

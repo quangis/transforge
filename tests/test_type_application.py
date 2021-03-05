@@ -1,7 +1,7 @@
 import unittest
 
 from quangis import error
-from quangis.transformation.type import Operator, Schema, Subtype
+from quangis.transformation.type import Operator, Schema
 
 Any = Operator('Any')
 Ord = Operator('Ord', supertype=Any)
@@ -113,7 +113,7 @@ class TestType(unittest.TestCase):
         self.apply(leq(Int), Bool, error.SubtypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
-        leq = Schema(lambda α: α ** α ** Bool | Subtype(α, Ord))
+        leq = Schema(lambda α: α ** α ** Bool | α << Ord)
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq, Any, error.SubtypeMismatch)
 
