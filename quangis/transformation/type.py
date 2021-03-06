@@ -117,7 +117,7 @@ class Type(ABC):
         Generate a list of instances operators that contain this type somewhere
         in its parameters.
         """
-        target = self.instance()
+        target = self.instance().plain
         options = []
         for op in ops:
             for i in range(op.arity) if at is None else (at - 1,):
