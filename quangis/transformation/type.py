@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
-from typing import Optional, Iterable, Union, Callable, Tuple
+from typing import Optional, Iterable, Union, Callable, Tuple, List
 
 from quangis import error
 
@@ -98,11 +98,34 @@ class Type(ABC):
             t = self.instance()
             return Term(t.plain, constraint, *t.constraints)
 
-    def __lshift__(self, other: Type) -> None:
+    def __lshift__(self, other: Union[Type, Iterable[Type]]
+            ) -> Optional[Constraint]:
         """
-        Write down subtype relations using <<.
+        Allows us to write subtype relations and constraints using <<.
         """
-        self.instance().plain.unify_subtype(other.instance().plain)
+        if isinstance(other, Type):
+            self.instance().plain.unify_subtype(other.instance().plain)
+            return None
+        else:
+            return Constraint(self.instance(), *(o.instance() for o in other))
+
+    def parameter_of(
+            self,
+            *ops: Operator,
+            at: Optional[int] = None) -> List[PlainTerm]:
+        """
+        Generate a list of instances operators that contain this type somewhere
+        in its parameters.
+        """
+        target = self.instance()
+        options = []
+        for op in ops:
+            for i in range(op.arity) if at is None else (at - 1,):
+                options.append(op(*(
+                    target if i == j else VariableTerm(wildcard=True)
+                    for j in range(op.arity)
+                )))
+        return options
 
     @staticmethod
     def combine(*types: Type, by: Callable[..., Term]) -> Type:
@@ -207,7 +230,7 @@ class Term(Type):
     def resolve(self, force: bool = False) -> Term:
         return Term(
             self.plain.resolve(force=force),
-            *(c for c in self.constraints if c.enforce())
+            *(c for c in self.constraints if not c.fulfilled())
         )
 
     def apply(self, arg: Term) -> Term:
@@ -227,7 +250,7 @@ class Term(Type):
             return Term(
                 f.params[1].resolve(),
                 *(c for c in chain(self.constraints, arg.constraints)
-                    if c.enforce())
+                    if not c.fulfilled())
             )
         else:
             raise error.NonFunctionApplication(f, x)
@@ -284,7 +307,7 @@ class PlainTerm(Type):
 
     def subtype(self, other: PlainTerm) -> Optional[bool]:
         """
-        Return true if self is definitely a subtype of other, False if it is
+        Return True if self is definitely a subtype of other, False if it is
         definitely not, and None if there is not enough information.
         """
         a = self.follow()
@@ -308,6 +331,13 @@ class PlainTerm(Type):
                     else:
                         result &= r
                 return result
+        else:
+            if (isinstance(a, VariableTerm) and a.wildcard) or \
+                    (isinstance(b, VariableTerm) and b.wildcard):
+                return True
+            # TODO if the upper limit of the subtype is a subtype of the lower
+            # limit of the supertype...
+            pass
         return None
 
     def unify_subtype(self, other: PlainTerm) -> None:
@@ -488,7 +518,8 @@ class OperatorTerm(PlainTerm):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, OperatorTerm):
             return self.operator == other.operator and \
-                all(s == t for s, t in zip(self.params, other.params))
+                all(s.follow() == t.follow()
+                    for s, t in zip(self.params, other.params))
         else:
             return False
 
@@ -499,26 +530,31 @@ class VariableTerm(PlainTerm):
     """
     counter = 0
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: Optional[str] = None, wildcard: bool = False):
         cls = type(self)
         self.id = cls.counter
         self.name = name
+        self.wildcard = wildcard
         self.lower: Optional[Operator] = None
         self.unified: Optional[PlainTerm] = None
         self.upper: Optional[Operator] = None
         cls.counter += 1
 
     def __str__(self) -> str:
-        return self.name or f"_{self.id}"
+        return "_" if self.wildcard else self.name or f"_{self.id}"
 
     def unify(self, t: PlainTerm) -> None:
         assert (not self.unified or t == self.unified), \
             "variable cannot be unified twice"
 
+        self.wildcard = False
+
         if self is not t:
             self.unified = t
 
             if isinstance(t, VariableTerm):
+                t.wildcard = False
+
                 if self.lower:
                     t.above(self.lower)
                 if self.upper:
@@ -561,7 +597,7 @@ class VariableTerm(PlainTerm):
         Constrain this variable to be a basic type with the given subtype as
         upper bound.
         """
-        # symmetric to subtype
+        # symmetric to `above`
         lower, upper = self.lower or new, self.upper or new
         if new < lower:
             raise error.SubtypeMismatch(lower, new)
@@ -588,86 +624,40 @@ Function = Operator(
     params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
 )
 
+"A wildcard: produces an unrelated variable, to be matched with anything."
+_ = Schema(lambda: VariableTerm(wildcard=True))
 
-class Constraint(ABC):
+
+class Constraint(object):
     """
     A constraint enforces that its subject type always remains consistent with
     whatever condition it represents.
     """
 
-    def __init__(self, *patterns: Union[PlainTerm, Operator], **kwargs):
-        self.patterns = list(
-            p() if isinstance(p, Operator) else p for p in patterns
-        )
-        self.kwargs = kwargs
+    def __init__(self, subject: Type, *patterns: Type):
+        self.subject = subject.instance().plain
+        self.patterns = [t.instance().plain for t in patterns]
 
     def __str__(self) -> str:
-        c = self.resolve()
-        args = ', '.join(chain(
-            (str(p) for p in c.patterns),
-            (f"{k}={v}" for k, v in c.kwargs.items())
-        ))
+        return (
+            f"{self.subject.resolve()} << "
+            f"{[p.resolve() for p in self.patterns]}"
+        )
 
-        return (f"{type(c).__name__}({args})")
-
-    def resolve(self) -> Constraint:
-        cls = type(self)
-        return cls(
-            *(p.resolve(resolve_subtypes=False) for p in self.patterns),
-            **self.kwargs)
-
-    @abstractmethod
-    def enforce(self) -> bool:
+    def fulfilled(self) -> bool:
         """
-        Check that the resolved constraint has not been violated. Return False
-        if it has also been completely fulfilled and need not be enforced any
-        longer.
+        Check that the constraint has not been violated and raise an error
+        otherwise. Additionally, return True if it has been completely
+        fulfilled and need not be enforced any longer.
         """
-        raise NotImplementedError
 
-
-class Member(Constraint):
-    """
-    Check that its first pattern is a subtype of at least one of its other
-    patterns.
-    """
-
-    def enforce(self) -> bool:
-        subject = self.patterns[0]
-        for other in self.patterns[1:]:
-            status = subject.subtype(other)
-            if status is True:
-                return False
-            elif status is None:
-                return True
-        raise error.ViolatedConstraint(self)
-
-
-class Param(Constraint):
-    """
-    Check that its first pattern is a compound type with one of the given types
-    occurring somewhere in its parameters.
-    """
-
-    def enforce(self) -> bool:
-        subject = self.patterns[0].follow()
-        position = self.kwargs.get('at')
-        if isinstance(subject, OperatorTerm):
-            if position is None:
-                for p in subject.params:
-                    for other in self.patterns[1:]:
-                        status = p.follow().subtype(other.follow())
-                        if status is True:
-                            return False
-                        elif status is None:
-                            return True
-            elif position - 1 < len(subject.params):
-                p = subject.params[position - 1].follow()
-                for other in self.patterns[1:]:
-                    status = p.subtype(other.follow())
-                    if status is True:
-                        return False
-                    elif status is None:
-                        return True
+        statuses = [(p, self.subject.subtype(p)) for p in self.patterns]
+        patterns = [(p, s) for p, s in statuses if s is not False]
+        self.patterns = [p[0] for p in patterns]
+        if len(patterns) == 0:
             raise error.ViolatedConstraint(self)
-        return True
+        elif len(patterns) == 1 and patterns[0][0] is True:
+            self.subject.unify_subtype(patterns[0][1])
+            return True
+        return False
+
