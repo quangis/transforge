@@ -52,6 +52,14 @@ class TransformationAlgebra(object):
         self.functions = functions
         self.parser: Optional[pp.Parser] = None
 
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return "\n".join([
+            f"{k}: {signature}" for k, (signature, _) in self.functions.items()
+        ]) + "\n"
+
     def generate_parser(self) -> pp.Parser:
 
         identifier = pp.Word(pp.alphanums + ':_').setName('identifier')

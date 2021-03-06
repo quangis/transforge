@@ -118,7 +118,7 @@ class Type(ABC):
         in its parameters.
         """
         target = self.instance().plain
-        options = []
+        options: List[PlainTerm] = []
         for op in ops:
             for i in range(op.arity) if at is None else (at - 1,):
                 if i < op.arity:
@@ -180,7 +180,7 @@ class Schema(Type):
 
     def __str__(self) -> str:
         return str(self.instance(*(
-            VariableTerm(v) for v in self.signature.parameters)))
+            VariableTerm(v) for v in self.signature.parameters)).resolve())
 
     def instance(self, *args: VariableTerm, **kwargs: VariableTerm) -> Term:
         """
