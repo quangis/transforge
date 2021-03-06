@@ -121,10 +121,11 @@ class Type(ABC):
         options = []
         for op in ops:
             for i in range(op.arity) if at is None else (at - 1,):
-                options.append(op(*(
-                    target if i == j else VariableTerm(wildcard=True)
-                    for j in range(op.arity)
-                )))
+                if i < op.arity:
+                    options.append(op(*(
+                        target if i == j else VariableTerm(wildcard=True)
+                        for j in range(op.arity)
+                    )))
         return options
 
     @staticmethod
@@ -228,10 +229,9 @@ class Term(Type):
         return self
 
     def resolve(self, force: bool = False) -> Term:
-        return Term(
-            self.plain.resolve(force=force),
-            *(c for c in self.constraints if not c.fulfilled())
-        )
+        constraints = [c for c in self.constraints if not c.fulfilled()]
+        t = self.plain.resolve(force=force)
+        return Term(t, *constraints)
 
     def apply(self, arg: Term) -> Term:
         """
@@ -248,10 +248,9 @@ class Term(Type):
         if isinstance(f, OperatorTerm) and f.operator == Function:
             x.unify_subtype(f.params[0])
             return Term(
-                f.params[1].resolve(),
-                *(c for c in chain(self.constraints, arg.constraints)
-                    if not c.fulfilled())
-            )
+                f.params[1],
+                *chain(self.constraints, arg.constraints)
+            ).resolve()
         else:
             raise error.NonFunctionApplication(f, x)
 
@@ -323,8 +322,10 @@ class PlainTerm(Type):
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.COVARIANT:
                         r = s.subtype(t)
-                    else:
+                    elif v == Variance.CONTRAVARIANT:
                         r = t.subtype(s)
+                    else:
+                        raise ValueError
 
                     if r is None:
                         return None
@@ -362,6 +363,8 @@ class PlainTerm(Type):
                         x.unify_subtype(y)
                     elif v == Variance.CONTRAVARIANT:
                         y.unify_subtype(x)
+                    else:
+                        raise ValueError
             else:
                 raise error.TypeMismatch(a, b)
 
@@ -656,8 +659,8 @@ class Constraint(object):
         self.patterns = [p[0] for p in patterns]
         if len(patterns) == 0:
             raise error.ViolatedConstraint(self)
-        elif len(patterns) == 1 and patterns[0][0] is True:
-            self.subject.unify_subtype(patterns[0][1])
+        elif len(patterns) == 1:  # and patterns[0][0] is True:
+            self.subject.unify_subtype(patterns[0][0])
             return True
         return False
 
