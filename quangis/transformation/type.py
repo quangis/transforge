@@ -236,9 +236,9 @@ class Term(Type):
         Signature().bind(*args, **kwargs)
         return self
 
-    def resolve(self, force: bool = False) -> Term:
+    def resolve(self) -> Term:
         constraints = [c for c in self.constraints if not c.fulfilled()]
-        t = self.plain.resolve(force=force)
+        t = self.plain.resolve()
         return Term(t, *constraints)
 
     def apply(self, arg: Term) -> Term:
@@ -397,28 +397,21 @@ class PlainTerm(Type):
                 b.bind(a.skeleton())
                 b.unify_subtype(a)
 
-    def resolve(
-            self,
-            force: bool = False,
-            prefer_lower: bool = True) -> PlainTerm:
+    def resolve(self, prefer_lower: bool = True) -> PlainTerm:
         """
         Obtain a version of this type with all unified variables substituted
         and optionally all subtypes resolved to their most specific type.
 
-        If `force`d, then variables that should be unified with their lower
-        bounds may also be unified with their upper bounds and vice versa. This
-        is not technically sound, but it can help to quickly avoid variables.
-        Note that if the subtype structure is a lattice, this can be avoided by
-        unifying with the supremum or infimum.
+        For starters, prefer the lower bound on a variable. After all, a value
+        of type T is also a value of type S for T < S; so the lower bound
+        represents the most specific type without loss of generality.
         """
         a = self.follow()
 
         if isinstance(a, OperatorTerm):
             return OperatorTerm(
                 a.operator,
-                *(p.resolve(
-                    prefer_lower=prefer_lower ^ (v == Variance.CONTRA),
-                    force=force)
+                *(p.resolve(prefer_lower ^ (v == Variance.CONTRA))
                     for v, p in zip(a.operator.variance, a.params))
             )
         elif isinstance(a, VariableTerm):
@@ -426,11 +419,6 @@ class PlainTerm(Type):
                 a.bind(a.lower())
             elif not prefer_lower and a.upper:
                 a.bind(a.upper())
-            elif force:
-                if a.upper:
-                    a.bind(a.upper())
-                elif a.lower:
-                    a.bind(a.lower())
             return a.follow()
         raise ValueError
 
