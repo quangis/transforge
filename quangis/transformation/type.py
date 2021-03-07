@@ -255,6 +255,7 @@ class Term(Type):
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
             x.unify_subtype(f.params[0])
+            f.resolve()
             return Term(
                 f.params[1],
                 *chain(self.constraints, arg.constraints)
