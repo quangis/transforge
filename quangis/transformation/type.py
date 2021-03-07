@@ -37,18 +37,17 @@ class Variance(Enum):
     just as conservative or more in what output it produces, e.g. β₂ ≤ β₁).
     """
 
-    COVARIANT = auto()
-    CONTRAVARIANT = auto()
-    INVARIANT = auto()
+    IN = auto()
+    CO = auto()
+    CONTRA = auto()
 
     def __and__(self, other: Variance) -> Variance:
-        if Variance.INVARIANT in (self, other):
-            return Variance.INVARIANT
-
-        if (self == Variance.COVARIANT) ^ (other == Variance.COVARIANT):
-            return Variance.CONTRAVARIANT
+        if Variance.IN in (self, other):
+            return Variance.IN
+        elif (self == Variance.CO) ^ (other == Variance.CO):
+            return Variance.CONTRA
         else:
-            return Variance.COVARIANT
+            return Variance.CO
 
 
 class Type(ABC):
@@ -329,9 +328,9 @@ class PlainTerm(Type):
             else:
                 result = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
-                    if v == Variance.COVARIANT:
+                    if v == Variance.CO:
                         r = s.subtype(t)
-                    elif v == Variance.CONTRAVARIANT:
+                    elif v == Variance.CONTRA:
                         r = t.subtype(s)
                     else:
                         raise ValueError
@@ -368,9 +367,9 @@ class PlainTerm(Type):
                     raise error.SubtypeMismatch(a, b)
             elif a.operator == b.operator:
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
-                    if v == Variance.COVARIANT:
+                    if v == Variance.CO:
                         x.unify_subtype(y)
-                    elif v == Variance.CONTRAVARIANT:
+                    elif v == Variance.CONTRA:
                         y.unify_subtype(x)
                     else:
                         raise ValueError
@@ -418,7 +417,7 @@ class PlainTerm(Type):
             return OperatorTerm(
                 a.operator,
                 *(p.resolve(
-                    prefer_lower=prefer_lower ^ (v == Variance.CONTRAVARIANT),
+                    prefer_lower=prefer_lower ^ (v == Variance.CONTRA),
                     force=force)
                     for v, p in zip(a.operator.variance, a.params))
             )
@@ -454,7 +453,7 @@ class Operator(Type):
         self.supertype: Optional[Operator] = supertype
 
         if isinstance(params, int):
-            self.variance = list(Variance.COVARIANT for _ in range(params))
+            self.variance = list(Variance.CO for _ in range(params))
         else:
             self.variance = list(params)
         self.arity = len(self.variance)
@@ -629,7 +628,7 @@ class VariableTerm(PlainTerm):
 "The special constructor for function types."
 Function = Operator(
     'Function',
-    params=(Variance.CONTRAVARIANT, Variance.COVARIANT)
+    params=(Variance.CONTRA, Variance.CO)
 )
 
 "A wildcard: produces an unrelated variable, to be matched with anything."
