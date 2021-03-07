@@ -628,18 +628,19 @@ _ = Schema(lambda: VariableTerm(wildcard=True))
 
 class Constraint(object):
     """
-    A constraint enforces that its subject type always remains consistent with
-    whatever condition it represents.
+    A constraint enforces that its subject type is a subtype of one of its
+    object types.
     """
 
-    def __init__(self, subject: Type, *patterns: Type):
+    def __init__(self, subject: Type, *objects: Type):
         self.subject = subject.instance().plain
-        self.patterns = [t.instance().plain for t in patterns]
+        self.objects = [t.instance().plain for t in objects]
+        self.fulfilled()
 
     def __str__(self) -> str:
         return (
             f"{self.subject.resolve()} << "
-            f"{[p.resolve() for p in self.patterns]}"
+            f"{[p.resolve() for p in self.objects]}"
         )
 
     def fulfilled(self) -> bool:
@@ -648,14 +649,15 @@ class Constraint(object):
         otherwise. Additionally, return True if it has been completely
         fulfilled and need not be enforced any longer.
         """
-
-        statuses = [(p, self.subject.subtype(p)) for p in self.patterns]
-        patterns = [(p, s) for p, s in statuses if s is not False]
-        self.patterns = [p[0] for p in patterns]
-        if len(patterns) == 0:
+        self.objects = [
+            t for t, compatibility in zip(
+                self.objects,
+                (self.subject.subtype(t) for t in self.objects))
+            if compatibility is not False
+        ]
+        if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
-        elif len(patterns) == 1:  # and patterns[0][0] is True:
-            self.subject.unify_subtype(patterns[0][0])
+        elif len(self.objects) == 1:
+            self.subject.unify_subtype(self.objects[0])
             return True
         return False
-
