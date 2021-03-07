@@ -39,6 +39,16 @@ class Variance(Enum):
 
     COVARIANT = auto()
     CONTRAVARIANT = auto()
+    INVARIANT = auto()
+
+    def __and__(self, other: Variance) -> Variance:
+        if Variance.INVARIANT in (self, other):
+            return Variance.INVARIANT
+
+        if (self == Variance.COVARIANT) ^ (other == Variance.COVARIANT):
+            return Variance.CONTRAVARIANT
+        else:
+            return Variance.COVARIANT
 
 
 class Type(ABC):
