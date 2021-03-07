@@ -242,7 +242,7 @@ class Term(Type):
         x = arg.plain.follow()
 
         if isinstance(f, VariableTerm):
-            f.unify(Function(VariableTerm(), VariableTerm()))
+            f.bind(Function(VariableTerm(), VariableTerm()))
             f = f.follow()
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
@@ -369,7 +369,7 @@ class PlainTerm(Type):
                 raise error.TypeMismatch(a, b)
 
         elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
-            a.unify(b)
+            a.bind(b)
 
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
             if a in b:
@@ -377,7 +377,7 @@ class PlainTerm(Type):
             elif b.operator.basic:
                 a.below(b.operator)
             else:
-                a.unify(b.skeleton())
+                a.bind(b.skeleton())
                 a.unify_subtype(b)
 
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
@@ -386,7 +386,7 @@ class PlainTerm(Type):
             elif a.operator.basic:
                 b.above(a.operator)
             else:
-                b.unify(a.skeleton())
+                b.bind(a.skeleton())
                 b.unify_subtype(a)
 
     def resolve(
@@ -419,14 +419,14 @@ class PlainTerm(Type):
             if not resolve_subtypes:
                 return a
             if prefer_lower and a.lower:
-                a.unify(a.lower())
+                a.bind(a.lower())
             elif not prefer_lower and a.upper:
-                a.unify(a.upper())
+                a.bind(a.upper())
             elif force:
                 if a.upper:
-                    a.unify(a.upper())
+                    a.bind(a.upper())
                 elif a.lower:
-                    a.unify(a.lower())
+                    a.bind(a.lower())
             return a.follow()
         raise ValueError
 
@@ -546,7 +546,7 @@ class VariableTerm(PlainTerm):
     def __str__(self) -> str:
         return "_" if self.wildcard else self.name or f"_{self.id}"
 
-    def unify(self, t: PlainTerm) -> None:
+    def bind(self, t: PlainTerm) -> None:
         assert (not self.unified or t == self.unified), \
             "variable cannot be unified twice"
 
@@ -564,7 +564,7 @@ class VariableTerm(PlainTerm):
                     t.below(self.upper)
 
                 if t.lower == t.upper and t.lower is not None:
-                    t.unify(t.lower())
+                    t.bind(t.lower())
 
             elif isinstance(t, OperatorTerm) and t.operator.basic:
                 if self.lower is not None and t.operator < self.lower:
