@@ -392,7 +392,6 @@ class PlainTerm(Type):
     def resolve(
             self,
             force: bool = False,
-            resolve_subtypes: bool = True,
             prefer_lower: bool = True) -> PlainTerm:
         """
         Obtain a version of this type with all unified variables substituted
@@ -410,14 +409,11 @@ class PlainTerm(Type):
             return OperatorTerm(
                 a.operator,
                 *(p.resolve(
-                    resolve_subtypes=resolve_subtypes,
                     prefer_lower=prefer_lower ^ (v == Variance.CONTRAVARIANT),
                     force=force)
                     for v, p in zip(a.operator.variance, a.params))
             )
         elif isinstance(a, VariableTerm):
-            if not resolve_subtypes:
-                return a
             if prefer_lower and a.lower:
                 a.bind(a.lower())
             elif not prefer_lower and a.upper:
