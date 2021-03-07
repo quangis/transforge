@@ -673,11 +673,9 @@ class Constraint(object):
         otherwise. Additionally, return True if it has been completely
         fulfilled and need not be enforced any longer.
         """
+        compatibility = [self.subject.subtype(t) for t in self.objects]
         self.objects = [
-            t for t, compatibility in zip(
-                self.objects,
-                (self.subject.subtype(t) for t in self.objects))
-            if compatibility is not False
+            t for t, c in zip(self.objects, compatibility) if c is not False
         ]
         if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
