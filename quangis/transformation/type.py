@@ -107,9 +107,9 @@ class Type(ABC):
             t = self.instance()
             return Term(t.plain, constraint, *t.constraints)
 
-    def __lshift__(self, others: Iterable[Type]) -> Constraint:
+    def __matmul__(self, others: Iterable[Type]) -> Constraint:
         """
-        Allows us to write constraints using <<.
+        Allows us to write constraints using @.
         """
         return Constraint(
             self.instance().plain,
@@ -661,7 +661,7 @@ class Constraint(object):
 
     def __str__(self) -> str:
         return (
-            f"{self.subject.resolve()} << "
+            f"{self.subject.resolve()} @ "
             f"{[p.resolve() for p in self.objects_initial]}"
         )
 
