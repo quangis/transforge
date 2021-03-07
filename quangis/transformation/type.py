@@ -17,7 +17,7 @@ functional programming languages.
 # PlainTerm class.
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, auto
 from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain, accumulate
@@ -37,8 +37,8 @@ class Variance(Enum):
     just as conservative or more in what output it produces, e.g. β₂ ≤ β₁).
     """
 
-    COVARIANT = 0
-    CONTRAVARIANT = 1
+    COVARIANT = auto()
+    CONTRAVARIANT = auto()
 
 
 class Type(ABC):
