@@ -98,16 +98,15 @@ class Type(ABC):
             t = self.instance()
             return Term(t.plain, constraint, *t.constraints)
 
-    def __lshift__(self, other: Union[Type, Iterable[Type]]
-            ) -> Optional[Constraint]:
+    def __lshift__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
         """
         Allows us to write subtype relations and constraints using <<.
         """
-        if isinstance(other, Type):
-            self.instance().plain.unify_subtype(other.instance().plain)
-            return None
-        else:
-            return Constraint(self.instance(), *(o.instance() for o in other))
+        return Constraint(self.instance(), *(
+            (other.instance(),)
+            if isinstance(other, Type) else
+            (o.instance() for o in other)
+        ))
 
     def parameter_of(
             self,
