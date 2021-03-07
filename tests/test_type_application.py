@@ -112,10 +112,10 @@ class TestType(unittest.TestCase):
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq(Int), Bool, error.SubtypeMismatch)
 
-    def test_order_of_subtype_application_with_constraints(self):
-        leq = Schema(lambda α: α ** α ** Bool | α << Ord)
-        self.apply(leq(Int), UInt, Bool)
-        self.apply(leq, Any, error.SubtypeMismatch)
+    #def test_order_of_subtype_application_with_constraints(self):
+    #    leq = Schema(lambda α: α ** α ** Bool | α << [Ord, Bool])
+    #    self.apply(leq(Int), UInt, Bool)
+    #    self.apply(leq, Any, error.SubtypeMismatch)
 
 
 if __name__ == '__main__':

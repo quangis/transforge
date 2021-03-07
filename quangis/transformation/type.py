@@ -107,15 +107,13 @@ class Type(ABC):
             t = self.instance()
             return Term(t.plain, constraint, *t.constraints)
 
-    def __lshift__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
+    def __lshift__(self, others: Iterable[Type]) -> Constraint:
         """
-        Allows us to write subtype relations and constraints using <<.
+        Allows us to write constraints using <<.
         """
-        return Constraint(self.instance().plain, *(
-            (other.instance().plain,)
-            if isinstance(other, Type) else
-            (o.instance().plain for o in other)
-        ))
+        return Constraint(
+            self.instance().plain,
+            *(o.instance().plain for o in others))
 
     def parameter_of(
             self,
@@ -226,9 +224,9 @@ class Term(Type):
 
         for v in set(self.plain.variables()):
             if v.lower:
-                res.append(f"{v.lower} << {v}")
+                res.append(f"{v.lower} <= {v}")
             if v.upper:
-                res.append(f"{v} << {v.upper}")
+                res.append(f"{v} <= {v.upper}")
 
         return ' | '.join(res)
 
