@@ -111,10 +111,10 @@ class Type(ABC):
         """
         Allows us to write subtype relations and constraints using <<.
         """
-        return Constraint(self.instance(), *(
-            (other.instance(),)
+        return Constraint(self.instance().plain, *(
+            (other.instance().plain,)
             if isinstance(other, Type) else
-            (o.instance() for o in other)
+            (o.instance().plain for o in other)
         ))
 
     def parameter_of(
@@ -630,15 +630,16 @@ class Constraint(object):
     object types.
     """
 
-    def __init__(self, subject: Type, *objects: Type):
-        self.subject = subject.instance().plain
-        self.objects = [t.instance().plain for t in objects]
+    def __init__(self, subject: PlainTerm, *objects: PlainTerm):
+        self.subject = subject
+        self.objects = list(objects)
+        self.objects_initial = self.objects
         self.fulfilled()
 
     def __str__(self) -> str:
         return (
             f"{self.subject.resolve()} << "
-            f"{[p.resolve() for p in self.objects]}"
+            f"{[p.resolve() for p in self.objects_initial]}"
         )
 
     def fulfilled(self) -> bool:
