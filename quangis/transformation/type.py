@@ -398,6 +398,31 @@ class PlainTerm(Type):
                 b.bind(a.skeleton())
                 b.unify_subtype(a)
 
+    def unify(self, other: PlainTerm) -> None:
+        a = self.follow()
+        b = other.follow()
+
+        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
+            if a.operator == b.operator:
+                for v, x, y in zip(a.operator.variance, a.params, b.params):
+                    x.unify(y)
+            else:
+                raise error.TypeMismatch(a, b)
+
+        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
+            a.bind(b)
+
+        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
+            if a in b:
+                raise error.RecursiveType(a, b)
+            a.bind(b)
+
+        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
+            if b in a:
+                raise error.RecursiveType(b, a)
+            else:
+                b.bind(a)
+
     def resolve(self, prefer_lower: bool = True) -> PlainTerm:
         """
         Obtain a version of this type with all unified variables substituted
@@ -657,6 +682,6 @@ class Constraint(object):
         if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
         elif len(self.objects) == 1:
-            self.subject.unify_subtype(self.objects[0])
+            self.subject.unify(self.objects[0])
             return True
         return False
