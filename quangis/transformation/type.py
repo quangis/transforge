@@ -109,11 +109,19 @@ class Type(ABC):
 
     def __matmul__(self, others: Iterable[Type]) -> Constraint:
         """
-        Allows us to write constraints using @.
+        Allows us to write typeclass constraints using @.
         """
         return Constraint(
             self.instance().plain,
             *(o.instance().plain for o in others))
+
+    def __lshift__(self, other: Type) -> None:
+        a = self.instance().plain
+        b = other.instance().plain
+        a.unify_subtype(b)
+
+    def __rshift__(self, other: Type) -> None:
+        return other.__lshift__(self)
 
     def parameter_of(
             self,
@@ -224,9 +232,9 @@ class Term(Type):
 
         for v in set(self.plain.variables()):
             if v.lower:
-                res.append(f"{v.lower} <= {v}")
+                res.append(f"{v} >> {v.lower}")
             if v.upper:
-                res.append(f"{v} <= {v.upper}")
+                res.append(f"{v} << {v.upper}")
 
         return ' | '.join(res)
 
