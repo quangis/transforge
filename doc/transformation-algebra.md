@@ -35,6 +35,8 @@ types. For example, `Set(Int)` could represent a set of integers. Note that
 this is automatically a subtype of `Set(Any)`.
 
     >>> Set = Operator("Set", 1)
+    >>> Set(Int) <= Set(Any)
+    True
 
 A special higher-order type is `Function`, which describes a transformation. 
 For convenience, to create functions, the right-associative infix operator 

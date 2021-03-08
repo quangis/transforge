@@ -119,6 +119,22 @@ class Type(ABC):
     def __rshift__(self, other: Type) -> None:
         return other.__lshift__(self)
 
+    def __lt__(self, other: Type) -> Optional[bool]:
+        return self != other and self <= other
+
+    def __gt__(self, other: Type) -> Optional[bool]:
+        return self != other and self >= other
+
+    def __le__(self, other: Type) -> Optional[bool]:
+        a = self.instance().plain
+        b = other.instance().plain
+        return a.subtype(b)
+
+    def __ge__(self, other: Type) -> Optional[bool]:
+        a = self.instance().plain
+        b = other.instance().plain
+        return b.subtype(a)
+
     def is_function(self) -> bool:
         """
         Does this type represent a function?
@@ -316,7 +332,7 @@ class PlainTerm(Type):
 
         if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
             if a.operator.basic:
-                return a.operator <= b.operator
+                return a.operator.subtype(b.operator)
             elif a.operator != b.operator:
                 return False
             else:
@@ -326,26 +342,22 @@ class PlainTerm(Type):
                         r = s.subtype(t)
                     elif v == Variance.CONTRA:
                         r = t.subtype(s)
-                    else:
-                        raise ValueError
-
                     if r is None:
                         return None
-                    else:
-                        result &= r
+                    result &= r
                 return result
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
-            if b.upper and b.upper < a.operator:
-                return True
+            if b.upper and b.upper.subtype(a.operator, True):
+                return False
             if b.wildcard:
                 return True
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
-            if a.lower and b.operator < a.lower:
+            if a.lower and b.operator.subtype(a.lower, True):
                 return False
             if a.wildcard:
                 return True
         elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
-            if a.lower and b.upper and a.lower < b.upper:
+            if a.lower and b.upper and a.lower.subtype(b.upper, True):
                 return False
         return None
 
@@ -363,7 +375,7 @@ class PlainTerm(Type):
 
         if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
             if a.operator.basic:
-                if not (a.operator <= b.operator):
+                if not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
             elif a.operator == b.operator:
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
@@ -461,11 +473,9 @@ class Operator(Type):
             self.name == other.name
             and self.variance == other.variance)
 
-    def __le__(self, other: Operator) -> bool:
-        return self == other or self < other
-
-    def __lt__(self, other: Operator) -> bool:
-        return bool(self.supertype and self.supertype <= other)
+    def subtype(self, other: Operator, strict: bool = False) -> bool:
+        return ((not strict and self == other) or
+            bool(self.supertype and self.supertype.subtype(other)))
 
     def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
         return OperatorTerm(self, *(p.instance().plain for p in params))
@@ -562,9 +572,9 @@ class VariableTerm(PlainTerm):
                     t.bind(t.lower())
 
             elif isinstance(t, OperatorTerm) and t.operator.basic:
-                if self.lower is not None and t.operator < self.lower:
+                if self.lower and t.operator.subtype(self.lower, True):
                     raise error.SubtypeMismatch(t, self)
-                if self.upper is not None and self.upper < t.operator:
+                if self.upper and self.upper.subtype(t.operator, True):
                     raise error.SubtypeMismatch(self, t)
 
     def above(self, new: Operator) -> None:
@@ -575,15 +585,15 @@ class VariableTerm(PlainTerm):
         lower, upper = self.lower or new, self.upper or new
 
         # lower bound higher than the upper bound fails
-        if upper < new:
+        if upper.subtype(new, True):
             raise error.SubtypeMismatch(new, upper)
 
         # lower bound lower than the current lower bound is ignored
-        elif new < lower:
+        elif new.subtype(lower, True):
             pass
 
         # tightening the lower bound
-        elif lower <= new:
+        elif lower.subtype(new):
             self.lower = new
 
         # new bound from another lineage (neither sub- nor supertype) fails
@@ -597,11 +607,11 @@ class VariableTerm(PlainTerm):
         """
         # symmetric to `above`
         lower, upper = self.lower or new, self.upper or new
-        if new < lower:
+        if new.subtype(lower, True):
             raise error.SubtypeMismatch(lower, new)
-        elif upper < new:
+        elif upper.subtype(new, True):
             pass
-        elif new <= upper:
+        elif new.subtype(upper):
             self.upper = new
         else:
             raise error.SubtypeMismatch(new, upper)
