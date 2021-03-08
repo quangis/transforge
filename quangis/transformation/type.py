@@ -261,6 +261,17 @@ class PlainTerm(Type):
             isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
 
+    def basics(self, follow: bool = True) -> Iterable[TermOperator]:
+        """
+        Find the basic types (optionally only those non-unified).
+        """
+        a = self.follow() if follow else self
+        if isinstance(a, OperatorTerm):
+            if a.operator.basic:
+                yield a
+            for t in chain(*(t.basics(follow) for t in self.params)):
+                yield t
+
     def variables(self) -> Iterable[VariableTerm]:
         """
         Obtain all type variables currently in the type expression.
@@ -268,8 +279,8 @@ class PlainTerm(Type):
         a = self.follow()
         if isinstance(a, VariableTerm):
             yield a
-        elif isinstance(self, OperatorTerm):
-            for v in chain(*(t.variables() for t in self.params)):
+        elif isinstance(a, OperatorTerm):
+            for v in chain(*(t.variables() for t in a.params)):
                 yield v
 
     def follow(self) -> PlainTerm:
@@ -619,11 +630,26 @@ class Constraint(object):
         self.objects = [
             t for t, c in zip(self.objects, compatibility) if c is not False
         ]
+
         if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
+
         elif len(self.objects) == 1:
-            self.subject.unify_subtype(self.objects[0])
+            obj = self.objects[0]
+
+            # This only works if there are no non-unified basic types, because
+            # we might be looking for a subtype of that basic type. In that
+            # case, we don't want to unify already, because the variable would
+            # be resolved against an overly loose bound
+            if not any(obj.basics(follow=False)):
+                self.subject.unify_subtype(obj)
+                return True
+
+        # A constraint is also fulfilled if the subject is fully concrete and
+        # there is at least one definitely compatible object
+        if not any(self.subject.variables()) and any(compatibility):
             return True
+
         return False
 
 
