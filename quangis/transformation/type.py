@@ -59,6 +59,9 @@ class Type(ABC):
     def instance(self, *arg: VariableTerm, **kwargs: VariableTerm) -> Term:
         return NotImplemented
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __pow__(self, other: Type) -> Type:
         """
         Function abstraction. This is an overloaded (ab)use of Python's
@@ -189,9 +192,6 @@ class Schema(Type):
         self.signature = signature(schema)
         self.n_vars = len(self.signature.parameters)
 
-    def __repr__(self) -> str:
-        return str(self)
-
     def __str__(self) -> str:
         return str(self.instance(*(
             VariableTerm(v) for v in self.signature.parameters)).resolve())
@@ -220,9 +220,6 @@ class Term(Type):
 
         for c in constraints:
             self.constraints.append(c)
-
-    def __repr__(self) -> str:
-        return str(self)
 
     def __str__(self) -> str:
         res = [str(self.plain)]
@@ -279,9 +276,6 @@ class PlainTerm(Type):
     variables) without constraints. Note that basic types are just 0-ary type
     operators and functions are just particular 2-ary type operators.
     """
-
-    def __repr__(self):
-        return self.__str__()
 
     def __contains__(self, value: PlainTerm) -> bool:
         return value == self or (
@@ -461,8 +455,7 @@ class Operator(Type):
         if self.supertype and not self.basic:
             raise ValueError("only nullary types can have direct supertypes")
 
-    def __repr__(self) -> str:
-        return str(self)
+
 
     def __str__(self) -> str:
         return self.name
