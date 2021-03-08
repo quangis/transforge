@@ -48,32 +48,43 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, **functions: Tuple[Type, int]):
-        self.functions = functions
+    def __init__(self, **signatures: Type):
         self.parser: Optional[pp.Parser] = None
+        self.transformations: Dict[str, Type] = {}
+        self.inputs: Dict[str, Type] = {}
+
+        for k, v in signatures.items():
+            if v.is_function():
+                self.transformations[k] = v
+            else:
+                self.inputs[k] = v
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return "\n".join([
-            f"{k}: {signature}" for k, (signature, _) in self.functions.items()
-        ]) + "\n"
+        return "\n".join(
+            f"{k}: {v}"
+            for k, v in dict(**self.transformations, **self.inputs).items()
+        ) + "\n"
 
     def generate_parser(self) -> pp.Parser:
 
-        identifier = pp.Word(pp.alphanums + ':_').setName('identifier')
+        ident = pp.Word(pp.alphanums + ':_').setName('identifier')
 
-        function = pp.MatchFirst(
-            pp.CaselessKeyword(keyword) + data_args * identifier
-            if data_args else
-            pp.CaselessKeyword(keyword)
-            for keyword, (signature, data_args) in self.functions.items()
+        transformation = pp.MatchFirst(
+            pp.CaselessKeyword(kw) for kw in self.transformations
         ).setParseAction(
-            lambda s, l, t: Expr(t, self.functions[t[0]][0].instance())
+            lambda s, l, t: Expr(t, self.transformations[t[0]].instance())
         )
 
-        return pp.infixNotation(function, [(
+        data = pp.MatchFirst(
+            pp.CaselessKeyword(kw) + pp.Optional(ident) for kw in self.inputs
+        ).setParseAction(
+            lambda s, l, t: Expr(t, self.inputs[t[0]].instance())
+        )
+
+        return pp.infixNotation(transformation | data, [(
             None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
         )])
 
@@ -87,17 +98,10 @@ class TransformationAlgebra(object):
     @staticmethod
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
         """
-        Create an transformation algebra from any dictionary, filtering out the
-        relevant keys. Relevant keys are those that start with a lowercase
-        symbol and are either a Type or a tuple starting with a Type.
+        Create transformation algebra from an object, filtering out the
+        relevant keys.
         """
-        algebra = TransformationAlgebra()
-        for k, v in obj.items():
-            if k[0].islower():
-                k = k.rstrip("_")
-                if isinstance(v, Type):
-                    algebra.functions[k] = v, 0
-                elif isinstance(v, tuple) and len(v) == 2 \
-                        and isinstance(v[0], Type) and isinstance(v[1], int):
-                    algebra.functions[k] = v[0], v[1]
-        return algebra
+        return TransformationAlgebra(**{
+            k.rstrip("_"): v for k, v in obj.items()
+            if k[0].islower() and isinstance(v, Type)
+        })
