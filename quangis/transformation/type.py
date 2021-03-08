@@ -214,11 +214,14 @@ class Term(Type):
         for c in self.constraints:
             res.append(str(c))
 
-        for v in set(self.plain.variables()):
-            if v.lower:
-                res.append(f"{v} >> {v.lower}")
-            if v.upper:
-                res.append(f"{v} << {v.upper}")
+        variables = []
+        for v in self.plain.variables():
+            if v not in variables:
+                if v.lower:
+                    res.append(f"{v} >> {v.lower}")
+                if v.upper:
+                    res.append(f"{v} << {v.upper}")
+            variables.append(v)
 
         return ' | '.join(res)
 
