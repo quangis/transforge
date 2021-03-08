@@ -1,20 +1,7 @@
 """
 Generic type system. Inspired loosely by Hindley-Milner type inference in
-functional programming languages.
+functional programming languages, as well as Traytel et al (2011).
 """
-# A primer: A type consists of type operators and type variables. Term
-# operators encompass basic types, parameterized types and functions. When
-# applying an argument of type A to a function of type B ** C, the algorithm
-# tries to bind variables in such a way that A becomes equal to B. Constraints
-# can be added to variables to make place further conditions on them;
-# otherwise, variables are universally quantified. Constraints are enforced
-# whenever a relevant variable is bound.
-# When we bind a type to a type variable, binding happens on the type variable
-# object itself. That is why we make fresh copies of generic type
-# expressions before using them or adding constraints to them. This means that
-# pointers are somewhat interwoven --- keep this in mind.
-# To understand the module, I recommend you start by reading the methods of the
-# PlainTerm class.
 from __future__ import annotations
 
 from enum import Enum, auto
@@ -37,17 +24,8 @@ class Variance(Enum):
     just as conservative or more in what output it produces, e.g. β₂ ≤ β₁).
     """
 
-    IN = auto()
     CO = auto()
     CONTRA = auto()
-
-    def __and__(self, other: Variance) -> Variance:
-        if Variance.IN in (self, other):
-            return Variance.IN
-        elif (self == Variance.CO) ^ (other == Variance.CO):
-            return Variance.CONTRA
-        else:
-            return Variance.CO
 
 
 class Type(ABC):
