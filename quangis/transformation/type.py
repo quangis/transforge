@@ -678,19 +678,16 @@ class Constraint(object):
 def operators(
         *ops: Operator,
         param: Optional[Type] = None,
-        at: Optional[int] = None) -> List[PlainTerm]:
+        at: int = None) -> List[PlainTerm]:
     """
     Generate a list of instances of operator terms. Optionally, the generated
     operator terms must contain a certain parameter (at some index, if given).
     """
-    param = param and param.instance().plain
     options: List[PlainTerm] = []
     for op in ops:
-        idx = (range(op.arity) if at is None else [at - 1]) if param else [-1]
-        for i in idx:
+        for i in ([at - 1] if at else range(op.arity)) if param else [-1]:
             if i < op.arity:
                 options.append(op(*(
-                    param if i == j else VariableTerm(wildcard=True)
-                    for j in range(op.arity)
+                    param if param and i == j else _ for j in range(op.arity)
                 )))
     return options
