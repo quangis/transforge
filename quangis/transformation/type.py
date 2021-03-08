@@ -330,15 +330,16 @@ class PlainTerm(Type):
             elif a.operator != b.operator:
                 return False
             else:
-                result = True
+                result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.CO:
                         r = s.subtype(t)
                     elif v == Variance.CONTRA:
                         r = t.subtype(s)
-                    if r is None:
-                        return None
-                    result &= r
+                    if r is False:
+                        return False
+                    elif r is None:
+                        result = None
                 return result
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b.upper and b.upper.subtype(a.operator, True):
@@ -455,8 +456,6 @@ class Operator(Type):
         if self.supertype and not self.basic:
             raise ValueError("only nullary types can have direct supertypes")
 
-
-
     def __str__(self) -> str:
         return self.name
 
@@ -466,12 +465,12 @@ class Operator(Type):
             self.name == other.name
             and self.variance == other.variance)
 
+    def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
+        return OperatorTerm(self, *(p.instance().plain for p in params))
+
     def subtype(self, other: Operator, strict: bool = False) -> bool:
         return ((not strict and self == other) or
             bool(self.supertype and self.supertype.subtype(other)))
-
-    def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
-        return OperatorTerm(self, *(p.instance().plain for p in params))
 
     def instance(self, *args, **kwargs) -> Term:
         Signature().bind(*args, **kwargs)
