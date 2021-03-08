@@ -37,6 +37,15 @@ class Type(ABC):
     def instance(self, *arg: VariableTerm, **kwargs: VariableTerm) -> Term:
         return NotImplemented
 
+    def plain(self) -> PlainTerm:
+        if isinstance(self, PlainTerm):
+            return self
+        elif isinstance(self, Term):
+            #if self.constraints:
+            #    raise ValueError("No")
+            return self._plain
+        return self.instance().plain()
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -53,7 +62,7 @@ class Type(ABC):
         """
 
         return Type.combine(self, other, by=lambda a, b:
-            Term(Function(a.plain, b.plain), *(a.constraints + b.constraints))
+            Term(Function(a._plain, b._plain), *(a.constraints + b.constraints))
         )
 
     def __call__(self, *args: Type) -> Type:
@@ -77,25 +86,21 @@ class Type(ABC):
         if isinstance(self, Schema):
             def σ(*args, **kwargs):
                 t = self.instance(*args, **kwargs)
-                return Term(t.plain, constraint, *t.constraints)
+                return Term(t._plain, constraint, *t.constraints)
             σ.__signature__ = self.signature  # type: ignore
             return Schema(σ)
         else:
             t = self.instance()
-            return Term(t.plain, constraint, *t.constraints)
+            return Term(t._plain, constraint, *t.constraints)
 
     def __matmul__(self, others: Iterable[Type]) -> Constraint:
         """
         Allows us to write typeclass constraints using @.
         """
-        return Constraint(
-            self.instance().plain,
-            *(o.instance().plain for o in others))
+        return Constraint(self.plain(), *(o.plain() for o in others))
 
     def __lshift__(self, other: Type) -> None:
-        a = self.instance().plain
-        b = other.instance().plain
-        a.unify_subtype(b)
+        self.plain().unify_subtype(other.plain())
 
     def __rshift__(self, other: Type) -> None:
         return other.__lshift__(self)
@@ -107,20 +112,16 @@ class Type(ABC):
         return self != other and self >= other
 
     def __le__(self, other: Type) -> Optional[bool]:
-        a = self.instance().plain
-        b = other.instance().plain
-        return a.subtype(b)
+        return self.plain().subtype(other.plain())
 
     def __ge__(self, other: Type) -> Optional[bool]:
-        a = self.instance().plain
-        b = other.instance().plain
-        return b.subtype(a)
+        return self.plain().subtype(other.plain())
 
     def is_function(self) -> bool:
         """
         Does this type represent a function?
         """
-        t = self.instance().plain
+        t = self.plain()
         return isinstance(t, OperatorTerm) and t.operator == Function
 
     @staticmethod
@@ -193,20 +194,20 @@ class Term(Type):
     """
 
     def __init__(self, plain: PlainTerm, *constraints: Constraint):
-        self.plain = plain
+        self._plain = plain
         self.constraints = []
 
         for c in constraints:
             self.constraints.append(c)
 
     def __str__(self) -> str:
-        res = [str(self.plain)]
+        res = [str(self._plain)]
 
         for c in self.constraints:
             res.append(str(c))
 
         variables = []
-        for v in self.plain.variables():
+        for v in self._plain.variables():
             if v not in variables:
                 if v.lower:
                     res.append(f"{v} >> {v.lower}")
@@ -222,16 +223,16 @@ class Term(Type):
 
     def resolve(self) -> Term:
         constraints = [c for c in self.constraints if not c.fulfilled()]
-        t = self.plain.resolve()
-        return Term(t, *constraints)
+        self._plain.resolve()
+        return Term(self._plain, *constraints)
 
     def apply(self, arg: Term) -> Term:
         """
         Apply an argument to a function type to get its output type.
         """
 
-        f = self.plain.follow()
-        x = arg.plain.follow()
+        f = self._plain.follow()
+        x = arg._plain.follow()
 
         if isinstance(f, VariableTerm):
             f.bind(Function(VariableTerm(), VariableTerm()))
@@ -436,7 +437,7 @@ class Operator(Type):
             and self.variance == other.variance)
 
     def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
-        return OperatorTerm(self, *(p.instance().plain for p in params))
+        return OperatorTerm(self, *(p.plain() for p in params))
 
     def subtype(self, other: Operator, strict: bool = False) -> bool:
         return ((not strict and self == other) or
