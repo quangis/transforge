@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from typing import List, Union, Optional, Tuple, Any, Dict
+from typing import List, Union, Optional, Any, Dict
 
 from quangis import error
 from quangis.transformation.type import Term, Type
@@ -99,7 +99,7 @@ class TransformationAlgebra(object):
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
         """
         Create transformation algebra from an object, filtering out the
-        relevant keys.
+        relevant parts: those Type values whose keys start with lowercase.
         """
         return TransformationAlgebra(**{
             k.rstrip("_"): v for k, v in obj.items()
