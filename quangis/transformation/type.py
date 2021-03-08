@@ -480,8 +480,8 @@ class Operator(Type):
     def __lt__(self, other: Operator) -> bool:
         return bool(self.supertype and self.supertype <= other)
 
-    def __call__(self, *params) -> OperatorTerm:  # type: ignore
-        return OperatorTerm(self, *params)
+    def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
+        return OperatorTerm(self, *(p.instance().plain for p in params))
 
     def instance(self, *args, **kwargs) -> Term:
         Signature().bind(*args, **kwargs)
@@ -501,9 +501,9 @@ class OperatorTerm(PlainTerm):
     An instance of an n-ary type constructor.
     """
 
-    def __init__(self, op: Operator, *params: Union[PlainTerm, Operator]):
+    def __init__(self, op: Operator, *params: PlainTerm):
         self.operator = op
-        self.params = [p() if isinstance(p, Operator) else p for p in params]
+        self.params = list(params)
 
         if len(self.params) != self.operator.arity:
             raise ValueError(
