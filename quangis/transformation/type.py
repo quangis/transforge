@@ -525,11 +525,9 @@ class OperatorTerm(PlainTerm):
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, OperatorTerm):
-            return self.operator == other.operator and \
-                all(s.follow() == t.follow()
-                    for s, t in zip(self.params, other.params))
-        else:
-            return False
+            return (self.operator == other.operator and
+                all(s == t for s, t in zip(self.params, other.params)))
+        return False
 
 
 class VariableTerm(PlainTerm):
@@ -550,6 +548,11 @@ class VariableTerm(PlainTerm):
 
     def __str__(self) -> str:
         return "_" if self.wildcard else self.name or f"_{self.id}"
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, VariableTerm) and (self.unified or other.unified):
+            return self.follow() == other.follow()
+        return super().__eq__(other)
 
     def bind(self, t: PlainTerm) -> None:
         assert (not self.unified or t == self.unified), \
