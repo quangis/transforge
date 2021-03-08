@@ -537,6 +537,8 @@ class VariableTerm(PlainTerm):
         cls.counter += 1
 
     def __str__(self) -> str:
+        if self.unified:
+            return str(self.unified)
         return "_" if self.wildcard else self.name or f"_{self.id}"
 
     def __eq__(self, other: object) -> bool:
@@ -633,10 +635,7 @@ class Constraint(object):
         self.fulfilled()
 
     def __str__(self) -> str:
-        return (
-            f"{self.subject.resolve()} @ "
-            f"{[p.resolve() for p in self.objects_initial]}"
-        )
+        return f"{self.subject} @ {self.objects_initial}"
 
     def fulfilled(self) -> bool:
         """
