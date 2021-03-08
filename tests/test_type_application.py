@@ -120,6 +120,10 @@ class TestType(unittest.TestCase):
         self.apply(sum, Set(UInt), Set(UInt))
         self.apply(sum, Bool, error.ViolatedConstraint)
 
+    def test_preserve_subtypes(self):
+        f = Schema(lambda x: x ** x | x @ [Any])
+        self.apply(f, Int, Int)
+
 
 if __name__ == '__main__':
     unittest.main()
