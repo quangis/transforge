@@ -133,7 +133,7 @@ class Type(ABC):
         if any(isinstance(t, Schema) for t in types):
             # A new schematic variable for every such one needed by arguments
             n_vars = [t.n_vars if isinstance(t, Schema) else 0 for t in types]
-            names = list(VariableTerm.names(sum(n_vars)))
+            names = list(varnames(sum(n_vars)))
             params = [
                 Parameter(v, Parameter.POSITIONAL_OR_KEYWORD) for v in names]
             sig = Signature(params)
@@ -619,15 +619,6 @@ class VariableTerm(PlainTerm):
         else:
             raise error.SubtypeMismatch(new, upper)
 
-    @staticmethod
-    def names(n: int, unicode: bool = False) -> Iterable[str]:
-        """
-        Produce some suitable variable names.
-        """
-        base = "τσαβγφψ" if unicode else "xyzuvw"
-        for i in range(n):
-            yield base[i] if n < len(base) else base[0] + str(i + 1)
-
 
 "The special constructor for function types."
 Function = Operator(
@@ -691,3 +682,12 @@ def operators(
                     param if param and i == j else _ for j in range(op.arity)
                 )))
     return options
+
+
+def varnames(n: int, unicode: bool = False) -> Iterable[str]:
+    """
+    Produce some suitable variable names.
+    """
+    base = "τσαβγφψ" if unicode else "xyzuvwabcde"
+    for i in range(n):
+        yield base[i] if n < len(base) else base[0] + str(i + 1)
