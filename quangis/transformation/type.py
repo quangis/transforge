@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
-from typing import Optional, Iterable, Union, Callable, Tuple, List
+from typing import Optional, Iterable, Union, Callable, List
 
 from quangis import error
 
@@ -308,8 +308,8 @@ class PlainTerm(Type):
 
     def subtype(self, other: PlainTerm) -> Optional[bool]:
         """
-        Return True if self is definitely a subtype of other, False if it is
-        definitely not, and None if there is not enough information.
+        Return True if self is (or can be) definitely a subtype of other, False
+        if it is definitely not, and None if there is not enough information.
         """
         a = self.follow()
         b = other.follow()
@@ -334,13 +334,19 @@ class PlainTerm(Type):
                     else:
                         result &= r
                 return result
-        else:
-            if (isinstance(a, VariableTerm) and a.wildcard) or \
-                    (isinstance(b, VariableTerm) and b.wildcard):
+        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
+            if b.upper and b.upper < a.operator:
                 return True
-            # TODO if the upper limit of the subtype is a subtype of the lower
-            # limit of the supertype...
-            pass
+            if b.wildcard:
+                return True
+        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
+            if a.lower and b.operator < a.lower:
+                return False
+            if a.wildcard:
+                return True
+        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
+            if a.lower and b.upper and a.lower < b.upper:
+                return False
         return None
 
     def unify_subtype(self, other: PlainTerm) -> None:
@@ -390,31 +396,6 @@ class PlainTerm(Type):
             else:
                 b.bind(a.skeleton())
                 b.unify_subtype(a)
-
-    def unify(self, other: PlainTerm) -> None:
-        a = self.follow()
-        b = other.follow()
-
-        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
-            if a.operator == b.operator:
-                for v, x, y in zip(a.operator.variance, a.params, b.params):
-                    x.unify(y)
-            else:
-                raise error.TypeMismatch(a, b)
-
-        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
-            a.bind(b)
-
-        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
-            if a in b:
-                raise error.RecursiveType(a, b)
-            a.bind(b)
-
-        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
-            if b in a:
-                raise error.RecursiveType(b, a)
-            else:
-                b.bind(a)
 
     def resolve(self, prefer_lower: bool = True) -> PlainTerm:
         """
@@ -667,7 +648,7 @@ class Constraint(object):
         if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
         elif len(self.objects) == 1:
-            self.subject.unify(self.objects[0])
+            self.subject.unify_subtype(self.objects[0])
             return True
         return False
 

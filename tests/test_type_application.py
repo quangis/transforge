@@ -10,6 +10,7 @@ Str = Operator('Str', supertype=Ord)
 Int = Operator('Int', supertype=Ord)
 UInt = Operator('UInt', supertype=Int)
 T = Operator('T', 1)
+Set = Operator('Set', 1)
 
 
 class TestType(unittest.TestCase):
@@ -83,9 +84,10 @@ class TestType(unittest.TestCase):
             compose(Int ** Str), Str ** UInt,
             Str ** Str)
 
-    #def test_variable_subtype_match(self):
-    #    f = Schema(lambda x: (x ** Any) ** x)
-    #    self.apply(f, Int ** Int, Int)
+    @unittest.skip("I think this one is not correct.")
+    def test_variable_subtype_match(self):
+        f = Schema(lambda x: (x ** Any) ** x)
+        self.apply(f, Int ** Int, Int)
 
     def test_variable_subtype_mismatch(self):
         f = Schema(lambda x: (x ** Int) ** x)
@@ -112,10 +114,15 @@ class TestType(unittest.TestCase):
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq(Int), Bool, error.SubtypeMismatch)
 
-    #def test_order_of_subtype_application_with_constraints(self):
-    #    leq = Schema(lambda α: α ** α ** Bool | α << [Ord, Bool])
-    #    self.apply(leq(Int), UInt, Bool)
-    #    self.apply(leq, Any, error.SubtypeMismatch)
+    def test_order_of_subtype_application_with_constraints(self):
+        leq = Schema(lambda α: α ** α ** Bool | α @ [Ord, Bool])
+        self.apply(leq(Int), UInt, Bool)
+        self.apply(leq, Any, error.ViolatedConstraint)
+
+    def test_constraint(self):
+        sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
+        self.apply(sum, Set(UInt), Set(UInt))
+        self.apply(sum, Bool, error.ViolatedConstraint)
 
 
 if __name__ == '__main__':

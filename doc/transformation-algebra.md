@@ -82,11 +82,7 @@ define a function that applies to both single integers and sets of integers:
 
     >>> sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
     >>> sum(Set(UInt))
-    Set(Int)
-
-**NOTE: This does not work yet. For now, I would use:**
-
-    sum = Schema(lambda α, β: α ** α | α @ [β, Set(β)] | β << Int)
+    Set(UInt)
 
 Additionally, we can constrain a type to a subtype or supertype with, 
 respectively, the `type << type` and `type >> type` operators.
