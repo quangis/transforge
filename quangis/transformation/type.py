@@ -312,7 +312,7 @@ class PlainTerm(Type):
             else:
                 return OperatorTerm(
                     self.operator,
-                    *(p.skeleton() for p in self.params))
+                    *(p.follow().skeleton() for p in self.params))
         else:
             return self
 
@@ -361,9 +361,6 @@ class PlainTerm(Type):
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
         also produces lower and upper bounds on subtypes that it must respect.
-
-        Resulting constraints are a side-effect; use resolve() to consolidate
-        equality.
         """
         a = self.follow()
         b = other.follow()
@@ -406,28 +403,23 @@ class PlainTerm(Type):
 
     def resolve(self, prefer_lower: bool = True) -> PlainTerm:
         """
-        Obtain a version of this type with all unified variables substituted
-        and optionally all subtypes resolved to their most specific type.
-
-        For starters, prefer the lower bound on a variable. After all, a value
-        of type T is also a value of type S for T < S; so the lower bound
-        represents the most specific type without loss of generality.
+        Obtain a version of this type with all eligible variables with subtype
+        constraints resolved to their most specific type.
         """
+        # For starters, prefer the lower bound on a variable. After all, a
+        # value of type T is also a value of type S for T < S; so the lower
+        # bound represents the most specific type without loss of generality.
         a = self.follow()
 
         if isinstance(a, OperatorTerm):
-            return OperatorTerm(
-                a.operator,
-                *(p.resolve(prefer_lower ^ (v == Variance.CONTRA))
-                    for v, p in zip(a.operator.variance, a.params))
-            )
+            for v, p in zip(a.operator.variance, a.params):
+                p.resolve(prefer_lower ^ (v == Variance.CONTRA))
         elif isinstance(a, VariableTerm):
             if prefer_lower and a.lower:
                 a.bind(a.lower())
             elif not prefer_lower and a.upper:
                 a.bind(a.upper())
-            return a.follow()
-        raise ValueError
+        return a.follow()
 
     def instance(self, *args, **kwargs) -> Term:
         Signature().bind(*args, **kwargs)
@@ -541,8 +533,10 @@ class VariableTerm(PlainTerm):
         return "_" if self.wildcard else self.name or f"_{self.id}"
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, VariableTerm) and (self.unified or other.unified):
-            return self.follow() == other.follow()
+        if self.unified:
+            return self.follow() == other
+        elif isinstance(other, VariableTerm) and other.unified:
+            return self == other.follow()
         return super().__eq__(other)
 
     def bind(self, t: PlainTerm) -> None:
