@@ -1,15 +1,16 @@
-# Type inference for a transformation algebra
+# transformation_algebra
 
-A transformation algebra describes abstract transformations in some domain. An 
-expression of such an algebra should have an interpretation, but there is not 
-necessarily any concrete data structure or implementation assigned to it. The 
-algebra simply describes what type of data some tool can take, and what type 
-of data it produces.
+A transformation algebra describes abstract transformations of tools in some 
+domain. An expression of such an algebra should have an interpretation, but 
+there is not necessarily any concrete data structure or implementation 
+assigned to it. The algebra simply describes what type of data some tool can 
+take, and what type of data it produces.
 
-To define such an algebra, we implemented a type inference system in Python. 
-To make it work, some magic happens under the hood; for now, refer to the 
-[source code](../quangis/transformation/type.py) to gain a deeper 
-understanding. This document is merely intended to be a user's guide.
+To define such an algebra, we implemented a **type inference system** in 
+Python. The system accepts **subtypes**. To make it work, some magic happens 
+under the hood; for now, refer to the [source 
+code](../quangis/transformation/type.py) to gain a deeper understanding. This 
+document is merely intended to be a user's guide.
 
 
 ## Concrete types and subtypes
@@ -17,7 +18,7 @@ understanding. This document is merely intended to be a user's guide.
 We first need to declare some bacic type signatures. For this, we use the 
 `Operator` class. 
 
-    >>> from quangis.transformation.type import Operator
+    >>> from transformation_algebra.type import Operator
     >>> Any = Operator("Any")
 
 Basic types may have supertypes. For instance, anything of type `Int` is also 
@@ -65,7 +66,7 @@ the signature `Int ** Int` also applies to `UInt ** Int` or indeed to `Int **
 Any`. We additionally allow *parametric polymorphism*, using the `Schema` 
 class.
 
-    >>> from quangis.transformation.type import Schema
+    >>> from transformation_algebra.type import Schema
     >>> compose = Schema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
     >>> compose(abs, add(Int))
     Int ** UInt
@@ -79,7 +80,7 @@ the schema, these variables are automatically populated.
 Note that, when you need a variable but you don't care about what variable it 
 is or how it relates to others, you may use the `_` *wildcard variable*.
 
-    >>> from quangis.transformation.type import _
+    >>> from transformation_algebra.type import _
     >>> size = Set(_) ** Int
 
 Often, variables in a schema are not universally quantified, but *constrained* 
@@ -98,7 +99,7 @@ define a function that applies to both single integers and sets of integers:
 Once we have created our types, we may define the `TransformationAlgebra` that 
 will read expressions of the algebra.
 
-    >>> from quangis.transformation.algebra import TransformationAlgebra
+    >>> from transformation_algebra.expr import TransformationAlgebra
     >>> algebra = TransformationAlgebra(
             number=Int,
             abs=Int ** UInt,

@@ -1,7 +1,7 @@
 import unittest
 
-from quangis import error
-from quangis.transformation.type import Operator, Schema
+from transformation_algebra import error
+from transformation_algebra.type import Operator, Schema
 
 Any = Operator('Any')
 Ord = Operator('Ord', supertype=Any)

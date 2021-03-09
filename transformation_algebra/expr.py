@@ -8,8 +8,8 @@ import pyparsing as pp
 from functools import reduce
 from typing import List, Union, Optional, Any, Dict
 
-from quangis import error
-from quangis.transformation.type import Term, Type
+from transformation_algebra import error
+from transformation_algebra.type import Term, Type
 
 
 class Expr(object):

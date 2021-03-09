@@ -11,7 +11,7 @@ from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
 from typing import Optional, Iterable, Union, Callable, List
 
-from quangis import error
+from transformation_algebra import error
 
 
 class Variance(Enum):
