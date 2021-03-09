@@ -76,6 +76,12 @@ with an anonymous Python function, its parameters declaring the variables that
 occur in its body, akin to *quantifying* those variables. When *instantiating* 
 the schema, these variables are automatically populated.
 
+Note that, when you need a variable but you don't care about what variable it 
+is or how it relates to others, you may use the `_` *wildcard variable*.
+
+    >>> from quangis.transformation.type import _
+    >>> size = Set(_) ** Int
+
 Often, variables in a schema are not universally quantified, but *constrained* 
 to some typeclass. We can use the `type | constraint` operator to attach 
 constraints to a term, and the `type @ [types]` operator to say that a type 
