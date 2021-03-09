@@ -99,12 +99,6 @@ class Type(ABC):
         """
         return Constraint(self.plain(), *(o.plain() for o in others))
 
-    def __lshift__(self, other: Type) -> None:
-        self.plain().unify_subtype(other.plain())
-
-    def __rshift__(self, other: Type) -> None:
-        return other.__lshift__(self)
-
     def __lt__(self, other: Type) -> Optional[bool]:
         return self != other and self <= other
 
@@ -210,9 +204,9 @@ class Term(Type):
         for v in self._plain.variables():
             if v not in variables:
                 if v.lower:
-                    res.append(f"{v} >> {v.lower}")
+                    res.append(f"{v} >= {v.lower}")
                 if v.upper:
-                    res.append(f"{v} << {v.upper}")
+                    res.append(f"{v} <= {v.upper}")
             variables.append(v)
 
         return ' | '.join(res)

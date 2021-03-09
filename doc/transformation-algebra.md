@@ -92,9 +92,6 @@ define a function that applies to both single integers and sets of integers:
     >>> sum(Set(UInt))
     Set(UInt)
 
-Additionally, we can constrain a type to a subtype or supertype with, 
-respectively, the `type << type` and `type >> type` operators.
-
 
 ## Algebra and expressions
 
