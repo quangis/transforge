@@ -1,4 +1,6 @@
-# transformation_algebra
+# transformation-algebra
+
+[![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
 A transformation algebra describes abstract transformations of tools in some 
 domain. An expression of such an algebra should have an interpretation, but 
@@ -9,8 +11,9 @@ take, and what type of data it produces.
 To define such an algebra, we implemented a **type inference system** in 
 Python. The system accepts **subtypes**. To make it work, some magic happens 
 under the hood; for now, refer to the [source 
-code](../quangis/transformation/type.py) to gain a deeper understanding. This 
-document is merely intended to be a user's guide.
+code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
+to gain a deeper understanding. This document is merely intended to be a 
+user's guide.
 
 
 ## Concrete types and subtypes
