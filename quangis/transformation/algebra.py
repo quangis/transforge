@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import pyparsing as pp
 from functools import reduce
-from typing import List, Iterable, Union, Optional
+from typing import List, Union, Optional, Any, Dict
 
 from quangis import error
-from quangis.transformation.type import AlgebraType, Definition
+from quangis.transformation.type import Term, Type
 
 
 class Expr(object):
@@ -17,7 +17,7 @@ class Expr(object):
     An expression of a transformation algebra.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: AlgebraType):
+    def __init__(self, tokens: List[Union[str, Expr]], type: Term):
         self.tokens = tokens
         self.type = type
 
@@ -27,15 +27,17 @@ class Expr(object):
             for t in self.tokens
         )
         if top_level:
-            constraints = [str(c) for c in self.type.all_constraints()]
-            if constraints:
-                return f"{expr} : {self.type} (where {', '.join(constraints)})"
-            else:
-                return f"{expr} : {self.type}"
+            return f"{expr} : {self.type}"
         elif len(self.tokens) == 1:
             return f"{expr}"
         else:
             return f"({expr})"
+
+    def resolve(self) -> None:
+        self.type = self.type.resolve()
+        for token in self.tokens:
+            if isinstance(token, Expr):
+                token.resolve()
 
     def apply(self: Expr, arg: Expr) -> Expr:
         try:
@@ -46,61 +48,60 @@ class Expr(object):
 
 
 class TransformationAlgebra(object):
-    """
-    To define a transformation algebra, make an instance of this class. Any
-    properties (starting with lowercase) that are `Definition`s or can be
-    translated to such via its constructor will be considered functions of the
-    transformation algebra.
-    """
-
-    def __init__(self):
+    def __init__(self, **signatures: Type):
         self.parser: Optional[pp.Parser] = None
+        self.transformations: Dict[str, Type] = {}
+        self.inputs: Dict[str, Type] = {}
 
-    def __setattr__(self, prop, value):
-        """
-        Makes sure definitions do not have to be tediously written out: any
-        lowercase attribute containing a type, or a tuple beginning with a
-        type, will also be converted into a `Definition`.
-        """
-        if prop[0].islower() and (isinstance(value, AlgebraType) or (
-                    isinstance(value, tuple) and
-                    isinstance(value[0], AlgebraType))
-                ):
-            # Invalidate parser
-            self.parser = None
-            name = "in" if prop == "in_" else prop
-            args = value if isinstance(value, Iterable) else (value,)
-            super().__setattr__(prop, Definition(name, *args))
-        else:
-            super().__setattr__(prop, value)
+        for k, v in signatures.items():
+            if v.is_function():
+                self.transformations[k] = v
+            else:
+                self.inputs[k] = v
 
-    def definitions(self) -> Iterable[Definition]:
-        """
-        Obtain the definitions of this algebra.
-        """
-        for attr in dir(self):
-            val = getattr(self, attr)
-            if isinstance(val, Definition):
-                yield val
+    def __repr__(self) -> str:
+        return str(self)
 
-    def make_parser(self) -> pp.Parser:
+    def __str__(self) -> str:
+        return "\n".join(
+            f"{k}: {v}"
+            for k, v in dict(**self.transformations, **self.inputs).items()
+        ) + "\n"
 
-        defs = {d.name: d for d in self.definitions()}
+    def generate_parser(self) -> pp.Parser:
 
-        identifier = pp.Word(pp.alphanums + ':_').setName('identifier')
+        ident = pp.Word(pp.alphanums + ':_').setName('identifier')
 
-        function = pp.MatchFirst(
-            pp.CaselessKeyword(d.name) + d.data * identifier
-            if d.data else
-            pp.CaselessKeyword(d.name)
-            for k, d in defs.items()
-        ).setParseAction(lambda s, l, t: Expr(t, defs[t[0]].instance()))
+        transformation = pp.MatchFirst(
+            pp.CaselessKeyword(kw) for kw in self.transformations
+        ).setParseAction(
+            lambda s, l, t: Expr(t, self.transformations[t[0]].instance())
+        )
 
-        return pp.infixNotation(function, [(
+        data = pp.MatchFirst(
+            pp.CaselessKeyword(kw) + pp.Optional(ident) for kw in self.inputs
+        ).setParseAction(
+            lambda s, l, t: Expr(t, self.inputs[t[0]].instance())
+        )
+
+        return pp.infixNotation(transformation | data, [(
             None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
         )])
 
     def parse(self, string: str) -> Expr:
         if not self.parser:
-            self.parser = self.make_parser()
-        return self.parser.parseString(string, parseAll=True)[0]
+            self.parser = self.generate_parser()
+        expr = self.parser.parseString(string, parseAll=True)[0]
+        expr.resolve()
+        return expr
+
+    @staticmethod
+    def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
+        """
+        Create transformation algebra from an object, filtering out the
+        relevant parts: those Type values whose keys start with lowercase.
+        """
+        return TransformationAlgebra(**{
+            k.rstrip("_"): v for k, v in obj.items()
+            if k[0].islower() and isinstance(v, Type)
+        })

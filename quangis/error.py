@@ -80,7 +80,22 @@ class TypeMismatch(AlgebraTypeError):
         return (
             super().__str__() +
             "Type mismatch. Could not unify:\n"
-            f"\t\033[1m{self.t1}\033[0m with \033[1m{self.t2}\033[0m"
+            f"\t{self.t1} with {self.t2}"
+        )
+
+
+class SubtypeMismatch(AlgebraTypeError):
+    def __init__(self, c1, c2):
+        self.c1 = c1
+        self.c2 = c2
+        self.fn = None
+        self.arg = None
+
+    def __str__(self) -> str:
+        return (
+            super().__str__() +
+            "Subtype mismatch. Could not satisfy:\n"
+            f"\t{self.c1} <= {self.c2}"
         )
 
 
@@ -104,15 +119,4 @@ class NonFunctionApplication(AlgebraTypeError):
         return (
             super().__str__() +
             f"Cannot apply {self.arg} to non-function {self.fn}"
-        )
-
-
-class AlreadyBound(AlgebraTypeError):
-    def __init__(self, var):
-        self.var = var
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"Variable {self.arg} was already bound"
         )
