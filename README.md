@@ -84,14 +84,23 @@ is or how it relates to others, you may use the `_` *wildcard variable*.
     >>> size = Set(_) ** Int
 
 Often, variables in a schema are not universally quantified, but *constrained* 
-to some typeclass. We can use the `type | constraint` operator to attach 
-constraints to a term, and the `type @ [types]` operator to say that a type 
-must be the same as one of the given types. For instance, we might want to 
-define a function that applies to both single integers and sets of integers:
+to some typeclass. We can use the `t | c` operator to attach a typeclass 
+constraint `c` to a term `t`. `c` can then specify the typeclass in an ad-hoc 
+manner, using the `t @ [ts]` operator (meaning that a term `t` must be a 
+subtype of one of the types specified in `[ts]`). For instance, we might want 
+to define a function that applies to both single integers and sets of 
+integers:
 
     >>> sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
     >>> sum(Set(UInt))
     Set(UInt)
+
+Finally, `operators` is a helper function for specifying typeclasses: it 
+generates type terms that contain certain parameters.
+
+    >>> Map = Operator("Map", 2)
+    >>> operators(Map, param=Int)
+    [Map(Int, _), Map(_, Int)]
 
 
 ## Algebra and expressions
