@@ -93,11 +93,15 @@ class Type(ABC):
             t = self.instance()
             return Term(t._plain, constraint, *t.constraints)
 
-    def __matmul__(self, others: Iterable[Type]) -> Constraint:
+    def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
         """
         Allows us to write typeclass constraints using @.
         """
-        return Constraint(self.plain(), *(o.plain() for o in others))
+        if isinstance(other, Type):
+            constraints = [other.plain()]
+        else:
+            constraints = list(o.plain() for o in other)
+        return Constraint(self.plain(), *constraints)
 
     def __lt__(self, other: Type) -> Optional[bool]:
         return self != other and self <= other
