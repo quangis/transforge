@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import Operator, Schema
+from transformation_algebra.type import Operator, Schema, _, VariableTerm
 
 Any = Operator('Any')
 Ord = Operator('Ord', supertype=Any)
@@ -89,13 +89,12 @@ class TestType(unittest.TestCase):
         f = Schema(lambda x: (x ** Int) ** x)
         self.apply(f, Int ** Any, error.SubtypeMismatch)
 
-    def test_weird(self):
+    def test_functions_as_arguments1(self):
         swap = Schema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
-        f = Int ** Int ** Int
-        x = UInt
-        self.apply(swap(f, x), x, Int)
+        f = Schema(lambda x: Bool ** x ** x)
+        self.apply(swap(f, UInt), Bool, UInt)
 
-    def test_functions_as_arguments(self):
+    def test_functions_as_arguments2(self):
         id = Schema(lambda x: x ** x)
         f = Int ** Int
         x = UInt
@@ -115,14 +114,39 @@ class TestType(unittest.TestCase):
         self.apply(leq(Int), UInt, Bool)
         self.apply(leq, Any, error.ViolatedConstraint)
 
-    def test_constraint(self):
+    def test_violation_of_constraints(self):
         sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
         self.apply(sum, Set(UInt), Set(UInt))
         self.apply(sum, Bool, error.ViolatedConstraint)
 
-    def test_preserve_subtypes(self):
+    def test_preservation_of_basic_subtypes_in_constraints(self):
         f = Schema(lambda x: x ** x | x @ [Any])
         self.apply(f, Int, Int)
+
+    def test_unification_of_compound_types_in_constraints(self):
+        f = Schema(lambda xs, x: xs ** x | xs @ [Set(x), T(x)])
+        self.apply(f, T(Int), Int)
+
+    def test_subtyping_of_concrete_functions(self):
+        self.assertTrue(Int ** Int <= UInt ** Int)
+        self.assertTrue(Int ** Int <= Int ** Any)
+        self.assertFalse(Int ** Int <= Any ** Int)
+        self.assertFalse(Int ** Int <= Int ** UInt)
+
+    def test_subtyping_of_variable_functions(self):
+        x = VariableTerm()
+        self.assertEqual(x ** Int <= UInt ** Int, None)
+        self.assertEqual(Int ** x <= Int ** Any, None)
+        self.assertEqual(Int ** Int <= x ** Int, None)
+        self.assertEqual(Int ** Int <= Int ** x, None)
+
+    def test_subtyping_of_wildcard_functions(self):
+        self.assertTrue(_ ** Int <= UInt ** Int)
+        self.assertTrue(Int ** _ <= Int ** Any)
+        self.assertTrue(Int ** Int <= _ ** Int)
+        self.assertTrue(Int ** Int <= Int ** _)
+        self.assertFalse(_ ** Any <= UInt ** Int)
+        self.assertFalse(UInt ** _ <= Int ** Any)
 
 
 if __name__ == '__main__':
