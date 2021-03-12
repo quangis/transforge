@@ -21,7 +21,7 @@ user's guide.
 We first need to declare some bacic type signatures. For this, we use the 
 `Operator` class. 
 
-    >>> from transformation_algebra.type import Operator
+    >>> from transformation_algebra import Operator
     >>> Any = Operator("Any")
 
 Basic types may have supertypes. For instance, anything of type `Int` is also 
@@ -69,7 +69,7 @@ the signature `Int ** Int` also applies to `UInt ** Int` or indeed to `Int **
 Any`. We additionally allow *parametric polymorphism*, using the `Schema` 
 class.
 
-    >>> from transformation_algebra.type import Schema
+    >>> from transformation_algebra import Schema
     >>> compose = Schema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
     >>> compose(abs, add(Int))
     Int ** UInt
@@ -83,7 +83,7 @@ the schema, these variables are automatically populated.
 Note that, when you need a variable but you don't care about what variable it 
 is or how it relates to others, you may use the `_` *wildcard variable*.
 
-    >>> from transformation_algebra.type import _
+    >>> from transformation_algebra import _
     >>> size = Set(_) ** Int
 
 Often, variables in a schema are not universally quantified, but *constrained* 
@@ -111,7 +111,7 @@ generates type terms that contain certain parameters.
 Once we have created our types, we may define the `TransformationAlgebra` that 
 will read expressions of the algebra.
 
-    >>> from transformation_algebra.expr import TransformationAlgebra
+    >>> from transformation_algebra import TransformationAlgebra
     >>> algebra = TransformationAlgebra(
             number=Int,
             abs=Int ** UInt,
