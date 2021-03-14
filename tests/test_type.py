@@ -127,11 +127,25 @@ class TestType(unittest.TestCase):
         f = Schema(lambda xs, x: xs ** x | xs @ [Set(x), T(x)])
         self.apply(f, T(Int), Int)
 
-    def test_global_subtype_resolution(self):
+    def test_multiple_bounds1(self):
+        """
+        This works because UInt ** UInt is acceptable for Int ** UInt.
+        """
         f = Schema(lambda x: (x ** x) ** x)
-        self.apply(f, UInt ** Int, Int)
-        g = Schema(lambda x: x ** (x ** x) ** x)
-        self.apply(g(UInt), UInt ** Int, Int)
+        self.apply(f, Int ** UInt, UInt)
+
+    def test_multiple_bounds2(self):
+        """
+        This doesn't work because the upper bound UInt cannot be reconciled
+        with the lower bound Int.
+        """
+        f = Schema(lambda x: (x ** x) ** x)
+        self.apply(f, UInt ** Int, error.SubtypeMismatch)
+
+    def test_global_subtype_resolution(self):
+        f = Schema(lambda x: x ** (x ** x) ** x)
+        self.apply(f(UInt), Int ** UInt, UInt)
+        self.apply(f(Int), Int ** UInt, Int)
 
     def test_subtyping_of_concrete_functions(self):
         self.assertTrue(Int ** Int <= UInt ** Int)
