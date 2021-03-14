@@ -127,6 +127,12 @@ class TestType(unittest.TestCase):
         f = Schema(lambda xs, x: xs ** x | xs @ [Set(x), T(x)])
         self.apply(f, T(Int), Int)
 
+    def test_global_subtype_resolution(self):
+        f = Schema(lambda x: (x ** x) ** x)
+        self.apply(f, UInt ** Int, Int)
+        g = Schema(lambda x: x ** (x ** x) ** x)
+        self.apply(g(UInt), UInt ** Int, Int)
+
     def test_subtyping_of_concrete_functions(self):
         self.assertTrue(Int ** Int <= UInt ** Int)
         self.assertTrue(Int ** Int <= Int ** Any)
