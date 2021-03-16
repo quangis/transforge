@@ -131,7 +131,7 @@ class TestType(unittest.TestCase):
         too loose a bound.
         """
         f = Schema(lambda x: x ** x | x @ [Map(Str, Int)])
-        result = f(_).plain().follow()  # TODO make follow unnecessary
+        result = f(_).plain()
         self.assertEqual(result.operator, Map)
 
     def test_multiple_bounds1(self):

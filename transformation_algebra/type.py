@@ -222,7 +222,7 @@ class Term(Type):
     def resolve(self) -> Term:
         constraints = [c for c in self.constraints if not c.fulfilled()]
         self._plain.resolve()
-        return Term(self._plain, *constraints)
+        return Term(self._plain.follow(), *constraints)
 
     def apply(self, arg: Term) -> Term:
         """
