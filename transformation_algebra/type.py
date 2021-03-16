@@ -259,17 +259,6 @@ class PlainTerm(Type):
             isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
 
-    def basics(self, follow: bool = True) -> Iterable[OperatorTerm]:
-        """
-        Find the basic types (optionally only those non-unified).
-        """
-        a = self.follow() if follow else self
-        if isinstance(a, OperatorTerm):
-            if a.operator.basic:
-                yield a
-            for t in chain(*(t.basics(follow) for t in a.params)):
-                yield t
-
     def variables(self) -> Iterable[VariableTerm]:
         """
         Obtain all type variables currently in the type expression.
@@ -627,30 +616,21 @@ class Constraint(object):
         fulfilled and need not be enforced any longer.
         """
         compatibility = [self.subject.subtype(t) for t in self.objects]
-        self.objects = [
-            t for t, c in zip(self.objects, compatibility) if c is not False
-        ]
+        self.objects = [t for t, c in zip(self.objects, compatibility)
+            if c is not False]
 
         if len(self.objects) == 0:
             raise error.ViolatedConstraint(self)
 
+        # If there is only one possibility left, we can unify, but *only* with
+        # the skeleton: the base types must remain variable, because we don't
+        # want to resolve against an overly loose subtype bound.
         elif len(self.objects) == 1:
-            obj = self.objects[0]
+            self.subject.unify(self.objects[0].skeleton())
 
-            # This only works if there are no non-unified basic types, because
-            # we might be looking for a subtype of that basic type. In that
-            # case, we don't want to unify already, because the variable would
-            # be resolved against an overly loose bound
-            if not any(obj.basics(follow=False)):
-                self.subject.unify(obj, subtype=False)
-                return True
-
-        # A constraint is also fulfilled if the subject is fully concrete and
-        # there is at least one definitely compatible object
-        if not any(self.subject.variables()) and any(compatibility):
-            return True
-
-        return False
+        # Fulfillment is achieved if the subject is fully concrete and there is
+        # at least one definitely compatible object
+        return not any(self.subject.variables()) and any(compatibility)
 
 
 def operators(

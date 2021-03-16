@@ -123,15 +123,16 @@ class TestType(unittest.TestCase):
         f = Schema(lambda xs, x: xs ** x | xs @ [Set(x), T(x)])
         self.apply(f, T(Int), Int)
 
-    @unittest.skip("This feature is not available yet.")
     def test_non_unification_of_base_types(self):
         """
         We cannot unify with base types from constraints, because they might
         also be subtypes. So in this case, we know that x is a Map, but we
-        don't know anything else.
+        don't know that its parameters are exactly Str and Int: that might be
+        too loose a bound.
         """
         f = Schema(lambda x: x ** x | x @ [Map(Str, Int)])
-        self.apply(f, _, Map(_, _))
+        result = f(_).plain().follow()  # TODO make follow unnecessary
+        self.assertEqual(result.operator, Map)
 
     def test_multiple_bounds1(self):
         """
