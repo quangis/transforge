@@ -237,7 +237,7 @@ class Term(Type):
             f = f.follow()
 
         if isinstance(f, OperatorTerm) and f.operator == Function:
-            x.unify_subtype(f.params[0])
+            x.unify(f.params[0], subtype=True)
             f.resolve()
             return Term(
                 f.params[1],
@@ -259,7 +259,7 @@ class PlainTerm(Type):
             isinstance(self, OperatorTerm) and
             any(value in t for t in self.params))
 
-    def basics(self, follow: bool = True) -> Iterable[TermOperator]:
+    def basics(self, follow: bool = True) -> Iterable[OperatorTerm]:
         """
         Find the basic types (optionally only those non-unified).
         """
@@ -267,7 +267,7 @@ class PlainTerm(Type):
         if isinstance(a, OperatorTerm):
             if a.operator.basic:
                 yield a
-            for t in chain(*(t.basics(follow) for t in self.params)):
+            for t in chain(*(t.basics(follow) for t in a.params)):
                 yield t
 
     def variables(self) -> Iterable[VariableTerm]:
@@ -344,7 +344,7 @@ class PlainTerm(Type):
                 return False
         return None
 
-    def unify_subtype(self, other: PlainTerm) -> None:
+    def unify(self, other: PlainTerm, subtype: bool = False) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables to terms,
@@ -355,14 +355,16 @@ class PlainTerm(Type):
 
         if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
             if a.operator.basic:
-                if not a.operator.subtype(b.operator):
+                if subtype and not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
+                elif not subtype and not a.operator != b.operator:
+                    raise error.TypeMismatch(a, b)
             elif a.operator == b.operator:
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        x.unify_subtype(y)
+                        x.unify(y, subtype=subtype)
                     elif v == Variance.CONTRA:
-                        y.unify_subtype(x)
+                        y.unify(x, subtype=subtype)
                     else:
                         raise ValueError
             else:
@@ -375,19 +377,25 @@ class PlainTerm(Type):
             if a in b:
                 raise error.RecursiveType(a, b)
             elif b.operator.basic:
-                a.below(b.operator)
+                if subtype:
+                    a.below(b.operator)
+                else:
+                    a.bind(b)
             else:
                 a.bind(b.skeleton())
-                a.unify_subtype(b)
+                a.unify(b, subtype=subtype)
 
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
             if b in a:
                 raise error.RecursiveType(b, a)
             elif a.operator.basic:
-                b.above(a.operator)
+                if subtype:
+                    b.above(a.operator)
+                else:
+                    b.bind(a)
             else:
                 b.bind(a.skeleton())
-                b.unify_subtype(a)
+                b.unify(a, subtype=subtype)
 
     def resolve(self, prefer_lower: bool = True) -> PlainTerm:
         """
@@ -640,7 +648,7 @@ class Constraint(object):
             # case, we don't want to unify already, because the variable would
             # be resolved against an overly loose bound
             if not any(obj.basics(follow=False)):
-                self.subject.unify_subtype(obj)
+                self.subject.unify(obj, subtype=False)
                 return True
 
         # A constraint is also fulfilled if the subject is fully concrete and
