@@ -11,6 +11,7 @@ Int = Operator('Int', supertype=Ord)
 UInt = Operator('UInt', supertype=Int)
 T = Operator('T', 1)
 Set = Operator('Set', 1)
+Map = Operator('Map', 2)
 
 
 class TestType(unittest.TestCase):
@@ -80,11 +81,6 @@ class TestType(unittest.TestCase):
             compose(Int ** Str), Str ** UInt,
             Str ** Str)
 
-    @unittest.skip("I think this one is not correct.")
-    def test_variable_subtype_match(self):
-        f = Schema(lambda x: (x ** Any) ** x)
-        self.apply(f, Int ** Int, Int)
-
     def test_variable_subtype_mismatch(self):
         f = Schema(lambda x: (x ** Int) ** x)
         self.apply(f, Int ** Any, error.SubtypeMismatch)
@@ -126,6 +122,16 @@ class TestType(unittest.TestCase):
     def test_unification_of_compound_types_in_constraints(self):
         f = Schema(lambda xs, x: xs ** x | xs @ [Set(x), T(x)])
         self.apply(f, T(Int), Int)
+
+    @unittest.skip("This feature is not available yet.")
+    def test_non_unification_of_base_types(self):
+        """
+        We cannot unify with base types from constraints, because they might
+        also be subtypes. So in this case, we know that x is a Map, but we
+        don't know anything else.
+        """
+        f = Schema(lambda x: x ** x | x @ [Map(Str, Int)])
+        self.apply(f, _, Map(_, _))
 
     def test_multiple_bounds1(self):
         """
