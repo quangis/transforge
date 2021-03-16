@@ -402,9 +402,6 @@ class PlainTerm(Type):
         Obtain a version of this type with all eligible variables with subtype
         constraints resolved to their most specific type.
         """
-        # For starters, prefer the lower bound on a variable. After all, a
-        # value of type T is also a value of type S for T < S; so the lower
-        # bound represents the most specific type without loss of generality.
         a = self.follow()
 
         if isinstance(a, OperatorTerm):
@@ -602,12 +599,9 @@ class VariableTerm(PlainTerm):
 
 
 "The special constructor for function types."
-Function = Operator(
-    'Function',
-    params=(Variance.CONTRA, Variance.CO)
-)
+Function = Operator('Function', params=(Variance.CONTRA, Variance.CO))
 
-"A wildcard: produces an unrelated variable, to be matched with anything."
+"A wildcard: fresh variable, unrelated to, and matchable with, anything else."
 _ = Schema(lambda: VariableTerm(wildcard=True))
 
 
