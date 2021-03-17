@@ -2,15 +2,20 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation algebra describes abstract transformations of tools in some 
-domain. An expression of such an algebra should have an interpretation, but 
-there is not necessarily any concrete data structure or implementation 
-assigned to it. The algebra simply describes what type of data some tool can 
-take, and what type of data it produces.
+A transformation algebra describes *tools* (in some domain) in terms of the 
+*abstract data transformations* they represent. An expression of such an 
+algebra has an interpretation, but there is not necessarily any concrete data 
+structure or implementation assigned to it. It merely describes the 
+*conceptual* properties of a tool's input and output that are deemed relevant.
 
-To define such an algebra, we implemented a **type inference system** in 
-Python. The system accepts **subtypes**. To make it work, some magic happens 
-under the hood; for now, refer to the [source 
+To define such an algebra, we implemented **type inference** in Python. The 
+system accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) 
+and [bounded parametric 
+polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism), which, 
+divorced from implementation, enable unusually powerful inference.
+
+To make it work, some magic happens under the hood; for now, refer to the 
+[source 
 code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
 to gain a deeper understanding. This document is merely intended to be a 
 user's guide.
@@ -18,13 +23,12 @@ user's guide.
 
 ## Concrete types and subtypes
 
-We first need to declare some bacic type signatures. For this, we use the 
-`Operator` class. 
+We first need to declare *base types*. For this, we use the `Operator` class. 
 
     >>> from transformation_algebra import Operator
     >>> Any = Operator("Any")
 
-Basic types may have supertypes. For instance, anything of type `Int` is also 
+Base types may have supertypes. For instance, anything of type `Int` is also 
 automatically of type `Any`, but not necessarily of type `UInt`:
 
     >>> Int = Operator("Int", supertype=Any)
@@ -34,17 +38,17 @@ automatically of type `Any`, but not necessarily of type `UInt`:
     >>> Int <= UInt
     False
 
-Higher-order types take other types as parameters, allowing us to combine 
-types. For example, `Set(Int)` could represent a set of integers. Note that 
-this is automatically a subtype of `Set(Any)`.
+*Complex types* take other types as parameters. For example, `Set(Int)` could 
+represent a set of integers. This would automatically be a subtype of 
+`Set(Any)`.
 
     >>> Set = Operator("Set", 1)
     >>> Set(Int) <= Set(Any)
     True
 
-A special higher-order type is `Function`, which describes a transformation. 
-For convenience, to create functions, the right-associative infix operator 
-`**` has been overloaded, resembling the function arrow. A function that takes 
+A special complex type is `Function`, which describes a transformation. For 
+convenience, to create functions, the right-associative infix operator `**` 
+has been overloaded, resembling the function arrow. A function that takes 
 multiple types can be [rewritten](https://en.wikipedia.org/wiki/Currying) to a 
 sequence of functions.
 
@@ -80,8 +84,10 @@ with an anonymous Python function, its parameters declaring the variables that
 occur in its body, akin to *quantifying* those variables. When *instantiating* 
 the schema, these variables are automatically populated.
 
-Note that, when you need a variable but you don't care about what variable it 
-is or how it relates to others, you may use the `_` *wildcard variable*.
+When you need a variable but you don't care about what variable it is or how 
+it relates to others, you may use the `_` *wildcard variable*. The purpose 
+goes beyond convenience: it communicates to the type system that it can always 
+be a sub- and supertype of *anything*.
 
     >>> from transformation_algebra import _
     >>> size = Set(_) ** Int
