@@ -12,13 +12,15 @@ To define such an algebra, we implemented **type inference** in Python. The
 system accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) 
 and [bounded parametric 
 polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism), which, 
-divorced from implementation, enable unusually powerful inference.
-
-To make it work, some magic happens under the hood; for now, refer to the 
-[source 
+divorced from implementation, enable unusually powerful inference. To make it 
+work, some magic happens under the hood; for now, refer to the [source 
 code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
 to gain a deeper understanding. This document is merely intended to be a 
 user's guide.
+
+This library was developed for the transformation algebra for core concepts of 
+geographical information, [CCT](https://github.com/quangis/cct). It can act as 
+a usage example.
 
 
 ## Concrete types and subtypes
