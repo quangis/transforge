@@ -2,30 +2,32 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation algebra describes *tools* (in some domain) in terms of the 
-*abstract data transformations* they represent. An expression of such an 
-algebra has an interpretation, but there is not necessarily any concrete data 
-structure or implementation assigned to it. It merely describes the 
-*conceptual* properties of a tool's input and output that are deemed relevant.
+A transformation algebra describes *tools* (in some domain) as *abstract data 
+transformations*. An expression of such an algebra has an interpretation, but 
+there is not necessarily any concrete data structure or implementation 
+assigned to it. It merely describes its input and output in terms of some 
+*conceptual* properties that are deemed relevant.
 
 To define such an algebra, we implemented **type inference** in Python. The 
 system accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) 
-and [bounded parametric 
+and [parametric 
 polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism), which, 
-divorced from implementation, enable unusually powerful inference. To make it 
-work, some magic happens under the hood; for now, refer to the [source 
+divorced from implementation, enable unusually powerful type inference. To 
+make it work, some magic happens under the hood --- for now, refer to the 
+[source 
 code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
 to gain a deeper understanding. This document is merely intended to be a 
 user's guide.
 
-This library was developed for the transformation algebra for core concepts of 
-geographical information, [CCT](https://github.com/quangis/cct). It can act as 
-a usage example.
+The library was developed for the core concept transformation algebra 
+([CCT](https://github.com/quangis/cct)) for geographical information, which 
+can act as an example.
 
 
 ## Concrete types and subtypes
 
-We first need to declare *base types*. For this, we use the `Operator` class. 
+To specify type transformations, we first need to declare *base types*. To 
+this end, we use the `Operator` class. 
 
     >>> from transformation_algebra import Operator
     >>> Any = Operator("Any")
@@ -82,9 +84,10 @@ class.
 
 Don't be fooled by the `lambda` keyword --- this is an implementation artefact 
 and does not refer to lambda abstraction. Instead, the `Schema` is initialized 
-with an anonymous Python function, its parameters declaring the variables that 
-occur in its body, akin to *quantifying* those variables. When *instantiating* 
-the schema, these variables are automatically populated.
+with an anonymous Python function, whose parameters declare the variables that 
+occur in its body. This is akin to *quantifying* those variables. When 
+*instantiating* the schema, these generic variables are automatically 
+populated with instances of type variables.
 
 When you need a variable but you don't care about what variable it is or how 
 it relates to others, you may use the `_` *wildcard variable*. The purpose 
@@ -105,6 +108,13 @@ integers:
     >>> sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
     >>> sum(Set(UInt))
     Set(UInt)
+
+Typeclass constraints can often aid in inference, figuring out 
+interdependencies between types:
+
+    >>> f = Schema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
+    >>> f(Set(Int))
+    Int
 
 Finally, `operators` is a helper function for specifying typeclasses: it 
 generates type terms that contain certain parameters.
