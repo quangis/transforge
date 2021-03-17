@@ -154,6 +154,11 @@ class TestType(unittest.TestCase):
         self.apply(f(UInt), Int ** UInt, UInt)
         self.apply(f(Int), Int ** UInt, Int)
 
+    def test_interdependent_types(self):
+        f = Schema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
+        self.apply(f, Set(Int), Int)
+        self.apply(f, Int, error.ViolatedConstraint)
+
     def test_subtyping_of_concrete_functions(self):
         self.assertTrue(Int ** Int <= UInt ** Int)
         self.assertTrue(Int ** Int <= Int ** Any)

@@ -319,11 +319,15 @@ class PlainTerm(Type):
                         result = None
                 return result
         elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
+            if (b.upper or b.lower) and a.operator.compound:
+                return False
             if b.upper and b.upper.subtype(a.operator, True):
                 return False
             if b.wildcard:
                 return True
         elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
+            if (a.upper or a.lower) and b.operator.compound:
+                return False
             if a.lower and b.operator.subtype(a.lower, True):
                 return False
             if a.wildcard:
