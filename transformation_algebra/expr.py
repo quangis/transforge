@@ -4,47 +4,69 @@ Classes to define generic transformation algebras.
 
 from __future__ import annotations
 
+from abc import ABC
 import pyparsing as pp
 from functools import reduce
-from typing import List, Union, Optional, Any, Dict
+from typing import List, Optional, Any, Dict
 
 from transformation_algebra import error
-from transformation_algebra.type import Term, Type
+from transformation_algebra.type import Type
 
 
-class Expr(object):
+class Expr(ABC):
+    def __init__(self):
+        self.type = None
+
+
+class Input(Expr):
     """
-    An expression of a transformation algebra.
+    Represents input data for a transformation algebra expression. This can
+    also be seen as a *typed variable* in an expression.
     """
 
-    def __init__(self, tokens: List[Union[str, Expr]], type: Term):
-        self.tokens = tokens
+    def __init__(
+            self,
+            token: str,
+            type: Type,
+            identifier: List[str] = None):
+        self.token = token
+        self.identifier = identifier
         self.type = type
 
-    def __str__(self, top_level=True) -> str:
-        expr = ' '.join(
-            t if isinstance(t, str) else t.__str__(False)
-            for t in self.tokens
-        )
-        if top_level:
-            return f"{expr} : {self.type}"
-        elif len(self.tokens) == 1:
-            return f"{expr}"
-        else:
-            return f"({expr})"
+        if any(self.type.plain().variables()):
+            raise RuntimeError("Input types must be fully qualified")
 
-    def resolve(self) -> None:
-        self.type = self.type.resolve()
-        for token in self.tokens:
-            if isinstance(token, Expr):
-                token.resolve()
+    def __str__(self) -> str:
+        if self.identifier:
+            return f"{self.token} {self.identifier}"
+        return self.token
 
-    def apply(self: Expr, arg: Expr) -> Expr:
+
+class Transformed(Expr):
+    """
+    Represents an *application* of a transformation.
+    """
+
+    def __init__(self, f: Expr, x: Expr):
+        self.f = f
+        self.x = x
         try:
-            return Expr([self, arg], self.type.apply(arg.type))
+            self.type = f.type.instance().apply(x.type.instance())
         except error.AlgebraTypeError as e:
-            e.add_expression(self, arg)
+            e.add_expression(self, x)
             raise e
+
+    def __str__(self) -> str:
+        return f"{self.f} {self.x}"
+
+
+class Transformation(Expr):
+    def __init__(self, token: str, type: Type):
+        self.token = token
+        self.type = type
+
+    def __str__(self) -> str:
+        return self.token
 
 
 class TransformationAlgebra(object):
@@ -75,24 +97,30 @@ class TransformationAlgebra(object):
         transformation = pp.MatchFirst(
             pp.CaselessKeyword(kw) for kw in self.transformations
         ).setParseAction(
-            lambda s, l, t: Expr(t, self.transformations[t[0]].instance())
+            lambda s, l, t: Transformation(
+                token=t[0],
+                type=self.transformations[t[0]],
+            )
         )
 
         data = pp.MatchFirst(
             pp.CaselessKeyword(kw) + pp.Optional(ident) for kw in self.inputs
         ).setParseAction(
-            lambda s, l, t: Expr(t, self.inputs[t[0]].instance())
+            lambda s, l, t: Input(
+                token=t[0],
+                type=self.inputs[t[0]],
+                identifier=t[1] if len(t) > 1 else None
+            )
         )
 
         return pp.infixNotation(transformation | data, [(
-            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Expr.apply, t[0])
+            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Transformed, t[0])
         )])
 
     def parse(self, string: str) -> Expr:
         if not self.parser:
             self.parser = self.generate_parser()
         expr = self.parser.parseString(string, parseAll=True)[0]
-        expr.resolve()
         return expr
 
     @staticmethod
