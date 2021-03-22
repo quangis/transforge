@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC
 import pyparsing as pp
 from functools import reduce
-from typing import List, Optional, Any, Dict
+from typing import Optional, Any, Dict
 
 from transformation_algebra import error
 from transformation_algebra.type import Type
@@ -16,6 +16,9 @@ from transformation_algebra.type import Type
 class Expr(ABC):
     def __init__(self):
         self.type = None
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class Input(Expr):
@@ -28,17 +31,19 @@ class Input(Expr):
             self,
             token: str,
             type: Type,
-            identifier: List[str] = None):
+            identifier: Optional[str] = None):
         self.token = token
         self.identifier = identifier
         self.type = type
 
+        if self.type.is_function():
+            raise RuntimeError("Must not be a function type")
         if any(self.type.plain().variables()):
             raise RuntimeError("Input types must be fully qualified")
 
     def __str__(self) -> str:
         if self.identifier:
-            return f"{self.token} {self.identifier}"
+            return f"{self.token} {self.identifier} : {self.type}"
         return self.token
 
 
@@ -53,17 +58,20 @@ class Transformed(Expr):
         try:
             self.type = f.type.instance().apply(x.type.instance())
         except error.AlgebraTypeError as e:
-            e.add_expression(self, x)
+            e.add_expression(f, x)
             raise e
 
     def __str__(self) -> str:
-        return f"{self.f} {self.x}"
+        return f"({self.f} {self.x} : {self.type})"
 
 
 class Transformation(Expr):
     def __init__(self, token: str, type: Type):
         self.token = token
         self.type = type
+
+        if not self.type.is_function():
+            raise RuntimeError("Must be a function type")
 
     def __str__(self) -> str:
         return self.token
