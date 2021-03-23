@@ -7,10 +7,30 @@ from __future__ import annotations
 from abc import ABC
 import pyparsing as pp
 from functools import reduce
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Callable, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type
+from transformation_algebra.type import Type, Schema
+
+
+def typed(
+        τ: Union[Type, Callable[..., Type]]) -> Callable[..., Transformation]:
+    """
+    A decorator for defining transformations in terms of other transformations.
+    Despite appearances, the provided function is *not* an implementation of
+    the transformation: it merely represents a decomposition into more
+    primitive conceptual building blocks.
+    """
+    τ2: Type = τ if isinstance(τ, Type) else Schema(τ)
+
+    def wrapper(func: Callable[..., Transformation]) -> Transformation:
+        return Transformation(
+            token=func.__name__,
+            type=τ2,
+            description=func.__doc__,
+            definition=func
+        )
+    return wrapper
 
 
 class Expr(ABC):
@@ -66,9 +86,16 @@ class Transformed(Expr):
 
 
 class Transformation(Expr):
-    def __init__(self, token: str, type: Type):
+    def __init__(
+            self,
+            token: str,
+            type: Type,
+            description: Optional[str] = None,
+            definition: Optional[Callable[..., Transformation]] = None):
         self.token = token
         self.type = type
+        self.description = description
+        self.definition = definition
 
         if not self.type.is_function():
             raise RuntimeError("Must be a function type")
