@@ -14,7 +14,7 @@ from transformation_algebra.type import Type, Schema
 
 
 def typed(
-        τ: Union[Type, Callable[..., Type]]) -> Callable[..., Transformation]:
+        τ: Union[Type, Callable[..., Type]]) -> Callable[..., Definition]:
     """
     A decorator for defining transformations in terms of other transformations.
     Despite appearances, the provided function is *not* an implementation of
@@ -23,12 +23,12 @@ def typed(
     """
     τ2: Type = τ if isinstance(τ, Type) else Schema(τ)
 
-    def wrapper(func: Callable[..., Transformation]) -> Transformation:
-        return Transformation(
-            token=func.__name__,
+    def wrapper(func: Callable[..., Expr]) -> Definition:
+        return Definition(
+            name=func.__name__,
             type=τ2,
             description=func.__doc__,
-            definition=func
+            composition=func
         )
     return wrapper
 
@@ -47,14 +47,10 @@ class Input(Expr):
     also be seen as a *typed variable* in an expression.
     """
 
-    def __init__(
-            self,
-            token: str,
-            type: Type,
-            identifier: Optional[str] = None):
-        self.token = token
-        self.identifier = identifier
-        self.type = type
+    def __init__(self, definition: Definition, ident: Optional[str] = None):
+        self.definition = definition
+        self.type = definition.type.instance()
+        self.identifier = ident
 
         if self.type.is_function():
             raise RuntimeError("Must not be a function type")
@@ -63,11 +59,23 @@ class Input(Expr):
 
     def __str__(self) -> str:
         if self.identifier:
-            return f"{self.token} {self.identifier} : {self.type}"
-        return self.token
+            return f"{self.definition.name} {self.identifier} : {self.type}"
+        return self.definition.name
 
 
-class Transformed(Expr):
+class Transformation(Expr):
+    def __init__(self, definition: Definition):
+        self.definition = definition
+        self.type = definition.type.instance()
+
+        if not self.type.is_function():
+            raise RuntimeError("Must be a function type")
+
+    def __str__(self) -> str:
+        return self.definition.name
+
+
+class Result(Expr):
     """
     Represents an *application* of a transformation.
     """
@@ -85,71 +93,64 @@ class Transformed(Expr):
         return f"({self.f} {self.x} : {self.type})"
 
 
-class Transformation(Expr):
+class Definition(object):
+    """
+    A definition represents a non-instantiated data input or transformation.
+    """
+
     def __init__(
             self,
-            token: str,
+            name: str,
             type: Type,
+            named: bool = False,
             description: Optional[str] = None,
-            definition: Optional[Callable[..., Transformation]] = None):
-        self.token = token
+            composition: Optional[Callable[..., Expr]] = None):
+        self.name = name
         self.type = type
-        self.description = description
-        self.definition = definition
+        self.named = named  # are instances identified or anonymous?
+        self.description = description  # human-readable
+        self.composition = composition  # non-primitive transformations may be
+        # composed of other transformations
+        self.is_input = not self.type.is_function()
 
-        if not self.type.is_function():
-            raise RuntimeError("Must be a function type")
-
-    def __str__(self) -> str:
-        return self.token
+    def instance(self, identifier: Optional[str] = None) -> Expr:
+        if self.type.is_function():
+            return Transformation(self)
+        else:
+            return Input(self, ident=identifier)
 
 
 class TransformationAlgebra(object):
     def __init__(self, **signatures: Type):
         self.parser: Optional[pp.Parser] = None
-        self.transformations: Dict[str, Type] = {}
-        self.inputs: Dict[str, Type] = {}
+        self.definitions: Dict[str, Definition] = {}
 
         for k, v in signatures.items():
-            if v.is_function():
-                self.transformations[k] = v
-            else:
-                self.inputs[k] = v
+            self.definitions[k] = Definition(name=k, type=v)
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
         return "\n".join(
-            f"{k}: {v}"
-            for k, v in dict(**self.transformations, **self.inputs).items()
-        ) + "\n"
+            f"{k}: {v}" for k, v in self.definitions.items()) + "\n"
 
     def generate_parser(self) -> pp.Parser:
 
         ident = pp.Word(pp.alphanums + ':_').setName('identifier')
 
-        transformation = pp.MatchFirst(
-            pp.CaselessKeyword(kw) for kw in self.transformations
+        expr = pp.MatchFirst(
+            pp.CaselessKeyword(d.name) + pp.Optional(ident)
+            if d.is_input else
+            pp.CaselessKeyword(d.name)
+            for d in self.definitions.values()
         ).setParseAction(
-            lambda s, l, t: Transformation(
-                token=t[0],
-                type=self.transformations[t[0]],
-            )
+            lambda s, l, t: self.definitions[t[0]].instance(
+                t[1] if len(t) > 1 else None)
         )
 
-        data = pp.MatchFirst(
-            pp.CaselessKeyword(kw) + pp.Optional(ident) for kw in self.inputs
-        ).setParseAction(
-            lambda s, l, t: Input(
-                token=t[0],
-                type=self.inputs[t[0]],
-                identifier=t[1] if len(t) > 1 else None
-            )
-        )
-
-        return pp.infixNotation(transformation | data, [(
-            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Transformed, t[0])
+        return pp.infixNotation(expr, [(
+            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Result, t[0])
         )])
 
     def parse(self, string: str) -> Expr:
