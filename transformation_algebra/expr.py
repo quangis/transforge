@@ -8,6 +8,7 @@ from abc import ABC
 import pyparsing as pp
 from functools import reduce
 from typing import Optional, Any, Dict, Callable, Union
+from inspect import signature
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, Schema
@@ -51,6 +52,23 @@ class Expr(ABC):
             )
         raise ValueError
 
+    def substitute(self, label: str, expr: Expr) -> Expr:
+        """
+        Attach the given expression to all simple expressions with the given
+        label.
+        """
+        if isinstance(self, Simple):
+            if self.label == label:
+                self.type.plain().unify(expr.type.plain())
+                return expr
+            else:
+                return self
+        elif isinstance(self, Compound):
+            self.f = self.f.substitute(label, expr)
+            self.x = self.x.substitute(label, expr)
+            return self
+        raise ValueError
+
 
 class Simple(Expr):
     """
@@ -62,7 +80,7 @@ class Simple(Expr):
     def __init__(self, definition: Definition, label: Optional[str] = None):
         self.definition = definition
         self.type = definition.type.instance()
-        self.label = label
+        self.label: Optional[str] = label
 
     def __str__(self) -> str:
         if self.label:
@@ -77,8 +95,8 @@ class Compound(Expr):
     """
 
     def __init__(self, f: Expr, x: Expr):
-        self.f = f
-        self.x = x
+        self.f: Expr = f
+        self.x: Expr = x
         try:
             self.type = f.type.apply(x.type)
         except error.AlgebraTypeError as e:
