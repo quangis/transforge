@@ -40,9 +40,21 @@ class Expr(ABC):
     def __repr__(self) -> str:
         return str(self)
 
+    def tree(self, lvl: str = "") -> str:
+        if isinstance(self, Simple):
+            return f"─═ {self} : {self.definition.type}"
+        elif isinstance(self, Compound):
+            return (
+                f"─┐ {self.type}\n"
+                f"{lvl} ├─{self.f.tree(lvl+' │ ')}\n"
+                f"{lvl} └─{self.x.tree(lvl+'   ')}"
+            )
+        raise ValueError
 
-class Input(Expr):
+
+class Simple(Expr):
     """
+    Represents either a transformation or input data in an algebra expression.
     Represents input data for a transformation algebra expression. This can
     also be seen as a *typed variable* in an expression.
     """
@@ -52,32 +64,16 @@ class Input(Expr):
         self.type = definition.type.instance()
         self.label = label
 
-        if self.type.is_function():
-            raise RuntimeError("Must not be a function type")
-        if any(self.type.plain().variables()):
-            raise RuntimeError("Input types must be fully qualified")
-
     def __str__(self) -> str:
         if self.label:
-            return f"{self.definition.name} {self.label} : {self.type}"
-        return self.definition.name
+            return (f"{self.definition.name} {self.label}")
+        else:
+            return f"{self.definition.name}"
 
 
-class Transformation(Expr):
-    def __init__(self, definition: Definition):
-        self.definition = definition
-        self.type = definition.type.instance()
-
-        if not self.type.is_function():
-            raise RuntimeError("Must be a function type")
-
-    def __str__(self) -> str:
-        return self.definition.name
-
-
-class Result(Expr):
+class Compound(Expr):
     """
-    Represents an *application* of a transformation.
+    Represents an *application* of a transformation, capturing its output.
     """
 
     def __init__(self, f: Expr, x: Expr):
@@ -90,7 +86,7 @@ class Result(Expr):
             raise e
 
     def __str__(self) -> str:
-        return f"({self.f} {self.x} : {self.type})"
+        return f"({self.f} {self.x})"
 
 
 class Definition(object):
@@ -114,10 +110,7 @@ class Definition(object):
         self.is_input = not self.type.is_function()
 
     def instance(self, identifier: Optional[str] = None) -> Expr:
-        if self.type.is_function():
-            return Transformation(self)
-        else:
-            return Input(self, label=identifier)
+        return Simple(self, label=identifier)
 
 
 class TransformationAlgebra(object):
@@ -150,7 +143,7 @@ class TransformationAlgebra(object):
         )
 
         return pp.infixNotation(expr, [(
-            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Result, t[0])
+            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Compound, t[0])
         )])
 
     def parse(self, string: str) -> Expr:
@@ -158,6 +151,12 @@ class TransformationAlgebra(object):
             self.parser = self.generate_parser()
         expr = self.parser.parseString(string, parseAll=True)[0]
         return expr
+
+    def tree(self, string: str) -> None:
+        """
+        Print a tree corresponding to the given algebra expression.
+        """
+        print(self.parse(string).tree())
 
     @staticmethod
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
