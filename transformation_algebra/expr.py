@@ -42,10 +42,10 @@ class Expr(ABC):
 
     def tree(self, lvl: str = "") -> str:
         if isinstance(self, Simple):
-            return f"─═ {self} : {self.definition.type}"
+            return f"═ {self} : {self.definition.type}"
         elif isinstance(self, Compound):
             return (
-                f"─┐ {self.type}\n"
+                f"{self.type}\n"
                 f"{lvl} ├─{self.f.tree(lvl+' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl+'   ')}"
             )
