@@ -47,10 +47,10 @@ class Input(Expr):
     also be seen as a *typed variable* in an expression.
     """
 
-    def __init__(self, definition: Definition, ident: Optional[str] = None):
+    def __init__(self, definition: Definition, label: Optional[str] = None):
         self.definition = definition
         self.type = definition.type.instance()
-        self.identifier = ident
+        self.label = label
 
         if self.type.is_function():
             raise RuntimeError("Must not be a function type")
@@ -58,8 +58,8 @@ class Input(Expr):
             raise RuntimeError("Input types must be fully qualified")
 
     def __str__(self) -> str:
-        if self.identifier:
-            return f"{self.definition.name} {self.identifier} : {self.type}"
+        if self.label:
+            return f"{self.definition.name} {self.label} : {self.type}"
         return self.definition.name
 
 
@@ -84,7 +84,7 @@ class Result(Expr):
         self.f = f
         self.x = x
         try:
-            self.type = f.type.instance().apply(x.type.instance())
+            self.type = f.type.apply(x.type)
         except error.AlgebraTypeError as e:
             e.add_expression(f, x)
             raise e
@@ -102,12 +102,12 @@ class Definition(object):
             self,
             name: str,
             type: Type,
-            named: bool = False,
+            labelled: bool = False,
             description: Optional[str] = None,
             composition: Optional[Callable[..., Expr]] = None):
         self.name = name
         self.type = type
-        self.named = named  # are instances identified or anonymous?
+        self.labelled = labelled  # are instances identified or anonymous?
         self.description = description  # human-readable
         self.composition = composition  # non-primitive transformations may be
         # composed of other transformations
@@ -117,7 +117,7 @@ class Definition(object):
         if self.type.is_function():
             return Transformation(self)
         else:
-            return Input(self, ident=identifier)
+            return Input(self, label=identifier)
 
 
 class TransformationAlgebra(object):
@@ -137,10 +137,10 @@ class TransformationAlgebra(object):
 
     def generate_parser(self) -> pp.Parser:
 
-        ident = pp.Word(pp.alphanums + ':_').setName('identifier')
+        label = pp.Word(pp.alphanums + ':_').setName('identifier')
 
         expr = pp.MatchFirst(
-            pp.CaselessKeyword(d.name) + pp.Optional(ident)
+            pp.CaselessKeyword(d.name) + pp.Optional(label)
             if d.is_input else
             pp.CaselessKeyword(d.name)
             for d in self.definitions.values()
