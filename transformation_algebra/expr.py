@@ -8,7 +8,6 @@ from abc import ABC
 import pyparsing as pp
 from functools import reduce
 from typing import Optional, Any, Dict, Callable, Union
-from inspect import signature
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, Schema
@@ -42,6 +41,10 @@ class Expr(ABC):
         return str(self)
 
     def tree(self, lvl: str = "") -> str:
+        """
+        Obtain a tree representation of this expression, using Unicode block
+        characters to draw the tree.
+        """
         if isinstance(self, Simple):
             return f"═ {self} : {self.definition.type}"
         elif isinstance(self, Compound):
@@ -119,7 +122,7 @@ class Definition(object):
             labelled: bool = False,
             description: Optional[str] = None,
             composition: Optional[Callable[..., Expr]] = None):
-        self.name = name
+        self.name = name.rstrip("_")
         self.type = type
         self.labelled = labelled  # are instances identified or anonymous?
         self.description = description  # human-readable
@@ -127,24 +130,26 @@ class Definition(object):
         # composed of other transformations
         self.is_input = not self.type.is_function()
 
+    def __str__(self) -> str:
+        return f"{self.name or 'anonymous'} : {self.type}"
+
     def instance(self, identifier: Optional[str] = None) -> Expr:
         return Simple(self, label=identifier)
 
 
 class TransformationAlgebra(object):
-    def __init__(self, **signatures: Type):
+    def __init__(self, *definitions: Definition):
         self.parser: Optional[pp.Parser] = None
         self.definitions: Dict[str, Definition] = {}
 
-        for k, v in signatures.items():
-            self.definitions[k] = Definition(name=k, type=v)
+        for d in definitions:
+            self.definitions[d.name] = d
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return "\n".join(
-            f"{k}: {v}" for k, v in self.definitions.items()) + "\n"
+        return "\n".join(str(d) for d in self.definitions.values()) + "\n"
 
     def generate_parser(self) -> pp.Parser:
 
@@ -179,10 +184,13 @@ class TransformationAlgebra(object):
     @staticmethod
     def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
         """
-        Create transformation algebra from an object, filtering out the
-        relevant parts: those Type values whose keys start with lowercase.
+        Create transformation algebra from an object, filtering out relevant
+        definitions.
         """
-        return TransformationAlgebra(**{
-            k.rstrip("_"): v for k, v in obj.items()
-            if k[0].islower() and isinstance(v, Type)
-        })
+        definitions = []
+        for k, v in obj.items():
+            if isinstance(v, Definition):
+                if not v.name:
+                    v.name = k.rstrip("_")
+                definitions.append(v)
+        return TransformationAlgebra(*definitions)
