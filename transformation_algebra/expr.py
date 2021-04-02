@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from abc import ABC
 import pyparsing as pp
-from functools import reduce
+from functools import reduce, partial
+from inspect import signature
 from typing import Optional, Any, Dict, Callable, Union
 
 from transformation_algebra import error
@@ -40,6 +41,9 @@ class Expr(ABC):
     def __repr__(self) -> str:
         return self.tree()
 
+    def __call__(self, *args: Expr) -> Expr:
+        return reduce(Compound, args, self)
+
     def tree(self, lvl: str = "") -> str:
         """
         Obtain a tree representation of this expression, using Unicode block
@@ -57,8 +61,7 @@ class Expr(ABC):
 
     def substitute(self, label: str, expr: Expr) -> Expr:
         """
-        Attach the given expression to all simple expressions with the given
-        label.
+        Replace the given expression for all expressions with the given label.
         """
         if isinstance(self, Simple):
             if self.label == label:
@@ -70,6 +73,66 @@ class Expr(ABC):
             self.f = self.f.substitute(label, expr)
             self.x = self.x.substitute(label, expr)
             return self
+        raise ValueError
+
+    def primitive(self) -> Expr:
+        """
+        Expand this expression into its simplest form.
+        """
+        f = self.partial_primitive()
+        if isinstance(f, Expr):
+            return f
+        raise RuntimeError("cannot express partial primitive")
+
+    def partial_primitive(self) -> Union[Expr, PartialExpr]:
+        """
+        Return an expression if the resulting expression is a primitive, or a
+        function returning an expression if the expression is incomplete.
+        """
+        if isinstance(self, Simple):
+            if self.definition.composition:
+                return PartialExpr(self.definition.composition).close()
+            else:
+                return self
+        elif isinstance(self, Compound):
+            f = self.f.partial_primitive()
+            x = self.x.partial_primitive()
+            return f.partial_apply(x)
+        raise ValueError
+
+    def partial_apply(
+            self,
+            x: Union[Expr, PartialExpr]) -> Union[Expr, PartialExpr]:
+        if isinstance(x, Expr):
+            return Compound(self, x)
+        elif isinstance(x, PartialExpr):
+            raise RuntimeError(
+                "cannot apply partial expression to primitive expression")
+
+
+class PartialExpr(object):
+    """
+    An incomplete expression that needs to be supplied with arguments to become
+    a full expression.
+    """
+
+    def __init__(self, composition: Callable[..., Expr]):
+        self.composition = composition
+
+    def close(self) -> Union[Expr, PartialExpr]:
+        n = len(signature(self.composition).parameters)
+        if n > 0:
+            return self
+        else:
+            return self.composition()
+
+    def partial_apply(
+            self,
+            x: Union[Expr, PartialExpr]) -> Union[Expr, PartialExpr]:
+        if isinstance(x, Expr):
+            self.composition = partial(self.composition, x)
+        elif isinstance(x, PartialExpr):
+            pass
         raise ValueError
 
 
