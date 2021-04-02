@@ -38,7 +38,7 @@ class Expr(ABC):
         self.type = None
 
     def __repr__(self) -> str:
-        return str(self)
+        return self.tree()
 
     def tree(self, lvl: str = "") -> str:
         """
@@ -46,7 +46,7 @@ class Expr(ABC):
         characters to draw the tree.
         """
         if isinstance(self, Simple):
-            return f"═ {self} : {self.definition.type}"
+            return f"╼ {self} : {self.definition.type}"
         elif isinstance(self, Compound):
             return (
                 f"{self.type}\n"
