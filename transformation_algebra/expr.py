@@ -14,8 +14,7 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, Schema
 
 
-def typed(
-        τ: Union[Type, Callable[..., Type]]) -> Callable[..., Definition]:
+def typed(τ: Union[Type, Callable[..., Type]]) -> Callable[..., Definition]:
     """
     A decorator for defining transformations in terms of other transformations.
     Despite appearances, the provided function is *not* an implementation of
@@ -29,33 +28,59 @@ def typed(
             name=func.__name__,
             type=τ2,
             description=func.__doc__,
-            composition=func
+            term=func
         )
     return wrapper
 
 
-class Expr(ABC):
-    def __init__(self):
-        self.type = None
+class PartialExpr(ABC):
+    """
+    An expression that may contain abstractions.
+    """
 
+    def __call__(self, *args: Union[PartialExpr, Definition]) -> PartialExpr:
+        args2 = (e.instance() if isinstance(e, Definition) else e for e in args)
+        return reduce(PartialExpr.partial_apply, args2, self).complete()
+
+    def partial_apply(self, x: PartialExpr) -> PartialExpr:
+        f = self.complete()
+        if isinstance(f, Abstraction):
+            f.composition = partial(f.composition, x)
+            return f.complete()
+        elif isinstance(x, Abstraction):
+            raise RuntimeError(
+                "cannot apply abstraction to primitive expression")
+        else:
+            assert isinstance(f, Expr) and isinstance(x, Expr)
+            return Application(f, x)
+
+    def complete(self) -> PartialExpr:
+        """
+        Once all parameters of an abstraction have been provided, turn into
+        full expression.
+        """
+        if isinstance(self, Abstraction):
+            n = len(signature(self.composition).parameters)
+            if n == 0:
+                return self.composition()
+        return self
+
+
+class Expr(PartialExpr):
     def __repr__(self) -> str:
         return self.tree()
 
-    def __call__(self, *args: Expr) -> Expr:
-        return reduce(Compound, args, self)
-
     def tree(self, lvl: str = "") -> str:
         """
-        Obtain a tree representation of this expression, using Unicode block
-        characters to draw the tree.
+        Obtain a tree representation using Unicode block characters.
         """
-        if isinstance(self, Simple):
+        if isinstance(self, Base):
             return f"╼ {self} : {self.definition.type}"
-        elif isinstance(self, Compound):
+        elif isinstance(self, Application):
             return (
                 f"{self.type}\n"
-                f"{lvl} ├─{self.f.tree(lvl+' │ ')}\n"
-                f"{lvl} └─{self.x.tree(lvl+'   ')}"
+                f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
+                f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
         raise ValueError
 
@@ -63,13 +88,13 @@ class Expr(ABC):
         """
         Replace the given expression for all expressions with the given label.
         """
-        if isinstance(self, Simple):
+        if isinstance(self, Base):
             if self.label == label:
                 self.type.plain().unify(expr.type.plain())
                 return expr
             else:
                 return self
-        elif isinstance(self, Compound):
+        elif isinstance(self, Application):
             self.f = self.f.substitute(label, expr)
             self.x = self.x.substitute(label, expr)
             return self
@@ -80,67 +105,35 @@ class Expr(ABC):
         Expand this expression into its simplest form.
         """
         f = self.partial_primitive()
-        if isinstance(f, Expr):
+        if isinstance(f, Abstraction):
+            raise RuntimeError("cannot express partial primitive")
+        elif isinstance(f, Expr):
             return f
-        raise RuntimeError("cannot express partial primitive")
+        raise ValueError
 
-    def partial_primitive(self) -> Union[Expr, PartialExpr]:
+    def partial_primitive(self) -> PartialExpr:
         """
-        Return an expression if the resulting expression is a primitive, or a
-        function returning an expression if the expression is incomplete.
+        Expand this expression into its simplest form. May contain
+        abstractions.
         """
-        if isinstance(self, Simple):
+        if isinstance(self, Base):
             if self.definition.composition:
-                return PartialExpr(self.definition.composition).close()
+                return Abstraction(self.definition.composition).complete()
             else:
                 return self
-        elif isinstance(self, Compound):
+        elif isinstance(self, Application):
             f = self.f.partial_primitive()
             x = self.x.partial_primitive()
             return f.partial_apply(x)
         raise ValueError
 
-    def partial_apply(
-            self,
-            x: Union[Expr, PartialExpr]) -> Union[Expr, PartialExpr]:
-        if isinstance(x, Expr):
-            return Compound(self, x)
-        elif isinstance(x, PartialExpr):
-            raise RuntimeError(
-                "cannot apply partial expression to primitive expression")
 
-
-class PartialExpr(object):
+class Base(Expr):
     """
-    An incomplete expression that needs to be supplied with arguments to become
-    a full expression.
-    """
-
-    def __init__(self, composition: Callable[..., Expr]):
-        self.composition = composition
-
-    def close(self) -> Union[Expr, PartialExpr]:
-        n = len(signature(self.composition).parameters)
-        if n > 0:
-            return self
-        else:
-            return self.composition()
-
-    def partial_apply(
-            self,
-            x: Union[Expr, PartialExpr]) -> Union[Expr, PartialExpr]:
-        if isinstance(x, Expr):
-            self.composition = partial(self.composition, x)
-        elif isinstance(x, PartialExpr):
-            pass
-        raise ValueError
-
-
-class Simple(Expr):
-    """
-    Represents either a transformation or input data in an algebra expression.
-    Represents input data for a transformation algebra expression. This can
-    also be seen as a *typed variable* in an expression.
+    A base expression represents either a single transformation or a data
+    input. Base expressions may be unfolded into multiple applications of
+    primitive transformations. Data input can be seen as a typed variable in an
+    expression: in this case, it should be labelled and substituted.
     """
 
     def __init__(self, definition: Definition, label: Optional[str] = None):
@@ -155,9 +148,10 @@ class Simple(Expr):
             return f"{self.definition.name}"
 
 
-class Compound(Expr):
+class Application(Expr):
     """
-    Represents an *application* of a transformation, capturing its output.
+    A comlex expression, representing an application of the transformation in
+    its first argument to the expression in its second argument.
     """
 
     def __init__(self, f: Expr, x: Expr):
@@ -173,6 +167,16 @@ class Compound(Expr):
         return f"({self.f} {self.x})"
 
 
+class Abstraction(PartialExpr):
+    """
+    An incomplete expression that needs to be supplied with arguments. Not
+    normally part of an expression tree --- only used for expanding primitives.
+    """
+
+    def __init__(self, composition: Callable[..., PartialExpr]):
+        self.composition: Callable[..., PartialExpr] = composition
+
+
 class Definition(object):
     """
     A definition represents a non-instantiated data input or transformation.
@@ -180,24 +184,27 @@ class Definition(object):
 
     def __init__(
             self,
-            name: str,
             type: Type,
+            name: Optional[str] = None,
             labelled: bool = False,
             description: Optional[str] = None,
-            composition: Optional[Callable[..., Expr]] = None):
-        self.name = name.rstrip("_")
+            term: Optional[Callable[..., PartialExpr]] = None):
+        self.name = name.rstrip("_") if name else None
         self.type = type
         self.labelled = labelled  # are instances identified or anonymous?
         self.description = description  # human-readable
-        self.composition = composition  # non-primitive transformations may be
+        self.composition = term  # non-primitive transformations may be
         # composed of other transformations
         self.is_input = not self.type.is_function()
 
     def __str__(self) -> str:
         return f"{self.name or 'anonymous'} : {self.type}"
 
+    def __call__(self, *args: Union[Definition, PartialExpr]) -> PartialExpr:
+        return self.instance().__call__(*args)
+
     def instance(self, identifier: Optional[str] = None) -> Expr:
-        return Simple(self, label=identifier)
+        return Base(self, label=identifier)
 
 
 class TransformationAlgebra(object):
@@ -229,7 +236,7 @@ class TransformationAlgebra(object):
         )
 
         return pp.infixNotation(expr, [(
-            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Compound, t[0])
+            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Application, t[0])
         )])
 
     def parse(self, string: str) -> Expr:
