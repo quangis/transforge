@@ -14,25 +14,6 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, Schema
 
 
-def typed(τ: Union[Type, Callable[..., Type]]) -> Callable[..., Definition]:
-    """
-    A decorator for defining transformations in terms of other transformations.
-    Despite appearances, the provided function is *not* an implementation of
-    the transformation: it merely represents a decomposition into more
-    primitive conceptual building blocks.
-    """
-    τ2: Type = τ if isinstance(τ, Type) else Schema(τ)
-
-    def wrapper(func: Callable[..., Expr]) -> Definition:
-        return Definition(
-            name=func.__name__,
-            type=τ2,
-            description=func.__doc__,
-            term=func
-        )
-    return wrapper
-
-
 class PartialExpr(ABC):
     """
     An expression that may contain abstractions.
@@ -184,15 +165,15 @@ class Definition(object):
 
     def __init__(
             self,
-            type: Type,
+            type: Union[Type, Callable[..., Type]],
+            term: Optional[Callable[..., PartialExpr]] = None,
             name: Optional[str] = None,
-            labelled: bool = False,
-            description: Optional[str] = None,
-            term: Optional[Callable[..., PartialExpr]] = None):
-        self.name = name.rstrip("_") if name else None
-        self.type = type
-        self.labelled = labelled  # are instances identified or anonymous?
-        self.description = description  # human-readable
+            descr: Optional[str] = None,
+            label: bool = False):
+        self.name = name
+        self.type = type if isinstance(type, Type) else Schema(type)
+        self.labelled = label  # are instances identified or anonymous?
+        self.description = descr  # human-readable
         self.composition = term  # non-primitive transformations may be
         # composed of other transformations
         self.is_input = not self.type.is_function()
@@ -260,7 +241,6 @@ class TransformationAlgebra(object):
         definitions = []
         for k, v in obj.items():
             if isinstance(v, Definition):
-                if not v.name:
-                    v.name = k.rstrip("_")
+                v.name = k.rstrip("_")
                 definitions.append(v)
         return TransformationAlgebra(*definitions)
