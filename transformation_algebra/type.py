@@ -34,13 +34,13 @@ class Type(ABC):
     """
 
     @abstractmethod
-    def instance(self, *arg: VariableTerm, **kwargs: VariableTerm) -> Term:
+    def instance(self, *arg: TypeVar, **kwargs: TypeVar) -> TypeInstance:
         return NotImplemented
 
-    def plain(self) -> PlainTerm:
-        if isinstance(self, PlainTerm):
+    def plain(self) -> TypeInstancePlain:
+        if isinstance(self, TypeInstancePlain):
             return self
-        elif isinstance(self, Term):
+        elif isinstance(self, TypeInstance):
             #if self.constraints:
             #    raise ValueError("No")
             return self._plain
@@ -62,7 +62,9 @@ class Type(ABC):
         """
 
         return Type.combine(self, other, by=lambda a, b:
-            Term(Function(a._plain, b._plain), *(a.constraints + b.constraints))
+            TypeInstance(
+                Function(a._plain, b._plain),
+                *(a.constraints + b.constraints))
         )
 
     def __call__(self, *args: Type) -> Type:
@@ -72,7 +74,7 @@ class Type(ABC):
         """
 
         return Type.combine(self, *args, by=lambda x, *xs:
-            reduce(Term.apply, xs, x)
+            reduce(TypeInstance.apply, xs, x)
         )
 
     def __or__(self, constraint: Optional[Constraint]) -> Type:
@@ -83,15 +85,15 @@ class Type(ABC):
         if not constraint:
             return self
 
-        if isinstance(self, Schema):
+        if isinstance(self, TypeSchema):
             def σ(*args, **kwargs):
                 t = self.instance(*args, **kwargs)
-                return Term(t._plain, constraint, *t.constraints)
+                return TypeInstance(t._plain, constraint, *t.constraints)
             σ.__signature__ = self.signature  # type: ignore
-            return Schema(σ)
+            return TypeSchema(σ)
         else:
             t = self.instance()
-            return Term(t._plain, constraint, *t.constraints)
+            return TypeInstance(t._plain, constraint, *t.constraints)
 
     def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
         """
@@ -120,19 +122,19 @@ class Type(ABC):
         Does this type represent a function?
         """
         t = self.plain()
-        return isinstance(t, OperatorTerm) and t.operator == Function
+        return isinstance(t, TypeOperation) and t.operator == Function
 
     @staticmethod
-    def combine(*types: Type, by: Callable[..., Term]) -> Type:
+    def combine(*types: Type, by: Callable[..., TypeInstance]) -> Type:
         """
         Combine several types into a single (possibly schematic) type using a
-        function that combines instances of those types into a single term.
+        function that combines instances of those types.
         """
 
-        if any(isinstance(t, Schema) for t in types):
+        if any(isinstance(t, TypeSchema) for t in types):
             # A new schematic variable for every such one needed by arguments
-            n_vars = [t.n_vars if isinstance(t, Schema) else 0 for t in types]
-            names = list(varnames(sum(n_vars)))
+            nvar = [t.nvar if isinstance(t, TypeSchema) else 0 for t in types]
+            names = list(varnames(sum(nvar)))
             params = [
                 Parameter(v, Parameter.POSITIONAL_OR_KEYWORD) for v in names]
             sig = Signature(params)
@@ -140,11 +142,11 @@ class Type(ABC):
             # Divvy up the new parameters for all the argument types
             types_with_varnames = [
                 (t, names[i:i + δ])
-                for t, i, δ in zip(types, accumulate([0] + n_vars), n_vars)
+                for t, i, δ in zip(types, accumulate([0] + nvar), nvar)
             ]
 
             # Combine into a new schema
-            def σ(*args: VariableTerm, **kwargs: VariableTerm) -> Term:
+            def σ(*args: TypeVar, **kwargs: TypeVar) -> TypeInstance:
                 binding = sig.bind(*args, **kwargs)
                 return by(*(
                     t.instance(*(binding.arguments[v] for v in varnames))
@@ -153,12 +155,12 @@ class Type(ABC):
             σ.__signature__ = (  # type: ignore
                 signature(σ).replace(parameters=params))
 
-            return Schema(σ)
+            return TypeSchema(σ)
         else:
             return by(*(t.instance() for t in types))
 
 
-class Schema(Type):
+class TypeSchema(Type):
     """
     Provides a definition of a *schema* for function and data signatures, that
     is, a type containing some schematic type variable.
@@ -167,13 +169,13 @@ class Schema(Type):
     def __init__(self, schema: Callable[..., Type]):
         self.schema = schema
         self.signature = signature(schema)
-        self.n_vars = len(self.signature.parameters)
+        self.nvar = len(self.signature.parameters)
 
     def __str__(self) -> str:
         return str(self.instance(*(
-            VariableTerm(v) for v in self.signature.parameters)).resolve())
+            TypeVar(v) for v in self.signature.parameters)).resolve())
 
-    def instance(self, *args: VariableTerm, **kwargs: VariableTerm) -> Term:
+    def instance(self, *args: TypeVar, **kwargs: TypeVar) -> TypeInstance:
         """
         Create an instance of this schema. Optionally bind schematic variables
         to concrete variables; non-bound variables will get automatically
@@ -182,16 +184,16 @@ class Schema(Type):
         binding = self.signature.bind_partial(*args, **kwargs)
         for param in self.signature.parameters:
             if param not in binding.arguments:
-                binding.arguments[param] = VariableTerm()
+                binding.arguments[param] = TypeVar()
         return self.schema(*binding.args, **binding.kwargs).instance()
 
 
-class Term(Type):
+class TypeInstance(Type):
     """
-    A top-level type term decorated with constraints.
+    A top-level type instance decorated with constraints.
     """
 
-    def __init__(self, plain: PlainTerm, *constraints: Constraint):
+    def __init__(self, plain: TypeInstancePlain, *constraints: Constraint):
         self._plain = plain
         self.constraints = []
 
@@ -215,16 +217,16 @@ class Term(Type):
 
         return ' | '.join(res)
 
-    def instance(self, *args, **kwargs) -> Term:
+    def instance(self, *args, **kwargs) -> TypeInstance:
         Signature().bind(*args, **kwargs)
         return self
 
-    def resolve(self) -> Term:
+    def resolve(self) -> TypeInstance:
         constraints = [c for c in self.constraints if not c.fulfilled()]
         self._plain.resolve()
-        return Term(self._plain.follow(), *constraints)
+        return TypeInstance(self._plain.follow(), *constraints)
 
-    def apply(self, arg: Term) -> Term:
+    def apply(self, arg: TypeInstance) -> TypeInstance:
         """
         Apply an argument to a function type to get its output type.
         """
@@ -232,14 +234,14 @@ class Term(Type):
         f = self._plain.follow()
         x = arg._plain.follow()
 
-        if isinstance(f, VariableTerm):
-            f.bind(Function(VariableTerm(), VariableTerm()))
+        if isinstance(f, TypeVar):
+            f.bind(Function(TypeVar(), TypeVar()))
             f = f.follow()
 
-        if isinstance(f, OperatorTerm) and f.operator == Function:
+        if isinstance(f, TypeOperation) and f.operator == Function:
             x.unify(f.params[0], subtype=True)
             f.resolve()
-            return Term(
+            return TypeInstance(
                 f.params[1],
                 *chain(self.constraints, arg.constraints)
             ).resolve()
@@ -247,53 +249,53 @@ class Term(Type):
             raise error.NonFunctionApplication(f, x)
 
 
-class PlainTerm(Type):
+class TypeInstancePlain(Type):
     """
-    Abstract base class for plain type terms (operator terms and type
-    variables) without constraints. Note that basic types are just 0-ary type
+    Abstract base class for plain type instances (type operations and
+    -variables) without constraints. Note that base types are just 0-ary type
     operators and functions are just particular 2-ary type operators.
     """
 
-    def __contains__(self, value: PlainTerm) -> bool:
+    def __contains__(self, value: TypeInstancePlain) -> bool:
         return value == self or (
-            isinstance(self, OperatorTerm) and
+            isinstance(self, TypeOperation) and
             any(value in t for t in self.params))
 
-    def variables(self) -> Iterable[VariableTerm]:
+    def variables(self) -> Iterable[TypeVar]:
         """
         Obtain all type variables currently in the type expression.
         """
         a = self.follow()
-        if isinstance(a, VariableTerm):
+        if isinstance(a, TypeVar):
             yield a
-        elif isinstance(a, OperatorTerm):
+        elif isinstance(a, TypeOperation):
             for v in chain(*(t.variables() for t in a.params)):
                 yield v
 
-    def follow(self) -> PlainTerm:
+    def follow(self) -> TypeInstancePlain:
         """
         Follow a unification until the nearest operator.
         """
-        if isinstance(self, VariableTerm) and self.unified:
+        if isinstance(self, TypeVar) and self.unified:
             return self.unified.follow()
         return self
 
-    def skeleton(self) -> PlainTerm:
+    def skeleton(self) -> TypeInstancePlain:
         """
         Create a copy of this operator, substituting fresh variables for basic
         types.
         """
-        if isinstance(self, OperatorTerm):
+        if isinstance(self, TypeOperation):
             if self.operator.basic:
-                return VariableTerm()
+                return TypeVar()
             else:
-                return OperatorTerm(
+                return TypeOperation(
                     self.operator,
                     *(p.follow().skeleton() for p in self.params))
         else:
             return self
 
-    def subtype(self, other: PlainTerm) -> Optional[bool]:
+    def subtype(self, other: TypeInstancePlain) -> Optional[bool]:
         """
         Return True if self is (or can be) definitely a subtype of other, False
         if it is definitely not, and None if there is not enough information.
@@ -301,7 +303,7 @@ class PlainTerm(Type):
         a = self.follow()
         b = other.follow()
 
-        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
+        if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.operator.basic:
                 return a.operator.subtype(b.operator)
             elif a.operator != b.operator:
@@ -318,35 +320,35 @@ class PlainTerm(Type):
                     elif r is None:
                         result = None
                 return result
-        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
+        elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
             if (b.upper or b.lower) and a.operator.compound:
                 return False
             if b.upper and b.upper.subtype(a.operator, True):
                 return False
             if b.wildcard:
                 return True
-        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
+        elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
             if (a.upper or a.lower) and b.operator.compound:
                 return False
             if a.lower and b.operator.subtype(a.lower, True):
                 return False
             if a.wildcard:
                 return True
-        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
+        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
             if a.lower and b.upper and a.lower.subtype(b.upper, True):
                 return False
         return None
 
-    def unify(self, other: PlainTerm, subtype: bool = False) -> None:
+    def unify(self, other: TypeInstancePlain, subtype: bool = False) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
-        unification, but instead of just a substitution of variables to terms,
-        also produces lower and upper bounds on subtypes that it must respect.
+        unification, but instead of just a substitution of variables, also
+        produces lower and upper bounds on subtypes that it must respect.
         """
         a = self.follow()
         b = other.follow()
 
-        if isinstance(a, OperatorTerm) and isinstance(b, OperatorTerm):
+        if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.operator.basic:
                 if subtype and not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
@@ -363,10 +365,10 @@ class PlainTerm(Type):
             else:
                 raise error.TypeMismatch(a, b)
 
-        elif isinstance(a, VariableTerm) and isinstance(b, VariableTerm):
+        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
             a.bind(b)
 
-        elif isinstance(a, VariableTerm) and isinstance(b, OperatorTerm):
+        elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
             if a in b:
                 raise error.RecursiveType(a, b)
             elif b.operator.basic:
@@ -378,7 +380,7 @@ class PlainTerm(Type):
                 a.bind(b.skeleton())
                 a.unify(b, subtype=subtype)
 
-        elif isinstance(a, OperatorTerm) and isinstance(b, VariableTerm):
+        elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
             if b in a:
                 raise error.RecursiveType(b, a)
             elif a.operator.basic:
@@ -390,29 +392,29 @@ class PlainTerm(Type):
                 b.bind(a.skeleton())
                 b.unify(a, subtype=subtype)
 
-    def resolve(self, prefer_lower: bool = True) -> PlainTerm:
+    def resolve(self, prefer_lower: bool = True) -> TypeInstancePlain:
         """
         Obtain a version of this type with all eligible variables with subtype
         constraints resolved to their most specific type.
         """
         a = self.follow()
 
-        if isinstance(a, OperatorTerm):
+        if isinstance(a, TypeOperation):
             for v, p in zip(a.operator.variance, a.params):
                 p.resolve(prefer_lower ^ (v == Variance.CONTRA))
-        elif isinstance(a, VariableTerm):
+        elif isinstance(a, TypeVar):
             if prefer_lower and a.lower:
                 a.bind(a.lower())
             elif not prefer_lower and a.upper:
                 a.bind(a.upper())
         return a.follow()
 
-    def instance(self, *args, **kwargs) -> Term:
+    def instance(self, *args, **kwargs) -> TypeInstance:
         Signature().bind(*args, **kwargs)
-        return Term(self)
+        return TypeInstance(self)
 
 
-class Operator(Type):
+class TypeOperator(Type):
     """
     An n-ary type constructor.
     """
@@ -421,9 +423,9 @@ class Operator(Type):
             self,
             name: str,
             params: Union[int, Iterable[Variance]] = 0,
-            supertype: Optional[Operator] = None):
+            supertype: Optional[TypeOperator] = None):
         self.name = name
-        self.supertype: Optional[Operator] = supertype
+        self.supertype: Optional[TypeOperator] = supertype
 
         if isinstance(params, int):
             self.variance = list(Variance.CO for _ in range(params))
@@ -439,20 +441,20 @@ class Operator(Type):
 
     def __eq__(self, other: object) -> bool:
         return (
-            isinstance(other, Operator) and
+            isinstance(other, TypeOperator) and
             self.name == other.name
             and self.variance == other.variance)
 
-    def __call__(self, *params: Type) -> OperatorTerm:  # type: ignore
-        return OperatorTerm(self, *(p.plain() for p in params))
+    def __call__(self, *params: Type) -> TypeOperation:  # type: ignore
+        return TypeOperation(self, *(p.plain() for p in params))
 
-    def subtype(self, other: Operator, strict: bool = False) -> bool:
+    def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
         return ((not strict and self == other) or
             bool(self.supertype and self.supertype.subtype(other)))
 
-    def instance(self, *args, **kwargs) -> Term:
+    def instance(self, *args, **kwargs) -> TypeInstance:
         Signature().bind(*args, **kwargs)
-        return Term(OperatorTerm(self))
+        return TypeInstance(TypeOperation(self))
 
     @property
     def basic(self) -> bool:
@@ -463,12 +465,12 @@ class Operator(Type):
         return not self.basic
 
 
-class OperatorTerm(PlainTerm):
+class TypeOperation(TypeInstancePlain):
     """
     An instance of an n-ary type constructor.
     """
 
-    def __init__(self, op: Operator, *params: PlainTerm):
+    def __init__(self, op: TypeOperator, *params: TypeInstancePlain):
         self.operator = op
         self.params = list(params)
 
@@ -482,7 +484,7 @@ class OperatorTerm(PlainTerm):
     def __str__(self) -> str:
         if self.operator == Function:
             inT, outT = self.params
-            if isinstance(inT, OperatorTerm) and inT.operator == Function:
+            if isinstance(inT, TypeOperation) and inT.operator == Function:
                 return f"({inT}) ** {outT}"
             return f"{inT} ** {outT}"
         elif self.params:
@@ -491,15 +493,15 @@ class OperatorTerm(PlainTerm):
             return str(self.operator)
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, OperatorTerm):
+        if isinstance(other, TypeOperation):
             return (self.operator == other.operator and
                 all(s == t for s, t in zip(self.params, other.params)))
         return False
 
 
-class VariableTerm(PlainTerm):
+class TypeVar(TypeInstancePlain):
     """
-    Term variable.
+    TypeInstance variable.
     """
     counter = 0
 
@@ -508,9 +510,9 @@ class VariableTerm(PlainTerm):
         self.id = cls.counter
         self.name = name
         self.wildcard = wildcard
-        self.lower: Optional[Operator] = None
-        self.unified: Optional[PlainTerm] = None
-        self.upper: Optional[Operator] = None
+        self.lower: Optional[TypeOperator] = None
+        self.unified: Optional[TypeInstancePlain] = None
+        self.upper: Optional[TypeOperator] = None
         cls.counter += 1
 
     def __str__(self) -> str:
@@ -521,11 +523,11 @@ class VariableTerm(PlainTerm):
     def __eq__(self, other: object) -> bool:
         if self.unified:
             return self.follow() == other
-        elif isinstance(other, VariableTerm) and other.unified:
+        elif isinstance(other, TypeVar) and other.unified:
             return self == other.follow()
         return super().__eq__(other)
 
-    def bind(self, t: PlainTerm) -> None:
+    def bind(self, t: TypeInstancePlain) -> None:
         assert (not self.unified or t == self.unified), \
             "variable cannot be unified twice"
 
@@ -534,7 +536,7 @@ class VariableTerm(PlainTerm):
         if self is not t:
             self.unified = t
 
-            if isinstance(t, VariableTerm):
+            if isinstance(t, TypeVar):
                 t.wildcard = False
 
                 if self.lower:
@@ -545,13 +547,13 @@ class VariableTerm(PlainTerm):
                 if t.lower == t.upper and t.lower is not None:
                     t.bind(t.lower())
 
-            elif isinstance(t, OperatorTerm) and t.operator.basic:
+            elif isinstance(t, TypeOperation) and t.operator.basic:
                 if self.lower and t.operator.subtype(self.lower, True):
                     raise error.SubtypeMismatch(t, self)
                 if self.upper and self.upper.subtype(t.operator, True):
                     raise error.SubtypeMismatch(self, t)
 
-    def above(self, new: Operator) -> None:
+    def above(self, new: TypeOperator) -> None:
         """
         Constrain this variable to be a basic type with the given type as lower
         bound.
@@ -574,7 +576,7 @@ class VariableTerm(PlainTerm):
         else:
             raise error.SubtypeMismatch(lower, new)
 
-    def below(self, new: Operator) -> None:
+    def below(self, new: TypeOperator) -> None:
         """
         Constrain this variable to be a basic type with the given subtype as
         upper bound.
@@ -592,10 +594,10 @@ class VariableTerm(PlainTerm):
 
 
 "The special constructor for function types."
-Function = Operator('Function', params=(Variance.CONTRA, Variance.CO))
+Function = TypeOperator('Function', params=(Variance.CONTRA, Variance.CO))
 
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
-_ = Schema(lambda: VariableTerm(wildcard=True))
+_ = TypeSchema(lambda: TypeVar(wildcard=True))
 
 
 class Constraint(object):
@@ -604,7 +606,7 @@ class Constraint(object):
     object types.
     """
 
-    def __init__(self, subject: PlainTerm, *objects: PlainTerm):
+    def __init__(self, subject: TypeInstancePlain, *objects: TypeInstancePlain):
         self.subject = subject
         self.objects = list(objects)
         self.objects_initial = self.objects
@@ -638,14 +640,14 @@ class Constraint(object):
 
 
 def operators(
-        *ops: Operator,
+        *ops: TypeOperator,
         param: Optional[Type] = None,
-        at: int = None) -> List[PlainTerm]:
+        at: int = None) -> List[TypeInstancePlain]:
     """
-    Generate a list of instances of operator terms. Optionally, the generated
-    operator terms must contain a certain parameter (at some index, if given).
+    Generate a list of instances of type operations. Optionally, the generated
+    type operations must contain a certain parameter (at some index, if given).
     """
-    options: List[PlainTerm] = []
+    options: List[TypeInstancePlain] = []
     for op in ops:
         for i in ([at - 1] if at else range(op.arity)) if param else [-1]:
             if i < op.arity:

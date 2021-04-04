@@ -1,10 +1,10 @@
 import unittest
 
-from transformation_algebra.type import Operator
+from transformation_algebra.type import TypeOperator
 from transformation_algebra.expr import \
     TransformationAlgebra, Data, Operation
 
-Int = Operator('Int')
+Int = TypeOperator('Int')
 
 one = Data(Int)
 add = Operation(Int ** Int ** Int)

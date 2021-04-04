@@ -11,7 +11,7 @@ from inspect import signature
 from typing import Optional, Any, Dict, Callable, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, Schema
+from transformation_algebra.type import Type, TypeSchema
 
 
 class PartialExpr(ABC):
@@ -171,7 +171,7 @@ class Definition(ABC):
             descr: Optional[str] = None,
             label: bool = False):
         self.name = name
-        self.type = type if isinstance(type, Type) else Schema(type)
+        self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.labelled = label  # are instances identified or anonymous?
         self.description = descr  # human-readable
         self.composition = term  # non-primitive transformations may be
