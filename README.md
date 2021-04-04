@@ -27,16 +27,16 @@ can act as an example.
 ## Concrete types and subtypes
 
 To specify type transformations, we first need to declare *base types*. To 
-this end, we use the `Operator` class. 
+this end, we use the `TypeOperator` class. 
 
-    >>> from transformation_algebra import Operator
-    >>> Any = Operator("Any")
+    >>> from transformation_algebra import TypeOperator
+    >>> Any = TypeOperator("Any")
 
 Base types may have supertypes. For instance, anything of type `Int` is also 
 automatically of type `Any`, but not necessarily of type `UInt`:
 
-    >>> Int = Operator("Int", supertype=Any)
-    >>> UInt = Operator("UInt", supertype=Int)
+    >>> Int = TypeOperator("Int", supertype=Any)
+    >>> UInt = TypeOperator("UInt", supertype=Int)
     >>> Int <= Any
     True
     >>> Int <= UInt
@@ -46,7 +46,7 @@ automatically of type `Any`, but not necessarily of type `UInt`:
 represent a set of integers. This would automatically be a subtype of 
 `Set(Any)`.
 
-    >>> Set = Operator("Set", 1)
+    >>> Set = TypeOperator("Set", 1)
     >>> Set(Int) <= Set(Any)
     True
 
@@ -70,24 +70,24 @@ or, if the type was inappropriate, an error:
         Any <= Int
 
 
-## Schematic types and constraints
+## TypeSchematic types and constraints
 
 Our types are *polymorphic* in that any type also represents its supertypes: 
 the signature `Int ** Int` also applies to `UInt ** Int` or indeed to `Int ** 
-Any`. We additionally allow *parametric polymorphism*, using the `Schema` 
+Any`. We additionally allow *parametric polymorphism*, using the `TypeSchema` 
 class.
 
-    >>> from transformation_algebra import Schema
-    >>> compose = Schema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
+    >>> from transformation_algebra import TypeSchema
+    >>> compose = TypeSchema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
     >>> compose(abs, add(Int))
     Int ** UInt
 
 Don't be fooled by the `lambda` keyword --- this is an implementation artefact 
-and does not refer to lambda abstraction. Instead, the `Schema` is initialized 
-with an anonymous Python function, whose parameters declare the variables that 
-occur in its body. This is akin to *quantifying* those variables. When 
-*instantiating* the schema, these generic variables are automatically 
-populated with instances of type variables.
+and does not refer to lambda abstraction. Instead, the `TypeSchema` is 
+initialized with an anonymous Python function whose parameters declare the 
+variables that occur in its body. This is akin to *quantifying* those 
+variables. When instantiating the schema, these generic variables are 
+automatically populated with *instances* of type variables.
 
 When you need a variable but you don't care about what variable it is or how 
 it relates to others, you may use the `_` *wildcard variable*. The purpose 
@@ -105,47 +105,87 @@ subtype of one of the types specified in `[ts]`). For instance, we might want
 to define a function that applies to both single integers and sets of 
 integers:
 
-    >>> sum = Schema(lambda α: α ** α | α @ [Int, Set(Int)])
+    >>> sum = TypeSchema(lambda α: α ** α | α @ [Int, Set(Int)])
     >>> sum(Set(UInt))
     Set(UInt)
 
 Typeclass constraints can often aid in inference, figuring out 
 interdependencies between types:
 
-    >>> f = Schema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
+    >>> f = TypeSchema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
     >>> f(Set(Int))
     Int
 
 Finally, `operators` is a helper function for specifying typeclasses: it 
 generates type terms that contain certain parameters.
 
-    >>> Map = Operator("Map", 2)
+    >>> Map = TypeOperator("Map", 2)
     >>> operators(Map, param=Int)
     [Map(Int, _), Map(_, Int)]
 
 
 ## Algebra and expressions
 
-Once we have created our types, we may define the `TransformationAlgebra` that 
-will read expressions of the algebra.
+Now that we know how types work, we can use them to define the data inputs and 
+operations of an algebra.
 
-    >>> from transformation_algebra import TransformationAlgebra
-    >>> algebra = TransformationAlgebra(
-            number=Int,
-            abs=Int ** UInt,
+    >>> from transformation_algebra import TransformationAlgebra, \
+                                           Data, Operation
+    >>> example = TransformationAlgebra(
+            one=Data(Int),
+            add=Operation(Int ** Int ** Int)
             ...
     )
 
-In fact, for convenience, you may simply define your types as globals and 
-automatically create the algebra once you are done:
+In fact, for convenience, you may provide your definitions globally and 
+automatically incorporate them into the algebra:
 
-    >>> algebra = TransformationAlgebra.from_dict(globals())
+    >>> one = Data(Int)
+    >>> add = Operation(Int ** Int ** Int)
+    >>> example = TransformationAlgebra.from_dict(globals())
 
-At this point, we can parse strings using `algebra.parse`. The parser accepts 
-the names of any function and input type. Adjacent expressions are applied to 
-eachother and the parser will only succeed if the result typechecks. Input 
-types can take an optional identifier to label that input.
+It is possible to define *composite* transformations: transformations that are 
+defined in terms of other, simpler ones. In the case of a transformation 
+algebra, such a definition should not be thought of as an *implementation*: it 
+merely represents a decomposition into more primitive conceptual building 
+blocks.
 
-    >>> algebra.parse("abs (number x)")
+    >>> add1 = Operation(
+            type=Int ** Int,
+            define=lambda x: add(x, one)
+        )
+    >>> compose = Operation(
+            type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            define=lambda f, g, x: f(g(x))
+        )
 
-This will give you an `Expr` object, which has a `type` and sub-expressions.
+With these definitions added to `example`, we are able to parse an expression 
+using the `TransformationAlgebra.parse()` function. If the result typechecks, 
+we obtain an `Expr` object. This object knows its inferred type as well as 
+that of its sub-expressions:
+
+    >>> e = example.parse("compose add1 add1 one")
+    >>> e.type
+    Int
+    >>> print(e.tree())
+    Int
+     ├─Int ** Int
+     │  ├─(Int ** Int) ** Int ** Int
+     │  │  ├─╼ compose : (β ** γ) ** (α ** β) ** α ** γ
+     │  │  └─╼ add1 : Int ** Int
+     │  └─╼ add1 : Int ** Int
+     └─╼ one : Int
+
+If desired, the underlying primitive expression can be derived using 
+`Expr.primitive()`:
+
+    >>> print(e.primitive().tree())
+    Int
+     ├─Int ** Int
+     │  ├─╼ add : Int ** Int ** Int
+     │  └─Int
+     │     ├─Int ** Int
+     │     │  ├─╼ add : Int ** Int ** Int
+     │     │  └─╼ one : Int
+     │     └─╼ one : Int
+     └─╼ one : Int
