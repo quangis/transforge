@@ -1,18 +1,19 @@
 import unittest
 
-from transformation_algebra.type import Operator, Schema
+from transformation_algebra.type import Operator
 from transformation_algebra.expr import \
-    TransformationAlgebra, Definition
+    TransformationAlgebra, Data, Operation
 
 Int = Operator('Int')
-one = Definition(Int)
-add = Definition(Int ** Int ** Int)
-add1 = Definition(
+
+one = Data(Int)
+add = Operation(Int ** Int ** Int)
+add1 = Operation(
     type=Int ** Int,
     term=lambda x: add(x, one)
 )
-compose = Definition(
-    type=Schema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ)),
+compose = Operation(
+    type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
     term=lambda f, g, x: f(g(x))
 )
 algebra = TransformationAlgebra.from_dict(globals())

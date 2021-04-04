@@ -158,7 +158,7 @@ class Abstraction(PartialExpr):
         self.composition: Callable[..., PartialExpr] = composition
 
 
-class Definition(object):
+class Definition(ABC):
     """
     A definition represents a non-instantiated data input or transformation.
     """
@@ -186,6 +186,14 @@ class Definition(object):
 
     def instance(self, identifier: Optional[str] = None) -> Expr:
         return Base(self, label=identifier)
+
+
+class Operation(Definition):
+    pass
+
+
+class Data(Definition):
+    pass
 
 
 class TransformationAlgebra(object):
