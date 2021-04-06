@@ -14,6 +14,55 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeSchema
 
 
+class Definition(ABC):
+    """
+    A definition represents a non-instantiated data input or transformation.
+    """
+
+    def __init__(
+            self,
+            type: Union[Type, Callable[..., Type]],
+            doc: Optional[str] = None):
+        self.name: Optional[str] = None
+        self.type = type if isinstance(type, Type) else TypeSchema(type)
+        self.description = doc
+
+    def __str__(self) -> str:
+        return f"{self.name or 'anonymous'} : {self.type}"
+
+    def __call__(self, *args: Union[Definition, PartialExpr]) -> PartialExpr:
+        return self.instance().__call__(*args)
+
+    def instance(self, identifier: Optional[str] = None) -> Expr:
+        return Base(self, label=identifier)
+
+
+class Data(Definition):
+    """
+    The definition of a data input. An instance of such a definition is a base
+    expression.
+    """
+
+    def __init__(self, *nargs, **kwargs):
+        self.composition = None
+        super().__init__(*nargs, **kwargs)
+        assert not self.type.is_function()
+
+
+class Operation(Definition):
+    """
+    The definition of a transformation. An instance of such a definition is a
+    base expression.
+    """
+
+    def __init__(
+            self, *nargs,
+            derived: Optional[Callable[..., PartialExpr]] = None, **kwargs):
+        self.composition = derived  # some transformations may be non-primitive
+        super().__init__(*nargs, **kwargs)
+        assert self.type.is_function()
+
+
 class PartialExpr(ABC):
     """
     An expression that may contain abstractions.
@@ -158,44 +207,6 @@ class Abstraction(PartialExpr):
         self.composition: Callable[..., PartialExpr] = composition
 
 
-class Definition(ABC):
-    """
-    A definition represents a non-instantiated data input or transformation.
-    """
-
-    def __init__(
-            self,
-            type: Union[Type, Callable[..., Type]],
-            term: Optional[Callable[..., PartialExpr]] = None,
-            name: Optional[str] = None,
-            descr: Optional[str] = None,
-            label: bool = False):
-        self.name = name
-        self.type = type if isinstance(type, Type) else TypeSchema(type)
-        self.labelled = label  # are instances identified or anonymous?
-        self.description = descr  # human-readable
-        self.composition = term  # non-primitive transformations may be
-        # composed of other transformations
-        self.is_input = not self.type.is_function()
-
-    def __str__(self) -> str:
-        return f"{self.name or 'anonymous'} : {self.type}"
-
-    def __call__(self, *args: Union[Definition, PartialExpr]) -> PartialExpr:
-        return self.instance().__call__(*args)
-
-    def instance(self, identifier: Optional[str] = None) -> Expr:
-        return Base(self, label=identifier)
-
-
-class Operation(Definition):
-    pass
-
-
-class Data(Definition):
-    pass
-
-
 class TransformationAlgebra(object):
     def __init__(self, *definitions: Definition):
         self.parser: Optional[pp.Parser] = None
@@ -216,7 +227,7 @@ class TransformationAlgebra(object):
 
         expr = pp.MatchFirst(
             pp.CaselessKeyword(d.name) + pp.Optional(label)
-            if d.is_input else
+            if isinstance(d, Data) else
             pp.CaselessKeyword(d.name)
             for d in self.definitions.values()
         ).setParseAction(

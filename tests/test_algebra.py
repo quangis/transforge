@@ -9,12 +9,12 @@ Int = TypeOperator('Int')
 one = Data(Int)
 add = Operation(Int ** Int ** Int)
 add1 = Operation(
-    type=Int ** Int,
-    term=lambda x: add(x, one)
+    Int ** Int,
+    derived=lambda x: add(x, one)
 )
 compose = Operation(
-    type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-    term=lambda f, g, x: f(g(x))
+    lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+    derived=lambda f, g, x: f(g(x))
 )
 algebra = TransformationAlgebra.from_dict(globals())
 

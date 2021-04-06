@@ -70,7 +70,7 @@ or, if the type was inappropriate, an error:
         Any <= Int
 
 
-## TypeSchematic types and constraints
+## Schematic types and constraints
 
 Our types are *polymorphic* in that any type also represents its supertypes: 
 the signature `Int ** Int` also applies to `UInt ** Int` or indeed to `Int ** 
@@ -151,12 +151,12 @@ merely represents a decomposition into more primitive conceptual building
 blocks.
 
     >>> add1 = Operation(
-            type=Int ** Int,
-            define=lambda x: add(x, one)
+            Int ** Int,
+            derived=lambda x: add(x, one)
         )
     >>> compose = Operation(
-            type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-            define=lambda f, g, x: f(g(x))
+            lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            derived=lambda f, g, x: f(g(x))
         )
 
 With these definitions added to `example`, we are able to parse an expression 
