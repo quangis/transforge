@@ -11,7 +11,7 @@ from inspect import signature
 from typing import Optional, Any, Dict, Callable, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, TypeSchema
+from transformation_algebra.type import Type, TypeSchema, TypeInstance
 
 
 class Definition(ABC):
@@ -69,8 +69,8 @@ class PartialExpr(ABC):
     """
 
     def __call__(self, *args: Union[PartialExpr, Definition]) -> PartialExpr:
-        args2 = (e.instance() if isinstance(e, Definition) else e for e in args)
-        return reduce(PartialExpr.partial_apply, args2, self).complete()
+        a = (e.instance() if isinstance(e, Definition) else e for e in args)
+        return reduce(PartialExpr.partial_apply, a, self).complete()
 
     def partial_apply(self, x: PartialExpr) -> PartialExpr:
         f = self.complete()
@@ -97,6 +97,9 @@ class PartialExpr(ABC):
 
 
 class Expr(PartialExpr):
+    def __init__(self, type: TypeInstance):
+        self.type = type
+
     def __repr__(self) -> str:
         return self.tree()
 
@@ -106,13 +109,13 @@ class Expr(PartialExpr):
         """
         if isinstance(self, Base):
             return f"╼ {self} : {self.definition.type}"
-        elif isinstance(self, Application):
+        else:
+            assert isinstance(self, Application)
             return (
                 f"{self.type}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
-        raise ValueError
 
     def substitute(self, label: str, expr: Expr) -> Expr:
         """
@@ -147,8 +150,9 @@ class Expr(PartialExpr):
         abstractions.
         """
         if isinstance(self, Base):
-            if self.definition.composition:
-                return Abstraction(self.definition.composition).complete()
+            d = self.definition
+            if isinstance(d, Operation) and d.composition:
+                return Abstraction(d.composition).complete()
             else:
                 return self
         elif isinstance(self, Application):
@@ -168,8 +172,8 @@ class Base(Expr):
 
     def __init__(self, definition: Definition, label: Optional[str] = None):
         self.definition = definition
-        self.type = definition.type.instance()
         self.label: Optional[str] = label
+        super().__init__(type=definition.type.instance())
 
     def __str__(self) -> str:
         if self.label:
@@ -185,13 +189,15 @@ class Application(Expr):
     """
 
     def __init__(self, f: Expr, x: Expr):
-        self.f: Expr = f
-        self.x: Expr = x
         try:
-            self.type = f.type.apply(x.type)
+            result = f.type.apply(x.type)
         except error.AlgebraTypeError as e:
             e.add_expression(f, x)
             raise e
+        else:
+            self.f: Expr = f
+            self.x: Expr = x
+            super().__init__(type=result)
 
     def __str__(self) -> str:
         return f"({self.f} {self.x})"
