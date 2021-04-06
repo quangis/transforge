@@ -208,12 +208,20 @@ class Abstraction(PartialExpr):
 
 
 class TransformationAlgebra(object):
-    def __init__(self, *definitions: Definition):
+    def __init__(self, *nargs: Definition, **kwargs: Definition):
+        """
+        Create a transformation algebra with pre-named (positional arguments)
+        or to-be-named (keyword arguments) data and operation definitions.
+        """
         self.parser: Optional[pp.Parser] = None
         self.definitions: Dict[str, Definition] = {}
-
-        for d in definitions:
-            self.definitions[d.name] = d
+        for v in nargs:
+            assert v.name
+            self.definitions[v.name] = v
+        for k, v in kwargs.items():
+            assert not v.name
+            v.name = k
+            self.definitions[v.name] = v
 
     def __repr__(self) -> str:
         return str(self)
@@ -257,9 +265,7 @@ class TransformationAlgebra(object):
         Create transformation algebra from an object, filtering out relevant
         definitions.
         """
-        definitions = []
-        for k, v in obj.items():
-            if isinstance(v, Definition):
-                v.name = k.rstrip("_")
-                definitions.append(v)
-        return TransformationAlgebra(*definitions)
+        return TransformationAlgebra(**{
+            k.rstrip("_"): v for k, v in obj.items()
+            if isinstance(v, Definition)
+        })
