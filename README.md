@@ -62,9 +62,9 @@ sequence of functions.
 When we apply an input type to a function signature, we get its output type, 
 or, if the type was inappropriate, an error:
 
-    >>> add(Int, UInt)
+    >>> add.instance().apply(Int.instance()).apply(UInt.instance())
     Int
-    >>> add(Any)
+    >>> add.instance().apply(Any.instance())
     ...
     Subtype mismatch. Could not satisfy:
         Any <= Int
@@ -79,7 +79,7 @@ class.
 
     >>> from transformation_algebra import TypeSchema
     >>> compose = TypeSchema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
-    >>> compose(abs, add(Int))
+    >>> compose.instance().apply(abs.instance()).apply(add.instance().apply(Int.instance()))
     Int ** UInt
 
 Don't be fooled by the `lambda` keyword --- this is an implementation artefact 
@@ -106,14 +106,14 @@ to define a function that applies to both single integers and sets of
 integers:
 
     >>> sum = TypeSchema(lambda α: α ** α | α @ [Int, Set(Int)])
-    >>> sum(Set(UInt))
+    >>> sum.instance().apply(Set(UInt).instance())
     Set(UInt)
 
 Typeclass constraints can often aid in inference, figuring out 
 interdependencies between types:
 
     >>> f = TypeSchema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
-    >>> f(Set(Int))
+    >>> f.instance().apply(Set(Int).instance())
     Int
 
 Finally, `operators` is a helper function for specifying typeclasses: it 

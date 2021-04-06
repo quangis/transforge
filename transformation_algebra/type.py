@@ -67,16 +67,6 @@ class Type(ABC):
                 *(a.constraints + b.constraints))
         )
 
-    def __call__(self, *args: Type) -> Type:
-        """
-        Function application. This allows us to apply two types to eachother by
-        calling the function type with its argument type.
-        """
-
-        return Type.combine(self, *args, by=lambda x, *xs:
-            reduce(TypeInstance.apply, xs, x)
-        )
-
     def __or__(self, constraint: Optional[Constraint]) -> Type:
         """
         Another abuse of Python's operators, allowing us to add constraints by
@@ -226,13 +216,18 @@ class TypeInstance(Type):
         self._plain.resolve()
         return TypeInstance(self._plain.follow(), *constraints)
 
-    def apply(self, arg: TypeInstance) -> TypeInstance:
+    def apply(self, arg: Union[TypeInstance, TypeInstancePlain]) -> TypeInstance:
         """
         Apply an argument to a function type to get its output type.
         """
 
-        f = self._plain.follow()
-        x = arg._plain.follow()
+        f = self._plain
+        x = arg._plain if isinstance(arg, TypeInstance) else arg
+        fc = self.constraints
+        xc = arg.constraints if isinstance(arg, TypeInstance) else []
+
+        f = f.follow()
+        x = x.follow()
 
         if isinstance(f, TypeVar):
             f.bind(Function(TypeVar(), TypeVar()))
@@ -241,10 +236,7 @@ class TypeInstance(Type):
         if isinstance(f, TypeOperation) and f.operator == Function:
             x.unify(f.params[0], subtype=True)
             f.resolve()
-            return TypeInstance(
-                f.params[1],
-                *chain(self.constraints, arg.constraints)
-            ).resolve()
+            return TypeInstance(f.params[1], *chain(fc, xc)).resolve()
         else:
             raise error.NonFunctionApplication(f, x)
 
