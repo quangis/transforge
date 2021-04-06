@@ -1,5 +1,7 @@
 # Changelog
 
+-   [breaking] Remove implicit conversion and application of types. See commit 
+    message at 7a854df.
 -   [breaking] Classes from the `type` module have been prefixed with `Type` 
     (bbc6eb9) or renamed entirely.
 -   [breaking] Leaf expressions in transformation algebras are now defined in 
