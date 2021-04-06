@@ -6,10 +6,9 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC, abstractmethod
-from functools import reduce
 from itertools import chain, accumulate
 from inspect import signature, Signature, Parameter
-from typing import Optional, Iterable, Union, Callable, List
+from typing import Optional, Iterable, Union, Callable, List, Set
 
 from transformation_algebra import error
 
@@ -253,10 +252,16 @@ class TypeInstancePlain(Type):
             isinstance(self, TypeOperation) and
             any(value in t for t in self.params))
 
-    def variables(self) -> Iterable[TypeVar]:
+    def variables(self, distinct: bool = False) -> Iterable[TypeVar]:
         """
-        Obtain all type variables currently in the type expression.
+        Obtain all distinct type variables currently in the type expression.
         """
+        if distinct:
+            return {v.id: v for v in self._variables()}.values()
+        else:
+            return self._variables()
+
+    def _variables(self) -> Iterable[TypeVar]:
         a = self.follow()
         if isinstance(a, TypeVar):
             yield a
@@ -274,8 +279,8 @@ class TypeInstancePlain(Type):
 
     def skeleton(self) -> TypeInstancePlain:
         """
-        Create a copy of this operator, substituting fresh variables for basic
-        types.
+        A copy of this type in which basic types are substituted with fresh
+        variables.
         """
         if isinstance(self, TypeOperation):
             if self.operator.basic:
@@ -498,13 +503,13 @@ class TypeVar(TypeInstancePlain):
     counter = 0
 
     def __init__(self, name: Optional[str] = None, wildcard: bool = False):
-        cls = type(self)
-        self.id = cls.counter
         self.name = name
         self.wildcard = wildcard
         self.lower: Optional[TypeOperator] = None
         self.unified: Optional[TypeInstancePlain] = None
         self.upper: Optional[TypeOperator] = None
+        cls = type(self)
+        self.id = cls.counter
         cls.counter += 1
 
     def __str__(self) -> str:
@@ -601,11 +606,10 @@ class Constraint(object):
     def __init__(self, subject: TypeInstancePlain, *objects: TypeInstancePlain):
         self.subject = subject
         self.objects = list(objects)
-        self.objects_initial = self.objects
         self.fulfilled()
 
     def __str__(self) -> str:
-        return f"{self.subject} @ {self.objects_initial}"
+        return f"{self.subject} @ {self.objects}"
 
     def fulfilled(self) -> bool:
         """
