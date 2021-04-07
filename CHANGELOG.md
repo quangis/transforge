@@ -1,5 +1,7 @@
 # Changelog
 
+-   [breaking] Directly pass globals to transformation algebra, if desired. 
+    (6c12c34)
 -   [breaking] Removed implicit conversion and application of types. See 
     commit messages at 7a854df and 8e212f6.
 -   [breaking] Classes from the `type` module have been prefixed with `Type` 
@@ -7,15 +9,9 @@
 -   [breaking] Base expressions in transformation algebras are now defined in 
     terms of `Data` and `Operation` definitions, not just in terms of their 
     `Type`.
-<<<<<<< HEAD
 -   [breaking] There is no longer a distinction between constrained type 
     instances and plain type instances; constraints are directly attached to 
     variables. (4d5b741)
-=======
--   There is no longer a distinction between constrained type instances and 
-    plain type instances; constraints are directly attached to variables. 
-    (4d5b741)
->>>>>>> 3c4655041b118e3de102028a4345f4138373370c
 -   Constraints can now only contain variables that are present in the type 
     they are constraining (f3e7300).
 -   Simplified the relationship between schematic types and type instances 
