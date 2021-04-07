@@ -115,7 +115,7 @@ class Expr(PartialExpr):
         else:
             assert isinstance(self, Application)
             return (
-                f"{self.type}\n"
+                f"{self.type.strc()}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )

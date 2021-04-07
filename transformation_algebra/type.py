@@ -62,7 +62,7 @@ class Type(ABC):
         for v in constraint.variables():
             if not v.wildcard and v not in t:
                 raise error.ConstrainFreeVariable(
-                    f"Variable {v.str2()} does not occur in type {t.str2()}")
+                    f"Variable {v} does not occur in type {t}")
         return t
 
     def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
@@ -127,8 +127,8 @@ class TypeSchema(Type):
         self.nvar = len(self.signature.parameters)
 
     def __str__(self) -> str:
-        return str(self.instance(*(
-            TypeVar(v) for v in self.signature.parameters)).resolve())
+        return (self.instance(*(TypeVar(v) for v in
+            self.signature.parameters)).resolve()).strc()
 
     def instance(self, *args: TypeVar, **kwargs: TypeVar) -> TypeInstance:
         """
@@ -194,8 +194,11 @@ class TypeInstance(Type):
     2-ary type operators.
     """
 
-    def __str__(self) -> str:
-        result = [self.str2()]
+    def strc(self) -> str:
+        """
+        Like str(), but includes constraints.
+        """
+        result = [str(self)]
         constraints: Set[Constraint] = set()
 
         for v in self.variables():
@@ -207,10 +210,6 @@ class TypeInstance(Type):
 
         result.extend(str(c) for c in constraints)
         return ' | '.join(result)
-
-    @abstractmethod
-    def str2(self) -> str:
-        return NotImplemented
 
     def instance(self, *args, **kwargs) -> TypeInstance:
         assert not args and not kwargs
@@ -391,14 +390,14 @@ class TypeOperation(TypeInstance):
                 f"{len(self.params)} given"
             )
 
-    def str2(self) -> str:
+    def __str__(self) -> str:
         if self.operator == Function:
             inT, outT = self.params
             if isinstance(inT, TypeOperation) and inT.operator == Function:
-                return f"({inT.str2()}) ** {outT.str2()}"
-            return f"{inT.str2()} ** {outT.str2()}"
+                return f"({inT}) ** {outT}"
+            return f"{inT} ** {outT}"
         elif self.params:
-            return f'{self.operator}({", ".join(t.str2() for t in self.params)})'
+            return f'{self.operator}({", ".join(str(t) for t in self.params)})'
         else:
             return str(self.operator)
 
@@ -430,9 +429,9 @@ class TypeVar(TypeInstance):
         self.id = cls.counter
         cls.counter += 1
 
-    def str2(self) -> str:
+    def __str__(self) -> str:
         if self.unified:
-            return self.unified.str2()
+            return str(self.unified)
         return "_" if self.wildcard else self.name or f"_{self.id}"
 
     def __eq__(self, other: object) -> bool:
@@ -538,10 +537,7 @@ class Constraint(object):
             v.constraints.add(self)
 
     def __str__(self) -> str:
-        return (
-            f"{self.subject.str2()} @ "
-            f"{', '.join(c.str2() for c in self.objects)}"
-        )
+        return f"{self.subject} @ {self.objects}"
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
