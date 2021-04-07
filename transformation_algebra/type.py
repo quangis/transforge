@@ -51,14 +51,19 @@ class Type(ABC):
         # been more intuitive visually, but would not have this property.
         return Function(self.instance(), other.instance())
 
-    def __or__(self, constraint: Constraint) -> Type:
+    def __or__(self, constraint: Constraint) -> TypeInstance:
         """
         Another abuse of Python's operators, allowing us to add constraints by
         using the | operator.
         """
         # Since constraints are fully attached during their instantiation, we
-        # don't have to do anything here
-        return self
+        # don't have to do anything here except perform a sanity check.
+        t = self.instance()
+        for v in constraint.variables():
+            if not v.wildcard and v not in t:
+                raise RuntimeError(
+                    f"Variable {v.str2()} does not occur in type {t.str2()}")
+        return t
 
     def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
         """
@@ -229,9 +234,11 @@ class TypeInstance(Type):
         return a.follow()
 
     def __contains__(self, value: TypeInstance) -> bool:
-        return value == self or (
-            isinstance(self, TypeOperation) and
-            any(value in t for t in self.params))
+        a = self.follow()
+        b = value.follow()
+        return a == b or (
+            isinstance(a, TypeOperation) and
+            any(b in t for t in a.params))
 
     def variables(self, distinct: bool = False) -> Iterable[TypeVar]:
         """
@@ -388,8 +395,8 @@ class TypeOperation(TypeInstance):
         if self.operator == Function:
             inT, outT = self.params
             if isinstance(inT, TypeOperation) and inT.operator == Function:
-                return f"({inT}) ** {outT}"
-            return f"{inT} ** {outT}"
+                return f"({inT.str2()}) ** {outT.str2()}"
+            return f"{inT.str2()} ** {outT.str2()}"
         elif self.params:
             return f'{self.operator}({", ".join(t.str2() for t in self.params)})'
         else:
@@ -425,7 +432,7 @@ class TypeVar(TypeInstance):
 
     def str2(self) -> str:
         if self.unified:
-            return str(self.unified)
+            return self.unified.str2()
         return "_" if self.wildcard else self.name or f"_{self.id}"
 
     def __eq__(self, other: object) -> bool:
