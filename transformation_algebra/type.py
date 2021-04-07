@@ -217,7 +217,7 @@ class TypeInstance(Type):
         A copy in which base types are substituted with fresh variables.
         """
         if isinstance(self, TypeOperation):
-            if self.operator.basic:
+            if self.basic:
                 return TypeVar()
             else:
                 return TypeOperation(
@@ -235,7 +235,7 @@ class TypeInstance(Type):
         b = other.follow()
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
-            if a.operator.basic:
+            if a.basic:
                 return a.operator.subtype(b.operator)
             elif a.operator != b.operator:
                 return False
@@ -252,14 +252,14 @@ class TypeInstance(Type):
                         result = None
                 return result
         elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
-            if (b.upper or b.lower) and a.operator.compound:
+            if (b.upper or b.lower) and not a.basic:
                 return False
             if b.upper and b.upper.subtype(a.operator, True):
                 return False
             if b.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
-            if (a.upper or a.lower) and b.operator.compound:
+            if (a.upper or a.lower) and not b.basic:
                 return False
             if a.lower and b.operator.subtype(a.lower, True):
                 return False
@@ -280,7 +280,7 @@ class TypeInstance(Type):
         b = other.follow()
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
-            if a.operator.basic:
+            if a.basic:
                 if subtype and not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
                 elif not subtype and not a.operator != b.operator:
@@ -302,7 +302,7 @@ class TypeInstance(Type):
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
             if a in b:
                 raise error.RecursiveType(a, b)
-            elif b.operator.basic:
+            elif b.basic:
                 if subtype:
                     a.below(b.operator)
                 else:
@@ -314,7 +314,7 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
             if b in a:
                 raise error.RecursiveType(b, a)
-            elif a.operator.basic:
+            elif a.basic:
                 if subtype:
                     b.above(a.operator)
                 else:
@@ -344,7 +344,7 @@ class TypeOperator(Type):
             self.variance = list(params)
         self.arity = len(self.variance)
 
-        if self.supertype and not self.basic:
+        if self.supertype and self.arity > 0:
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
@@ -366,14 +366,6 @@ class TypeOperator(Type):
     def instance(self, *args, **kwargs) -> TypeInstance:
         assert not args and not kwargs
         return TypeOperation(self)
-
-    @property
-    def basic(self) -> bool:
-        return self.arity == 0
-
-    @property
-    def compound(self) -> bool:
-        return not self.basic
 
 
 class TypeOperation(TypeInstance):
@@ -408,6 +400,10 @@ class TypeOperation(TypeInstance):
             return (self.operator == other.operator and
                 all(s == t for s, t in zip(self.params, other.params)))
         return False
+
+    @property
+    def basic(self) -> bool:
+        return self.operator.arity == 0
 
 
 class TypeVar(TypeInstance):
@@ -464,7 +460,7 @@ class TypeVar(TypeInstance):
                 if t.lower == t.upper and t.lower is not None:
                     t.bind(t.lower())
 
-            elif isinstance(t, TypeOperation) and t.operator.basic:
+            elif isinstance(t, TypeOperation) and t.basic:
                 if self.lower and t.operator.subtype(self.lower, True):
                     raise error.SubtypeMismatch(t, self)
                 if self.upper and self.upper.subtype(t.operator, True):
