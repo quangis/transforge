@@ -76,6 +76,10 @@ class ViolatedConstraint(AlgebraTypeError):
         )
 
 
+class ConstrainFreeVariable(AlgebraTypeError):
+    pass
+
+
 class NonFunctionApplication(AlgebraTypeError):
     def __init__(self, fn, arg):
         self.fn = fn

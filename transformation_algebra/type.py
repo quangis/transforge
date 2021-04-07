@@ -61,7 +61,7 @@ class Type(ABC):
         t = self.instance()
         for v in constraint.variables():
             if not v.wildcard and v not in t:
-                raise RuntimeError(
+                raise error.ConstrainFreeVariable(
                     f"Variable {v.str2()} does not occur in type {t.str2()}")
         return t
 
@@ -334,7 +334,7 @@ class TypeInstance(Type):
             if a.basic:
                 if subtype and not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
-                elif not subtype and not a.operator != b.operator:
+                elif not subtype and a.operator != b.operator:
                     raise error.TypeMismatch(a, b)
             elif a.operator == b.operator:
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
@@ -538,7 +538,10 @@ class Constraint(object):
             v.constraints.add(self)
 
     def __str__(self) -> str:
-        return f"{self.subject.str2()} @ {[c.str2() for c in self.objects]}"
+        return (
+            f"{self.subject.str2()} @ "
+            f"{', '.join(c.str2() for c in self.objects)}"
+        )
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(

@@ -1,7 +1,8 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import TypeOperator, TypeSchema, TypeVar, _
+from transformation_algebra.type import \
+    Type, TypeOperator, TypeSchema, TypeVar, _
 
 Any = TypeOperator('Any')
 Ord = TypeOperator('Ord', supertype=Any)
@@ -148,6 +149,16 @@ class TestType(unittest.TestCase):
         """
         f = TypeSchema(lambda x: (x ** x) ** x)
         self.apply(f, UInt ** Int, error.SubtypeMismatch)
+
+    def test_constrain_wildcard(self):
+        f = TypeSchema(lambda x: x ** x | x @ [_])
+        self.apply(f, Int, Int)
+
+    def test_constrain_free_variable(self):
+        f = TypeSchema(lambda x, y, z: x ** x | y @ [x, z])
+        g = TypeSchema(lambda x, y, z: x ** x | x @ [y, z])
+        self.assertRaises(error.ConstrainFreeVariable, TypeSchema.instance, f)
+        self.assertRaises(error.ConstrainFreeVariable, TypeSchema.instance, g)
 
     def test_global_subtype_resolution(self):
         f = TypeSchema(lambda x: x ** (x ** x) ** x)
