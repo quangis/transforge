@@ -138,6 +138,50 @@ class TypeSchema(Type):
         return self.schema(*binding.args, **binding.kwargs).instance()
 
 
+class TypeOperator(Type):
+    """
+    An n-ary type constructor. If 0-ary, can also be treated as an instance of
+    the corresponding type operation (that is, a base type).
+    """
+
+    def __init__(
+            self,
+            name: str,
+            params: Union[int, Iterable[Variance]] = 0,
+            supertype: Optional[TypeOperator] = None):
+        self.name = name
+        self.supertype: Optional[TypeOperator] = supertype
+
+        if isinstance(params, int):
+            self.variance = list(Variance.CO for _ in range(params))
+        else:
+            self.variance = list(params)
+        self.arity = len(self.variance)
+
+        if self.supertype and self.arity > 0:
+            raise ValueError("only nullary types can have direct supertypes")
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, TypeOperator) and
+            self.name == other.name
+            and self.variance == other.variance)
+
+    def __call__(self, *params: Type) -> TypeOperation:  # type: ignore
+        return TypeOperation(self, *(p.instance() for p in params))
+
+    def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
+        return ((not strict and self == other) or
+            bool(self.supertype and self.supertype.subtype(other)))
+
+    def instance(self, *args, **kwargs) -> TypeInstance:
+        assert not args and not kwargs
+        return TypeOperation(self)
+
+
 class TypeInstance(Type):
     """
     Base class for type instances (type operations and -variables). Note that
@@ -324,50 +368,6 @@ class TypeInstance(Type):
                 b.unify(a, subtype=subtype)
 
 
-class TypeOperator(Type):
-    """
-    An n-ary type constructor. If 0-ary, can also be treated as an instance of
-    the corresponding type operation (that is, a base type).
-    """
-
-    def __init__(
-            self,
-            name: str,
-            params: Union[int, Iterable[Variance]] = 0,
-            supertype: Optional[TypeOperator] = None):
-        self.name = name
-        self.supertype: Optional[TypeOperator] = supertype
-
-        if isinstance(params, int):
-            self.variance = list(Variance.CO for _ in range(params))
-        else:
-            self.variance = list(params)
-        self.arity = len(self.variance)
-
-        if self.supertype and self.arity > 0:
-            raise ValueError("only nullary types can have direct supertypes")
-
-    def __str__(self) -> str:
-        return self.name
-
-    def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, TypeOperator) and
-            self.name == other.name
-            and self.variance == other.variance)
-
-    def __call__(self, *params: Type) -> TypeOperation:  # type: ignore
-        return TypeOperation(self, *(p.instance() for p in params))
-
-    def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
-        return ((not strict and self == other) or
-            bool(self.supertype and self.supertype.subtype(other)))
-
-    def instance(self, *args, **kwargs) -> TypeInstance:
-        assert not args and not kwargs
-        return TypeOperation(self)
-
-
 class TypeOperation(TypeInstance):
     """
     An instance of an n-ary type constructor.
@@ -514,13 +514,6 @@ class TypeVar(TypeInstance):
             c for c in self.constraints if not c.fulfilled(unify))
 
 
-"The special constructor for function types."
-Function = TypeOperator('Function', params=(Variance.CONTRA, Variance.CO))
-
-"A wildcard: fresh variable, unrelated to, and matchable with, anything else."
-_ = TypeSchema(lambda: TypeVar(wildcard=True))
-
-
 class Constraint(object):
     """
     A constraint enforces that its subject type is a subtype of one of its
@@ -568,6 +561,13 @@ class Constraint(object):
         # Fulfillment is achieved if the subject is fully concrete and there is
         # at least one definitely compatible object
         return not any(self.subject.variables()) and any(compatibility)
+
+
+"The special constructor for function types."
+Function = TypeOperator('Function', params=(Variance.CONTRA, Variance.CO))
+
+"A wildcard: fresh variable, unrelated to, and matchable with, anything else."
+_ = TypeSchema(lambda: TypeVar(wildcard=True))
 
 
 def operators(
