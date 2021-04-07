@@ -17,7 +17,7 @@ compose = Operation(
     lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
     derived=lambda f, g, x: f(g(x))
 )
-algebra = TransformationAlgebra.from_dict(globals())
+algebra = TransformationAlgebra(**globals())
 
 
 A = TypeOperator('A')

@@ -141,7 +141,7 @@ automatically incorporate them into the algebra:
 
     >>> one = Data(Int)
     >>> add = Operation(Int ** Int ** Int)
-    >>> example = TransformationAlgebra.from_dict(globals())
+    >>> example = TransformationAlgebra(**globals())
 
 It is possible to define *composite* transformations: transformations that are 
 derived from other, simpler ones. This definition should not necessarily be 

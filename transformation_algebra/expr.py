@@ -256,10 +256,16 @@ class TransformationAlgebra(object):
         for v in nargs:
             assert v.name
             self.definitions[v.name] = v
+
+        # If we get fed globals(), we will automatically filter out only
+        # definitions, without complaining
+        got_globals = '__builtins__' in kwargs
+
         for k, v in kwargs.items():
-            assert not v.name
-            v.name = k
-            self.definitions[v.name] = v
+            if not got_globals or isinstance(v, Definition):
+                assert not v.name
+                v.name = k.rstrip("_") if got_globals else k
+                self.definitions[v.name] = v
 
     def __repr__(self) -> str:
         return str(self)
@@ -290,20 +296,3 @@ class TransformationAlgebra(object):
             self.parser = self.generate_parser()
         expr = self.parser.parseString(string, parseAll=True)[0]
         return expr
-
-    def tree(self, string: str) -> None:
-        """
-        Print a tree corresponding to the given algebra expression.
-        """
-        print(self.parse(string).tree())
-
-    @staticmethod
-    def from_dict(obj: Dict[str, Any]) -> TransformationAlgebra:
-        """
-        Create transformation algebra from an object, filtering out relevant
-        definitions.
-        """
-        return TransformationAlgebra(**{
-            k.rstrip("_"): v for k, v in obj.items()
-            if isinstance(v, Definition)
-        })
