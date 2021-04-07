@@ -8,7 +8,7 @@ from abc import ABC
 import pyparsing as pp
 from functools import reduce, partial
 from inspect import signature
-from typing import Optional, Any, Dict, Callable, Union
+from typing import Optional, Dict, Callable, Union
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -22,7 +22,7 @@ class Definition(ABC):
 
     def __init__(
             self,
-            type: Union[Type, Callable[..., Type]],
+            type: Union[Type, Callable[..., TypeInstance]],
             doc: Optional[str] = None):
         self.name: Optional[str] = None
         self.type = type if isinstance(type, Type) else TypeSchema(type)
@@ -157,7 +157,7 @@ class Expr(PartialExpr):
         """
         if isinstance(self, Base):
             if self.label == label:
-                self.type.plain().unify(expr.type.plain())
+                self.type.unify(expr.type)
                 return expr
             else:
                 return self
