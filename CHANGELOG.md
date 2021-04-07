@@ -7,9 +7,15 @@
 -   [breaking] Base expressions in transformation algebras are now defined in 
     terms of `Data` and `Operation` definitions, not just in terms of their 
     `Type`.
+<<<<<<< HEAD
 -   [breaking] There is no longer a distinction between constrained type 
     instances and plain type instances; constraints are directly attached to 
     variables. (4d5b741)
+=======
+-   There is no longer a distinction between constrained type instances and 
+    plain type instances; constraints are directly attached to variables. 
+    (4d5b741)
+>>>>>>> 3c4655041b118e3de102028a4345f4138373370c
 -   Constraints can now only contain variables that are present in the type 
     they are constraining (f3e7300).
 -   Simplified the relationship between schematic types and type instances 
