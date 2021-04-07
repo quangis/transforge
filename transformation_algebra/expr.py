@@ -195,6 +195,22 @@ class Expr(PartialExpr):
             return f.partial_apply(x)
         raise ValueError
 
+    def renamed(self) -> Expr:
+        """
+        Give readable variable names to any variable left on the top-level of
+        the expression. Differentiate them with a prime symbol (') to make sure
+        there's no conflict with schematic variables in any definition.
+        """
+        # TODO better way to differentiate
+        variables = list(self.type.variables(distinct=True))
+        names = list("stuvwxyzabcde")
+
+        if len(variables) > len(names):
+            names = [f"t{i}" for i in range(len(variables))]
+
+        for v, n in zip(variables, names):
+            v.name = f"{n}'"
+        return self
 
 class Base(Expr):
     """
@@ -295,4 +311,4 @@ class TransformationAlgebra(object):
         if not self.parser:
             self.parser = self.generate_parser()
         expr = self.parser.parseString(string, parseAll=True)[0]
-        return expr
+        return expr.renamed()

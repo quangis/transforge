@@ -128,7 +128,7 @@ class TypeSchema(Type):
 
     def __str__(self) -> str:
         return self.schema(
-            TypeVar(v) for v in signature(self.schema).parameters
+            *(TypeVar(v) for v in signature(self.schema).parameters)
         ).resolve().strc()
 
     def instance(self) -> TypeInstance:
@@ -468,22 +468,14 @@ class TypeVar(TypeInstance):
         bound.
         """
         lower, upper = self.lower or new, self.upper or new
-
-        # lower bound higher than the upper bound fails
-        if upper.subtype(new, True):
+        if upper.subtype(new, True):  # fail when lower bound higher than upper
             raise error.SubtypeMismatch(new, upper)
-
-        # lower bound lower than the current lower bound is ignored
-        elif new.subtype(lower, True):
+        elif new.subtype(lower, True):  # ignore lower bound lower than current
             pass
-
-        # tightening the lower bound
-        elif lower.subtype(new):
+        elif lower.subtype(new):  # tighten the lower bound
             self.lower = new
             self.check_constraints(False)
-
-        # new bound from another lineage (neither sub- nor supertype) fails
-        else:
+        else:  # fail on bound from other lineage (neither sub- nor supertype)
             raise error.SubtypeMismatch(lower, new)
 
     def below(self, new: TypeOperator) -> None:
@@ -580,12 +572,3 @@ def operators(
                     param if param and i == j else _ for j in range(op.arity)
                 )))
     return options
-
-
-def varnames(n: int, unicode: bool = False) -> Iterable[str]:
-    """
-    Produce some suitable variable names.
-    """
-    base = "τσαβγφψ" if unicode else "stuvwxyzabcde"
-    for i in range(n):
-        yield base[i] if n < len(base) else base[0] + str(i + 1)
