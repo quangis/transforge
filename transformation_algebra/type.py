@@ -83,6 +83,25 @@ class Type(ABC):
     def __ge__(self, other: Type) -> Optional[bool]:
         return self.instance().subtype(other.instance())
 
+    def apply(self, arg: Type) -> TypeInstance:
+        """
+        Apply an argument to a function type to get its output type.
+        """
+
+        f = self.instance().follow()
+        x = arg.instance().follow()
+
+        if isinstance(f, TypeVar):
+            f.bind(Function(TypeVar(), TypeVar()))
+            f = f.follow()
+
+        if isinstance(f, TypeOperation) and f.operator == Function:
+            x.unify(f.params[0], subtype=True)
+            f.resolve()
+            return f.params[1].resolve()
+        else:
+            raise error.NonFunctionApplication(f, x)
+
     def is_function(self) -> bool:
         """
         Does this type represent a function?
@@ -164,25 +183,6 @@ class TypeInstance(Type):
             elif not prefer_lower and a.upper:
                 a.bind(a.upper())
         return a.follow()
-
-    def apply(self, arg: TypeInstance) -> TypeInstance:
-        """
-        Apply an argument to a function type to get its output type.
-        """
-
-        f = self.follow()
-        x = arg.follow()
-
-        if isinstance(f, TypeVar):
-            f.bind(Function(TypeVar(), TypeVar()))
-            f = f.follow()
-
-        if isinstance(f, TypeOperation) and f.operator == Function:
-            x.unify(f.params[0], subtype=True)
-            f.resolve()
-            return f.params[1].resolve()
-        else:
-            raise error.NonFunctionApplication(f, x)
 
     def __contains__(self, value: TypeInstance) -> bool:
         return value == self or (

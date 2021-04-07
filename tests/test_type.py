@@ -72,13 +72,13 @@ class TestType(unittest.TestCase):
     def test_compose(self):
         compose = TypeSchema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
         self.apply(
-            compose.instance().apply(Int ** Str), Str ** Int,
+            compose.apply(Int ** Str), Str ** Int,
             Str ** Str)
 
     def test_compose_subtype(self):
         compose = TypeSchema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
         self.apply(
-            compose.instance().apply(Int ** Str), Str ** UInt,
+            compose.apply(Int ** Str), Str ** UInt,
             Str ** Str)
 
     def test_variable_subtype_mismatch(self):
@@ -88,26 +88,26 @@ class TestType(unittest.TestCase):
     def test_functions_as_arguments1(self):
         swap = TypeSchema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
         f = TypeSchema(lambda x: Bool ** x ** x)
-        self.apply(swap.instance().apply(f.instance()).apply(UInt()), Bool, UInt)
+        self.apply(swap.apply(f).apply(UInt), Bool, UInt)
 
     def test_functions_as_arguments2(self):
         id = TypeSchema(lambda x: x ** x)
         f = Int ** Int
         x = UInt
-        self.apply(id.instance().apply(f.instance()), x, Int)
+        self.apply(id.apply(f), x, Int)
 
     def test_order_of_subtype_application(self):
         """
         This test is inspired by Traytel et al (2011).
         """
         leq = TypeSchema(lambda α: α ** α ** Bool)
-        self.apply(leq.instance().apply(UInt()), Int(), Bool())
-        self.apply(leq.instance().apply(Int()), UInt, Bool)
-        self.apply(leq.instance().apply(Int()), Bool, error.SubtypeMismatch)
+        self.apply(leq.apply(UInt), Int(), Bool())
+        self.apply(leq.apply(Int), UInt, Bool)
+        self.apply(leq.apply(Int), Bool, error.SubtypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
         leq = TypeSchema(lambda α: α ** α ** Bool | α @ [Ord, Bool])
-        self.apply(leq.instance().apply(Int()), UInt, Bool)
+        self.apply(leq.apply(Int), UInt, Bool)
         self.apply(leq, Any, error.ViolatedConstraint)
 
     def test_violation_of_constraints(self):
@@ -131,7 +131,7 @@ class TestType(unittest.TestCase):
         too loose a bound.
         """
         f = TypeSchema(lambda x: x ** x | x @ [Map(Str, Int)])
-        result = f.instance().apply(TypeVar())
+        result = f.apply(TypeVar())
         self.assertEqual(result.operator, Map)
 
     def test_multiple_bounds1(self):
@@ -151,8 +151,8 @@ class TestType(unittest.TestCase):
 
     def test_global_subtype_resolution(self):
         f = TypeSchema(lambda x: x ** (x ** x) ** x)
-        self.apply(f.instance().apply(UInt()), Int ** UInt, UInt)
-        self.apply(f.instance().apply(Int()), Int ** UInt, Int)
+        self.apply(f.apply(UInt), Int ** UInt, UInt)
+        self.apply(f.apply(Int), Int ** UInt, Int)
 
     def test_interdependent_types(self):
         f = TypeSchema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
