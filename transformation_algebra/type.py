@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC, abstractmethod
-from itertools import chain, accumulate
-from inspect import signature, Signature, Parameter
+from itertools import chain
+from inspect import signature
 from typing import Optional, Iterable, Union, Callable, List, Set
 
 from transformation_algebra import error
@@ -39,7 +39,7 @@ class Type(ABC):
     def __repr__(self) -> str:
         return str(self)
 
-    def __pow__(self, other: Type) -> Type:
+    def __pow__(self, other: Type) -> TypeInstance:
         """
         Function abstraction. This is an overloaded (ab)use of Python's
         exponentiation operator. It allows us to use the right-to-left
@@ -49,7 +49,7 @@ class Type(ABC):
         # associative, matching the conventional behaviour of the function
         # arrow. The right-bitshift operator >> (for __rshift__) might have
         # been more intuitive visually, but would not have this property.
-        return Type.combine(self, other, by=Function)
+        return Function(self.instance(), other.instance())
 
     def __or__(self, constraint: Constraint) -> Type:
         """
@@ -89,41 +89,6 @@ class Type(ABC):
         """
         t = self.instance()
         return isinstance(t, TypeOperation) and t.operator == Function
-
-    @staticmethod
-    def combine(*types: Type, by: Callable[..., TypeInstance]) -> Type:
-        """
-        Combine several types into a single (possibly schematic) type using a
-        function that combines instances of those types.
-        """
-
-        if any(isinstance(t, TypeSchema) for t in types):
-            # A new schematic variable for every such one needed by arguments
-            nvar = [t.nvar if isinstance(t, TypeSchema) else 0 for t in types]
-            names = list(varnames(sum(nvar)))
-            params = [
-                Parameter(v, Parameter.POSITIONAL_OR_KEYWORD) for v in names]
-            sig = Signature(params)
-
-            # Divvy up the new parameters for all the argument types
-            types_with_varnames = [
-                (t, names[i:i + δ])
-                for t, i, δ in zip(types, accumulate([0] + nvar), nvar)
-            ]
-
-            # Combine into a new schema
-            def σ(*args: TypeVar, **kwargs: TypeVar) -> TypeInstance:
-                binding = sig.bind(*args, **kwargs)
-                return by(*(
-                    t.instance(*(binding.arguments[v] for v in varnames))
-                    for t, varnames in types_with_varnames
-                ))
-            σ.__signature__ = (  # type: ignore
-                signature(σ).replace(parameters=params))
-
-            return TypeSchema(σ)
-        else:
-            return by(*(t.instance() for t in types))
 
 
 class TypeSchema(Type):
