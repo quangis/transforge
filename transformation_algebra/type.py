@@ -29,12 +29,9 @@ class Variance(Enum):
 
 class Type(ABC):
     """
-    The base class for anything that can be treated as a (schematic) type.
+    The base class for anything that can be treated as a type: type schemata
+    and type instances.
     """
-
-    @abstractmethod
-    def instance(self, *arg: TypeVar, **kwargs: TypeVar) -> TypeInstance:
-        return NotImplemented
 
     def __repr__(self) -> str:
         return str(self)
@@ -114,6 +111,10 @@ class Type(ABC):
         t = self.instance()
         return isinstance(t, TypeOperation) and t.operator == Function
 
+    @abstractmethod
+    def instance(self) -> TypeInstance:
+        return NotImplemented
+
 
 class TypeSchema(Type):
     """
@@ -121,26 +122,17 @@ class TypeSchema(Type):
     is, a type containing some schematic type variable.
     """
 
-    def __init__(self, schema: Callable[..., Type]):
+    def __init__(self, schema: Callable[..., TypeInstance]):
         self.schema = schema
-        self.signature = signature(schema)
-        self.nvar = len(self.signature.parameters)
+        self.n = len(signature(schema).parameters)
 
     def __str__(self) -> str:
-        return (self.instance(*(TypeVar(v) for v in
-            self.signature.parameters)).resolve()).strc()
+        return self.schema(
+            TypeVar(v) for v in signature(self.schema).parameters
+        ).resolve().strc()
 
-    def instance(self, *args: TypeVar, **kwargs: TypeVar) -> TypeInstance:
-        """
-        Create an instance of this schema. Optionally bind schematic variables
-        to concrete variables; non-bound variables will get automatically
-        assigned a concrete variable.
-        """
-        binding = self.signature.bind_partial(*args, **kwargs)
-        for param in self.signature.parameters:
-            if param not in binding.arguments:
-                binding.arguments[param] = TypeVar()
-        return self.schema(*binding.args, **binding.kwargs).instance()
+    def instance(self) -> TypeInstance:
+        return self.schema(*(TypeVar() for _ in range(self.n)))
 
 
 class TypeOperator(Type):
@@ -170,20 +162,17 @@ class TypeOperator(Type):
         return self.name
 
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, TypeOperator) and
-            self.name == other.name
-            and self.variance == other.variance)
+        return (isinstance(other, TypeOperator) and
+            self.name == other.name and self.variance == other.variance)
 
-    def __call__(self, *params: Type) -> TypeOperation:  # type: ignore
+    def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
 
     def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
         return ((not strict and self == other) or
             bool(self.supertype and self.supertype.subtype(other)))
 
-    def instance(self, *args, **kwargs) -> TypeInstance:
-        assert not args and not kwargs
+    def instance(self) -> TypeInstance:
         return TypeOperation(self)
 
 
@@ -210,10 +199,6 @@ class TypeInstance(Type):
 
         result.extend(str(c) for c in constraints)
         return ' | '.join(result)
-
-    def instance(self, *args, **kwargs) -> TypeInstance:
-        assert not args and not kwargs
-        return self
 
     def resolve(self, prefer_lower: bool = True) -> TypeInstance:
         """
@@ -372,6 +357,9 @@ class TypeInstance(Type):
             else:
                 b.bind(a.skeleton())
                 b.unify(a, subtype=subtype)
+
+    def instance(self) -> TypeInstance:
+        return self
 
 
 class TypeOperation(TypeInstance):
@@ -598,6 +586,6 @@ def varnames(n: int, unicode: bool = False) -> Iterable[str]:
     """
     Produce some suitable variable names.
     """
-    base = "τσαβγφψ" if unicode else "xyzuvwabcde"
+    base = "τσαβγφψ" if unicode else "stuvwxyzabcde"
     for i in range(n):
         yield base[i] if n < len(base) else base[0] + str(i + 1)
