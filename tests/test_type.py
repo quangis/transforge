@@ -26,8 +26,8 @@ class TestType(unittest.TestCase):
         if isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result, lambda x: f.apply(x), x)
         else:
-            actual = f.apply(x).plain()
-            expected = result.instance().plain()
+            actual = f.apply(x)
+            expected = result.instance()
             self.assertEqual(actual, expected)
 
     def test_apply_non_function(self):
@@ -131,7 +131,7 @@ class TestType(unittest.TestCase):
         too loose a bound.
         """
         f = TypeSchema(lambda x: x ** x | x @ [Map(Str, Int)])
-        result = f.instance().apply(TypeVar()).plain()
+        result = f.instance().apply(TypeVar())
         self.assertEqual(result.operator, Map)
 
     def test_multiple_bounds1(self):

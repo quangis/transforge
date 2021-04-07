@@ -27,6 +27,9 @@ class Definition(ABC):
         self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.description = doc
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __str__(self) -> str:
         return f"{self.name or 'anonymous'} : {self.type}"
 
