@@ -12,9 +12,8 @@ To define such an algebra, we implemented **type inference** in Python. The
 system accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) 
 and [parametric 
 polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism), which, 
-divorced from implementation, enable unusually powerful type inference. To 
-make it work, some magic happens under the hood --- for now, refer to the 
-[source 
+divorced from implementation, enable powerful type inference. To make it work, 
+some magic happens under the hood --- for now, refer to the [source 
 code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
 to gain a deeper understanding. This document is merely intended to be a 
 user's guide.
@@ -145,10 +144,9 @@ automatically incorporate them into the algebra:
     >>> example = TransformationAlgebra.from_dict(globals())
 
 It is possible to define *composite* transformations: transformations that are 
-defined in terms of other, simpler ones. In the case of a transformation 
-algebra, such a definition should not be thought of as an *implementation*: it 
-merely represents a decomposition into more primitive conceptual building 
-blocks.
+derived from other, simpler ones. This definition should not necessarily be 
+thought of as an *implementation*: it merely represents a decomposition into 
+more primitive conceptual building blocks.
 
     >>> add1 = Operation(
             Int ** Int,
