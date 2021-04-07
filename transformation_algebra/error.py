@@ -12,15 +12,34 @@ class AlgebraTypeError(RuntimeError):
         self.fn = fn
         self.arg = arg
 
+    def add_definition(self, definition):
+        self.definition = definition
+
     def __str__(self) -> str:
+        result = []
         if self.fn and self.arg:
-            return (
-                f"Error while applying:\n"
-                f"\t\033[1m{self.arg}\033[0m\n\tto\n"
-                f"\t\033[1m{self.fn}\033[0m\n"
-            )
-        else:
-            return "Typing error.\n"
+            result.extend([
+                "Error while applying:",
+                f"\t\033[1m{self.arg}\033[0m\n\tto",
+                f"\t\033[1m{self.fn}\033[0m",
+            ])
+        if self.definition:
+            result.append(f"in the definition of {self.definition.name}")
+        return "\n".join(result or "Typing error.") + "\n"
+
+
+class DefinitionTypeMismatch(AlgebraTypeError):
+    def __init__(self, definition, declared, inferred):
+        self.declared = declared
+        self.inferred = inferred
+        self.definition = definition
+
+    def __str__(self) -> str:
+        return (
+            f"Declared type {self.declared} cannot be reconciled with "
+            f"inferred type {self.inferred} "
+            f"in {self.definition.name or 'an anonymous operation'}"
+        )
 
 
 class RecursiveType(AlgebraTypeError):

@@ -11,7 +11,8 @@ from inspect import signature
 from typing import Optional, Any, Dict, Callable, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, TypeSchema, TypeInstance
+from transformation_algebra.type import \
+    Type, TypeSchema, TypeInstance, Function, _
 
 
 class Definition(ABC):
@@ -64,6 +65,36 @@ class Operation(Definition):
         self.composition = derived  # some transformations may be non-primitive
         super().__init__(*nargs, **kwargs)
         assert self.type.is_function()
+
+        # If the operation is composite, check that its declared type is no
+        # more general than the type we can infer from the composition function
+        if self.composition:
+            mock = Definition(_)
+            args = [Base(mock) for a in signature(self.composition).parameters]
+            output = self.composition(*args)
+            if isinstance(output, Expr):
+                declared_type = self.type.instance()
+                inferred_type = output.type
+                nvars = sum(1 for v in declared_type.variables())
+                for a in reversed(args):
+                    inferred_type = Function(a.type, inferred_type)
+                try:
+                    declared_type.unify(inferred_type, subtype=True)
+                    declared_type = declared_type.resolve()
+                except error.AlgebraTypeError:
+                    raise error.DefinitionTypeMismatch(
+                        self, self.type, inferred_type)
+                else:
+                    # If some variables we declared were unified, we know that
+                    # the inferred type is more specific than the declared type
+                    if sum(1 for v in declared_type.variables()) != nvars:
+                        raise error.DefinitionTypeMismatch(
+                            self, self.type, inferred_type)
+
+            else:
+                # The type could not be derived because the result is not a
+                # full expression. Shouldn't happen?
+                raise RuntimeError
 
 
 class PartialExpr(ABC):
@@ -179,10 +210,8 @@ class Base(Expr):
         super().__init__(type=definition.type.instance())
 
     def __str__(self) -> str:
-        if self.label:
-            return (f"{self.definition.name} {self.label}")
-        else:
-            return f"{self.definition.name}"
+        name = self.definition.name or "anonymous"
+        return f"{name} {self.label}" if self.label else name
 
 
 class Application(Expr):
