@@ -302,15 +302,21 @@ class TransformationAlgebra(object):
         stack: List[Optional[Expr]] = [None]
 
         for token_group, chars in groupby(string, Token.ize):
-            if token_group is Token.LPAREN:
-                for lparen in chars:
-                    stack.append(None)
-            elif token_group is Token.RPAREN:
+            if token_group is Token.RPAREN:
                 for rparen in chars:
                     y = stack.pop()
                     if y:
                         x = stack.pop()
                         stack.append(Application(x, y) if x else y)
+            elif token_group is Token.LPAREN:
+                for lparen in chars:
+                    stack.append(None)
+            elif token_group is Token.COMMA:
+                y = stack.pop()
+                if y:
+                    x = stack.pop()
+                    stack.append(Application(x, y) if x else y)
+                stack.append(None)
             elif token_group is Token.IDENT:
                 token = "".join(chars)
                 previous = stack.pop()
@@ -334,6 +340,7 @@ class Token(Enum):
     RPAREN = auto()
     SPACE = auto()
     IDENT = auto()
+    COMMA = auto()
 
     @staticmethod
     def ize(char: str) -> Token:
@@ -341,6 +348,8 @@ class Token(Enum):
             return Token.LPAREN
         elif ord(char) == 41:
             return Token.RPAREN
+        elif ord(char) == 44:
+            return Token.COMMA
         elif char.isspace():
             return Token.SPACE
         else:

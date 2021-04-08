@@ -13,7 +13,8 @@
     instances and plain type instances; constraints are directly attached to 
     variables. (4d5b741)
 -   Removed `pyparsing` dependency and sped up parsing by two orders of 
-    magnitude.
+    magnitude. Python-style function calling (`f(x,y)`) is now parseable in 
+    addition to `f x y`.
 -   Constraints can now only contain variables that are present in the type 
     they are constraining (f3e7300).
 -   Simplified the relationship between schematic types and type instances 
