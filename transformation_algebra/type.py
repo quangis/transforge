@@ -324,10 +324,9 @@ class TypeInstance(Type):
                 for v, x, y in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.CO:
                         x.unify(y, subtype=subtype)
-                    elif v == Variance.CONTRA:
-                        y.unify(x, subtype=subtype)
                     else:
-                        raise ValueError
+                        assert v == Variance.CONTRA
+                        y.unify(x, subtype=subtype)
             else:
                 raise error.TypeMismatch(a, b)
 

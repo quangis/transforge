@@ -163,11 +163,11 @@ class Expr(PartialExpr):
                 return expr
             else:
                 return self
-        elif isinstance(self, Application):
+        else:
+            assert isinstance(self, Application)
             self.f = self.f.substitute(label, expr)
             self.x = self.x.substitute(label, expr)
             return self
-        raise ValueError
 
     def primitive(self) -> Expr:
         """
@@ -176,9 +176,9 @@ class Expr(PartialExpr):
         f = self.partial_primitive()
         if isinstance(f, Abstraction):
             raise RuntimeError("cannot express partial primitive")
-        elif isinstance(f, Expr):
+        else:
+            assert isinstance(f, Expr)
             return f
-        raise ValueError
 
     def partial_primitive(self) -> PartialExpr:
         """
@@ -191,11 +191,11 @@ class Expr(PartialExpr):
                 return Abstraction(d.composition).complete()
             else:
                 return self
-        elif isinstance(self, Application):
+        else:
+            assert isinstance(self, Application)
             f = self.f.partial_primitive()
             x = self.x.partial_primitive()
             return f.partial_apply(x)
-        raise ValueError
 
     def renamed(self) -> Expr:
         """
@@ -203,7 +203,8 @@ class Expr(PartialExpr):
         the expression. Differentiate them with a prime symbol (') to make sure
         there's no conflict with schematic variables in any definition.
         """
-        # TODO better way to differentiate
+        # TODO this is turned off at the moment. find a better way to
+        # differentiate between schematic and instance variables
         variables = list(self.type.variables(distinct=True))
         names = list("stuvwxyzabcde")
 
