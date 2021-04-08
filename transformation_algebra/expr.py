@@ -4,11 +4,13 @@ Classes to define generic transformation algebras.
 
 from __future__ import annotations
 
+from enum import Enum, auto
 from abc import ABC
 import pyparsing as pp
 from functools import reduce, partial
+from itertools import groupby
 from inspect import signature
-from typing import Optional, Dict, Callable, Union
+from typing import Optional, Dict, Callable, Union, List
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -267,11 +269,10 @@ class TransformationAlgebra(object):
         Create a transformation algebra with pre-named (positional arguments)
         or to-be-named (keyword arguments) data and operation definitions.
         """
-        self.parser: Optional[pp.Parser] = None
         self.definitions: Dict[str, Definition] = {}
         for v in nargs:
             assert v.name
-            self.definitions[v.name] = v
+            self[v.name] = v
 
         # If we get fed globals(), we will automatically filter out only
         # definitions, without complaining
@@ -281,7 +282,7 @@ class TransformationAlgebra(object):
             if not got_globals or isinstance(v, Definition):
                 assert not v.name
                 v.name = k.rstrip("_") if got_globals else k
-                self.definitions[v.name] = v
+                self[v.name] = v
 
     def __repr__(self) -> str:
         return str(self)
@@ -289,26 +290,58 @@ class TransformationAlgebra(object):
     def __str__(self) -> str:
         return "\n".join(str(d) for d in self.definitions.values()) + "\n"
 
-    def generate_parser(self) -> pp.Parser:
+    def __getitem__(self, key: str) -> Definition:
+        return self.definitions[key.lower()]
 
-        label = pp.Word(pp.alphanums + ':_').setName('identifier')
+    def __setitem__(self, key: str, value: Definition) -> None:
+        self.definitions[key.lower()] = value
 
-        expr = pp.MatchFirst(
-            pp.CaselessKeyword(d.name) + pp.Optional(label)
-            if isinstance(d, Data) else
-            pp.CaselessKeyword(d.name)
-            for d in self.definitions.values()
-        ).setParseAction(
-            lambda s, l, t: self.definitions[t[0]].instance(
-                t[1] if len(t) > 1 else None)
-        )
+    def parse(self, string: str) -> Optional[Expr]:
+        # This used to be done via pyparsing, but the structure is so simple
+        # that I opted to remove the dependency --- this is *much* faster
+        stack: List[Optional[Expr]] = [None]
 
-        return pp.infixNotation(expr, [(
-            None, 2, pp.opAssoc.LEFT, lambda s, l, t: reduce(Application, t[0])
-        )])
+        for token_group, chars in groupby(string, Token.ize):
+            if token_group is Token.LPAREN:
+                for lparen in chars:
+                    stack.append(None)
+            elif token_group is Token.RPAREN:
+                for rparen in chars:
+                    y = stack.pop()
+                    if y:
+                        x = stack.pop()
+                        stack.append(Application(x, y) if x else y)
+            elif token_group is Token.IDENT:
+                token = "".join(chars)
+                previous = stack.pop()
+                if previous and isinstance(previous, Base) \
+                        and isinstance(previous.definition, Data):
+                    previous.label = token
+                    stack.append(previous)
+                else:
+                    current = self[token].instance()
+                    if previous:
+                        current = Application(previous, current)
+                    stack.append(current)
 
-    def parse(self, string: str) -> Expr:
-        if not self.parser:
-            self.parser = self.generate_parser()
-        expr = self.parser.parseString(string, parseAll=True)[0]
-        return expr.renamed()
+        if len(stack) == 1:
+            return stack[0]
+        raise RuntimeError
+
+
+class Token(Enum):
+    LPAREN = auto()
+    RPAREN = auto()
+    SPACE = auto()
+    IDENT = auto()
+
+    @staticmethod
+    def ize(char: str) -> Token:
+        if ord(char) == 40:
+            return Token.LPAREN
+        elif ord(char) == 41:
+            return Token.RPAREN
+        elif char.isspace():
+            return Token.SPACE
+        else:
+            return Token.IDENT
