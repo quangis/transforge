@@ -88,10 +88,10 @@ variables that occur in its body. This is akin to *quantifying* those
 variables. When instantiating the schema, these generic variables are 
 automatically populated with *instances* of type variables.
 
-When you need a variable but you don't care about what variable it is or how 
-it relates to others, you may use the `_` *wildcard variable*. The purpose 
-goes beyond convenience: it communicates to the type system that it can always 
-be a sub- and supertype of *anything*.
+When you need a variable, but you don't care how it relates to others, you may 
+use the *wildcard variable* `_`. The purpose goes beyond convenience: it 
+communicates to the type system that it can always be a sub- and supertype of 
+*anything*. (Note that it must be explicitly imported.)
 
     >>> from transformation_algebra import _
     >>> size = Set(_) ** Int
