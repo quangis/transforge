@@ -161,10 +161,6 @@ class TypeOperator(Type):
     def __str__(self) -> str:
         return self.name
 
-    def __eq__(self, other: object) -> bool:
-        return (isinstance(other, TypeOperator) and
-            self.name == other.name and self.variance == other.variance)
-
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
 
