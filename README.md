@@ -26,16 +26,16 @@ can act as an example.
 ## Concrete types and subtypes
 
 To specify type transformations, we first need to declare *base types*. To 
-this end, we use the `TypeOperator` class. 
+this end, we use the `Type.declare` function. 
 
-    >>> from transformation_algebra import TypeOperator
-    >>> Any = TypeOperator("Any")
+    >>> from transformation_algebra import *
+    >>> Any = Type.declare("Any")
 
 Base types may have supertypes. For instance, anything of type `Int` is also 
 automatically of type `Any`, but not necessarily of type `UInt`:
 
-    >>> Int = TypeOperator("Int", supertype=Any)
-    >>> UInt = TypeOperator("UInt", supertype=Int)
+    >>> Int = Type.declare("Int", supertype=Any)
+    >>> UInt = Type.declare("UInt", supertype=Int)
     >>> Int <= Any
     True
     >>> Int <= UInt
@@ -45,7 +45,7 @@ automatically of type `Any`, but not necessarily of type `UInt`:
 represent a set of integers. This would automatically be a subtype of 
 `Set(Any)`.
 
-    >>> Set = TypeOperator("Set", 1)
+    >>> Set = Type.declare("Set", params=1)
     >>> Set(Int) <= Set(Any)
     True
 
@@ -76,7 +76,6 @@ the signature `Int ** Int` also applies to `UInt ** Int` or indeed to `Int **
 Any`. We additionally allow *parametric polymorphism*, using the `TypeSchema` 
 class.
 
-    >>> from transformation_algebra import TypeSchema
     >>> compose = TypeSchema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
     >>> compose.apply(abs).apply(add.apply(Int))
     Int ** UInt
@@ -118,7 +117,7 @@ interdependencies between types:
 Finally, `operators` is a helper function for specifying typeclasses: it 
 generates type terms that contain certain parameters.
 
-    >>> Map = TypeOperator("Map", 2)
+    >>> Map = Type.declare("Map", params=2)
     >>> operators(Map, param=Int)
     [Map(Int, _), Map(_, Int)]
 
@@ -128,8 +127,6 @@ generates type terms that contain certain parameters.
 Now that we know how types work, we can use them to define the data inputs and 
 operations of an algebra.
 
-    >>> from transformation_algebra import TransformationAlgebra, \
-                                           Data, Operation
     >>> example = TransformationAlgebra(
             one=Data(Int),
             add=Operation(Int ** Int ** Int)

@@ -2,17 +2,17 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeOperator, TypeSchema, TypeVar, _
+    Type, TypeSchema, TypeVar, _
 
-Any = TypeOperator('Any')
-Ord = TypeOperator('Ord', supertype=Any)
-Bool = TypeOperator('Bool', supertype=Ord)
-Str = TypeOperator('Str', supertype=Ord)
-Int = TypeOperator('Int', supertype=Ord)
-UInt = TypeOperator('UInt', supertype=Int)
-T = TypeOperator('T', 1)
-Set = TypeOperator('Set', 1)
-Map = TypeOperator('Map', 2)
+Any = Type.declare('Any')
+Ord = Type.declare('Ord', supertype=Any)
+Bool = Type.declare('Bool', supertype=Ord)
+Str = Type.declare('Str', supertype=Ord)
+Int = Type.declare('Int', supertype=Ord)
+UInt = Type.declare('UInt', supertype=Int)
+T = Type.declare('T', 1)
+Set = Type.declare('Set', 1)
+Map = Type.declare('Map', 2)
 
 
 class TestType(unittest.TestCase):

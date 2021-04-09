@@ -1,11 +1,11 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import TypeOperator
+from transformation_algebra.type import Type
 from transformation_algebra.expr import \
     TransformationAlgebra, Data, Operation
 
-Int = TypeOperator('Int')
+Int = Type.declare('Int')
 
 one = Data(Int)
 add = Operation(Int ** Int ** Int)
@@ -20,8 +20,8 @@ compose = Operation(
 algebra = TransformationAlgebra(**globals())
 
 
-A = TypeOperator('A')
-B = TypeOperator('B')
+A = Type.declare('A')
+B = Type.declare('B')
 f = Operation(A ** B)
 g = Operation(lambda α: α ** B)
 
