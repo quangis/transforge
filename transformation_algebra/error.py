@@ -3,7 +3,39 @@ This module holds all the errors that might be raised.
 """
 
 
-class AlgebraTypeError(RuntimeError):
+class TAError(RuntimeError):
+    """
+    Any error raised by this library.
+    """
+    pass
+
+
+class ParseError(TAError):
+    pass
+
+
+class BracketMismatch(ParseError):
+    def __str__(self) -> str:
+        return "Mismatched bracket."
+
+
+class LBracketMismatch(BracketMismatch):
+    pass
+
+
+class RBracketMismatch(BracketMismatch):
+    pass
+
+
+class Undefined(ParseError):
+    def __init__(self, token: str):
+        self.token = token
+
+    def __str__(self) -> str:
+        return f"Transformation or data input '{self.token}' is undefined."
+
+
+class AlgebraTypeError(TAError):
     """
     This error occurs when an expression does not typecheck.
     """

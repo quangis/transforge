@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC
-import pyparsing as pp
 from functools import reduce, partial
 from itertools import groupby
 from inspect import signature
@@ -305,19 +304,25 @@ class TransformationAlgebra(object):
         for token_group, chars in groupby(string, Token.ize):
             if token_group is Token.RPAREN:
                 for rparen in chars:
-                    y = stack.pop()
-                    if y:
-                        x = stack.pop()
-                        stack.append(Application(x, y) if x else y)
+                    try:
+                        y = stack.pop()
+                        if y:
+                            x = stack.pop()
+                            stack.append(Application(x, y) if x else y)
+                    except IndexError as e:
+                        raise error.LBracketMismatch from e
             elif token_group is Token.LPAREN:
                 for lparen in chars:
                     stack.append(None)
             elif token_group is Token.COMMA:
-                y = stack.pop()
-                if y:
-                    x = stack.pop()
-                    stack.append(Application(x, y) if x else y)
-                stack.append(None)
+                try:
+                    y = stack.pop()
+                    if y:
+                        x = stack.pop()
+                        stack.append(Application(x, y) if x else y)
+                    stack.append(None)
+                except IndexError as e:
+                    raise error.LBracketMismatch from e
             elif token_group is Token.IDENT:
                 token = "".join(chars)
                 previous = stack.pop()
@@ -326,14 +331,19 @@ class TransformationAlgebra(object):
                     previous.label = token
                     stack.append(previous)
                 else:
-                    current = self[token].instance()
-                    if previous:
-                        current = Application(previous, current)
-                    stack.append(current)
+                    try:
+                        current = self[token].instance()
+                    except KeyError as e:
+                        raise error.Undefined(token) from e
+                    else:
+                        if previous:
+                            current = Application(previous, current)
+                        stack.append(current)
 
         if len(stack) == 1:
             return stack[0]
-        raise RuntimeError
+        else:
+            raise error.RBracketMismatch(string)
 
 
 class Token(Enum):
