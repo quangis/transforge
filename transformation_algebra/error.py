@@ -12,11 +12,11 @@ class TAError(RuntimeError):
     pass
 
 
-class ParseError(TAError):
+class TAParseError(TAError):
     pass
 
 
-class BracketMismatch(ParseError):
+class BracketMismatch(TAParseError):
     def __str__(self) -> str:
         return "Mismatched bracket."
 
@@ -29,7 +29,7 @@ class RBracketMismatch(BracketMismatch):
     pass
 
 
-class Undefined(ParseError):
+class Undefined(TAParseError):
     def __init__(self, token: str):
         self.token = token
 
@@ -37,7 +37,7 @@ class Undefined(ParseError):
         return f"Transformation or data input '{self.token}' is undefined."
 
 
-class AlgebraTypeError(TAError):
+class TATypeError(TAError):
     """
     This error occurs when an expression does not typecheck.
     """
@@ -62,7 +62,7 @@ class AlgebraTypeError(TAError):
         return "\n".join(result or "Typing error.") + "\n"
 
 
-class DefinitionTypeMismatch(AlgebraTypeError):
+class DefinitionTypeMismatch(TATypeError):
     def __init__(self, definition, declared, inferred):
         self.declared = declared
         self.inferred = inferred
@@ -76,7 +76,7 @@ class DefinitionTypeMismatch(AlgebraTypeError):
         )
 
 
-class RecursiveType(AlgebraTypeError):
+class RecursiveType(TATypeError):
     def __init__(self, t1, t2):
         self.t1 = t1
         self.t2 = t2
@@ -88,7 +88,7 @@ class RecursiveType(AlgebraTypeError):
         )
 
 
-class TypeMismatch(AlgebraTypeError):
+class TypeMismatch(TATypeError):
     def __init__(self, t1, t2):
         self.t1 = t1
         self.t2 = t2
@@ -103,7 +103,7 @@ class TypeMismatch(AlgebraTypeError):
         )
 
 
-class SubtypeMismatch(AlgebraTypeError):
+class SubtypeMismatch(TATypeError):
     def __init__(self, c1, c2):
         self.c1 = c1
         self.c2 = c2
@@ -118,7 +118,7 @@ class SubtypeMismatch(AlgebraTypeError):
         )
 
 
-class ConstraintViolation(AlgebraTypeError):
+class ConstraintViolation(TATypeError):
     def __init__(self, constraint: 'ta.type.Constraint'):
         self.constraint = constraint
 
@@ -129,11 +129,11 @@ class ConstraintViolation(AlgebraTypeError):
         )
 
 
-class ConstrainFreeVariable(AlgebraTypeError):
+class ConstrainFreeVariable(TATypeError):
     pass
 
 
-class NonFunctionApplication(AlgebraTypeError):
+class NonFunctionApplication(TATypeError):
     def __init__(self, fn, arg):
         self.fn = fn
         self.arg = arg

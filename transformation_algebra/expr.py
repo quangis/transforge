@@ -82,9 +82,9 @@ class Operation(Definition):
                 try:
                     declared_type.unify(inferred_type, subtype=True)
                     declared_type = declared_type.resolve()
-                except error.AlgebraTypeError:
+                except error.TATypeError as e:
                     raise error.DefinitionTypeMismatch(
-                        self, self.type, inferred_type)
+                        self, self.type, inferred_type) from e
                 else:
                     # If some variables we declared were unified, we know that
                     # the inferred type is more specific than the declared type
@@ -241,9 +241,9 @@ class Application(Expr):
     def __init__(self, f: Expr, x: Expr):
         try:
             result = f.type.apply(x.type)
-        except error.AlgebraTypeError as e:
+        except error.TATypeError as e:
             e.add_expression(f, x)
-            raise e
+            raise
         else:
             self.f: Expr = f
             self.x: Expr = x
