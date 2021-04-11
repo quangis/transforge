@@ -60,6 +60,7 @@ class Type(ABC):
             if not v.wildcard and v not in t:
                 raise error.ConstrainFreeVariable(
                     f"Variable {v} does not occur in type {t}")
+        constraint.set_context(t)
         return t
 
     def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
@@ -511,9 +512,13 @@ class Constraint(object):
     object types.
     """
 
-    def __init__(self, subject: TypeInstance, *objects: TypeInstance):
+    def __init__(
+            self,
+            subject: TypeInstance,
+            *objects: TypeInstance):
         self.subject = subject
         self.objects = list(objects)
+        self.description = str(self)
         self.fulfilled()
 
         # Inform variables about the constraint present on them
@@ -523,6 +528,9 @@ class Constraint(object):
 
     def __str__(self) -> str:
         return f"{self.subject} @ {self.objects}"
+
+    def set_context(self, context: TypeInstance) -> None:
+        self.description = f"{context} | {self}"
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
