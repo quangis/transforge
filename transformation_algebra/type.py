@@ -549,7 +549,7 @@ class Constraint(object):
             if c is not False]
 
         if len(self.objects) == 0:
-            raise error.ViolatedConstraint(self)
+            raise error.ConstraintViolation(self)
 
         # If there is only one possibility left, we can unify, but *only* with
         # the skeleton: the base types must remain variable, because we don't

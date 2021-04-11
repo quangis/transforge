@@ -109,12 +109,12 @@ class TestType(unittest.TestCase):
     def test_order_of_subtype_application_with_constraints(self):
         leq = TypeSchema(lambda α: α ** α ** Bool | α @ [Ord, Bool])
         self.apply(leq.apply(Int), UInt, Bool)
-        self.apply(leq, Any, error.ViolatedConstraint)
+        self.apply(leq, Any, error.ConstraintViolation)
 
     def test_violation_of_constraints(self):
         sum = TypeSchema(lambda α: α ** α | α @ [Int, Set(Int)])
         self.apply(sum, Set(UInt), Set(UInt))
-        self.apply(sum, Bool, error.ViolatedConstraint)
+        self.apply(sum, Bool, error.ConstraintViolation)
 
     def test_preservation_of_basic_subtypes_in_constraints(self):
         f = TypeSchema(lambda x: x ** x | x @ [Any])
@@ -168,7 +168,7 @@ class TestType(unittest.TestCase):
     def test_interdependent_types(self):
         f = TypeSchema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
         self.apply(f, Set(Int), Int)
-        self.apply(f, Int, error.ViolatedConstraint)
+        self.apply(f, Int, error.ConstraintViolation)
 
     def test_subtyping_of_concrete_functions(self):
         self.assertTrue(Int ** Int <= UInt ** Int)

@@ -2,6 +2,8 @@
 This module holds all the errors that might be raised.
 """
 
+import transformation_algebra as ta
+
 
 class TAError(RuntimeError):
     """
@@ -116,14 +118,14 @@ class SubtypeMismatch(AlgebraTypeError):
         )
 
 
-class ViolatedConstraint(AlgebraTypeError):
-    def __init__(self, c):
-        self.c = c
+class ConstraintViolation(AlgebraTypeError):
+    def __init__(self, constraint: 'ta.type.Constraint'):
+        self.constraint = constraint
 
     def __str__(self) -> str:
         return (
             super().__str__() +
-            f"Violated type constraint:\n\t{self.c}"
+            f"Violated type constraint:\n\t{self.constraint.description}"
         )
 
 
