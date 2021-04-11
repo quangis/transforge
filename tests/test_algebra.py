@@ -52,7 +52,7 @@ class TestAlgebra(unittest.TestCase):
 
     def test_exact_declared_type_in_definition(self):
         self.assertRaises(
-            error.DefinitionTypeMismatch, Operation,
+            error.TypeAnnotationError, Operation,
             B ** B, derived=lambda x: f(x)
         )
         Operation(A ** B, derived=lambda x: f(x))
@@ -64,7 +64,7 @@ class TestAlgebra(unittest.TestCase):
     def test_looser_declared_type_in_definition(self):
         Operation(lambda α: α ** B, derived=lambda x: g(x))
         self.assertRaises(
-            error.DefinitionTypeMismatch, Operation,
+            error.TypeAnnotationError, Operation,
             lambda α: α ** B, derived=lambda x: f(x))
 
 

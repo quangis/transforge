@@ -83,13 +83,14 @@ class Operation(Definition):
                     declared_type.unify(inferred_type, subtype=True)
                     declared_type = declared_type.resolve()
                 except error.TATypeError as e:
-                    raise error.DefinitionTypeMismatch(
+                    raise error.TypeAnnotationError(
                         self, self.type, inferred_type) from e
                 else:
                     # If some variables we declared were unified, we know that
                     # the inferred type is more specific than the declared type
+                    # TODO is this always true?
                     if sum(1 for v in declared_type.variables()) != nvars:
-                        raise error.DefinitionTypeMismatch(
+                        raise error.TypeAnnotationError(
                             self, self.type, inferred_type)
 
             else:

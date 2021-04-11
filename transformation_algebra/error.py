@@ -62,8 +62,18 @@ class TATypeError(TAError):
         return "\n".join(result or "Typing error.") + "\n"
 
 
-class DefinitionTypeMismatch(TATypeError):
-    def __init__(self, definition, declared, inferred):
+class TypeAnnotationError(TATypeError):
+    """
+    Raised when the declared type of a composite transformation is not
+    unifiable with the type inferred from its derivation, or when the declared
+    type is more general than the inferred type.
+    """
+
+    def __init__(
+            self,
+            definition: 'ta.expr.Definition',
+            declared: 'ta.type.Type',
+            inferred: 'ta.type.Type'):
         self.declared = declared
         self.inferred = inferred
         self.definition = definition
@@ -72,7 +82,7 @@ class DefinitionTypeMismatch(TATypeError):
         return (
             f"Declared type {self.declared} cannot be reconciled with "
             f"inferred type {self.inferred} "
-            f"in {self.definition.name or 'an anonymous operation'}"
+            f"in {self.definition.name or 'the definition of an operation'}"
         )
 
 
