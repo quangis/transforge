@@ -143,8 +143,12 @@ class ConstrainFreeVariable(TATypeError):
     pass
 
 
-class NonFunctionApplication(TATypeError):
-    def __init__(self, fn, arg):
+class FunctionApplicationError(TATypeError):
+    """
+    Raised when an argument is passed to a non-function type.
+    """
+
+    def __init__(self, fn: 'ta.type.Type', arg: 'ta.type.Type'):
         self.fn = fn
         self.arg = arg
 

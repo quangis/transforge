@@ -103,7 +103,7 @@ class Type(ABC):
             f.resolve()
             return f.params[1].resolve()
         else:
-            raise error.NonFunctionApplication(f, x)
+            raise error.FunctionApplicationError(f, x)
 
     def is_function(self) -> bool:
         """

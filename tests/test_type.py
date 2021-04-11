@@ -32,7 +32,7 @@ class TestType(unittest.TestCase):
             self.assertEqual(actual, expected)
 
     def test_apply_non_function(self):
-        self.apply(Int, Int, error.NonFunctionApplication)
+        self.apply(Int, Int, error.FunctionApplicationError)
 
     def test_basic_match(self):
         f = Int ** Str
