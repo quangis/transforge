@@ -33,7 +33,7 @@ class Definition(ABC):
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.name or 'anonymous'} : {self.type}"
+        return f"{self.name or '[?]'} : {self.type}"
 
     def __call__(self, *args: Union[Definition, PartialExpr]) -> PartialExpr:
         return self.instance().__call__(*args)
@@ -223,7 +223,7 @@ class Base(Expr):
         super().__init__(type=definition.type.instance())
 
     def __str__(self) -> str:
-        name = self.definition.name or "anonymous"
+        name = self.definition.name or "[?]"
         return f"{name} {self.label}" if self.label else name
 
 

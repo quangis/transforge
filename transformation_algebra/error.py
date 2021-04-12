@@ -63,15 +63,9 @@ class TATypeError(TAError):
         return NotImplemented
 
     def __str__(self) -> str:
-        if self.fn and self.arg:
-            return (
-                f"During the application of the following expressions:\n"
-                f"\t\033[1m{self.fn}\033[0m to\n"
-                f"\t\033[1m{self.arg}\033[0m\n"
-                f"{self.specify()}"
-            )
-        else:
-            return f"A type error occurred: {self.specify()}"
+        clause = f" while applying {self.fn} to {self.arg}" \
+            if self.fn and self.arg else ""
+        return f"A type error occurred{clause}: {self.specify()}"
 
 
 class RecursiveType(TATypeError):
@@ -89,7 +83,7 @@ class TypeMismatch(TATypeError):
     """
 
     def specify(self) -> str:
-        return "Could not unify type {self.t1} with {self.t2}."
+        return f"Could not unify type {self.t1} with {self.t2}."
 
 
 class SubtypeMismatch(TypeMismatch):
@@ -98,7 +92,7 @@ class SubtypeMismatch(TypeMismatch):
     """
 
     def specify(self) -> str:
-        return "Could not satisfy subtype {self.t1} <= {self.t2}"
+        return f"Could not satisfy subtype {self.t1} <= {self.t2}."
 
 
 class FunctionApplicationError(TATypeError):
@@ -140,7 +134,7 @@ class ConstraintViolation(TAConstraintError):
     """
 
     def __str__(self) -> str:
-        return f"Violated type constraint:\n\t{self.constraint.description}"
+        return f"Violated typeclass constraint {self.constraint.description}."
 
 
 class ConstrainFreeVariable(TAConstraintError):
@@ -151,8 +145,8 @@ class ConstrainFreeVariable(TAConstraintError):
 
     def __str__(self) -> str:
         return (
-            f"Free variable occurs in constraint:\n"
-            f"\t{self.constraint.description}")
+            f"A free variable occurs in constraint "
+            f"{self.constraint.description}")
 
 
 # Other errors ###############################################################
@@ -171,5 +165,5 @@ class PartialPrimitiveError(TAError):
     def __str__(self) -> str:
         return (
             "Cannot express partially applied composite "
-            "expression as primitive."
+            "expression as a primitive expression."
         )
