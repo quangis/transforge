@@ -84,14 +84,19 @@ class Operation(Definition):
                     declared_type = declared_type.resolve()
                 except error.TATypeError as e:
                     raise error.TypeAnnotationError(
-                        self, self.type, inferred_type) from e
+                        definition=self,
+                        declared=self.type,
+                        inferred=inferred_type,
+                        e=e) from e
                 else:
                     # If some variables we declared were unified, we know that
                     # the inferred type is more specific than the declared type
                     # TODO is this always true?
                     if sum(1 for v in declared_type.variables()) != nvars:
                         raise error.TypeAnnotationError(
-                            self, self.type, inferred_type)
+                            definition=self,
+                            declared=self.type,
+                            inferred=inferred_type)
 
             else:
                 # The type could not be derived because the result is not a
@@ -215,6 +220,7 @@ class Expr(PartialExpr):
             v.name = f"{n}'"
         return self
 
+
 class Base(Expr):
     """
     A base expression represents either a single transformation or a data
@@ -243,7 +249,7 @@ class Application(Expr):
         try:
             result = f.type.apply(x.type)
         except error.TATypeError as e:
-            e.add_expression(f, x)
+            e.while_applying(f, x)
             raise
         else:
             self.f: Expr = f

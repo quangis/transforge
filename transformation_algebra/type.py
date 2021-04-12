@@ -56,11 +56,10 @@ class Type(ABC):
         # Since constraints are fully attached during their instantiation, we
         # don't have to do anything here except perform a sanity check.
         t = self.instance()
+        constraint.set_context(t)
         for v in constraint.variables():
             if not v.wildcard and v not in t:
-                raise error.ConstrainFreeVariable(
-                    f"Variable {v} does not occur in type {t}")
-        constraint.set_context(t)
+                raise error.ConstrainFreeVariable(constraint)
         return t
 
     def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:

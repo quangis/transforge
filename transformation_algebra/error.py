@@ -2,6 +2,9 @@
 This module holds all the errors that might be raised.
 """
 
+from abc import abstractmethod
+from typing import Optional
+
 import transformation_algebra as ta
 
 
@@ -11,6 +14,8 @@ class TAError(RuntimeError):
     """
     pass
 
+
+# Parsing errors #############################################################
 
 class TAParseError(TAError):
     pass
@@ -37,32 +42,124 @@ class Undefined(TAParseError):
         return f"Transformation or data input '{self.token}' is undefined."
 
 
+# Type errors ################################################################
+
 class TATypeError(TAError):
     """
     This error occurs when an expression does not typecheck.
     """
 
-    def add_expression(self, fn, arg):
+    def __init__(self, t1: 'ta.type.Type', t2: 'ta.type.Type'):
+        self.t1 = t1
+        self.t2 = t2
+        self.fn = None
+        self.arg = None
+
+    def while_applying(self, fn: 'ta.expr.Expr', arg: 'ta.expr.Expr'):
         self.fn = fn
         self.arg = arg
 
-    def add_definition(self, definition):
-        self.definition = definition
+    @abstractmethod
+    def specify(self) -> str:
+        return NotImplemented
 
     def __str__(self) -> str:
-        result = []
         if self.fn and self.arg:
-            result.extend([
-                "Error while applying:",
-                f"\t\033[1m{self.arg}\033[0m\n\tto",
-                f"\t\033[1m{self.fn}\033[0m",
-            ])
-        if self.definition:
-            result.append(f"in the definition of {self.definition.name}")
-        return "\n".join(result or "Typing error.") + "\n"
+            return (
+                f"During the application of the following expressions:\n"
+                f"\t\033[1m{self.fn}\033[0m to\n"
+                f"\t\033[1m{self.arg}\033[0m\n"
+                f"{self.specify()}"
+            )
+        else:
+            return f"A type error occurred: {self.specify()}"
 
 
-class TypeAnnotationError(TATypeError):
+class RecursiveType(TATypeError):
+    """
+    Raised for infinite types.
+    """
+
+    def specify(self) -> str:
+        return f"Encountered the recursive type {self.t1}~{self.t2}."
+
+
+class TypeMismatch(TATypeError):
+    """
+    Raised when compound types mismatch.
+    """
+
+    def specify(self) -> str:
+        return "Could not unify type {self.t1} with {self.t2}."
+
+
+class SubtypeMismatch(TypeMismatch):
+    """
+    Raised when base types are not subtypes.
+    """
+
+    def specify(self) -> str:
+        return "Could not satisfy subtype {self.t1} <= {self.t2}"
+
+
+class FunctionApplicationError(TATypeError):
+    """
+    Raised when an argument is passed to a non-function type.
+    """
+
+    def specify(self) -> str:
+        return f"Could not apply non-function {self.t1} to {self.t2}."
+
+
+# Constraint errors ##########################################################
+
+class TAConstraintError(TAError):
+    """
+    Raised when there is an issue with a typeclass constraint.
+    """
+
+    def __init__(self, constraint: 'ta.type.Constraint'):
+        self.constraint = constraint
+
+
+class ConstraintViolation(TAConstraintError):
+    """
+    Raised when there can be no situation in which a constraint is satisfied.
+    """
+
+    def __str__(self) -> str:
+        return f"Violated type constraint:\n\t{self.constraint.description}"
+
+
+class ConstrainFreeVariable(TAConstraintError):
+    """
+    Raised when a constraint refers to a variable that does not occur in the
+    context that it is constraining.
+    """
+
+    def __str__(self) -> str:
+        return (
+            f"Free variable occurs in constraint:\n"
+            f"\t{self.constraint.description}")
+
+
+# Definition errors ##########################################################
+
+class TADefinitionError(TAError):
+    """
+    An error that occurs in the definition of an operation or data input.
+    """
+    pass
+
+    def __init__(
+            self,
+            definition: 'ta.expr.Definition',
+            e: 'Optional[TAError]' = None):
+        self.definition = definition
+        self.e = e
+
+
+class TypeAnnotationError(TADefinitionError):
     """
     Raised when the declared type of a composite transformation is not
     unifiable with the type inferred from its derivation, or when the declared
@@ -71,89 +168,15 @@ class TypeAnnotationError(TATypeError):
 
     def __init__(
             self,
-            definition: 'ta.expr.Definition',
             declared: 'ta.type.Type',
-            inferred: 'ta.type.Type'):
+            inferred: 'ta.type.Type',
+            *nargs, **kwargs):
         self.declared = declared
         self.inferred = inferred
-        self.definition = definition
+        super().__init__(*nargs, **kwargs)
 
     def __str__(self) -> str:
         return (
-            f"Declared type {self.declared} cannot be reconciled with "
-            f"inferred type {self.inferred} "
-            f"in {self.definition.name or 'the definition of an operation'}"
-        )
-
-
-class RecursiveType(TATypeError):
-    def __init__(self, t1, t2):
-        self.t1 = t1
-        self.t2 = t2
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"Recursive type: {self.t1} and {self.t2}"
-        )
-
-
-class TypeMismatch(TATypeError):
-    def __init__(self, t1, t2):
-        self.t1 = t1
-        self.t2 = t2
-        self.fn = None
-        self.arg = None
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            "Type mismatch. Could not unify:\n"
-            f"\t{self.t1} with {self.t2}"
-        )
-
-
-class SubtypeMismatch(TATypeError):
-    def __init__(self, c1, c2):
-        self.c1 = c1
-        self.c2 = c2
-        self.fn = None
-        self.arg = None
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            "Subtype mismatch. Could not satisfy:\n"
-            f"\t{self.c1} <= {self.c2}"
-        )
-
-
-class ConstraintViolation(TATypeError):
-    def __init__(self, constraint: 'ta.type.Constraint'):
-        self.constraint = constraint
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"Violated type constraint:\n\t{self.constraint.description}"
-        )
-
-
-class ConstrainFreeVariable(TATypeError):
-    pass
-
-
-class FunctionApplicationError(TATypeError):
-    """
-    Raised when an argument is passed to a non-function type.
-    """
-
-    def __init__(self, fn: 'ta.type.Type', arg: 'ta.type.Type'):
-        self.fn = fn
-        self.arg = arg
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"Cannot apply {self.arg} to non-function {self.fn}"
+            f"Declared type {self.declared} could not be reconciled with "
+            f"inferred type {self.inferred}. {self.e if self.e else ''}"
         )
