@@ -82,7 +82,7 @@ class Operation(Definition):
                 try:
                     declared_type.unify(inferred_type, subtype=True)
                     declared_type = declared_type.resolve()
-                except error.TATypeError as e:
+                except error.TAError as e:
                     raise error.TypeAnnotationError(
                         definition=self,
                         declared=self.type,
@@ -101,7 +101,7 @@ class Operation(Definition):
             else:
                 # The type could not be derived because the result is not a
                 # full expression. Shouldn't happen?
-                raise RuntimeError
+                raise error.PartialPrimitive()
 
 
 class PartialExpr(ABC):
@@ -119,8 +119,7 @@ class PartialExpr(ABC):
             f.composition = partial(f.composition, x)
             return f.complete()
         elif isinstance(x, Abstraction):
-            raise RuntimeError(
-                "cannot apply abstraction to primitive expression")
+            raise error.PartialPrimitive()
         else:
             assert isinstance(f, Expr) and isinstance(x, Expr)
             return Application(f, x)
@@ -180,7 +179,7 @@ class Expr(PartialExpr):
         """
         f = self.partial_primitive()
         if isinstance(f, Abstraction):
-            raise RuntimeError("cannot express partial primitive")
+            raise error.PartialPrimitive
         else:
             assert isinstance(f, Expr)
             return f

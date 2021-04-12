@@ -180,3 +180,21 @@ class TypeAnnotationError(TADefinitionError):
             f"Declared type {self.declared} could not be reconciled with "
             f"inferred type {self.inferred}. {self.e if self.e else ''}"
         )
+
+
+class PartialPrimitiveError(TAError):
+    """
+    A composite expression must be fully applied before for its primitive to be
+    derivable. Otherwise, an expression tree would contain abstractions. This
+    error is raised when the primitive of a partially applied composite
+    expression is taken.
+    """
+
+    def __init__(self):
+        pass
+
+    def __str__(self) -> str:
+        return (
+            f"Cannot express partially applied composite "
+            f"expression as primitive."
+        )
