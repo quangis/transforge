@@ -13,7 +13,7 @@ from typing import Optional, Dict, Callable, Union, List
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeSchema, TypeInstance, Function, _
+    Type, TypeVar, TypeSchema, TypeInstance, Function, _
 
 
 class Definition(ABC):
@@ -74,29 +74,18 @@ class Operation(Definition):
             args = [Base(mock) for a in signature(self.composition).parameters]
             output = self.composition(*args)
             if isinstance(output, Expr):
-                declared_type = self.type.instance()
-                inferred_type = output.type
-                nvars = sum(1 for v in declared_type.variables())
+                type_infer = output.type
+                type_decl = self.type.instance()
+                vars_decl = list(type_decl.variables())
                 for a in reversed(args):
-                    inferred_type = Function(a.type, inferred_type)
-                try:
-                    declared_type.unify(inferred_type, subtype=True)
-                    declared_type = declared_type.resolve()
-                except error.TAError as e:
-                    raise error.TypeAnnotationError(
-                        definition=self,
-                        declared=self.type,
-                        inferred=inferred_type,
-                        e=e) from e
-                else:
-                    # If some variables we declared were unified, we know that
-                    # the inferred type is more specific than the declared type
-                    # TODO is this always true?
-                    if sum(1 for v in declared_type.variables()) != nvars:
-                        raise error.TypeAnnotationError(
-                            definition=self,
-                            declared=self.type,
-                            inferred=inferred_type)
+                    type_infer = Function(a.type, type_infer)
+                type_decl.unify(type_infer, subtype=True)
+                type_decl = type_decl.resolve()
+
+                # All the variables in the declared type must still be
+                # variables --- otherwise we were too general
+                if not all(isinstance(v.follow(), TypeVar) for v in vars_decl):
+                    raise error.DeclaredTypeTooGeneral(self.type, type_infer)
 
             else:
                 # The type could not be derived because the result is not a

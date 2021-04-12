@@ -3,7 +3,6 @@ This module holds all the errors that might be raised.
 """
 
 from abc import abstractmethod
-from typing import Optional
 
 import transformation_algebra as ta
 
@@ -111,6 +110,19 @@ class FunctionApplicationError(TATypeError):
         return f"Could not apply non-function {self.t1} to {self.t2}."
 
 
+class DeclaredTypeTooGeneral(TATypeError):
+    """
+    Raised when the declared type of a composite transformation is unifiable
+    with the type inferred from its derivation, but it is too general.
+    """
+
+    def specify(self) -> str:
+        return (
+            f"Declared type {self.t1} is more general than "
+            f"inferred type {self.t2}."
+        )
+
+
 # Constraint errors ##########################################################
 
 class TAConstraintError(TAError):
@@ -143,44 +155,7 @@ class ConstrainFreeVariable(TAConstraintError):
             f"\t{self.constraint.description}")
 
 
-# Definition errors ##########################################################
-
-class TADefinitionError(TAError):
-    """
-    An error that occurs in the definition of an operation or data input.
-    """
-    pass
-
-    def __init__(
-            self,
-            definition: 'ta.expr.Definition',
-            e: 'Optional[TAError]' = None):
-        self.definition = definition
-        self.e = e
-
-
-class TypeAnnotationError(TADefinitionError):
-    """
-    Raised when the declared type of a composite transformation is not
-    unifiable with the type inferred from its derivation, or when the declared
-    type is more general than the inferred type.
-    """
-
-    def __init__(
-            self,
-            declared: 'ta.type.Type',
-            inferred: 'ta.type.Type',
-            *nargs, **kwargs):
-        self.declared = declared
-        self.inferred = inferred
-        super().__init__(*nargs, **kwargs)
-
-    def __str__(self) -> str:
-        return (
-            f"Declared type {self.declared} could not be reconciled with "
-            f"inferred type {self.inferred}. {self.e if self.e else ''}"
-        )
-
+# Other errors ###############################################################
 
 class PartialPrimitiveError(TAError):
     """
@@ -195,6 +170,6 @@ class PartialPrimitiveError(TAError):
 
     def __str__(self) -> str:
         return (
-            f"Cannot express partially applied composite "
-            f"expression as primitive."
+            "Cannot express partially applied composite "
+            "expression as primitive."
         )
