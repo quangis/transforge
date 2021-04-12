@@ -26,10 +26,12 @@ class TestType(unittest.TestCase):
 
         if isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result, lambda x: f.apply(x), x)
-        else:
+        elif result:
             actual = f.apply(x)
             expected = result.instance()
             self.assertEqual(actual, expected)
+        else:
+            f.apply(x)
 
     def test_apply_non_function(self):
         self.apply(Int, Int, error.FunctionApplicationError)
@@ -190,6 +192,23 @@ class TestType(unittest.TestCase):
         self.assertTrue(Int ** Int <= Int ** _)
         self.assertFalse(_ ** Any <= UInt ** Int)
         self.assertFalse(UInt ** _ <= Int ** Any)
+
+    def test_constrained_to_base_type(self):
+        # Addresses issue #2, which caused an infinite loop
+        A = Type.declare('A')
+        f = TypeSchema(lambda x: x ** x | x @ A)
+        g = TypeSchema(lambda x, y: (x ** y) ** y)
+        self.apply(g, f)
+
+    def test_constrained_to_compound_type(self):
+        # Same as before, making sure that compound types also work
+        A = Type.declare('A')
+        F = Type.declare('F', params=1)
+        f = TypeSchema(lambda x: x ** x | x @ F(A))
+        g = TypeSchema(lambda x, y: (x ** y) ** y)
+        self.apply(g, f)
+
+
 
 
 if __name__ == '__main__':

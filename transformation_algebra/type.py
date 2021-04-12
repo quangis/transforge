@@ -554,7 +554,9 @@ class Constraint(object):
         # the skeleton: the base types must remain variable, because we don't
         # want to resolve against an overly loose subtype bound.
         elif len(self.objects) == 1 and unify:
-            self.subject.unify(self.objects[0].skeleton())
+            skeleton = self.objects[0].skeleton()
+            if not isinstance(skeleton, TypeVar):
+                self.subject.unify(skeleton)
 
         # Fulfillment is achieved if the subject is fully concrete and there is
         # at least one definitely compatible object
