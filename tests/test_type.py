@@ -209,7 +209,5 @@ class TestType(unittest.TestCase):
         self.apply(g, f)
 
 
-
-
 if __name__ == '__main__':
     unittest.main()

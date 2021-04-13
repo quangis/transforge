@@ -151,7 +151,7 @@ class ConstrainFreeVariable(TAConstraintError):
 
 # Other errors ###############################################################
 
-class PartialPrimitiveError(TAError):
+class PartialPrimitive(TAError):
     """
     A composite expression must be fully applied before for its primitive to be
     derivable. Otherwise, an expression tree would contain abstractions. This
