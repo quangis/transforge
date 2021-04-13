@@ -67,6 +67,12 @@ class Operation(Definition):
         super().__init__(*nargs, **kwargs)
         assert self.type.is_function()
 
+    def validate(self) -> None:
+        """
+        This method raises an error if the operation is a composite operation,
+        but the declared type cannot be reconciled with the type inferred from
+        the composition.
+        """
         # If the operation is composite, check that its declared type is no
         # more general than the type we can infer from the composition function
         if self.composition:
@@ -290,6 +296,11 @@ class TransformationAlgebra(object):
 
     def __setitem__(self, key: str, value: Definition) -> None:
         self.definitions[key.lower()] = value
+
+        # Validation only happens once an operation is added to the algebra. If
+        # we did it at define-time, it would lead to issues --- see issue #3
+        if isinstance(value, Operation):
+            value.validate()
 
     def parse(self, string: str) -> Optional[Expr]:
         # This used to be done via pyparsing, but the structure is so simple
