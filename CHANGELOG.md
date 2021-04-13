@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.1.1
+
+Bugfix release. Fixes an infinite loop when constraining to a base type, and 
+an issue with validation when an operation that is defined later is called.
+
 ### v0.1.0
 
 Major changes:
