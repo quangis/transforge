@@ -1,5 +1,7 @@
 # Changelog
 
+-   If a definition leads to error, mention which definition it was.
+
 ### v0.1.1
 
 Bugfix release. Fixes an infinite loop when constraining to a base type, and 
