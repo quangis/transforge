@@ -151,6 +151,22 @@ class ConstrainFreeVariable(TAConstraintError):
 
 # Other errors ###############################################################
 
+class DefinitionError(TAError):
+    """
+    Wrapper for when an error occurs in a definition.
+    """
+
+    def __init__(self, definition, error):
+        self.definition = definition
+        self.error = error
+
+    def __str__(self) -> str:
+        return (
+            f"Error in {self.definition.name or 'anonymous'} definition:\n"
+            f"{self.error}"
+        )
+
+
 class PartialPrimitive(TAError):
     """
     A composite expression must be fully applied before for its primitive to be

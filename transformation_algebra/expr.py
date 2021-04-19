@@ -75,28 +75,34 @@ class Operation(Definition):
         """
         # If the operation is composite, check that its declared type is no
         # more general than the type we can infer from the composition function
-        if self.composition:
-            mock = Definition(_)
-            args = [Base(mock) for a in signature(self.composition).parameters]
-            output = self.composition(*args)
-            if isinstance(output, Expr):
-                type_infer = output.type
-                type_decl = self.type.instance()
-                vars_decl = list(type_decl.variables())
-                for a in reversed(args):
-                    type_infer = Function(a.type, type_infer)
-                type_decl.unify(type_infer, subtype=True)
-                type_decl = type_decl.resolve()
+        try:
+            if self.composition:
+                mock = Definition(_)
+                args = [
+                    Base(mock) for a in signature(self.composition).parameters]
+                output = self.composition(*args)
+                if isinstance(output, Expr):
+                    type_infer = output.type
+                    type_decl = self.type.instance()
+                    vars_decl = list(type_decl.variables())
+                    for a in reversed(args):
+                        type_infer = Function(a.type, type_infer)
+                    type_decl.unify(type_infer, subtype=True)
+                    type_decl = type_decl.resolve()
 
-                # All the variables in the declared type must still be
-                # variables --- otherwise we were too general
-                if not all(isinstance(v.follow(), TypeVar) for v in vars_decl):
-                    raise error.DeclaredTypeTooGeneral(self.type, type_infer)
+                    # All the variables in the declared type must still be
+                    # variables --- otherwise we were too general
+                    if not all(isinstance(v.follow(), TypeVar)
+                            for v in vars_decl):
+                        raise error.DeclaredTypeTooGeneral(
+                            self.type, type_infer)
 
-            else:
-                # The type could not be derived because the result is not a
-                # full expression. Shouldn't happen?
-                raise error.PartialPrimitive()
+                else:
+                    # The type could not be derived because the result is not a
+                    # full expression. Shouldn't happen?
+                    raise error.PartialPrimitive()
+        except error.TAError as e:
+            raise error.DefinitionError(self, e) from e
 
 
 class PartialExpr(ABC):
