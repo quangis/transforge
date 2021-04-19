@@ -13,7 +13,7 @@ from typing import Optional, Dict, Callable, Union, List
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function, _
+    Type, TypeVar, TypeSchema, TypeInstance, Function
 
 
 class Definition(ABC):
@@ -77,7 +77,7 @@ class Operation(Definition):
         # more general than the type we can infer from the composition function
         try:
             if self.composition:
-                mock = Definition(_)
+                mock = Definition(lambda x: x)
                 args = [
                     Base(mock) for a in signature(self.composition).parameters]
                 output = self.composition(*args)
