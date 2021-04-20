@@ -77,7 +77,7 @@ class Operation(Definition):
         # more general than the type we can infer from the composition function
         try:
             if self.composition:
-                mock = Definition(lambda x: x)
+                mock = Definition(TypeSchema(lambda: TypeVar()))
                 args = [
                     Base(mock) for a in signature(self.composition).parameters]
                 output = self.composition(*args)

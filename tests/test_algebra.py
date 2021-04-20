@@ -52,20 +52,22 @@ class TestAlgebra(unittest.TestCase):
 
     def test_exact_declared_type_in_definition(self):
         self.assertRaises(
-            error.SubtypeMismatch, Operation,
-            B ** B, derived=lambda x: f(x)
+            error.SubtypeMismatch,
+            Operation.validate,
+            Operation(B ** B, derived=lambda x: f(x))
         )
-        Operation(A ** B, derived=lambda x: f(x))
+        Operation(A ** B, derived=lambda x: f(x)).validate()
 
     def test_tighter_declared_type_in_definition(self):
-        Operation(A ** B, derived=lambda x: g(x))
-        Operation(B ** B, derived=lambda x: g(x))
+        Operation(A ** B, derived=lambda x: g(x)).validate()
+        Operation(B ** B, derived=lambda x: g(x)).validate()
 
     def test_looser_declared_type_in_definition(self):
-        Operation(lambda α: α ** B, derived=lambda x: g(x))
+        Operation(lambda α: α ** B, derived=lambda x: g(x)).validate()
         self.assertRaises(
-            error.DeclaredTypeTooGeneral, Operation,
-            lambda α: α ** B, derived=lambda x: f(x))
+            error.DeclaredTypeTooGeneral,
+            Operation.validate,
+            Operation(lambda α: α ** B, derived=lambda x: f(x)))
 
 
 if __name__ == '__main__':
