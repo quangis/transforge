@@ -564,7 +564,7 @@ class Constraint(object):
 
 
 "The special constructor for function types."
-Function = TypeOperator('Function', params=(Variance.CONTRA, Variance.CO))
+Function = TypeOperator('Function', params=[Variance.CONTRA, Variance.CO])
 
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
 _ = TypeSchema(lambda: TypeVar(wildcard=True))

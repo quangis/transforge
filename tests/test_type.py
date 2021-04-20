@@ -208,6 +208,18 @@ class TestType(unittest.TestCase):
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
+    def test_unification_of_constraint_with_variables(self):
+        # See issue #13
+        A = Type.declare('A')
+        B = Type.declare('B')
+        C = Type.declare('C')
+        R2 = Type.declare('R2', params=2)
+        R3 = Type.declare('R3', params=3)
+        actual = TypeSchema(lambda x:
+            R3(A, x, C) | R2(C, B) @ [R2(A, x), R2(C, x)])
+        expected = R3(A, B, C)
+        self.assertEqual(actual.instance(), expected.instance())
+
 
 if __name__ == '__main__':
     unittest.main()
