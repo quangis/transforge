@@ -102,7 +102,8 @@ class Operation(Definition):
                     # full expression. Shouldn't happen?
                     raise error.PartialPrimitive()
         except error.TAError as e:
-            raise error.DefinitionError(self, e) from e
+            e.definition = self
+            raise
 
 
 class PartialExpr(ABC):

@@ -11,7 +11,21 @@ class TAError(RuntimeError):
     """
     Any error raised by this library.
     """
-    pass
+
+    def __init__(self):
+        self.definition = None
+
+    @abstractmethod
+    def msg(self) -> str:
+        return NotImplemented
+
+    def __str__(self) -> str:
+        if self.definition:
+            return (
+                f"Error in {self.definition.name or 'anonymous'} definition:\n"
+                f"{self.msg()}"
+            )
+        return self.msg()
 
 
 # Parsing errors #############################################################
@@ -21,7 +35,7 @@ class TAParseError(TAError):
 
 
 class BracketMismatch(TAParseError):
-    def __str__(self) -> str:
+    def msg(self) -> str:
         return "Mismatched bracket."
 
 
@@ -36,8 +50,9 @@ class RBracketMismatch(BracketMismatch):
 class Undefined(TAParseError):
     def __init__(self, token: str):
         self.token = token
+        super().__init__()
 
-    def __str__(self) -> str:
+    def msg(self) -> str:
         return f"Transformation or data input '{self.token}' is undefined."
 
 
@@ -53,6 +68,7 @@ class TATypeError(TAError):
         self.t2 = t2
         self.fn = None
         self.arg = None
+        super().__init__()
 
     def while_applying(self, fn: 'ta.expr.Expr', arg: 'ta.expr.Expr'):
         self.fn = fn
@@ -62,7 +78,7 @@ class TATypeError(TAError):
     def specify(self) -> str:
         return NotImplemented
 
-    def __str__(self) -> str:
+    def msg(self) -> str:
         clause = f" while applying {self.fn} to {self.arg}" \
             if self.fn and self.arg else ""
         return f"A type error occurred{clause}: {self.specify()}"
@@ -126,6 +142,7 @@ class TAConstraintError(TAError):
 
     def __init__(self, constraint: 'ta.type.Constraint'):
         self.constraint = constraint
+        super().__init__()
 
 
 class ConstraintViolation(TAConstraintError):
@@ -133,7 +150,7 @@ class ConstraintViolation(TAConstraintError):
     Raised when there can be no situation in which a constraint is satisfied.
     """
 
-    def __str__(self) -> str:
+    def msg(self) -> str:
         return f"Violated typeclass constraint {self.constraint.description}."
 
 
@@ -143,29 +160,13 @@ class ConstrainFreeVariable(TAConstraintError):
     context that it is constraining.
     """
 
-    def __str__(self) -> str:
+    def msg(self) -> str:
         return (
             f"A free variable occurs in constraint "
             f"{self.constraint.description}")
 
 
 # Other errors ###############################################################
-
-class DefinitionError(TAError):
-    """
-    Wrapper for when an error occurs in a definition.
-    """
-
-    def __init__(self, definition, error):
-        self.definition = definition
-        self.error = error
-
-    def __str__(self) -> str:
-        return (
-            f"Error in {self.definition.name or 'anonymous'} definition:\n"
-            f"{self.error}"
-        )
-
 
 class PartialPrimitive(TAError):
     """
@@ -175,10 +176,7 @@ class PartialPrimitive(TAError):
     expression is taken.
     """
 
-    def __init__(self):
-        pass
-
-    def __str__(self) -> str:
+    def msg(self) -> str:
         return (
             "Cannot express partially applied composite "
             "expression as a primitive expression."
