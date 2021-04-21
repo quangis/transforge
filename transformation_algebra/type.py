@@ -565,7 +565,10 @@ class Constraint(object):
         fulfilled and need not be enforced any longer.
         """
 
+        # TODO Minimization is expensive and it is performed on every variable
+        # binding. Make this more efficient?
         self.minimize()
+
         compatibility = [self.subject.subtype(t) for t in self.objects]
         self.objects = [t for t, c in zip(self.objects, compatibility)
             if c is not False]
