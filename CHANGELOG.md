@@ -1,6 +1,10 @@
 # Changelog
 
--   If a definition leads to error, mention which definition it was.
+-   If a definition leads to error, the definition will be mentioned in the 
+    error message.
+-   Type inference has been improved: constraint options that are subtypes of 
+    one another are boiled down to their most specific representative, 
+    allowing more unification.
 
 ### v0.1.1
 
