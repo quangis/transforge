@@ -69,6 +69,21 @@ class TestAlgebra(unittest.TestCase):
             Operation.validate,
             Operation(lambda α: α ** B, derived=lambda x: f(x)))
 
+    def test_same_labels_unify(self):
+        # See issue #10
+        A = Type.declare("A")
+        B = Type.declare("B")
+        algebra = TransformationAlgebra(
+            d1=Data(A),
+            d2=Data(B),
+            f=Operation(A ** B ** A))
+        algebra.parse("f (d1 x) (d2 y)")
+        self.assertRaises(
+            error.TATypeError,
+            algebra.parse,
+            "f (d1 x) (d2 x)"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

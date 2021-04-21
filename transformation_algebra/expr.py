@@ -312,6 +312,8 @@ class TransformationAlgebra(object):
     def parse(self, string: str) -> Optional[Expr]:
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
+
+        labels: Dict[str, TypeInstance] = dict()
         stack: List[Optional[Expr]] = [None]
 
         for token_group, chars in groupby(string, Token.ize):
@@ -342,6 +344,10 @@ class TransformationAlgebra(object):
                 if previous and isinstance(previous, Base) \
                         and isinstance(previous.definition, Data):
                     previous.label = token
+                    if token in labels:
+                        labels[token].unify(previous.type)
+                    else:
+                        labels[token] = previous.type
                     stack.append(previous)
                 else:
                     try:
