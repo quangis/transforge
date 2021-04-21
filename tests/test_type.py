@@ -225,6 +225,22 @@ class TestType(unittest.TestCase):
         expected = R3(A, B, C)
         self.assertEqual(actual.instance(), expected.instance())
 
+    def test_unification_of_constraint_options(self):
+        # See issue #11
+        A = Type.declare('A')
+        F = Type.declare('F', params=2)
+        actual = TypeSchema(lambda x: x | F(A, A) @ [F(A, x), F(A, x)])
+        expected = A
+        self.assertEqual(actual.instance(), expected.instance())
+
+    @unittest.skip("Infinite loop.")
+    def test_unification_of_constraint_option_subtypes(self):
+        A = Type.declare('A')
+        F = Type.declare('F', params=2)
+        B = Type.declare('B', supertype=A)
+        actual = TypeSchema(lambda x: x | F(_, A) @ [F(A, x), F(B, x)])
+        expected = A
+        self.assertEqual(actual.instance(), expected.instance())
 
 
 if __name__ == '__main__':

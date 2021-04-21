@@ -175,6 +175,7 @@ class TypeOperator(Type):
         return TypeOperation(self, *(p.instance() for p in params))
 
     def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
+        assert isinstance(other, TypeOperator)
         return ((not strict and self == other) or
             bool(self.supertype and self.supertype.subtype(other)))
 
@@ -520,12 +521,13 @@ class Constraint(object):
         self.subject = subject
         self.objects = list(objects)
         self.description = str(self)
-        self.fulfilled()
 
         # Inform variables about the constraint present on them
         for v in self.variables():
             assert not v.unified
             v.constraints.add(self)
+
+        self.fulfilled()
 
     def __str__(self) -> str:
         return f"{self.subject} @ {self.objects}"
@@ -539,12 +541,31 @@ class Constraint(object):
             *(o.variables() for o in self.objects)
         )
 
+    def minimize(self) -> None:
+        """
+        Ensure that constraints don't contain extraneous objects: objects that
+        are equal to, or more general versions of, other objects.
+        """
+        minimized: List[TypeInstance] = []
+        for obj in self.objects:
+            add = True
+            for i in range(len(minimized)):
+                if obj.subtype(minimized[i]) is True:
+                    if minimized[i].subtype(obj) is not True:
+                        minimized[i] = obj
+                    add = False
+            if add:
+                minimized.append(obj)
+        self.objects = minimized
+
     def fulfilled(self, unify: bool = True) -> bool:
         """
         Check that the constraint has not been violated and raise an error
         otherwise. Additionally, return True if it has been completely
         fulfilled and need not be enforced any longer.
         """
+
+        self.minimize()
         compatibility = [self.subject.subtype(t) for t in self.objects]
         self.objects = [t for t, c in zip(self.objects, compatibility)
             if c is not False]
