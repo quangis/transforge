@@ -307,6 +307,8 @@ class TypeInstance(Type):
             if a.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
+            if a == b:
+                return True
             if a.lower and b.upper and a.lower.subtype(b.upper, True):
                 return False
         return None

@@ -178,6 +178,11 @@ class TestType(unittest.TestCase):
         self.assertFalse(Int ** Int <= Any ** Int)
         self.assertFalse(Int ** Int <= Int ** UInt)
 
+    def test_subtyping_of_variables(self):
+        x = TypeVar()
+        self.assertEqual(x < x, False)
+        self.assertEqual(x <= x, True)
+
     def test_subtyping_of_variable_functions(self):
         x = TypeVar()
         self.assertEqual(x ** Int <= UInt ** Int, None)
@@ -219,6 +224,7 @@ class TestType(unittest.TestCase):
             R3(A, x, C) | R2(C, B) @ [R2(A, x), R2(C, x)])
         expected = R3(A, B, C)
         self.assertEqual(actual.instance(), expected.instance())
+
 
 
 if __name__ == '__main__':
