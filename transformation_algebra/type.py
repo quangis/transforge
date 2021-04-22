@@ -80,10 +80,12 @@ class Type(ABC):
         return self != other and self >= other
 
     def __le__(self, other: Type) -> Optional[bool]:
-        return self.instance().subtype(other.instance())
+        return self.instance().subtype(other.instance(),
+            accept_wildcard=True)
 
     def __ge__(self, other: Type) -> Optional[bool]:
-        return self.instance().subtype(other.instance())
+        return self.instance().subtype(other.instance(),
+            accept_wildcard=True)
 
     def apply(self, arg: Type) -> TypeInstance:
         """
@@ -268,7 +270,10 @@ class TypeInstance(Type):
         else:
             return self
 
-    def subtype(self, other: TypeInstance) -> Optional[bool]:
+    def subtype(
+            self,
+            other: TypeInstance,
+            accept_wildcard: bool = False) -> Optional[bool]:
         """
         Return True if self can definitely be a subtype of other, False if it
         is definitely not, and None if there is not enough information.
@@ -285,9 +290,9 @@ class TypeInstance(Type):
                 result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        r = s.subtype(t)
+                        r = s.subtype(t, accept_wildcard=accept_wildcard)
                     elif v == Variance.CONTRA:
-                        r = t.subtype(s)
+                        r = t.subtype(s, accept_wildcard=accept_wildcard)
                     if r is False:
                         return False
                     elif r is None:
@@ -296,21 +301,23 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
             if (b.upper or b.lower) and not a.basic:
                 return False
-            if b.upper and b.upper.subtype(a.operator, True):
+            if b.upper and b.upper.subtype(a.operator, strict=True):
                 return False
-            if b.wildcard:
+            if accept_wildcard and b.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
             if (a.upper or a.lower) and not b.basic:
                 return False
-            if a.lower and b.operator.subtype(a.lower, True):
+            if a.lower and b.operator.subtype(a.lower, strict=True):
                 return False
-            if a.wildcard:
+            if accept_wildcard and a.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
             if a == b:
                 return True
-            if a.lower and b.upper and a.lower.subtype(b.upper, True):
+            if accept_wildcard and (a.wildcard or b.wildcard):
+                return True
+            if a.lower and b.upper and a.lower.subtype(b.upper, strict=True):
                 return False
         return None
 
@@ -569,7 +576,9 @@ class Constraint(object):
         # binding. Make this more efficient?
         self.minimize()
 
-        compatibility = [self.subject.subtype(t) for t in self.objects]
+        compatibility = [
+            self.subject.subtype(t, accept_wildcard=True)
+            for t in self.objects]
         self.objects = [t for t, c in zip(self.objects, compatibility)
             if c is not False]
 

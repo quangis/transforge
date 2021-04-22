@@ -233,6 +233,15 @@ class TestType(unittest.TestCase):
         expected = A
         self.assertEqual(actual.instance(), expected.instance())
 
+    def test_overeager_unification_of_constraint_options(self):
+        # See issue #17
+        A = Type.declare('A')
+        F = Type.declare('F', params=2)
+        self.assertEqual(F(A, _) <= F(_, A), True)
+        x = TypeVar()
+        c = x @ [F(A, _), F(_, A)]
+        self.assertEqual(len(c.objects), 2)
+
     @unittest.skip("Infinite loop.")
     def test_unification_of_constraint_option_subtypes(self):
         A = Type.declare('A')
