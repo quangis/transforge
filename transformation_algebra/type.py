@@ -470,9 +470,9 @@ class TypeVar(TypeInstance):
                     t.bind(t.lower())
 
             elif isinstance(t, TypeOperation) and t.basic:
-                if self.lower and t.operator.subtype(self.lower, True):
+                if self.lower and t.operator.subtype(self.lower, strict=True):
                     raise error.SubtypeMismatch(t, self)
-                if self.upper and self.upper.subtype(t.operator, True):
+                if self.upper and self.upper.subtype(t.operator, strict=True):
                     raise error.SubtypeMismatch(self, t)
 
             self.check_constraints()
