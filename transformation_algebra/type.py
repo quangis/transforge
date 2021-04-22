@@ -528,6 +528,7 @@ class Constraint(object):
         self.subject = subject
         self.objects = list(objects)
         self.description = str(self)
+        self.skeleton: Optional[TypeInstance] = None
 
         # Inform variables about the constraint present on them
         for v in self.variables():
@@ -588,10 +589,10 @@ class Constraint(object):
         # If there is only one possibility left, we can unify, but *only* with
         # the skeleton: the base types must remain variable, because we don't
         # want to resolve against an overly loose subtype bound.
-        elif len(self.objects) == 1 and unify:
-            skeleton = self.objects[0].skeleton()
-            if not isinstance(skeleton, TypeVar):
-                self.subject.unify(skeleton)
+        elif len(self.objects) == 1 and unify and not self.skeleton:
+            self.skeleton = self.objects[0].skeleton()
+            if not isinstance(self.skeleton, TypeVar):
+                self.subject.unify(self.skeleton)
 
         # Fulfillment is achieved if the subject is fully concrete and there is
         # at least one definitely compatible object
