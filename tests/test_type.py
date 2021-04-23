@@ -260,6 +260,15 @@ class TestType(unittest.TestCase):
         expected = A.instance()
         self.assertEqual(actual, expected)
 
+    def test_constraint_check_on_intertwined_variables(self):
+        # See issue #18
+        F = Type.declare('F', params=2)
+        f = TypeSchema(lambda x, y, z: (x ** y) ** z | z @ F(x, y))
+        g = TypeSchema(lambda x, y: x ** y)
+        x, y = f.apply(g).params
+        self.assertEqual(len(x.constraints), 0)
+        self.assertEqual(len(y.constraints), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

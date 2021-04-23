@@ -57,7 +57,7 @@ class Type(ABC):
         # don't have to do anything here except perform a sanity check.
         t = self.instance()
         constraint.set_context(t)
-        for v in constraint.variables():
+        for v in constraint.variables_iter():
             if not v.wildcard and v not in t:
                 raise error.ConstrainFreeVariable(constraint)
         return t
@@ -233,19 +233,36 @@ class TypeInstance(Type):
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
-    def variables(self, distinct: bool = False) -> Iterable[TypeVar]:
+    def variables(self) -> List[TypeVar]:
         """
-        Obtain all distinct type variables currently in the type expression.
+        Obtain all distinct type variables currently in the type expression,
+        including variables that might occur in constraints.
         """
-        return {v.id: v for v in self._variables()}.values() \
-            if distinct else self._variables()
+        # TODO a better way is needed - I'm not sure that id's will remain
+        # distinct in all situations
+        captured = set()
+        result = []
+        for v in self.variables_iter():
+            if v.id not in captured:
+                result.append(v)
+                captured.add(v.id)
+            for c in v.constraints:
+                for v1 in c.variables_iter():
+                    if v1.id not in captured:
+                        result.append(v1)
+                        captured.add(v1.id)
+        return result
 
-    def _variables(self) -> Iterable[TypeVar]:
+    def variables_iter(self) -> Iterable[TypeVar]:
+        """
+        Obtain an iterator of variables in this type instance, excluding
+        variables that might occur in constraints, with possible repetitions.
+        """
         a = self.follow()
         if isinstance(a, TypeVar):
             yield a
         elif isinstance(a, TypeOperation):
-            for v in chain(*(t.variables() for t in a.params)):
+            for v in chain(*(t.variables_iter() for t in a.params)):
                 yield v
 
     def follow(self) -> TypeInstance:
@@ -488,6 +505,7 @@ class TypeVar(TypeInstance):
                     self.constraints = constraints
                     for v in t.variables():
                         v.constraints = constraints
+                        v.check_constraints()
 
             self.check_constraints()
 
@@ -557,10 +575,16 @@ class Constraint(object):
     def set_context(self, context: TypeInstance) -> None:
         self.description = f"{context} | {self}"
 
-    def variables(self) -> Iterable[TypeVar]:
+    def variables(self) -> List[TypeVar]:
+        result = self.reference.variables()
+        for t in self.alternatives:
+            result.extend(t.variables())
+        return result
+
+    def variables_iter(self) -> Iterable[TypeVar]:
         return chain(
-            self.reference.variables(),
-            *(o.variables() for o in self.alternatives)
+            self.reference.variables_iter(),
+            *(o.variables_iter() for o in self.alternatives)
         )
 
     def minimize(self) -> None:
