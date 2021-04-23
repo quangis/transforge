@@ -80,12 +80,12 @@ class Type(ABC):
         return self != other and self >= other
 
     def __le__(self, other: Type) -> Optional[bool]:
-        return self.instance().subtype(other.instance(),
-            accept_wildcard=True)
+        return self.instance().unifiable(other.instance(),
+            accept_wildcard=True, subtype=True)
 
     def __ge__(self, other: Type) -> Optional[bool]:
-        return self.instance().subtype(other.instance(),
-            accept_wildcard=True)
+        return self.instance().unifiable(other.instance(),
+            accept_wildcard=True, subtype=True)
 
     def apply(self, arg: Type) -> TypeInstance:
         """
@@ -270,12 +270,13 @@ class TypeInstance(Type):
         else:
             return self
 
-    def subtype(
+    def unifiable(
             self,
             other: TypeInstance,
+            subtype: bool = False,
             accept_wildcard: bool = False) -> Optional[bool]:
         """
-        Return True if self can definitely be a subtype of other, False if it
+        Return True if self can definitely be (a subtype of) other, False if it
         is definitely not, and None if there is not enough information.
         """
         a = self.follow()
@@ -283,16 +284,19 @@ class TypeInstance(Type):
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                return a.operator.subtype(b.operator)
+                if subtype:
+                    return a.operator.subtype(b.operator)
+                else:
+                    return a.operator == b.operator
             elif a.operator != b.operator:
                 return False
             else:
                 result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
-                    if v == Variance.CO:
-                        r = s.subtype(t, accept_wildcard=accept_wildcard)
-                    elif v == Variance.CONTRA:
-                        r = t.subtype(s, accept_wildcard=accept_wildcard)
+                    r = TypeInstance.unifiable(
+                        *((s, t) if v == Variance.CO else (t, s)),
+                        subtype=subtype,
+                        accept_wildcard=accept_wildcard)
                     if r is False:
                         return False
                     elif r is None:
@@ -569,8 +573,8 @@ class Constraint(object):
         for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
-                if obj.subtype(minimized[i]) is True:
-                    if minimized[i].subtype(obj) is not True:
+                if obj.unifiable(minimized[i], subtype=True) is True:
+                    if minimized[i].unifiable(obj, subtype=True) is not True:
                         minimized[i] = obj
                     add = False
             if add:
@@ -589,7 +593,7 @@ class Constraint(object):
         self.minimize()
 
         compatibility = [
-            self.reference.subtype(t, accept_wildcard=True)
+            self.reference.unifiable(t, subtype=True, accept_wildcard=True)
             for t in self.alternatives]
         self.alternatives = [t for t, c in zip(self.alternatives, compatibility)
             if c is not False]
