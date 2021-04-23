@@ -1,10 +1,12 @@
 # Changelog
 
+### v0.1.2
+
 -   If a definition leads to error, the definition will be mentioned in the 
     error message.
 -   Type inference has been improved: constraint options that are subtypes of 
     one another are boiled down to their most specific representative, 
-    allowing more unification.
+    allowing more unification. Various other improvements to type inference.
 
 ### v0.1.1
 
