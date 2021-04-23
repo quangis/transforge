@@ -481,6 +481,7 @@ class TypeVar(TypeInstance):
                 constraints = set.union(self.constraints, t.constraints)
                 self.constraints = constraints
                 t.constraints = constraints
+                t.check_constraints()
 
                 t.wildcard = False
 
