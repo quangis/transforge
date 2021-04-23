@@ -150,11 +150,11 @@ class Expr(PartialExpr):
         Obtain a tree representation using Unicode block characters.
         """
         if isinstance(self, Base):
-            return f"╼ {self} : {self.definition.type}"
+            return f"╼ {self} : {self.type.str_with_constraints()}"
         else:
             assert isinstance(self, Application)
             return (
-                f"{self.type.strc()}\n"
+                f"{self.type.str_with_constraints()}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )

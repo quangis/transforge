@@ -145,7 +145,7 @@ class TypeSchema(Type):
     def __str__(self) -> str:
         return self.schema(
             *(TypeVar(v) for v in signature(self.schema).parameters)
-        ).resolve().strc()
+        ).resolve().str_with_constraints()
 
     def instance(self) -> TypeInstance:
         return self.schema(*(TypeVar() for _ in range(self.n)))
@@ -192,7 +192,7 @@ class TypeInstance(Type):
     2-ary type operators.
     """
 
-    def strc(self) -> str:
+    def str_with_constraints(self) -> str:
         """
         Like str(), but includes constraints.
         """
