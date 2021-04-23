@@ -247,6 +247,8 @@ class TestType(unittest.TestCase):
         x = TypeVar()
         c = x @ [F(A, _), F(_, A)]
         self.assertEqual(len(c.objects), 2)
+        c = x @ [F(_, _), F(_, _)]
+        self.assertEqual(len(c.objects), 1)
 
     def test_unification_of_constraint_option_subtypes(self):
         # See issue #16

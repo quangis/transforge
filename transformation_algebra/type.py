@@ -313,7 +313,7 @@ class TypeInstance(Type):
             if accept_wildcard and a.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
-            if a == b:
+            if a == b or (a.wildcard and b.wildcard):
                 return True
             if accept_wildcard and (a.wildcard or b.wildcard):
                 return True
@@ -405,6 +405,8 @@ class TypeOperation(TypeInstance):
             return str(self.operator)
 
     def __eq__(self, other: object) -> bool:
+        if isinstance(other, TypeVar):
+            other = other.follow()
         if isinstance(other, TypeOperation):
             return (self.operator == other.operator and
                 all(s == t for s, t in zip(self.params, other.params)))
@@ -603,7 +605,8 @@ class Constraint(object):
 
         # Fulfillment is achieved if the subject is fully concrete and there is
         # at least one definitely compatible object
-        return not any(self.subject.variables()) and any(compatibility)
+        return (not any(self.subject.variables()) and any(compatibility)) or \
+            self.subject in self.objects
 
 
 "The special constructor for function types."
