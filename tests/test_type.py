@@ -225,7 +225,7 @@ class TestType(unittest.TestCase):
 
     def test_timely_constraint_check(self):
         # See issue #13
-        A, B, F = τ('A'), τ('B'), τ('F', 2)
+        A, B, F = Type.declare('A'), Type.declare('B'), Type.declare('F', 2)
         f = TypeSchema(lambda r, x: r ** x | r @ [F(A, x), F(B, x)])
         actual = f.apply(F(A, B))
         expected = B

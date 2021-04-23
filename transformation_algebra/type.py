@@ -469,11 +469,19 @@ class TypeVar(TypeInstance):
                 if t.lower == t.upper and t.lower is not None:
                     t.bind(t.lower())
 
-            elif isinstance(t, TypeOperation) and t.basic:
-                if self.lower and t.operator.subtype(self.lower, strict=True):
-                    raise error.SubtypeMismatch(t, self)
-                if self.upper and self.upper.subtype(t.operator, strict=True):
-                    raise error.SubtypeMismatch(self, t)
+            elif isinstance(t, TypeOperation):
+                if t.basic:
+                    if self.lower and t.operator.subtype(self.lower, strict=True):
+                        raise error.SubtypeMismatch(t, self)
+                    if self.upper and self.upper.subtype(t.operator, strict=True):
+                        raise error.SubtypeMismatch(self, t)
+                else:
+                    constraints = self.constraints.union(*(
+                        v.constraints for v in t.variables()
+                    ))
+                    self.constraints = constraints
+                    for v in t.variables():
+                        v.constraints = constraints
 
             self.check_constraints()
 
