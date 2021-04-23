@@ -527,16 +527,16 @@ class TypeVar(TypeInstance):
 
 class Constraint(object):
     """
-    A constraint enforces that its subject type is a subtype of one of its
-    object types.
+    A constraint enforces that its reference is a subtype of one of the given
+    alternatives.
     """
 
     def __init__(
             self,
-            subject: TypeInstance,
-            *objects: TypeInstance):
-        self.subject = subject
-        self.objects = list(objects)
+            reference: TypeInstance,
+            *alternatives: TypeInstance):
+        self.reference = reference
+        self.alternatives = list(alternatives)
         self.description = str(self)
         self.skeleton: Optional[TypeInstance] = None
 
@@ -548,24 +548,25 @@ class Constraint(object):
         self.fulfilled()
 
     def __str__(self) -> str:
-        return f"{self.subject} @ {self.objects}"
+        return f"{self.reference} @ {self.alternatives}"
 
     def set_context(self, context: TypeInstance) -> None:
         self.description = f"{context} | {self}"
 
     def variables(self) -> Iterable[TypeVar]:
         return chain(
-            self.subject.variables(),
-            *(o.variables() for o in self.objects)
+            self.reference.variables(),
+            *(o.variables() for o in self.alternatives)
         )
 
     def minimize(self) -> None:
         """
-        Ensure that constraints don't contain extraneous objects: objects that
-        are equal to, or more general versions of, other objects.
+        Ensure that constraints don't contain extraneous alternatives:
+        alternatives that are equal to, or more general versions of, other
+        alternatives.
         """
         minimized: List[TypeInstance] = []
-        for obj in self.objects:
+        for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
                 if obj.subtype(minimized[i]) is True:
@@ -574,7 +575,7 @@ class Constraint(object):
                     add = False
             if add:
                 minimized.append(obj)
-        self.objects = minimized
+        self.alternatives = minimized
 
     def fulfilled(self) -> bool:
         """
@@ -588,25 +589,25 @@ class Constraint(object):
         self.minimize()
 
         compatibility = [
-            self.subject.subtype(t, accept_wildcard=True)
-            for t in self.objects]
-        self.objects = [t for t, c in zip(self.objects, compatibility)
+            self.reference.subtype(t, accept_wildcard=True)
+            for t in self.alternatives]
+        self.alternatives = [t for t, c in zip(self.alternatives, compatibility)
             if c is not False]
 
-        if len(self.objects) == 0:
+        if len(self.alternatives) == 0:
             raise error.ConstraintViolation(self)
 
         # If there is only one possibility left, we can unify, but *only* with
         # the skeleton: the base types must remain variable, because we don't
         # want to resolve against an overly loose subtype bound.
-        elif len(self.objects) == 1 and not self.skeleton:
-            self.skeleton = self.objects[0].skeleton()
-            self.subject.unify(self.skeleton)
+        elif len(self.alternatives) == 1 and not self.skeleton:
+            self.skeleton = self.alternatives[0].skeleton()
+            self.reference.unify(self.skeleton)
 
-        # Fulfillment is achieved if the subject is fully concrete and there is
-        # at least one definitely compatible object
-        return (not any(self.subject.variables()) and any(compatibility)) or \
-            self.subject in self.objects
+        # Fulfillment is achieved if the reference is fully concrete and there
+        # is at least one definitely compatible alternative
+        return (not any(self.reference.variables()) and any(compatibility)) or \
+            self.reference in self.alternatives
 
 
 "The special constructor for function types."
