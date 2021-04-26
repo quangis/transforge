@@ -13,7 +13,7 @@ from typing import Optional, Dict, Callable, Union, List
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function
+    Type, TypeVar, TypeSchema, TypeInstance, Function, _
 
 
 class Definition(ABC):
@@ -24,8 +24,9 @@ class Definition(ABC):
     def __init__(
             self,
             type: Union[Type, Callable[..., TypeInstance]],
-            doc: Optional[str] = None):
-        self.name: Optional[str] = None
+            doc: Optional[str] = None,
+            name: Optional[str] = None):
+        self.name = name
         self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.description = doc
 
@@ -100,7 +101,7 @@ class Operation(Definition):
                 else:
                     # The type could not be derived because the result is not a
                     # full expression. Shouldn't happen?
-                    raise error.PartialPrimitive()
+                    raise error.PartialPrimitive(output)
         except error.TAError as e:
             e.definition = self
             raise
@@ -121,7 +122,7 @@ class PartialExpr(ABC):
             f.composition = partial(f.composition, x)
             return f.complete()
         elif isinstance(x, Abstraction):
-            raise error.PartialPrimitive()
+            raise error.PartialPrimitive(x)
         else:
             assert isinstance(f, Expr) and isinstance(x, Expr)
             return Application(f, x)
@@ -181,7 +182,7 @@ class Expr(PartialExpr):
         """
         f = self.partial_primitive()
         if isinstance(f, Abstraction):
-            raise error.PartialPrimitive
+            raise error.PartialPrimitive(f)
         else:
             assert isinstance(f, Expr)
             return f
@@ -237,7 +238,7 @@ class Base(Expr):
 
     def __str__(self) -> str:
         name = self.definition.name or "[?]"
-        return f"{name} {self.label}" if self.label else name
+        return f"({name} {self.label})" if self.label else name
 
 
 class Application(Expr):
@@ -264,11 +265,17 @@ class Application(Expr):
 class Abstraction(PartialExpr):
     """
     An incomplete expression that needs to be supplied with arguments. Not
-    normally part of an expression tree --- only used for expanding primitives.
+    normally part of an expression tree --- only while expanding to primitives.
     """
 
     def __init__(self, composition: Callable[..., PartialExpr]):
         self.composition: Callable[..., PartialExpr] = composition
+
+    def __str__(self) -> str:
+        params = [Definition(_, name=p)
+            for p in signature(self.composition).parameters]
+        expr = self.composition(*(Base(d) for d in params))
+        return f"λ{' '.join(d.name for d in params)}. {expr}"
 
 
 class TransformationAlgebra(object):

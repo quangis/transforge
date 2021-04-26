@@ -20,12 +20,16 @@ class TAError(RuntimeError):
         return NotImplemented
 
     def __str__(self) -> str:
-        if self.definition:
-            return (
-                f"Error in {self.definition.name or 'anonymous'} definition:\n"
-                f"{self.msg()}"
-            )
-        return self.msg()
+        try:
+            if self.definition:
+                return (
+                    f"Error in definition of "
+                    f"{self.definition.name or 'something'}:\n"
+                    f"{self.msg()}"
+                )
+            return self.msg()
+        except Exception as e:
+            return str(e)
 
 
 # Parsing errors #############################################################
@@ -176,8 +180,12 @@ class PartialPrimitive(TAError):
     expression is taken.
     """
 
+    def __init__(self, expr: 'ta.expr.PartialExpr'):
+        self.expr = expr
+        super().__init__()
+
     def msg(self) -> str:
         return (
-            "Cannot express partially applied composite "
-            "expression as a primitive expression."
+            f"Will not accept partially applied composite "
+            f"expression {self.expr} as a primitive expression."
         )
