@@ -2,17 +2,18 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation algebra is a notational system for describing *software 
-tools* of some domain as abstract semantic *transformations*. The expressions 
-of such an algebra are not necessarily associated with any concrete data 
-structure or implementation: they merely describe input and output in terms of 
-some *conceptual properties* that are deemed relevant.
+A transformation algebra is a notational system for describing *tools* as 
+abstract semantic *transformations*. The expressions of such an algebra are 
+not necessarily associated with any concrete data structure or implementation: 
+they merely describe input and output in terms of some *conceptual properties* 
+that are deemed relevant.
 
-To define such algebras, we implemented [type 
+To enable reasoning about its expressions, we implemented [type 
 inference](https://en.wikipedia.org/wiki/Type_inference) in Python. While the 
-algorithm may also be useful for conventional purposes, it is written to be 
-divorced from implementation, and it accommodates both 
-[subtype](https://en.wikipedia.org/wiki/Subtyping) and [parametric 
+algorithm is probably also useful in the more traditional context of catching 
+implementation errors, it was written to be separate from such concerns. It 
+accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) and 
+[parametric 
 polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism).
 
 For now, refer to the [source 
@@ -42,8 +43,8 @@ automatically of type `Real`, but not necessarily of type `Nat`:
     False
 
 *Complex types* take other types as parameters. For example, `Set(Int)` could 
-represent a set of integers. This would automatically be a subtype of 
-`Set(Real)`.
+represent the type of sets of integers. This would automatically be a subtype 
+of `Set(Real)`.
 
     >>> Set = Type.declare("Set", params=1)
     >>> Set(Int) <= Set(Real)
@@ -88,23 +89,22 @@ lambda abstraction!). When instantiated, the *schematic* variables are
 automatically populated with concrete *instances* of type variables.
 
 Often, variables in a schema are *constrained* to some typeclass. We can use 
-the `t | c` operator to attach a typeclass constraint `c` to a type `t`. `c` 
-can then specify the typeclass in an ad-hoc manner, using the `t @ [ts]` 
-operator --- meaning that a type `t` must be a subtype of one of the types 
-specified in `[ts]`. For instance, we might want to define a function that 
-applies to both single integers and sets of integers:
+the notation `context | type @ alternatives` notation to constrain a type to 
+some ad-hoc typeclass --- meaning that the `type` must be a subtype of one of 
+the types specified in the `alternatives`. For instance, we might want to 
+define a function that applies to both single integers and sets of integers:
 
     >>> f = TypeSchema(lambda α: α ** α | α @ [Int, Set(Int)])
     >>> f.apply(Set(Nat))
     Set(Nat)
 
-Note that, when you need a type variable, but you don't care how it relates to 
-others, you may use the *wildcard variable* `_`. The purpose goes beyond 
+As an aside: when you need a type variable, but you don't care how it relates 
+to others, you may use the *wildcard variable* `_`. The purpose goes beyond 
 convenience: it communicates to the type system that it can always be a sub- 
 and supertype of *anything*. (Note that it must be explicitly imported.)
 
     >>> from transformation_algebra import _
-    >>> size = Set(_) ** Int
+    >>> f = Set(_) ** Int
 
 Typeclass constraints and wildcards can often aid in inference, figuring out 
 interdependencies between types:
