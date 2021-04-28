@@ -6,14 +6,14 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC
-from functools import reduce, partial
+from functools import reduce
 from itertools import groupby
 from inspect import signature
 from typing import Optional, Dict, Callable, Union, List
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function, _
+    Type, TypeVar, TypeSchema, TypeInstance, Function, TypeOperation
 
 
 class Definition(ABC):
@@ -36,7 +36,7 @@ class Definition(ABC):
     def __str__(self) -> str:
         return f"{self.name or '[?]'} : {self.type}"
 
-    def __call__(self, *args: Union[Definition, PartialExpr]) -> PartialExpr:
+    def __call__(self, *args: Union[Definition, Expr]) -> Expr:
         return self.instance().__call__(*args)
 
     def instance(self, identifier: Optional[str] = None) -> Expr:
@@ -63,8 +63,8 @@ class Operation(Definition):
 
     def __init__(
             self, *nargs,
-            derived: Optional[Callable[..., PartialExpr]] = None, **kwargs):
-        self.composition = derived  # some transformations may be non-primitive
+            derived: Optional[Callable[..., Expr]] = None, **kwargs):
+        self.composition = derived  # a transformation may be non-primitive
         super().__init__(*nargs, **kwargs)
         assert self.type.is_function()
 
@@ -78,131 +78,100 @@ class Operation(Definition):
         # more general than the type we can infer from the composition function
         try:
             if self.composition:
-                mock = Definition(TypeSchema(lambda: TypeVar()))
-                args = [
-                    Base(mock) for a in signature(self.composition).parameters]
-                output = self.composition(*args)
-                if isinstance(output, Expr):
-                    type_infer = output.type
-                    type_decl = self.type.instance()
-                    vars_decl = list(type_decl.variables())
-                    for a in reversed(args):
-                        type_infer = Function(a.type, type_infer)
-                    type_decl.unify(type_infer, subtype=True)
-                    type_decl = type_decl.resolve()
+                type_infer = self.instance().primitive().type
+                type_decl = self.type.instance()
+                vars_decl = list(type_decl.variables())
+                type_decl.unify(type_infer, subtype=True)
+                type_decl = type_decl.resolve()
 
-                    # All the variables in the declared type must still be
-                    # variables --- otherwise we were too general
-                    if not all(isinstance(v.follow(), TypeVar)
-                            for v in vars_decl):
-                        raise error.DeclaredTypeTooGeneral(
-                            self.type, type_infer)
+                # All the variables in the declared type must still be
+                # variables --- otherwise we were too general
+                if not all(isinstance(v.follow(), TypeVar) for v in vars_decl):
+                    raise error.DeclaredTypeTooGeneral(
+                        self.type, self.instance().primitive().type)
 
-                else:
-                    # The type could not be derived because the result is not a
-                    # full expression. Shouldn't happen?
-                    raise error.PartialPrimitive(output)
         except error.TAError as e:
             e.definition = self
             raise
 
 
-class PartialExpr(ABC):
-    """
-    An expression that may contain abstractions.
-    """
+###############################################################################
 
-    def __call__(self, *args: Union[PartialExpr, Definition]) -> PartialExpr:
-        a = (e.instance() if isinstance(e, Definition) else e for e in args)
-        return reduce(PartialExpr.partial_apply, a, self).complete()
-
-    def partial_apply(self, x: PartialExpr) -> PartialExpr:
-        f = self.complete()
-        if isinstance(f, Abstraction):
-            f.composition = partial(f.composition, x)
-            return f.complete()
-        elif isinstance(x, Abstraction):
-            raise error.PartialPrimitive(x)
-        else:
-            assert isinstance(f, Expr) and isinstance(x, Expr)
-            return Application(f, x)
-
-    def complete(self) -> PartialExpr:
-        """
-        Once all parameters of an abstraction have been provided, turn into
-        full expression.
-        """
-        if isinstance(self, Abstraction):
-            n = len(signature(self.composition).parameters)
-            if n == 0:
-                return self.composition()
-        return self
-
-
-class Expr(PartialExpr):
+class Expr(ABC):
     def __init__(self, type: TypeInstance):
         self.type = type
 
     def __repr__(self) -> str:
         return self.tree()
 
+    def __call__(self, *args: Union[Expr, Definition]) -> Expr:
+        return reduce(Expr.apply,
+            (e if isinstance(e, Expr) else e.instance() for e in args),
+            self)
+
     def tree(self, lvl: str = "") -> str:
         """
         Obtain a tree representation using Unicode block characters.
         """
-        if isinstance(self, Base):
-            return f"╼ {self} : {self.type.str_with_constraints()}"
-        else:
-            assert isinstance(self, Application)
+        if isinstance(self, Application):
             return (
                 f"{self.type.str_with_constraints()}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
-
-    def substitute(self, label: str, expr: Expr) -> Expr:
-        """
-        Replace the given expression for all expressions with the given label.
-        """
-        if isinstance(self, Base):
-            if self.label == label:
-                self.type.unify(expr.type)
-                return expr
-            else:
-                return self
+        elif isinstance(self, Abstraction):
+            return (
+                f"λ{' '.join(str(p) for p in self.params)}. ... : "
+                f"{self.type.str_with_constraints()}\n"
+                f"{lvl} └─{self.body.tree(lvl + '   ')}"
+            )
         else:
-            assert isinstance(self, Application)
-            self.f = self.f.substitute(label, expr)
-            self.x = self.x.substitute(label, expr)
-            return self
+            return f"╼ {self} : {self.type.str_with_constraints()}"
+
+    def apply(self, arg: Expr) -> Expr:
+        try:
+            if isinstance(self, Abstraction):
+                var = self.params.pop(0)
+                assert isinstance(self.type, TypeOperation) and \
+                    self.type.operator is Function
+                self.type = self.type.params[1]
+                self.body.replace(var, arg)
+                return self if self.params else self.body
+            else:
+                return Application(self, arg)
+        except error.TATypeError as e:
+            e.while_applying(self, arg)
+            raise
+
+    def replace(self, old: Union[Variable, str], new: Expr) -> Expr:
+        """
+        Substitute all variables or expressions with the given label in the
+        given expression.
+        """
+        if self is old or (isinstance(self, Base) and self.label == old):
+            new.type.unify(self.type, subtype=True)
+            return new
+        elif isinstance(self, Abstraction):
+            # TODO assert not any(p.name == old.name for p in self.params)
+            self.body = self.body.replace(old, new)
+        elif isinstance(self, Application):
+            self.f = self.f.replace(old, new)
+            self.x = self.x.replace(old, new)
+        return self
 
     def primitive(self) -> Expr:
         """
         Expand this expression into its simplest form.
         """
-        f = self.partial_primitive()
-        if isinstance(f, Abstraction):
-            raise error.PartialPrimitive(f)
-        else:
-            assert isinstance(f, Expr)
-            return f
-
-    def partial_primitive(self) -> PartialExpr:
-        """
-        Expand this expression into its simplest form. May contain
-        abstractions.
-        """
         if isinstance(self, Base):
             d = self.definition
             if isinstance(d, Operation) and d.composition:
-                return Abstraction(d.composition).complete()
-            else:
-                return self
-        else:
-            assert isinstance(self, Application)
-            f = self.f.partial_primitive()
-            x = self.x.partial_primitive()
-            return f.partial_apply(x)
+                return Abstraction(d.composition)
+        elif isinstance(self, Application):
+            return self.f.primitive().apply(self.x.primitive())
+        elif isinstance(self, Abstraction):
+            self.body = self.body.primitive()
+        return self
 
     def renamed(self) -> Expr:
         """
@@ -227,8 +196,7 @@ class Base(Expr):
     """
     A base expression represents either a single transformation or a data
     input. Base expressions may be unfolded into multiple applications of
-    primitive transformations. Data input can be seen as a typed variable in an
-    expression: in this case, it should be labelled and substituted.
+    primitive transformations.
     """
 
     def __init__(self, definition: Definition, label: Optional[str] = None):
@@ -243,40 +211,52 @@ class Base(Expr):
 
 class Application(Expr):
     """
-    A comlex expression, representing an application of the transformation in
+    A complex expression, representing an application of the transformation in
     its first argument to the expression in its second argument.
     """
 
     def __init__(self, f: Expr, x: Expr):
-        try:
-            result = f.type.apply(x.type)
-        except error.TATypeError as e:
-            e.while_applying(f, x)
-            raise
-        else:
-            self.f: Expr = f
-            self.x: Expr = x
-            super().__init__(type=result)
+        self.f: Expr = f
+        self.x: Expr = x
+        super().__init__(type=f.type.apply(x.type))
 
     def __str__(self) -> str:
         return f"({self.f} {self.x})"
 
 
-class Abstraction(PartialExpr):
+class Abstraction(Expr):
     """
     An incomplete expression that needs to be supplied with arguments. Not
-    normally part of an expression tree --- only while expanding to primitives.
+    normally part of an expression tree --- except after expanding to
+    primitives and then not fully applying the derived function.
     """
 
-    def __init__(self, composition: Callable[..., PartialExpr]):
-        self.composition: Callable[..., PartialExpr] = composition
+    def __init__(self, composition: Callable[..., Expr]):
+        self.params = [Variable(p) for p in signature(composition).parameters]
+        self.body = composition(*self.params)
+        t = self.body.type
+        for p in reversed(self.params):
+            t = Function(p.type, t)
+        super().__init__(type=t)
 
     def __str__(self) -> str:
-        params = [Definition(_, name=p)
-            for p in signature(self.composition).parameters]
-        expr = self.composition(*(Base(d) for d in params))
-        return f"λ{' '.join(d.name for d in params)}. {expr}"
+        return f"λ{' '.join(str(p) for p in self.params)}. {self.body}"
 
+
+class Variable(Expr):
+    """
+    An expression variable. See `Abstraction`.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        super().__init__(type=TypeVar())
+
+    def __str__(self) -> str:
+        return self.name
+
+
+###############################################################################
 
 class TransformationAlgebra(object):
     def __init__(self, *nargs: Definition, **kwargs: Definition):

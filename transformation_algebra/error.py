@@ -168,24 +168,3 @@ class ConstrainFreeVariable(TAConstraintError):
         return (
             f"A free variable occurs in constraint "
             f"{self.constraint.description}")
-
-
-# Other errors ###############################################################
-
-class PartialPrimitive(TAError):
-    """
-    A composite expression must be fully applied before for its primitive to be
-    derivable. Otherwise, an expression tree would contain abstractions. This
-    error is raised when the primitive of a partially applied composite
-    expression is taken.
-    """
-
-    def __init__(self, expr: 'ta.expr.PartialExpr'):
-        self.expr = expr
-        super().__init__()
-
-    def msg(self) -> str:
-        return (
-            f"Will not accept partially applied composite "
-            f"expression {self.expr} as a primitive expression."
-        )
