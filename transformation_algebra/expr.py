@@ -134,8 +134,9 @@ class Expr(ABC):
                 var = self.params.pop(0)
                 assert isinstance(self.type, TypeOperation) and \
                     self.type.operator is Function
-                self.type = self.type.params[1]
+                # arg.type.unify(var.type, subtype=True)
                 self.body.replace(var, arg)
+                self.type = self.type.apply(arg.type)
                 return self if self.params else self.body
             else:
                 return Application(self, arg)
@@ -149,10 +150,10 @@ class Expr(ABC):
         given expression.
         """
         if self is old or (isinstance(self, Base) and self.label == old):
-            new.type.unify(self.type, subtype=True)
+            # new.type.unify(self.type)
+            # new.type = new.type.resolve()
             return new
         elif isinstance(self, Abstraction):
-            # TODO assert not any(p.name == old.name for p in self.params)
             self.body = self.body.replace(old, new)
         elif isinstance(self, Application):
             self.f = self.f.replace(old, new)
@@ -181,7 +182,7 @@ class Expr(ABC):
         """
         # TODO this is turned off at the moment. find a better way to
         # differentiate between schematic and instance variables
-        variables = list(self.type.variables(distinct=True))
+        variables = list(self.type.variables())
         names = list("stuvwxyzabcde")
 
         if len(variables) > len(names):
@@ -232,8 +233,10 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        self.params = [Variable(p) for p in signature(composition).parameters]
-        self.body = composition(*self.params)
+        self.params = [Variable() for p in signature(composition).parameters]
+        # TODO delaying the call until all parameters have been supplied or the
+        # expression will not be expanded further would be faster
+        self.body: Expr = composition(*self.params)
         t = self.body.type
         for p in reversed(self.params):
             t = Function(p.type, t)
@@ -248,9 +251,18 @@ class Variable(Expr):
     An expression variable. See `Abstraction`.
     """
 
-    def __init__(self, name: str):
-        self.name = name
+    def __init__(self, name: Optional[str] = None):
+        self._name = name
         super().__init__(type=TypeVar())
+
+    @property
+    def name(self):
+        return self._name or f"anonymous{hash(self)}"
+
+    @name.setter
+    def name(self, value: str):
+        assert not self._name, "variable is already named"
+        self._name = value
 
     def __str__(self) -> str:
         return self.name
