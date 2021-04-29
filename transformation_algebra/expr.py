@@ -160,6 +160,8 @@ class Expr(ABC):
                 self.x.primitive(complete=False))
         if isinstance(result, Abstraction) and complete:
             result = result.complete(force=True)
+        if complete:
+            result.rename()
         return result
 
     def replace(self, label: str, new: Expr) -> Expr:
@@ -185,7 +187,7 @@ class Expr(ABC):
             yield self
         elif isinstance(self, Abstraction):
             assert isinstance(self.body, Expr)
-            for v in self.body.expressions():
+            for v in self.body.leaves():
                 yield v
         elif isinstance(self, Application):
             for v in chain(self.f.leaves(), self.x.leaves()):
