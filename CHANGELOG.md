@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.1.3
+
+-   Partial primitives are now allowed in the final expression tree. They are 
+    shown as lambda expressions and their function types are properly 
+    resolved.
+-   Variables are now printed with friendly names.
+
 ### v0.1.2
 
 -   If a definition leads to error, the definition will be mentioned in the 
