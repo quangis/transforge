@@ -137,7 +137,9 @@ class Expr(ABC):
                 self.body = partial(self.body, arg)
                 return self.complete()
             elif isinstance(arg, Abstraction):
-                return Application(self, arg.complete(force=True))
+                other = arg.complete(force=True)
+                other.type.resolve()
+                return Application(self, other)
             else:
                 return Application(self, arg)
         except error.TATypeError as e:
