@@ -78,9 +78,10 @@ class Operation(Definition):
         # more general than the type we can infer from the composition function
         try:
             if self.composition:
-                type_infer = self.instance().primitive().complete().type
                 type_decl = self.type.instance()
                 vars_decl = list(type_decl.variables())
+                type_infer = self.instance().primitive().type
+
                 type_decl.unify(type_infer, subtype=True)
                 type_decl = type_decl.resolve()
 
@@ -120,7 +121,7 @@ class Expr(ABC):
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
         elif isinstance(self, Abstraction):
-            assert isinstance(self.body, Expr)
+            assert isinstance(self.body, Expr) and self.params and self.type
             return (
                 f"λ{' '.join(str(p) for p in self.params)}. ... : "
                 f"{self.type.str_with_constraints()}\n"
@@ -132,7 +133,7 @@ class Expr(ABC):
     def apply(self, arg: Expr) -> Expr:
         try:
             if isinstance(self, Abstraction):
-                assert not self.completed
+                assert not isinstance(self.body, Expr)
                 self.body = partial(self.body, arg)
                 return self.complete()
             elif isinstance(arg, Abstraction):
@@ -167,7 +168,7 @@ class Expr(ABC):
             new.type.unify(self.type)
             return new
         elif isinstance(self, Abstraction):
-            assert self.type
+            assert isinstance(self.body, Expr)
             self.body = self.body.replace(label, new)
         elif isinstance(self, Application):
             self.f = self.f.replace(label, new)
@@ -233,21 +234,16 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        self.type = None  # type is only provided once completed
-        self.params = None  # params are only relevant once completed
         self.body: Union[Expr, Callable[..., Expr]] = composition
-
-    @property
-    def completed(self) -> bool:
-        assert (self.type and self.params) or not isinstance(self.body, Expr)
-        return bool(self.type)
+        self.type: Optional[TypeInstance] = None  # only provided once complete
+        self.params: Optional[List[Variable]] = None  # same
 
     def complete(self, force: bool = False) -> Expr:
         """
         If no further arguments will be supplied, call this function to get the
         final expression (or a partial expression containing variables).
         """
-        if self.completed:
+        if isinstance(self.body, Expr):
             return self
         else:
             params = list(signature(self.body).parameters)
@@ -265,7 +261,7 @@ class Abstraction(Expr):
                 return self
 
     def __str__(self) -> str:
-        assert self.completed
+        assert self.params
         return f"λ{' '.join(str(p) for p in self.params)}. {self.body}"
 
 
