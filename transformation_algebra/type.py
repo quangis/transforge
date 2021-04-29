@@ -74,10 +74,10 @@ class Type(ABC):
             ))
 
     def __lt__(self, other: Type) -> Optional[bool]:
-        return self != other and self <= other
+        return not self.unifiable(other) and self <= other
 
     def __gt__(self, other: Type) -> Optional[bool]:
-        return self != other and self >= other
+        return not self.unifiable(other) and self >= other
 
     def __le__(self, other: Type) -> Optional[bool]:
         return self.instance().unifiable(other.instance(),
@@ -229,7 +229,7 @@ class TypeInstance(Type):
     def __contains__(self, value: TypeInstance) -> bool:
         a = self.follow()
         b = value.follow()
-        return a == b or (
+        return a.unifiable(b) is True or (
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
@@ -293,8 +293,9 @@ class TypeInstance(Type):
             subtype: bool = False,
             accept_wildcard: bool = False) -> Optional[bool]:
         """
-        Return True if self can definitely be (a subtype of) other, False if it
-        is definitely not, and None if there is not enough information.
+        Return True if self is definitely the same as (or a subtype of) other,
+        False if it is definitely not, and None if there is not enough
+        information.
         """
         a = self.follow()
         b = other.follow()
@@ -426,12 +427,7 @@ class TypeOperation(TypeInstance):
             return str(self.operator)
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, TypeVar):
-            other = other.follow()
-        if isinstance(other, TypeOperation):
-            return (self.operator == other.operator and
-                all(s == t for s, t in zip(self.params, other.params)))
-        return False
+        return isinstance(other, TypeInstance) and bool(self.unifiable(other))
 
     @property
     def basic(self) -> bool:
@@ -459,13 +455,6 @@ class TypeVar(TypeInstance):
         if self.unified:
             return str(self.unified)
         return "_" if self.wildcard else self.name or f"_{self.id}"
-
-    def __eq__(self, other: object) -> bool:
-        if self.unified:
-            return self.follow() == other
-        elif isinstance(other, TypeVar) and other.unified:
-            return self == other.follow()
-        return super().__eq__(other)
 
     def bind(self, t: TypeInstance) -> None:
         assert (not self.unified or t == self.unified), \
