@@ -233,24 +233,16 @@ class TypeInstance(Type):
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
-    def variables(self) -> List[TypeVar]:
+    def variables(self) -> Set[TypeVar]:
         """
         Obtain all distinct type variables currently in the type expression,
         including variables that might occur in constraints.
         """
-        # TODO a better way is needed - I'm not sure that id's will remain
-        # distinct in all situations
-        captured = set()
-        result = []
-        for v in self.variables_iter():
-            if v.id not in captured:
-                result.append(v)
-                captured.add(v.id)
+        result = set(self.variables_iter())
+        for v in list(result):
             for c in v.constraints:
                 for v1 in c.variables_iter():
-                    if v1.id not in captured:
-                        result.append(v1)
-                        captured.add(v1.id)
+                    result.add(v1)
         return result
 
     def variables_iter(self) -> Iterable[TypeVar]:
@@ -565,10 +557,10 @@ class Constraint(object):
     def set_context(self, context: TypeInstance) -> None:
         self.description = f"{context} | {self}"
 
-    def variables(self) -> List[TypeVar]:
+    def variables(self) -> Set[TypeVar]:
         result = self.reference.variables()
         for t in self.alternatives:
-            result.extend(t.variables())
+            result = result.union(t.variables())
         return result
 
     def variables_iter(self) -> Iterable[TypeVar]:
