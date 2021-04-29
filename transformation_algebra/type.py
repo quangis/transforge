@@ -430,23 +430,27 @@ class TypeVar(TypeInstance):
     """
     A type variable. This is not a schematic variable — it is instantiated!
     """
-    counter = 0
 
     def __init__(self, name: Optional[str] = None, wildcard: bool = False):
-        self.name = name
+        self._name = name
         self.wildcard = wildcard
-        self.lower: Optional[TypeOperator] = None
         self.unified: Optional[TypeInstance] = None
+        self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self.constraints: Set[Constraint] = set()
-        cls = type(self)
-        self.id = cls.counter
-        cls.counter += 1
 
     def __str__(self) -> str:
         if self.unified:
             return str(self.unified)
-        return "_" if self.wildcard else self.name or f"_{self.id}"
+        return "_" if self.wildcard else self.name
+
+    @property
+    def name(self) -> str:
+        return self._name or f"var{hash(self)}"
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
 
     def bind(self, t: TypeInstance) -> None:
         assert (not self.unified or t == self.unified), \

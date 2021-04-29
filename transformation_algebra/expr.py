@@ -7,9 +7,9 @@ from __future__ import annotations
 from enum import Enum, auto
 from abc import ABC
 from functools import reduce, partial
-from itertools import groupby
+from itertools import groupby, chain
 from inspect import signature
-from typing import Optional, Dict, Callable, Union, List
+from typing import Optional, Dict, Callable, Union, List, Iterable
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -174,23 +174,39 @@ class Expr(ABC):
             self.x = self.x.replace(label, new)
         return self
 
-    def renamed(self) -> Expr:
+    def leaves(self) -> Iterable[Expr]:
         """
-        Give readable variable names to any variable left on the top-level of
-        the expression. Differentiate them with a prime symbol (') to make sure
-        there's no conflict with schematic variables in any definition.
+        Obtain leaf expressions.
         """
-        # TODO this is turned off at the moment. find a better way to
-        # differentiate between schematic and instance variables
-        variables = list(self.type.variables())
-        names = list("stuvwxyzabcde")
+        if isinstance(self, (Base, Variable)):
+            yield self
+        elif isinstance(self, Abstraction):
+            assert isinstance(self.body, Expr)
+            for v in self.body.expressions():
+                yield v
+        elif isinstance(self, Application):
+            for v in chain(self.f.leaves(), self.x.leaves()):
+                yield v
 
-        if len(variables) > len(names):
-            names = [f"t{i}" for i in range(len(variables))]
+    def rename(self) -> Expr:
+        """
+        Give readable variable names to any expression variable and type
+        variable in the expression.
+        """
+        expr_vars = set()
+        type_vars = set()
 
-        for v, n in zip(variables, names):
-            v.name = f"{n}'"
-        return self
+        for expr in self.leaves():
+            type_vars = type_vars.union(expr.type.variables())
+            if isinstance(expr, Variable):
+                expr_vars.add(expr)
+
+        for expr, name in zip(expr_vars, varnames("x")):
+            expr.name = name
+
+        for var, name in zip(type_vars, varnames("τ")):
+            var.name = name
+
 
 
 class Base(Expr):
@@ -279,12 +295,11 @@ class Variable(Expr):
         super().__init__(type=TypeVar())
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name or f"var{hash(self)}"
 
     @name.setter
-    def name(self, value: str):
-        assert not self._name, "variable is already named"
+    def name(self, value: str) -> None:
         self._name = value
 
     def __str__(self) -> str:
@@ -382,7 +397,10 @@ class TransformationAlgebra(object):
                         stack.append(current)
 
         if len(stack) == 1:
-            return stack[0]
+            result = stack[0]
+            if result:
+                result.rename()
+            return result
         else:
             raise error.RBracketMismatch(string)
 
@@ -406,3 +424,13 @@ class Token(Enum):
             return Token.SPACE
         else:
             return Token.IDENT
+
+
+def varnames(prefix: str, i: int = 1) -> Iterable[str]:
+    """
+    An endless iterable of variable names.
+    """
+    while True:
+        num = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in str(i))
+        yield f"{prefix}{num}"
+        i += 1
