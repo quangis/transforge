@@ -59,8 +59,8 @@ functions.
     >>> sqrt = Real ** Real
     >>> abs = Int ** Nat
 
-When we apply an input type to a function signature, we get its output type, 
-or, if the type was inappropriate, an error:
+When we apply a function type to an input type, we get its output type, or, if 
+the type was inappropriate, an error:
 
     >>> sqrt.apply(Int)
     Real
