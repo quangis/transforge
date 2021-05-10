@@ -8,8 +8,8 @@ from enum import Enum, auto
 from abc import ABC
 from functools import reduce, partial
 from itertools import groupby, chain
-from inspect import signature
-from typing import Optional, Dict, Callable, Union, List, Iterable
+from inspect import signature, Signature, Parameter
+from typing import Optional, Dict, Callable, Union, List, Iterable, Set
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -169,7 +169,7 @@ class Expr(ABC):
         Substitute all labelled expressions with the new expression.
         """
         if isinstance(self, Base) and self.label == label:
-            new.type.unify(self.type)
+            new.type.unify(self.type, subtype=True)
             return new
         elif isinstance(self, Abstraction):
             assert isinstance(self.body, Expr)
@@ -193,13 +193,36 @@ class Expr(ABC):
             for v in chain(self.f.leaves(), self.x.leaves()):
                 yield v
 
-    def rename(self) -> Expr:
+    def labels(self) -> List[str]:
+        """
+        Obtain the all labels in this expression in alphabetical order.
+        """
+        labels: Set[str] = set()
+        for expr in self.leaves():
+            if isinstance(expr, Base) and expr.label:
+                labels.add(expr.label)
+        return sorted(labels)
+
+    def supply(self, *nargs: Expr, **kwargs: Expr) -> Expr:
+        """
+        Treat labelled inputs as parameters and supply them. Note that
+        arguments are in alphabetical order.
+        """
+        sig = Signature([Parameter(v, Parameter.POSITIONAL_OR_KEYWORD)
+            for v in self.labels()])
+        binding = sig.bind(*nargs, **kwargs)
+        result = self
+        for param, value in binding.arguments.items():
+            result = result.replace(param, value)
+        return result
+
+    def rename(self) -> None:
         """
         Give readable variable names to any expression variable and type
         variable in the expression.
         """
-        expr_vars = set()
-        type_vars = set()
+        expr_vars: Set[Variable] = set()
+        type_vars: Set[TypeVar] = set()
 
         for expr in self.leaves():
             type_vars = type_vars.union(expr.type.variables())
@@ -401,7 +424,7 @@ class TransformationAlgebra(object):
                 result.rename()
             return result
         else:
-            raise error.RBracketMismatch(string)
+            raise error.RBracketMismatch
 
 
 class Token(Enum):
