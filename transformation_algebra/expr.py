@@ -9,7 +9,7 @@ from abc import ABC
 from functools import reduce, partial
 from itertools import groupby, chain
 from inspect import signature
-from typing import Optional, Dict, Callable, Union, List, Iterable
+from typing import Optional, Dict, Callable, Union, List, Iterable, Set
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -193,13 +193,13 @@ class Expr(ABC):
             for v in chain(self.f.leaves(), self.x.leaves()):
                 yield v
 
-    def rename(self) -> Expr:
+    def rename(self) -> None:
         """
         Give readable variable names to any expression variable and type
         variable in the expression.
         """
-        expr_vars = set()
-        type_vars = set()
+        expr_vars: Set[Variable] = set()
+        type_vars: Set[TypeVar] = set()
 
         for expr in self.leaves():
             type_vars = type_vars.union(expr.type.variables())
@@ -401,7 +401,7 @@ class TransformationAlgebra(object):
                 result.rename()
             return result
         else:
-            raise error.RBracketMismatch(string)
+            raise error.RBracketMismatch
 
 
 class Token(Enum):
