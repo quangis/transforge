@@ -8,7 +8,7 @@ from enum import Enum, auto
 from abc import ABC
 from functools import reduce, partial
 from itertools import groupby, chain
-from inspect import signature
+from inspect import signature, Signature, Parameter
 from typing import Optional, Dict, Callable, Union, List, Iterable, Set
 
 from transformation_algebra import error
@@ -192,6 +192,29 @@ class Expr(ABC):
         elif isinstance(self, Application):
             for v in chain(self.f.leaves(), self.x.leaves()):
                 yield v
+
+    def labels(self) -> List[str]:
+        """
+        Obtain the all labels in this expression in alphabetical order.
+        """
+        labels: Set[str] = set()
+        for expr in self.leaves():
+            if isinstance(expr, Base) and expr.label:
+                labels.add(expr.label)
+        return sorted(labels)
+
+    def supply(self, *nargs: Expr, **kwargs: Expr) -> Expr:
+        """
+        Treat labelled inputs as parameters and supply them. Note that
+        arguments are in alphabetical order.
+        """
+        sig = Signature([Parameter(v, Parameter.POSITIONAL_OR_KEYWORD)
+            for v in self.labels()])
+        binding = sig.bind(*nargs, **kwargs)
+        result = self
+        for param, value in binding.arguments.items():
+            result = result.replace(param, value)
+        return result
 
     def rename(self) -> None:
         """
