@@ -169,7 +169,7 @@ class Expr(ABC):
         Substitute all labelled expressions with the new expression.
         """
         if isinstance(self, Base) and self.label == label:
-            new.type.unify(self.type)
+            new.type.unify(self.type, subtype=True)
             return new
         elif isinstance(self, Abstraction):
             assert isinstance(self.body, Expr)
