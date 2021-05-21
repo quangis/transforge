@@ -42,6 +42,9 @@ class Definition(ABC):
     def instance(self, identifier: Optional[str] = None) -> Expr:
         return Base(self, label=identifier)
 
+    def primitive(self) -> bool:
+        return isinstance(self, Operation) and not self.composition
+
 
 class Data(Definition):
     """
