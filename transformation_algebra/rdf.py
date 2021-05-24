@@ -15,6 +15,8 @@ from rdflib.term import Node
 from rdflib.namespace import RDF
 from rdflib.tools.rdf2dot import rdf2dot
 
+from typing import Optional
+
 TA = Namespace(
     "https://github.com/quangis/transformation-algebra/"
     "TransformationAlgebra.rdf#"
@@ -33,24 +35,31 @@ class TransformationRDF(TransformationAlgebra):
         if expr:
             self.rdf(graph, expr.primitive())
 
-    def rdf(self, g: Graph, expr: Expr, **inputs: Node) -> BNode:
+    def rdf(
+            self,
+            g: Graph,
+            expr: Expr,
+            output: Optional[Node] = None,
+            **inputs: Node) -> BNode:
         """
         Translate the given expression to RDF and add it to the given graph.
         Return the output node (with an `rdf:type` of either `ta:Data` or
         `ta:Operation`). Input nodes that match the labels in the expression
         are appropriately attached.
         """
+        # the only things that are annotated with types are Data's and
+        # Operations that are taken as input
         τ = expr.type
         assert τ
 
         g.bind("ta", TA)
 
-        output = BNode()
+        output = output or BNode()
         if isinstance(expr, Base):
             assert expr.definition.name
 
-            alg_type = getattr(self.namespace, expr.definition.name)
-            g.add((output, RDF.type, alg_type))
+            definition_node = getattr(self.namespace, expr.definition.name)
+            g.add((output, RDF.type, definition_node))
 
             if isinstance(expr.definition, Data) and expr.label:
                 try:
@@ -61,18 +70,23 @@ class TransformationRDF(TransformationAlgebra):
                     raise RuntimeError(msg) from e
 
         elif isinstance(expr, Application):
-            f = self.rdf(g, expr.f)
+            f = self.rdf(g, expr.f, output=output)
             x = self.rdf(g, expr.x)
             g.add((f, TA.input, x))
-            g.add((f, TA.output, output))
+
+            if not τ.is_function():
+                output = BNode()
+                g.add((f, TA.output, output))
 
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr)
             f = self.rdf(g, expr.body)
             g.add((output, TA.input, f))
 
-        g.add((output, TA.type, Literal(τ)))
-        g.add((output, RDF.type, TA.Operation if τ.is_function() else TA.Data))
+        if not τ.is_function():
+            g.add((output, TA.type, Literal(τ)))
+            if not isinstance(expr, Base):
+                g.add((output, RDF.type, TA.Data))
 
         return output
 
