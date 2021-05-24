@@ -9,9 +9,11 @@ from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation
 
+import io
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF
+from rdflib.tools.rdf2dot import rdf2dot
 
 TA = Namespace(
     "https://github.com/quangis/transformation-algebra/"
@@ -74,3 +76,16 @@ class TransformationRDF(TransformationAlgebra):
 
         return output
 
+
+def dot(g: Graph) -> str:
+    """
+    Return a string of GraphViz dot syntax. You can pass the output to such
+    programs as `xdot` to visualize the RDF graph.
+    """
+    # rdf2dot uses deprecated cgi.escape function; this hack solves that
+    import cgi
+    import html
+    stream = io.StringIO()
+    cgi.escape = html.escape  # type: ignore
+    rdf2dot(g, stream)
+    return stream.getvalue()
