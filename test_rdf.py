@@ -4,22 +4,26 @@ from transformation_algebra.rdf import TransformationRDF, dot
 
 from rdflib import Namespace, Graph
 
-Int = Type.declare('Int')
-add = Operation(Int ** Int ** Int, name='add')
-one = Data(Int)
+A, B, C = Type.declare('A'), Type.declare('B'), Type.declare('C')
 algebra = TransformationRDF(
     "cct", Namespace("https://github.com/quangis/cct/CCT.rdf#"),
-    one=one,
-    add1=Operation(
-        Int ** Int,
-        derived=lambda x: add(x, one)
-    ),
-    compose=Operation(
-        lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-        derived=lambda f, g, x: f(g(x))
-    )
+    a=Data(A),
+    ab=Operation(A ** B),
+    bc=Operation(B ** C)
 )
 g = Graph()
-output_node = algebra.parse_rdf(g, "compose add1 add1 one")
+output_node = algebra.parse_rdf(g, "bc (ab a)")
+result = g.query(
+    """
+    SELECT ?type1 ?type2
+    WHERE {
+      ?data1 (^ta:input/ta:output)+ ?data2.
+      ?data1 ta:type ?type1.
+      ?data2 ta:type ?type2.
+    }
+    """)
 
-print(dot(g))
+for data1, data2 in result:
+    print(f"{data1} -> {data2}")
+
+#print(dot(g))
