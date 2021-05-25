@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
-    Operation
+    Operation, Variable
 
 import io
 from rdflib import Graph, Namespace, BNode, Literal
@@ -15,7 +15,7 @@ from rdflib.term import Node
 from rdflib.namespace import RDF
 from rdflib.tools.rdf2dot import rdf2dot
 
-from typing import Optional
+from typing import Dict
 
 TA = Namespace(
     "https://github.com/quangis/transformation-algebra/"
@@ -24,71 +24,87 @@ TA = Namespace(
 
 
 class TransformationRDF(TransformationAlgebra):
-    def __init__(self, prefix: Namespace, *nargs, **kwargs):
-        self.namespace = prefix
+    def __init__(self, prefix: str, namespace: Namespace, *nargs, **kwargs):
+        self.prefix = prefix
+        self.namespace = namespace
         super().__init__(*nargs, **kwargs)
 
-    def parse_rdf(self, graph: Graph, string: str) -> None:
-
-        graph.bind("cct", self.namespace)
+    def parse_rdf(self, graph: Graph, string: str) -> BNode:
+        """
+        Convenience function to parse an expression and add it to an RDF graph
+        in one go.
+        """
         expr = self.parse(string)
         if expr:
-            self.rdf(graph, expr.primitive())
+            return self.expr2rdf(graph, expr.primitive())
 
-    def rdf(
-            self,
-            g: Graph,
-            expr: Expr,
-            output: Optional[Node] = None,
-            **inputs: Node) -> BNode:
+    def expr2rdf(self, g: Graph, expr: Expr,
+            inputs: Dict[str, Node] = {}) -> BNode:
         """
         Translate the given expression to RDF and add it to the given graph.
-        Return the output node (with an `rdf:type` of either `ta:Data` or
-        `ta:Operation`). Input nodes that match the labels in the expression
-        are appropriately attached.
+        Return the root node (of type `ta:Transformation`) to which all
+        transformation steps connect via `ta:step`. Input nodes that match the
+        labels in the expression are appropriately attached via `ta:source`.
         """
-        # the only things that are annotated with types are Data's and
-        # Operations that are taken as input
-        τ = expr.type
-        assert τ
+
+        assert not expr.type.is_function()
 
         g.bind("ta", TA)
+        g.bind(self.prefix, self.namespace)
 
-        output = output or BNode()
+        root = BNode()
+        g.add((root, TA.type, TA.Transformation))
+        self._expr2rdf(g, expr, root=root, step=BNode(), inputs=inputs)
+        return root
+
+    def _expr2rdf(self, g: Graph, expr: Expr,
+            root: Node, step: Node, inputs: Dict[str, Node]) -> Node:
+        """
+        Translate the given expression to RDF. Return the final node of type
+        `ta:Operation` or `ta:Data`.
+        """
+        assert expr.type
+
+        # Determine the type of this node
+        if expr.type.is_function():
+            type_node = TA.Operation
+        elif isinstance(expr, Variable):
+            type_node = TA.Variable
+        else:
+            type_node = TA.Data
+
+        # Add connections to input or output nodes
         if isinstance(expr, Base):
             assert expr.definition.name
-
             definition_node = getattr(self.namespace, expr.definition.name)
-            g.add((output, RDF.type, definition_node))
-
-            if isinstance(expr.definition, Data) and expr.label:
+            g.add((step, RDF.type, definition_node))
+            if isinstance(expr.definition, Operation):
+                g.add((root, TA.step, step))
+            elif isinstance(expr.definition, Data) and expr.label:
                 try:
-                    # TODO or directly connect to input?
-                    g.add((output, TA.input, inputs[expr.label]))
+                    g.add((step, TA.source, inputs[expr.label]))
                 except KeyError as e:
                     msg = f"no input node named '{expr.label}'"
                     raise RuntimeError(msg) from e
-
-        elif isinstance(expr, Application):
-            f = self.rdf(g, expr.f, output=output)
-            x = self.rdf(g, expr.x)
-            g.add((f, TA.input, x))
-
-            if not τ.is_function():
-                output = BNode()
-                g.add((f, TA.output, output))
-
         elif isinstance(expr, Abstraction):
+            g.add((step, RDF.type, type_node))
             assert isinstance(expr.body, Expr)
-            f = self.rdf(g, expr.body)
-            g.add((output, TA.input, f))
+            f = self._expr2rdf(g, expr.body, root, step=BNode(), inputs=inputs)
+            g.add((step, TA.input, f))
+        elif isinstance(expr, Application):
+            f = self._expr2rdf(g, expr.f, root, step=step, inputs=inputs)
+            x = self._expr2rdf(g, expr.x, root, step=BNode(), inputs=inputs)
+            g.add((f, TA.input, x))
+            if type_node == TA.Data:
+                step = BNode()
+                g.add((f, TA.output, step))
 
-        if not τ.is_function():
-            g.add((output, TA.type, Literal(τ)))
-            if not isinstance(expr, Base):
-                g.add((output, RDF.type, TA.Data))
+        # Add semantic information on the type of node
+        if not isinstance(expr, Application) or type_node == TA.Data:
+            g.add((step, RDF.type, type_node))
+            g.add((step, TA.type, Literal(expr.type)))
 
-        return output
+        return step
 
 
 def dot(g: Graph) -> str:
