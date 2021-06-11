@@ -12,7 +12,7 @@ from transformation_algebra.expr import \
 import io
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
-from rdflib.namespace import RDF
+from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
 
 from typing import Dict
@@ -28,6 +28,21 @@ class TransformationRDF(TransformationAlgebra):
         self.prefix = prefix
         self.namespace = namespace
         super().__init__(*nargs, **kwargs)
+
+    def vocabulary(self) -> Graph:
+        """
+        Produce an RDF vocabulary for describing expressions in terms of the
+        operations defined for this transformation algebra.
+        """
+        vocab = Graph()
+        for d in self.definitions.values():
+            assert d.name
+            node = getattr(self.namespace, d.name)
+            typenode = TA.Data if isinstance(d, Data) else TA.Operation
+            vocab.add((node, RDF.type, typenode))
+            if d.description:
+                vocab.add((node, RDFS.label, d.description))
+        return vocab
 
     def parse_rdf(self, graph: Graph, string: str) -> BNode:
         """
