@@ -5,17 +5,20 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
+from transformation_algebra.type import Type
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation, Variable
 
 import io
+from itertools import count
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
+from rdflib.plugins import sparql
 
-from typing import Dict
+from typing import Dict, Union, List, Iterator, Optional
 
 TA = Namespace(
     "https://github.com/quangis/transformation-algebra/"
@@ -134,3 +137,116 @@ def dot(g: Graph) -> str:
     cgi.escape = html.escape  # type: ignore
     rdf2dot(g, stream)
     return stream.getvalue()
+
+
+class Chain(object):
+    """
+    A chain captures some relevant aspects of the conceptual process described
+    by an algebra expression, in terms of the sequence of types and operations
+    that must occur in it.
+
+    The same can also be described in terms of semantic linear time logic
+    formulae (SLTL), but since we will be using SPARQL to search through
+    workflows, the approach chosen here makes for a straightforward translation.
+    """
+
+    def __init__(self, *chain: Union[None, Type, Operation, List[Chain]]):
+        """
+        Starting from the output node, describe which data types and operations
+        must occur, in what order. A `None` value indicates that we may skip
+        zero or more steps, and a list indicates that every one of its
+        subchains must at some point occur in one of the paths.
+        """
+        self.chain = list(chain)
+
+    def to_sparql(self, algebra: TransformationAlgebra) -> sparql.Query:
+        """
+        Convert this chain to a SPARQL query.
+        """
+
+        query = [
+            "SELECT ?workflow WHERE {",
+            "?workflow ta:transformation ?transformation.",
+            "?tranformation rdf:type ta:Transformation.",
+            "?transformation ta:step ?step.",
+            "?step ta:output ?node0.",
+            "FILTER NOT EXISTS {?next_step ta:input ?node0}."
+        ]
+        query.extend(self.trace(start="node0", algebra=algebra))
+        query.append("}")
+
+        print()
+        print("\n".join(query))
+        print()
+
+        return sparql.prepareQuery("\n".join(query),
+            initNs={'ta': TA, 'rdf': RDF}
+        )
+
+    def trace(self,
+            start: str,
+            algebra: TransformationAlgebra,
+            generator: Optional[Iterator[str]] = None,
+            previous_name: Optional[str] = None,
+            previous: Optional[Union[Type, Operation]] = None,
+            skip: bool = False) -> Iterator[str]:
+        """
+        Trace the paths between each node in this chain to produce a set of
+        SPARQL constraints.
+        """
+        generator = generator or (f"node{i}" for i in count(start=1))
+
+        current_name = start
+        for current in self.chain:
+            if current is None:
+                skip = True
+                continue
+            elif isinstance(current, list):
+                for subchain in current:
+                    yield from subchain.trace(
+                        start=current_name,
+                        algebra=algebra,
+                        generator=generator,
+                        previous_name=previous_name,
+                        previous=previous,
+                        skip=skip)
+            else:
+                assert isinstance(current, (Operation, Type))
+                if previous:
+                    yield (
+                        f"?{previous_name} "
+                        f"{self.path(previous, current, skip)} "
+                        f"?{current_name}.")
+
+                yield f"?{current_name} ta:type \"{current}\"."
+
+                skip = False
+                previous = current
+                previous_name = current_name
+                current_name = next(generator)
+
+    def path(self,
+            before: Union[Type, Operation],
+            after: Union[Type, Operation],
+            skip: bool) -> str:
+        """
+        Produce a SPARQL property path describing the connection between two
+        nodes that represent either a data type or an operation. `skip`
+        indicates that multiple intermediaries may lie between.
+        """
+        # See also rdflib.paths
+
+        repeat = "+" if skip else ""
+        if isinstance(before, Type):
+            if isinstance(after, Type):
+                return f"(^ta:output/ta:input){repeat}"
+            else:
+                assert isinstance(after, Operation)
+                return f"(^ta:output){repeat}"
+        else:
+            assert isinstance(before, Operation)
+            if isinstance(after, Type):
+                return f"(ta:input){repeat}"
+            else:
+                assert isinstance(after, Type)
+                return f"(ta.input/^ta:output){repeat}"
