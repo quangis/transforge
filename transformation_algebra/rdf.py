@@ -57,16 +57,18 @@ class TransformationRDF(TransformationAlgebra):
                 operator_node = TA.Function
             else:
                 operator_node = getattr(self.namespace, t.operator.name)
+
+            node = BNode()
+            graph.add((node, RDF.type, operator_node))
+
             if t.params:
-                node = BNode()
-                graph.add((node, RDF.type, operator_node))
-                graph.add((node, RDF.type, RDF.Bag))
-                for i, param in enumerate(t.params, start=1):
-                    param_node = self.rdf_type(graph, param)
-                    graph.add((node, getattr(RDF, f"_{i}"), param_node))
-                return node
-            else:
-                return operator_node
+                graph.add((node, RDF.type, RDF.Seq))
+
+            for i, param in enumerate(t.params, start=1):
+                param_node = self.rdf_type(graph, param)
+                graph.add((node, getattr(RDF, f"_{i}"), param_node))
+
+            return node
         else:
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
@@ -153,6 +155,34 @@ class TransformationRDF(TransformationAlgebra):
 
         return step
 
+    def sparql_type(self, type: Type, name: str,
+            name_generator: Iterator[str]) -> Iterator[str]:
+        """
+        Produce SPARQL constraints for the given (non-function) type.
+        """
+
+        t = type.instance()
+
+        if isinstance(t, TypeVar):
+            # If a type in a trace query contains variables, it must be a
+            # wildcard --- because we don't do anything with it
+            assert t.wildcard
+        else:
+            assert isinstance(t, TypeOperation)
+            assert t.operator != Function
+            yield (
+                f"?{name} "
+                f"rdf:type "
+                f"<{getattr(self.namespace, t.operator.name)}>."
+            )
+            for i, param in enumerate(t.params, start=1):
+                next_name = next(name_generator)
+                yield (
+                    f"?{name} rdf:_{i} ?{next_name}."
+                )
+                yield from self.sparql_type(param, next_name, name_generator)
+
+
 
 def dot(g: Graph) -> str:
     """
@@ -190,7 +220,7 @@ class Chain(object):
         # Lists may only occur in the final place of a chain
         assert not any(isinstance(p, list) for p in self.chain[:-1])
 
-    def to_sparql(self, algebra: TransformationAlgebra) -> sparql.Query:
+    def to_sparql(self, algebra: TransformationRDF) -> sparql.Query:
         """
         Convert this chain to a SPARQL query.
         """
@@ -215,7 +245,7 @@ class Chain(object):
         )
 
     def trace(self,
-            algebra: TransformationAlgebra,
+            algebra: TransformationRDF,
             name_generator: Optional[Iterator[str]] = None,
             previous: Optional[Tuple[str, Union[Type, Operation]]] = None,
             skip: bool = False) -> Iterator[str]:
@@ -241,7 +271,19 @@ class Chain(object):
                         f"{self.path(previous[1], current, skip)} "
                         f"?{name}.")
 
-                yield f"?{name} ta:type \"{current}\"."
+                if isinstance(current, Operation):
+                    assert current.name
+                    yield (
+                        f"?{name} "
+                        f"rdf:type "
+                        f"{getattr(algebra.namespace, current.name)}."
+                    )
+                else:
+                    assert isinstance(current, Type)
+                    next_name = next(name_generator)
+                    yield f"?{name} ta:type ?{next_name}."
+                    yield from algebra.sparql_type(current, next_name,
+                            name_generator)
 
                 skip = False
                 previous = name, current
