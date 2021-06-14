@@ -28,9 +28,10 @@ TA = Namespace(
 
 
 class TransformationAlgebraRDF(TransformationAlgebra):
-    def __init__(self, prefix: str, namespace: Namespace):
+    def __init__(self, prefix: str, namespace: Union[Namespace, str]):
         self.prefix = prefix
-        self.namespace = namespace
+        self.namespace = Namespace(namespace) \
+            if isinstance(namespace, str) else namespace
         super().__init__()
 
     def uri(self, value: Union[TypeOperator, Definition]) -> URIRef:
@@ -47,15 +48,30 @@ class TransformationAlgebraRDF(TransformationAlgebra):
     def vocabulary(self) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
-        operations defined for this transformation algebra.
+        types and operations defined for this transformation algebra.
         """
         vocab = Graph()
+
+        # Add type operators to the vocabulary
+        for t in self.types:
+            previous_uri = None
+            current: Optional[TypeOperator] = t
+            while current:
+                current_uri = self.uri(current)
+                vocab.add((current_uri, RDF.type, TA.Type))
+                if previous_uri:
+                    vocab.add((previous_uri, RDF.type, current_uri))
+                previous_uri = current_uri
+                current = current.supertype
+
+        # Add operations to the vocabulary
         for d in self.definitions.values():
             node = self.uri(d)
             typenode = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, typenode))
             if d.description:
                 vocab.add((node, RDFS.label, d.description))
+
         return vocab
 
     def rdf_type(self, graph: Graph, value: Type) -> Node:
