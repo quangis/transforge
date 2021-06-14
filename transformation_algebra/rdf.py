@@ -172,7 +172,7 @@ class Chain(object):
             "?step ta:output ?node0.",
             "FILTER NOT EXISTS {?next_step ta:input ?node0}."
         ]
-        query.extend(self.trace(start="node0", algebra=algebra))
+        query.extend(self.trace(algebra=algebra))
         query.append("}")
 
         print()
@@ -184,7 +184,6 @@ class Chain(object):
         )
 
     def trace(self,
-            start: str,
             algebra: TransformationAlgebra,
             generator: Optional[Iterator[str]] = None,
             previous_name: Optional[str] = None,
@@ -194,9 +193,8 @@ class Chain(object):
         Trace the paths between each node in this chain to produce a set of
         SPARQL constraints.
         """
-        generator = generator or (f"node{i}" for i in count(start=1))
+        generator = generator or iter(f"node{i}" for i in count(start=0))
 
-        current_name = start
         for current in self.chain:
             if current is None:
                 skip = True
@@ -204,7 +202,6 @@ class Chain(object):
             elif isinstance(current, list):
                 for subchain in current:
                     yield from subchain.trace(
-                        start=current_name,
                         algebra=algebra,
                         generator=generator,
                         previous_name=previous_name,
@@ -212,6 +209,7 @@ class Chain(object):
                         skip=skip)
             else:
                 assert isinstance(current, (Operation, Type))
+                current_name = next(generator)
                 if previous:
                     yield (
                         f"?{previous_name} "
@@ -223,7 +221,6 @@ class Chain(object):
                 skip = False
                 previous = current
                 previous_name = current_name
-                current_name = next(generator)
 
     def path(self,
             before: Union[Type, Operation],
