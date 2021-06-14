@@ -5,7 +5,7 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.type import Type
+from transformation_algebra.type import Type, TypeOperation, TypeVar
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation, Variable
@@ -46,6 +46,31 @@ class TransformationRDF(TransformationAlgebra):
             if d.description:
                 vocab.add((node, RDFS.label, d.description))
         return vocab
+
+    def rdf_type(self, graph: Graph, value: Type) -> Node:
+        """
+        Add an RDF representation of a type to the given graph.
+        """
+        t = value.instance()
+        if isinstance(t, TypeOperation):
+            operator_node = getattr(self.namespace, t.operator.name)
+            if t.params:
+                node = BNode()
+                graph.add((node, RDF.type, operator_node))
+                graph.add((node, RDF.type, RDF.Bag))
+                for i, param in enumerate(t.params, start=1):
+                    param_node = self.rdf_type(graph, param)
+                    graph.add((node, getattr(RDF, f"_{i}"), param_node))
+                return node
+            else:
+                return operator_node
+        else:
+            # TODO don't make new node if we already encountered this variable
+            assert isinstance(t, TypeVar)
+            node = BNode()
+            graph.add((node, RDF.type, TA.TypeVariable))
+            graph.add((node, TA.variable, Literal(str(t))))
+            return node
 
     def parse_rdf(self, graph: Graph, string: str) -> BNode:
         """
@@ -119,8 +144,9 @@ class TransformationRDF(TransformationAlgebra):
 
         # Add semantic information on the type of node
         if not isinstance(expr, Application) or type_node == TA.Data:
+            type2_node = self.rdf_type(g, expr.type)
             g.add((step, RDF.type, type_node))
-            g.add((step, TA.type, Literal(expr.type)))
+            g.add((step, TA.type, type2_node))
 
         return step
 
