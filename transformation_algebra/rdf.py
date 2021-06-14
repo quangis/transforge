@@ -5,14 +5,15 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.type import Type, TypeOperation, TypeVar, Function
+from transformation_algebra.type import Type, TypeOperation, TypeVar, \
+    Function, TypeOperator
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
-    Operation, Variable
+    Operation, Variable, Definition
 
 import io
 from itertools import count
-from rdflib import Graph, Namespace, BNode, Literal
+from rdflib import URIRef, Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
@@ -32,6 +33,17 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         self.namespace = namespace
         super().__init__()
 
+    def uri(self, value: Union[TypeOperator, Definition]) -> URIRef:
+        """
+        Obtain the URI node for an operation or type operator.
+        """
+        assert value in self
+        if isinstance(value, TypeOperator):
+            return getattr(self.namespace, value.name)
+        else:
+            assert isinstance(value, Definition) and value.name
+            return getattr(self.namespace, value.name)
+
     def vocabulary(self) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
@@ -39,8 +51,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         vocab = Graph()
         for d in self.definitions.values():
-            assert d.name
-            node = getattr(self.namespace, d.name)
+            node = self.uri(d)
             typenode = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, typenode))
             if d.description:
@@ -56,7 +67,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if t.operator == Function:
                 operator_node = TA.Function
             else:
-                operator_node = getattr(self.namespace, t.operator.name)
+                operator_node = self.uri(t.operator)
 
             node = BNode()
             graph.add((node, RDF.type, operator_node))
@@ -124,7 +135,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         # Add connections to input or output nodes
         if isinstance(expr, Base):
             assert expr.definition.name
-            definition_node = getattr(self.namespace, expr.definition.name)
+            definition_node = self.uri(expr.definition)
             g.add((step, RDF.type, definition_node))
             if isinstance(expr.definition, Operation):
                 g.add((root, TA.step, step))
@@ -173,7 +184,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             yield (
                 f"?{name} "
                 f"rdf:type "
-                f"<{getattr(self.namespace, t.operator.name)}>."
+                f"<{self.uri(t.operator)}>."
             )
             for i, param in enumerate(t.params, start=1):
                 next_name = next(name_generator)
@@ -181,7 +192,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     f"?{name} rdf:_{i} ?{next_name}."
                 )
                 yield from self.sparql_type(param, next_name, name_generator)
-
 
 
 def dot(g: Graph) -> str:
@@ -272,12 +282,7 @@ class Chain(object):
                         f"?{name}.")
 
                 if isinstance(current, Operation):
-                    assert current.name
-                    yield (
-                        f"?{name} "
-                        f"rdf:type "
-                        f"{getattr(algebra.namespace, current.name)}."
-                    )
+                    yield f"?{name} rdf:type {algebra.uri(current)}."
                 else:
                     assert isinstance(current, Type)
                     next_name = next(name_generator)

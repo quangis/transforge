@@ -8,7 +8,7 @@ from enum import Enum, auto
 from abc import ABC, abstractmethod
 from itertools import chain
 from inspect import signature
-from typing import Optional, Iterable, Union, Callable, List, Set
+from typing import Optional, Iterator, Iterable, Union, Callable, List, Set
 
 from transformation_algebra import error
 
@@ -245,7 +245,7 @@ class TypeInstance(Type):
                     result.add(v1)
         return result
 
-    def variables_iter(self) -> Iterable[TypeVar]:
+    def variables_iter(self) -> Iterator[TypeVar]:
         """
         Obtain an iterator of variables in this type instance, excluding
         variables that might occur in constraints, with possible repetitions.
@@ -256,6 +256,20 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation):
             for v in chain(*(t.variables_iter() for t in a.params)):
                 yield v
+
+    def operators_iter(self) -> Iterator[TypeOperator]:
+        """
+        Obtain an iterator of all non-function operators in the type
+        expression.
+        """
+        a = self.follow()
+        if isinstance(a, TypeOperation):
+            if a.operator is not Function:
+                yield a.operator
+            yield from chain(*(t.operators_iter() for t in a.params))
+        else:
+            assert isinstance(a, TypeVar)
+            yield from chain(*(c.operators_iter() for c in a.constraints))
 
     def follow(self) -> TypeInstance:
         """
@@ -567,7 +581,13 @@ class Constraint(object):
             result = result.union(t.variables())
         return result
 
-    def variables_iter(self) -> Iterable[TypeVar]:
+    def operators_iter(self) -> Iterator[TypeOperator]:
+        return chain(
+            self.reference.operators_iter(),
+            *(o.operators_iter() for o in self.alternatives)
+        )
+
+    def variables_iter(self) -> Iterator[TypeVar]:
         return chain(
             self.reference.variables_iter(),
             *(o.variables_iter() for o in self.alternatives)
