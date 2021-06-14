@@ -26,11 +26,11 @@ TA = Namespace(
 )
 
 
-class TransformationRDF(TransformationAlgebra):
-    def __init__(self, prefix: str, namespace: Namespace, *nargs, **kwargs):
+class TransformationAlgebraRDF(TransformationAlgebra):
+    def __init__(self, prefix: str, namespace: Namespace):
         self.prefix = prefix
         self.namespace = namespace
-        super().__init__(*nargs, **kwargs)
+        super().__init__()
 
     def vocabulary(self) -> Graph:
         """
@@ -220,7 +220,7 @@ class Chain(object):
         # Lists may only occur in the final place of a chain
         assert not any(isinstance(p, list) for p in self.chain[:-1])
 
-    def to_sparql(self, algebra: TransformationRDF) -> sparql.Query:
+    def to_sparql(self, algebra: TransformationAlgebraRDF) -> sparql.Query:
         """
         Convert this chain to a SPARQL query.
         """
@@ -245,7 +245,7 @@ class Chain(object):
         )
 
     def trace(self,
-            algebra: TransformationRDF,
+            algebra: TransformationAlgebraRDF,
             name_generator: Optional[Iterator[str]] = None,
             previous: Optional[Tuple[str, Union[Type, Operation]]] = None,
             skip: bool = False) -> Iterator[str]:

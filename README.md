@@ -123,21 +123,24 @@ generates type terms that contain certain parameters.
 
 ## Algebra and expressions
 
-Now that we know how types work, we can use them to define the data inputs and 
-operations of an algebra.
+Now that we know how types work, we can use them to define the types, data 
+inputs and operations of an algebra.
 
-    >>> alg = TransformationAlgebra(
+    >>> alg = TransformationAlgebra()
+    >>> alg.add(
+            Int,
             one=Data(Int),
             add=Operation(Int ** Int ** Int)
             ...
-    )
+        )
 
 In fact, for convenience, you may provide your definitions globally and 
 automatically incorporate them into the algebra:
 
     >>> one = Data(Int)
     >>> add = Operation(Int ** Int ** Int)
-    >>> alg = TransformationAlgebra(**globals())
+    >>> alg = TransformationAlgebra()
+    >>> alg.add(**globals())
 
 It is possible to define *composite* transformations: transformations that are 
 derived from other, simpler ones. This definition should not necessarily be 

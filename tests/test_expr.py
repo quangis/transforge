@@ -11,7 +11,8 @@ class TestAlgebra(unittest.TestCase):
         Int = Type.declare('Int')
         add = Operation(Int ** Int ** Int)
         one = Data(Int)
-        algebra = TransformationAlgebra(
+        algebra = TransformationAlgebra()
+        algebra.add(
             one=one,
             add1=Operation(
                 Int ** Int,
@@ -72,7 +73,8 @@ class TestAlgebra(unittest.TestCase):
     def test_same_labels_unify(self):
         # See issue #10
         A, B = Type.declare('A'), Type.declare('B')
-        algebra = TransformationAlgebra(
+        algebra = TransformationAlgebra()
+        algebra.add(
             d1=Data(A),
             d2=Data(B),
             f=Operation(A ** B ** A))

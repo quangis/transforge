@@ -13,7 +13,7 @@ from typing import Optional, Dict, Callable, Union, List, Iterable, Set
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function
+    Type, TypeVar, TypeSchema, TypeOperator, TypeInstance, Function
 
 
 class Definition(ABC):
@@ -334,25 +334,12 @@ class Variable(Expr):
 ###############################################################################
 
 class TransformationAlgebra(object):
-    def __init__(self, *nargs: Definition, **kwargs: Definition):
+    def __init__(self):
         """
-        Create a transformation algebra with pre-named (positional arguments)
-        or to-be-named (keyword arguments) data and operation definitions.
+        Initiate an empty transformation algebra.
         """
+        self.types: Dict[str, TypeOperator] = {}
         self.definitions: Dict[str, Definition] = {}
-        for v in nargs:
-            assert v.name
-            self[v.name] = v
-
-        # If we get fed globals(), we will automatically filter out only
-        # definitions, without complaining
-        got_globals = '__builtins__' in kwargs
-
-        for k, v in kwargs.items():
-            if not got_globals or isinstance(v, Definition):
-                assert not v.name
-                v.name = k.rstrip("_") if got_globals else k
-                self[v.name] = v
 
     def __repr__(self) -> str:
         return str(self)
@@ -370,6 +357,37 @@ class TransformationAlgebra(object):
         # we did it at define-time, it would lead to issues --- see issue #3
         if isinstance(value, Operation):
             value.validate()
+
+    def add(self,
+            *nargs: Union[TypeOperator, Definition],
+            **kwargs: Union[TypeOperator, Definition]):
+        """
+        Add named types, data and operation definitions to this transformation
+        algebra. Note that names ending with an underscore will be stripped of
+        that symbol.
+        """
+
+        def args():
+            for v in nargs:
+                assert v.name
+                yield v.name, v
+            for k, v in kwargs.items():
+                k = k.rstrip("_")
+                yield k, v
+
+        for k, v in args():
+            tp, op = isinstance(v, TypeOperator), isinstance(v, Definition)
+            if op or tp:
+                assert v.name is None or k == v.name
+                v.name = k
+                if tp:
+                    self.types[k] = v
+                elif op:
+                    self[k] = v
+            else:
+                # Only if we were fed globals() will we automatically filter
+                # out irrelevant types without complaining
+                assert '__builtins__' in kwargs
 
     def parse(self, string: str) -> Optional[Expr]:
         # This used to be done via pyparsing, but the structure is so simple
