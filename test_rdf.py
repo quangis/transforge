@@ -1,29 +1,25 @@
 from transformation_algebra.type import Type
 from transformation_algebra.expr import Data, Operation
-from transformation_algebra.rdf import TransformationRDF, dot
+from transformation_algebra.rdf import TransformationRDF, dot, Chain
 
 from rdflib import Namespace, Graph
 
 A, B, C = Type.declare('A'), Type.declare('B'), Type.declare('C')
 algebra = TransformationRDF(
     "cct", Namespace("https://github.com/quangis/cct/CCT.rdf#"),
-    a=Data(A),
+    data=Data(A),
     ab=Operation(A ** B),
-    bc=Operation(B ** C)
+    bc=Operation(B ** C),
+    compose=Operation(
+        lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+        derived=lambda f, g, x: f(g(x))
+    )
 )
+
 g = Graph()
-output_node = algebra.parse_rdf(g, "bc (ab a)")
-result = g.query(
-    """
-    SELECT ?type1 ?type2
-    WHERE {
-      ?data1 (^ta:input/ta:output)+ ?data2.
-      ?data1 ta:type ?type1.
-      ?data2 ta:type ?type2.
-    }
-    """)
+output_node = algebra.parse_rdf(g, "compose bc ab data")
+q = Chain(A, None, [Chain(A), Chain(C)]).to_sparql(algebra)
+print(q)
+# result = g.query(q)
 
-for data1, data2 in result:
-    print(f"{data1} -> {data2}")
-
-#print(dot(g))
+# print(dot(g))
