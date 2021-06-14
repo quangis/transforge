@@ -18,7 +18,7 @@ from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
 from rdflib.plugins import sparql
 
-from typing import Dict, Union, List, Iterator, Optional
+from typing import Dict, Union, List, Iterator, Optional, Tuple
 
 TA = Namespace(
     "https://github.com/quangis/transformation-algebra/"
@@ -158,6 +158,8 @@ class Chain(object):
         subchains must at some point occur in one of the paths.
         """
         self.chain = list(chain)
+        # Lists may only occur in the final place of a chain
+        assert not any(isinstance(p, list) for p in self.chain[:-1])
 
     def to_sparql(self, algebra: TransformationAlgebra) -> sparql.Query:
         """
@@ -185,42 +187,35 @@ class Chain(object):
 
     def trace(self,
             algebra: TransformationAlgebra,
-            generator: Optional[Iterator[str]] = None,
-            previous_name: Optional[str] = None,
-            previous: Optional[Union[Type, Operation]] = None,
+            name_generator: Optional[Iterator[str]] = None,
+            previous: Optional[Tuple[str, Union[Type, Operation]]] = None,
             skip: bool = False) -> Iterator[str]:
         """
         Trace the paths between each node in this chain to produce a set of
         SPARQL constraints.
         """
-        generator = generator or iter(f"node{i}" for i in count(start=0))
+        name_generator = name_generator or iter(f"node{i}" for i in count())
 
         for current in self.chain:
             if current is None:
                 skip = True
-                continue
             elif isinstance(current, list):
                 for subchain in current:
                     yield from subchain.trace(
-                        algebra=algebra,
-                        generator=generator,
-                        previous_name=previous_name,
-                        previous=previous,
-                        skip=skip)
+                        algebra, name_generator, previous, skip)
             else:
                 assert isinstance(current, (Operation, Type))
-                current_name = next(generator)
+                name = next(name_generator)
                 if previous:
                     yield (
-                        f"?{previous_name} "
-                        f"{self.path(previous, current, skip)} "
-                        f"?{current_name}.")
+                        f"?{previous[0]} "
+                        f"{self.path(previous[1], current, skip)} "
+                        f"?{name}.")
 
-                yield f"?{current_name} ta:type \"{current}\"."
+                yield f"?{name} ta:type \"{current}\"."
 
                 skip = False
-                previous = current
-                previous_name = current_name
+                previous = name, current
 
     def path(self,
             before: Union[Type, Operation],
