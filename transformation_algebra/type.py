@@ -253,9 +253,9 @@ class TypeInstance(Type):
         a = self.follow()
         if isinstance(a, TypeVar):
             yield a
-        elif isinstance(a, TypeOperation):
-            for v in chain(*(t.variables_iter() for t in a.params)):
-                yield v
+        else:
+            assert isinstance(a, TypeOperation)
+            yield from chain(*(t.variables_iter() for t in a.params))
 
     def operators_iter(self) -> Iterator[TypeOperator]:
         """

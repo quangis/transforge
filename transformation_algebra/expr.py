@@ -9,7 +9,7 @@ from abc import ABC
 from functools import reduce, partial
 from itertools import groupby, chain
 from inspect import signature, Signature, Parameter
-from typing import Optional, Dict, Callable, Union, List, Iterable, Set
+from typing import Optional, Dict, Callable, Union, List, Iterator, Set
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -182,7 +182,7 @@ class Expr(ABC):
             self.x = self.x.replace(label, new)
         return self
 
-    def leaves(self) -> Iterable[Expr]:
+    def leaves(self) -> Iterator[Expr]:
         """
         Obtain leaf expressions.
         """
@@ -190,11 +190,9 @@ class Expr(ABC):
             yield self
         elif isinstance(self, Abstraction):
             assert isinstance(self.body, Expr)
-            for v in self.body.leaves():
-                yield v
+            yield from self.body.leaves()
         elif isinstance(self, Application):
-            for v in chain(self.f.leaves(), self.x.leaves()):
-                yield v
+            yield from chain(self.f.leaves(), self.x.leaves())
 
     def labels(self) -> List[str]:
         """
@@ -476,9 +474,9 @@ class Token(Enum):
             return Token.IDENT
 
 
-def varnames(prefix: str, i: int = 1) -> Iterable[str]:
+def varnames(prefix: str, i: int = 1) -> Iterator[str]:
     """
-    An endless iterable of variable names.
+    An endless iterator of variable names.
     """
     while True:
         num = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in str(i))
