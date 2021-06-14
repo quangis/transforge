@@ -5,7 +5,7 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.type import Type, TypeOperation, TypeVar
+from transformation_algebra.type import Type, TypeOperation, TypeVar, Function
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation, Variable
@@ -53,7 +53,10 @@ class TransformationRDF(TransformationAlgebra):
         """
         t = value.instance()
         if isinstance(t, TypeOperation):
-            operator_node = getattr(self.namespace, t.operator.name)
+            if t.operator == Function:
+                operator_node = TA.Function
+            else:
+                operator_node = getattr(self.namespace, t.operator.name)
             if t.params:
                 node = BNode()
                 graph.add((node, RDF.type, operator_node))
