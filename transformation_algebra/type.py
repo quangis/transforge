@@ -49,10 +49,12 @@ class Type(ABC):
         return Function(self.instance(), other.instance())
 
     def __lt__(self, other: Type) -> Optional[bool]:
-        return not self.match(other) and self <= other
+        a, b = self.instance(), other.instance()
+        return not a.match(b) and a <= b
 
     def __gt__(self, other: Type) -> Optional[bool]:
-        return not self.match(other) and self >= other
+        a, b = self.instance(), other.instance()
+        return not a.match(b) and a >= b
 
     def __le__(self, other: Type) -> Optional[bool]:
         return self.instance().match(other.instance(),
@@ -93,9 +95,7 @@ class Type(ABC):
         return NotImplemented
 
     @staticmethod
-    def declare(
-            name: str,
-            params: Union[int, Iterable[Variance]] = 0,
+    def declare(name: str, params: Union[int, Iterable[Variance]] = 0,
             supertype: Optional[TypeOperator] = None) -> TypeOperator:
         """
         Convenience function for defining a type.
@@ -135,7 +135,7 @@ class TypeOperator(Type):
     def __init__(
             self,
             name: str,
-            params: List[Variance] = (),
+            params: List[Variance] = [],
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype: Optional[TypeOperator] = supertype
@@ -172,16 +172,12 @@ class TypeInstance(Type):
         Like str(), but includes constraints.
         """
         result = [str(self)]
-        constraints: Set[Constraint] = set()
-
         for v in self.variables():
-            constraints = constraints.union(v.constraints)
             if v.lower:
                 result.append(f"{v} >= {v.lower}")
             if v.upper:
                 result.append(f"{v} <= {v.upper}")
-
-        result.extend(str(c) for c in constraints)
+        result.extend(str(c) for c in self.constraints())
         return ' | '.join(result)
 
     def resolve(self, prefer_lower: bool = True) -> TypeInstance:
@@ -201,13 +197,6 @@ class TypeInstance(Type):
                 a.bind(a.upper())
         return a.follow()
 
-    def __contains__(self, value: TypeInstance) -> bool:
-        a = self.follow()
-        b = value.follow()
-        return a.match(b) is True or (
-            isinstance(a, TypeOperation) and
-            any(b in t for t in a.params))
-
     def __iter__(self) -> Iterator[TypeInstance]:
         """
         Iterate through all substructures of this type instance.
@@ -216,6 +205,13 @@ class TypeInstance(Type):
         yield a
         if isinstance(a, TypeOperation):
             yield from chain(*a.params)
+
+    def __contains__(self, value: TypeInstance) -> bool:
+        a = self.follow()
+        b = value.follow()
+        return a.match(b) is True or (
+            isinstance(a, TypeOperation) and
+            any(b in t for t in a.params))
 
     def variables(self, recursive: bool = True) -> Set[TypeVar]:
         """
@@ -259,8 +255,8 @@ class TypeInstance(Type):
         """
         Follow a unification until bumping into a type that is not yet bound.
         """
-        if isinstance(self, TypeVar) and self.unified:
-            return self.unified.follow()
+        if isinstance(self, TypeVar) and self.unification:
+            return self.unification.follow()
         return self
 
     def skeleton(self) -> TypeInstance:
@@ -277,10 +273,7 @@ class TypeInstance(Type):
         else:
             return self
 
-    def match(
-            self,
-            other: TypeInstance,
-            subtype: bool = False,
+    def match(self, other: TypeInstance, subtype: bool = False,
             accept_wildcard: bool = False) -> Optional[bool]:
         """
         Return True if self is definitely the same as (or a subtype of) other,
@@ -292,19 +285,16 @@ class TypeInstance(Type):
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                if subtype:
-                    return a.operator.subtype(b.operator)
-                else:
-                    return a.operator == b.operator
-            elif a.operator != b.operator:
+                return a.operator is b.operator or \
+                    (subtype and a.operator.subtype(b.operator))
+            elif a.operator is not b.operator:
                 return False
             else:
                 result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
                     r = TypeInstance.match(
                         *((s, t) if v == Variance.CO else (t, s)),
-                        subtype=subtype,
-                        accept_wildcard=accept_wildcard)
+                        subtype=subtype, accept_wildcard=accept_wildcard)
                     if r is False:
                         return False
                     elif r is None:
@@ -373,7 +363,8 @@ class TypeInstance(Type):
                 a.bind(b.skeleton())
                 a.unify(b, subtype=subtype)
 
-        elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
+        else:
+            assert isinstance(a, TypeOperation) and isinstance(b, TypeVar)
             if b in a:
                 raise error.RecursiveType(b, a)
             elif a.basic:
@@ -455,14 +446,14 @@ class TypeVar(TypeInstance):
     def __init__(self, name: Optional[str] = None, wildcard: bool = False):
         self._name = name
         self.wildcard = wildcard
-        self.unified: Optional[TypeInstance] = None
+        self.unification: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self._constraints: Set[Constraint] = set()
 
     def __str__(self) -> str:
-        if self.unified:
-            return str(self.unified)
+        if self.unification:
+            return str(self.unification)
         return "_" if self.wildcard else self.name
 
     @property
@@ -474,14 +465,14 @@ class TypeVar(TypeInstance):
         self._name = value
 
     def bind(self, t: TypeInstance) -> None:
-        assert (not self.unified or t == self.unified), \
+        assert (not self.unification or t == self.unification), \
             "variable cannot be unified twice"
 
         # Once a wildcard variable is bound, it is no longer wildcard
         self.wildcard = False
 
         if self is not t:
-            self.unified = t
+            self.unification = t
 
             if isinstance(t, TypeVar):
                 t._constraints.update(self._constraints)
@@ -573,7 +564,7 @@ class Constraint(object):
 
         # Inform variables about the constraint present on them
         for v in self.variables():
-            assert not v.unified
+            assert not v.unification
             v._constraints.add(self)
 
         self.fulfilled()
