@@ -49,17 +49,17 @@ class Type(ABC):
         return Function(self.instance(), other.instance())
 
     def __lt__(self, other: Type) -> Optional[bool]:
-        return not self.unifiable(other) and self <= other
+        return not self.match(other) and self <= other
 
     def __gt__(self, other: Type) -> Optional[bool]:
-        return not self.unifiable(other) and self >= other
+        return not self.match(other) and self >= other
 
     def __le__(self, other: Type) -> Optional[bool]:
-        return self.instance().unifiable(other.instance(),
+        return self.instance().match(other.instance(),
             accept_wildcard=True, subtype=True)
 
     def __ge__(self, other: Type) -> Optional[bool]:
-        return self.instance().unifiable(other.instance(),
+        return self.instance().match(other.instance(),
             accept_wildcard=True, subtype=True)
 
     def apply(self, arg: Type) -> TypeInstance:
@@ -204,7 +204,7 @@ class TypeInstance(Type):
     def __contains__(self, value: TypeInstance) -> bool:
         a = self.follow()
         b = value.follow()
-        return a.unifiable(b) is True or (
+        return a.match(b) is True or (
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
@@ -277,7 +277,7 @@ class TypeInstance(Type):
         else:
             return self
 
-    def unifiable(
+    def match(
             self,
             other: TypeInstance,
             subtype: bool = False,
@@ -301,7 +301,7 @@ class TypeInstance(Type):
             else:
                 result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):
-                    r = TypeInstance.unifiable(
+                    r = TypeInstance.match(
                         *((s, t) if v == Variance.CO else (t, s)),
                         subtype=subtype,
                         accept_wildcard=accept_wildcard)
@@ -437,7 +437,7 @@ class TypeOperation(TypeInstance):
             return str(self.operator)
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, TypeInstance) and bool(self.unifiable(other))
+        return isinstance(other, TypeInstance) and bool(self.match(other))
 
     def __getitem__(self, key: int) -> TypeInstance:
         return self.params[key]
@@ -616,8 +616,8 @@ class Constraint(object):
         for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
-                if obj.unifiable(minimized[i], subtype=True) is True:
-                    if minimized[i].unifiable(obj, subtype=True) is not True:
+                if obj.match(minimized[i], subtype=True) is True:
+                    if minimized[i].match(obj, subtype=True) is not True:
                         minimized[i] = obj
                     add = False
             if add:
@@ -636,7 +636,7 @@ class Constraint(object):
         self.minimize()
 
         compatibility = [
-            self.reference.unifiable(t, subtype=True, accept_wildcard=True)
+            self.reference.match(t, subtype=True, accept_wildcard=True)
             for t in self.alternatives]
         self.alternatives = [t for t, c in zip(self.alternatives, compatibility)
             if c is not False]
