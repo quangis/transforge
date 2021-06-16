@@ -245,7 +245,7 @@ class TypeInstance(Type):
         Obtain all distinct non-function operators in the type instance.
         """
         result = set(t.operator for t in self
-            if isinstance(t, TypeOperation) and t.operator is not Function)
+            if isinstance(t, TypeOperation) and t.operator != Function)
         if recursive:
             for constraint in self.constraints():
                 result.update(*(p.operators(False) for p in constraint.parts()))
@@ -285,9 +285,9 @@ class TypeInstance(Type):
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                return a.operator is b.operator or \
+                return a.operator == b.operator or \
                     (subtype and a.operator.subtype(b.operator))
-            elif a.operator is not b.operator:
+            elif a.operator != b.operator:
                 return False
             else:
                 result: Optional[bool] = True
@@ -332,7 +332,9 @@ class TypeInstance(Type):
         a = self.follow()
         b = other.follow()
 
-        if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
+        if isinstance(a, TypeVar) and isinstance(b, TypeVar):
+            a.bind(b)
+        elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
                 if subtype and not a.operator.subtype(b.operator):
                     raise error.SubtypeMismatch(a, b)
@@ -347,34 +349,23 @@ class TypeInstance(Type):
                         y.unify(x, subtype=subtype)
             else:
                 raise error.TypeMismatch(a, b)
-
-        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
-            a.bind(b)
-
-        elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
-            if a in b:
-                raise error.RecursiveType(a, b)
-            elif b.basic:
-                if subtype:
-                    a.below(b.operator)
-                else:
-                    a.bind(b)
-            else:
-                a.bind(b.skeleton())
-                a.unify(b, subtype=subtype)
-
         else:
-            assert isinstance(a, TypeOperation) and isinstance(b, TypeVar)
-            if b in a:
-                raise error.RecursiveType(b, a)
-            elif a.basic:
-                if subtype:
-                    b.above(a.operator)
-                else:
-                    b.bind(a)
+            if isinstance(a, TypeOperation) and isinstance(b, TypeVar):
+                op, var, f = a, b, TypeVar.above
             else:
-                b.bind(a.skeleton())
-                b.unify(a, subtype=subtype)
+                assert isinstance(a, TypeVar) and isinstance(b, TypeOperation)
+                op, var, f = b, a, TypeVar.below
+
+            if var in op:
+                raise error.RecursiveType(var, op)
+            elif op.basic:
+                if subtype:
+                    f(var, op.operator)
+                else:
+                    var.bind(op)
+            else:
+                var.bind(op.skeleton())
+                var.unify(op, subtype=subtype)
 
     def instance(self) -> TypeInstance:
         return self
