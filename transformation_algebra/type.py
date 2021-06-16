@@ -48,31 +48,6 @@ class Type(ABC):
         # been more intuitive visually, but would not have this property.
         return Function(self.instance(), other.instance())
 
-    def __or__(self, constraint: Constraint) -> TypeInstance:
-        """
-        Another abuse of Python's operators, allowing us to add constraints by
-        using the | operator.
-        """
-        # Since constraints are fully attached during their instantiation, we
-        # don't have to do anything here except perform a sanity check.
-        t = self.instance()
-        constraint.set_context(t)
-        for v in constraint.variables_iter():
-            if not v.wildcard and v not in t:
-                raise error.ConstrainFreeVariable(constraint)
-        return t
-
-    def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
-        """
-        Allows us to write typeclass constraints using @.
-        """
-        return Constraint(
-            self.instance(), *(
-                (other.instance(),)
-                if isinstance(other, Type) else
-                (o.instance() for o in other)
-            ))
-
     def __lt__(self, other: Type) -> Optional[bool]:
         return not self.unifiable(other) and self <= other
 
@@ -233,43 +208,52 @@ class TypeInstance(Type):
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
-    def variables(self) -> Set[TypeVar]:
+    def __iter__(self) -> Iterator[TypeInstance]:
         """
-        Obtain all distinct type variables currently in the type expression,
-        including variables that might occur in constraints.
+        Iterate through all substructures of this type instance.
         """
-        result = set(self.variables_iter())
-        for v in list(result):
-            for c in v.constraints:
-                for v1 in c.variables_iter():
-                    result.add(v1)
+        a = self.follow()
+        yield a
+        if isinstance(a, TypeOperation):
+            yield from chain(*a.params)
+
+    def variables(self, recursive: bool = True) -> Set[TypeVar]:
+        """
+        Obtain all distinct type variables currently in the type instance.
+        """
+        result = set(t for t in self if isinstance(t, TypeVar))
+        if not recursive:
+            return result
+        stack = list(result)
+        while stack:
+            var = stack.pop()
+            for constraint in var._constraints:
+                for element in constraint.parts():
+                    for extra_var in element.variables(False):
+                        if extra_var not in result:
+                            stack.append(extra_var)
+                            result.add(extra_var)
         return result
 
-    def variables_iter(self) -> Iterator[TypeVar]:
+    def constraints(self, recursive: bool = True) -> Set[Constraint]:
         """
-        Obtain an iterator of variables in this type instance, excluding
-        variables that might occur in constraints, with possible repetitions.
+        Obtain all constraints attached to variables in the type instance.
         """
-        a = self.follow()
-        if isinstance(a, TypeVar):
-            yield a
-        else:
-            assert isinstance(a, TypeOperation)
-            yield from chain(*(t.variables_iter() for t in a.params))
+        result = set()
+        for v in self.variables(recursive=recursive):
+            result.update(v._constraints)
+        return result
 
-    def operators_iter(self) -> Iterator[TypeOperator]:
+    def operators(self, recursive: bool = True) -> Set[TypeOperator]:
         """
-        Obtain an iterator of all non-function operators in the type
-        expression.
+        Obtain all distinct non-function operators in the type instance.
         """
-        a = self.follow()
-        if isinstance(a, TypeOperation):
-            if a.operator is not Function:
-                yield a.operator
-            yield from chain(*(t.operators_iter() for t in a.params))
-        else:
-            assert isinstance(a, TypeVar)
-            yield from chain(*(c.operators_iter() for c in a.constraints))
+        result = set(t.operator for t in self
+            if isinstance(t, TypeOperation) and t.operator is not Function)
+        if recursive:
+            for constraint in self.constraints():
+                result.update(*(p.operators(False) for p in constraint.parts()))
+        return result
 
     def follow(self) -> TypeInstance:
         """
@@ -404,6 +388,26 @@ class TypeInstance(Type):
     def instance(self) -> TypeInstance:
         return self
 
+    def __or__(self, constraint: Constraint) -> TypeInstance:
+        """
+        Another abuse of Python's operators, allowing us to add constraints to
+        a type instance by using the | operator.
+        """
+        # Constraints are attached to the relevant variables when the
+        # constraint is instantiated; so at this point, we only attach context.
+        constraint.set_context(self)
+        return self
+
+    def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
+        """
+        Allows us to write typeclass constraints using @.
+        """
+        if isinstance(other, Type):
+            return Constraint(self, other.instance())
+        else:
+            assert isinstance(other, Iterable)
+            return Constraint(self, *(o.instance() for o in other))
+
 
 class TypeOperation(TypeInstance):
     """
@@ -451,7 +455,7 @@ class TypeVar(TypeInstance):
         self.unified: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
-        self.constraints: Set[Constraint] = set()
+        self._constraints: Set[Constraint] = set()
 
     def __str__(self) -> str:
         if self.unified:
@@ -477,9 +481,8 @@ class TypeVar(TypeInstance):
             self.unified = t
 
             if isinstance(t, TypeVar):
-                constraints = set.union(self.constraints, t.constraints)
-                self.constraints = constraints
-                t.constraints = constraints
+                t._constraints.update(self._constraints)
+                self._constraints = t._constraints
                 t.check_constraints()
 
                 t.wildcard = False
@@ -499,12 +502,13 @@ class TypeVar(TypeInstance):
                     if self.upper and self.upper.subtype(t.operator, strict=True):
                         raise error.SubtypeMismatch(self, t)
                 else:
-                    constraints = self.constraints.union(*(
-                        v.constraints for v in t.variables()
-                    ))
-                    self.constraints = constraints
-                    for v in t.variables():
-                        v.constraints = constraints
+                    variables = t.variables(recursive=False)
+
+                    self._constraints.update(chain(*(
+                        v._constraints for v in variables
+                    )))
+                    for v in variables:
+                        v._constraints = self._constraints
                         v.check_constraints()
 
             self.check_constraints()
@@ -543,8 +547,8 @@ class TypeVar(TypeInstance):
             raise error.SubtypeMismatch(new, upper)
 
     def check_constraints(self) -> None:
-        self.constraints = set(
-            c for c in self.constraints if not c.fulfilled())
+        self._constraints = set(
+            c for c in self._constraints if not c.fulfilled())
 
 
 class Constraint(object):
@@ -556,42 +560,48 @@ class Constraint(object):
     def __init__(
             self,
             reference: TypeInstance,
-            *alternatives: TypeInstance):
+            *alternatives: TypeInstance,
+            context: Optional[TypeInstance] = None):
         self.reference = reference
         self.alternatives = list(alternatives)
         self.description = str(self)
+        self.context = context
         self.skeleton: Optional[TypeInstance] = None
 
         # Inform variables about the constraint present on them
         for v in self.variables():
             assert not v.unified
-            v.constraints.add(self)
+            v._constraints.add(self)
 
         self.fulfilled()
 
     def __str__(self) -> str:
         return f"{self.reference} @ {self.alternatives}"
 
-    def set_context(self, context: TypeInstance) -> None:
-        self.description = f"{context} | {self}"
+    def parts(self) -> Iterator[TypeInstance]:
+        """
+        An iterator of the constituent parts of this constraint.
+        """
+        return chain(self.reference, *self.alternatives)
 
     def variables(self) -> Set[TypeVar]:
-        result = self.reference.variables()
-        for t in self.alternatives:
-            result = result.union(t.variables())
-        return result
+        return self.reference.variables(True)
 
-    def operators_iter(self) -> Iterator[TypeOperator]:
-        return chain(
-            self.reference.operators_iter(),
-            *(o.operators_iter() for o in self.alternatives)
-        )
+    def set_context(self, context: TypeInstance) -> None:
+        self.context = context
+        self.description = f"{context} | {self}"
+        if not self.all_variables_occur_in_context():
+            raise error.ConstrainFreeVariable(self)
 
-    def variables_iter(self) -> Iterator[TypeVar]:
-        return chain(
-            self.reference.variables_iter(),
-            *(o.variables_iter() for o in self.alternatives)
-        )
+    def all_variables_occur_in_context(self) -> bool:
+        """
+        Are all variables in this constraint bound to a variable in the
+        context in which it is applied?
+        """
+        return bool(self.context and all(
+            var.wildcard or var in self.context
+            for el in self.parts()
+            for var in el.variables(recursive=False)))
 
     def minimize(self) -> None:
         """

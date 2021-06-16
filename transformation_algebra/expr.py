@@ -366,7 +366,7 @@ class TransformationAlgebra(object):
         if isinstance(value, Operation):
             value.validate()
 
-        for op in value.type.instance().operators_iter():
+        for op in value.type.instance().operators():
             self.types.add(op)
 
     def add(self, *nargs: Definition, **kwargs: Definition) -> None:
