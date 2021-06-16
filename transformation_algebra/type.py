@@ -439,6 +439,9 @@ class TypeOperation(TypeInstance):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, TypeInstance) and bool(self.unifiable(other))
 
+    def __getitem__(self, key: int) -> TypeInstance:
+        return self.params[key]
+
     @property
     def basic(self) -> bool:
         return self.operator.arity == 0

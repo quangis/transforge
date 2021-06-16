@@ -313,6 +313,18 @@ class TestType(unittest.TestCase):
         y = f.apply(g)
         self.assertEqual(len(y._constraints), 0)
 
+    def test_reach_all_constraints(self):
+        f = TypeSchema(lambda a, b, c: a ** b ** c
+            | c @ [b, _] | b @ [c, a] | a @ [b, c]).instance()
+        self.assertEqual(len(f[1][1].constraints()), 3)
+
+    def test_reach_all_operators(self):
+        A = Type.declare('A')
+        f = TypeSchema(lambda a, b, c: a ** b ** c
+            | c @ [b, _] | b @ [a, _] | a @ [A, _]).instance()
+        self.assertEqual(f[1][1].operators(), {A})
+
+
 
 if __name__ == '__main__':
     unittest.main()
