@@ -40,10 +40,10 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         assert value in self
         if isinstance(value, TypeOperator):
-            return getattr(self.namespace, value.name)
+            return self.namespace.term(value.name)
         else:
             assert isinstance(value, Definition) and value.name
-            return getattr(self.namespace, value.name)
+            return self.namespace.term(value.name)
 
     def vocabulary(self) -> Graph:
         """
@@ -67,10 +67,10 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         # Add operations to the vocabulary
         for d in self.definitions.values():
             node = self.uri(d)
-            typenode = TA.Data if isinstance(d, Data) else TA.Operation
-            vocab.add((node, RDF.type, typenode))
+            type_node = TA.Data if isinstance(d, Data) else TA.Operation
+            vocab.add((node, RDF.type, type_node))
             if d.description:
-                vocab.add((node, RDFS.label, d.description))
+                vocab.add((node, RDFS.label, Literal(d.description)))
 
         return vocab
 
@@ -93,7 +93,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
             for i, param in enumerate(t.params, start=1):
                 param_node = self.rdf_type(graph, param)
-                graph.add((node, getattr(RDF, f"_{i}"), param_node))
+                graph.add((node, RDF.term(f"_{i}"), param_node))
 
             return node
         else:
