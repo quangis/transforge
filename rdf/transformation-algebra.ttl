@@ -1,0 +1,22 @@
+:Transformation
+    rdf:label "A blank node representing a full transformation.".
+:Data
+    rdf:label "A blank node representing input, outpur or intermediary data.".
+:Operation
+    rdf:label "A blank node representing an operation.".
+:Variable
+    rdf:label "A node representing variable data or operation.".
+:source
+    rdf:label "The source for some input data.".
+:input
+    rdf:label "The input data for a transformation.".
+:output
+    rdf:label "The output data for a transformation.".
+:operation
+    rdf:label "Point to all constituent operations of a transformation.".
+:data
+    rdf:label "Point to all input, intermediary and output data of a transformation.".
+
+#hello
+:type
+    rdf:label "Point to a RDF node type.".

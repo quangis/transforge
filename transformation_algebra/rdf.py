@@ -6,7 +6,7 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
-    Function, TypeOperator
+    Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation, Variable, Definition
@@ -51,6 +51,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         types and operations defined for this transformation algebra.
         """
         vocab = Graph()
+        self.bindings(vocab)
 
         # Add type operators to the vocabulary
         for t in self.types:
@@ -111,76 +112,84 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         expr = self.parse(string)
         if expr:
-            return self.expr2rdf(graph, expr.primitive())
+            return self.rdf_expr(graph, expr.primitive())
 
-    def expr2rdf(self, g: Graph, expr: Expr,
-            inputs: Dict[str, Node] = {}) -> BNode:
+    def bindings(self, g: Graph) -> None:
         """
-        Translate the given expression to RDF and add it to the given graph.
-        Return the root node (of type `ta:Transformation`) to which all
-        transformation steps connect via `ta:step`. Input nodes that match the
-        labels in the expression are appropriately attached via `ta:source`.
+        Add namespace bindings to RDF.
         """
-
-        assert not expr.type.is_function()
-
         g.bind("ta", TA)
         g.bind(self.prefix, self.namespace)
 
-        root = BNode()
-        g.add((root, TA.type, TA.Transformation))
-        self._expr2rdf(g, expr, root=root, step=BNode(), inputs=inputs)
-        return root
-
-    def _expr2rdf(self, g: Graph, expr: Expr,
-            root: Node, step: Node, inputs: Dict[str, Node]) -> Node:
+    def rdf_expr(self, g: Graph, expr: Expr,
+            inputs: Dict[str, Node] = {},
+            root: Optional[Node] = None,
+            intermediate: Optional[Node] = None) -> Node:
         """
-        Translate the given expression to RDF. Return the final node of type
-        `ta:Operation` or `ta:Data`.
+        Translate the given expression to  a representation in RDF and add it
+        to the given graph. Eventually return the root node to which all
+        intermediary data and operation nodes connect. Data input nodes that
+        match the labels in the expression are appropriately attached via
+        `ta:source`.
         """
-        assert expr.type
+        assert isinstance(expr.type, TypeInstance)
 
-        # Determine the type of this node
-        if expr.type.is_function():
-            type_node = TA.Operation
-        elif isinstance(expr, Variable):
-            type_node = TA.Variable
+        # If no root was given, we are on the top level and create one for
+        # returning
+        top_level = not root
+        if not root:
+            root = BNode()
+            g.add((root, TA.type, TA.Transformation))
+
+        # If no intermediate node was provided, we make a fresh one for this
+        # node
+        if not intermediate:
+            intermediate = BNode()
+
+        # Determine and attach the kind of this node
+        if isinstance(expr, Variable):
+            node_kind = TA.Variable
+        elif expr.type.operator == Function:
+            node_kind = TA.Operation
         else:
-            type_node = TA.Data
+            node_kind = TA.Data
 
         # Add connections to input or output nodes
         if isinstance(expr, Base):
-            assert expr.definition.name
-            definition_node = self.uri(expr.definition)
-            g.add((step, RDF.type, definition_node))
+            g.add((intermediate, RDF.type, self.uri(expr.definition)))
             if isinstance(expr.definition, Operation):
-                g.add((root, TA.step, step))
-            elif isinstance(expr.definition, Data) and expr.label:
-                try:
-                    g.add((step, TA.source, inputs[expr.label]))
-                except KeyError as e:
-                    msg = f"no input node named '{expr.label}'"
-                    raise RuntimeError(msg) from e
+                g.add((root, TA.operation, intermediate))
+            else:
+                assert isinstance(expr.definition, Data)
+                g.add((root, TA.data, intermediate))
+                if expr.label:
+                    try:
+                        g.add((intermediate, TA.source, inputs[expr.label]))
+                    except KeyError as e:
+                        msg = f"no input node named '{expr.label}'"
+                        raise RuntimeError(msg) from e
         elif isinstance(expr, Abstraction):
-            g.add((step, RDF.type, type_node))
             assert isinstance(expr.body, Expr)
-            f = self._expr2rdf(g, expr.body, root, step=BNode(), inputs=inputs)
-            g.add((step, TA.input, f))
+            f = self.rdf_expr(g, expr.body, inputs, root)
+            g.add((intermediate, TA.input, f))
         elif isinstance(expr, Application):
-            f = self._expr2rdf(g, expr.f, root, step=step, inputs=inputs)
-            x = self._expr2rdf(g, expr.x, root, step=BNode(), inputs=inputs)
+            f = self.rdf_expr(g, expr.f, inputs, root, intermediate)
+            x = self.rdf_expr(g, expr.x, inputs, root)
             g.add((f, TA.input, x))
-            if type_node == TA.Data:
-                step = BNode()
-                g.add((f, TA.output, step))
+
+            # If the output of this application is data (that is, no more
+            # arguments to present), make a new intermediate node for the data
+            if expr.type.operator != Function:
+                intermediate = BNode()
+                g.add((f, TA.output, intermediate))
 
         # Add semantic information on the type of node
-        if not isinstance(expr, Application) or type_node == TA.Data:
-            type2_node = self.rdf_type(g, expr.type)
-            g.add((step, RDF.type, type_node))
-            g.add((step, TA.type, type2_node))
+        if not isinstance(expr, Application) or expr.type.operator != Function:
+            node_type = self.rdf_type(g, expr.type)
+            g.add((intermediate, RDF.type, node_kind))
+            g.add((intermediate, TA.type, node_type))
 
-        return step
+        return root if top_level else intermediate
 
     def sparql_type(self, type: Type, name: str,
             name_generator: Iterator[str]) -> Iterator[str]:
@@ -195,8 +204,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # wildcard --- because we don't do anything with it
             assert t.wildcard
         else:
-            assert isinstance(t, TypeOperation)
-            assert t.operator != Function
+            assert isinstance(t, TypeOperation) and t.operator != Function
             yield (
                 f"?{name} "
                 f"rdf:type "

@@ -370,6 +370,11 @@ class TypeInstance(Type):
     def instance(self) -> TypeInstance:
         return self
 
+    @property
+    def operator(self) -> Optional[TypeOperator]:
+        # Overridden for TypeOperations
+        return None
+
     def __or__(self, constraint: Constraint) -> TypeInstance:
         """
         Another abuse of Python's operators, allowing us to add constraints to
