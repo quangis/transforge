@@ -76,7 +76,7 @@ class Type(ABC):
             f.bind(Function(TypeVar(), TypeVar()))
             f = f.follow()
 
-        if isinstance(f, TypeOperation) and f.operator == Function:
+        if isinstance(f, TypeOperation) and f._operator == Function:
             x.unify(f.params[0], subtype=True)
             f.resolve()
             return f.params[1].resolve()
@@ -88,7 +88,7 @@ class Type(ABC):
         Does this type represent a function?
         """
         t = self.instance()
-        return isinstance(t, TypeOperation) and t.operator == Function
+        return isinstance(t, TypeOperation) and t._operator == Function
 
     @abstractmethod
     def instance(self) -> TypeInstance:
@@ -188,7 +188,7 @@ class TypeInstance(Type):
         a = self.follow()
 
         if isinstance(a, TypeOperation):
-            for v, p in zip(a.operator.variance, a.params):
+            for v, p in zip(a._operator.variance, a.params):
                 p.resolve(prefer_lower ^ (v == Variance.CONTRA))
         elif isinstance(a, TypeVar):
             if prefer_lower and a.lower:
@@ -244,8 +244,8 @@ class TypeInstance(Type):
         """
         Obtain all distinct non-function operators in the type instance.
         """
-        result = set(t.operator for t in self
-            if isinstance(t, TypeOperation) and t.operator != Function)
+        result = set(t._operator for t in self
+            if isinstance(t, TypeOperation) and t._operator != Function)
         if recursive:
             for constraint in self.constraints():
                 result.update(*(p.operators(False) for p in constraint.parts()))
@@ -268,7 +268,7 @@ class TypeInstance(Type):
                 return TypeVar()
             else:
                 return TypeOperation(
-                    self.operator,
+                    self._operator,
                     *(p.follow().skeleton() for p in self.params))
         else:
             return self
@@ -285,13 +285,13 @@ class TypeInstance(Type):
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                return a.operator == b.operator or \
-                    (subtype and a.operator.subtype(b.operator))
-            elif a.operator != b.operator:
+                return a._operator == b._operator or \
+                    (subtype and a._operator.subtype(b._operator))
+            elif a._operator != b._operator:
                 return False
             else:
                 result: Optional[bool] = True
-                for v, s, t in zip(a.operator.variance, a.params, b.params):
+                for v, s, t in zip(a._operator.variance, a.params, b.params):
                     r = TypeInstance.match(
                         *((s, t) if v == Variance.CO else (t, s)),
                         subtype=subtype, accept_wildcard=accept_wildcard)
@@ -303,14 +303,14 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
             if (b.upper or b.lower) and not a.basic:
                 return False
-            if b.upper and b.upper.subtype(a.operator, strict=True):
+            if b.upper and b.upper.subtype(a._operator, strict=True):
                 return False
             if accept_wildcard and b.wildcard:
                 return True
         elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
             if (a.upper or a.lower) and not b.basic:
                 return False
-            if a.lower and b.operator.subtype(a.lower, strict=True):
+            if a.lower and b._operator.subtype(a.lower, strict=True):
                 return False
             if accept_wildcard and a.wildcard:
                 return True
@@ -336,12 +336,12 @@ class TypeInstance(Type):
             a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                if subtype and not a.operator.subtype(b.operator):
+                if subtype and not a._operator.subtype(b._operator):
                     raise error.SubtypeMismatch(a, b)
-                elif not subtype and a.operator != b.operator:
+                elif not subtype and a._operator != b._operator:
                     raise error.TypeMismatch(a, b)
-            elif a.operator == b.operator:
-                for v, x, y in zip(a.operator.variance, a.params, b.params):
+            elif a._operator == b._operator:
+                for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
                         x.unify(y, subtype=subtype)
                     else:
@@ -360,7 +360,7 @@ class TypeInstance(Type):
                 raise error.RecursiveType(var, op)
             elif op.basic:
                 if subtype:
-                    f(var, op.operator)
+                    f(var, op._operator)
                 else:
                     var.bind(op)
             else:
@@ -372,8 +372,7 @@ class TypeInstance(Type):
 
     @property
     def operator(self) -> Optional[TypeOperator]:
-        # Overridden for TypeOperations
-        return None
+        return self._operator if isinstance(self, TypeOperation) else None
 
     def __or__(self, constraint: Constraint) -> TypeInstance:
         """
@@ -402,26 +401,26 @@ class TypeOperation(TypeInstance):
     """
 
     def __init__(self, op: TypeOperator, *params: TypeInstance):
-        self.operator = op
+        self._operator = op
         self.params = list(params)
 
-        if len(self.params) != self.operator.arity:
+        if len(self.params) != self._operator.arity:
             raise ValueError(
-                f"{self.operator} takes {self.operator.arity} "
-                f"parameter{'' if self.operator.arity == 1 else 's'}; "
+                f"{self._operator} takes {self._operator.arity} "
+                f"parameter{'' if self._operator.arity == 1 else 's'}; "
                 f"{len(self.params)} given"
             )
 
     def __str__(self) -> str:
-        if self.operator == Function:
+        if self._operator == Function:
             inT, outT = self.params
-            if isinstance(inT, TypeOperation) and inT.operator == Function:
+            if isinstance(inT, TypeOperation) and inT._operator == Function:
                 return f"({inT}) ** {outT}"
             return f"{inT} ** {outT}"
         elif self.params:
-            return f'{self.operator}({", ".join(str(t) for t in self.params)})'
+            return f'{self._operator}({", ".join(str(t) for t in self.params)})'
         else:
-            return str(self.operator)
+            return str(self._operator)
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, TypeInstance) and bool(self.match(other))
@@ -431,7 +430,7 @@ class TypeOperation(TypeInstance):
 
     @property
     def basic(self) -> bool:
-        return self.operator.arity == 0
+        return self._operator.arity == 0
 
 
 class TypeVar(TypeInstance):
@@ -487,9 +486,9 @@ class TypeVar(TypeInstance):
 
             elif isinstance(t, TypeOperation):
                 if t.basic:
-                    if self.lower and t.operator.subtype(self.lower, strict=True):
+                    if self.lower and t._operator.subtype(self.lower, strict=True):
                         raise error.SubtypeMismatch(t, self)
-                    if self.upper and self.upper.subtype(t.operator, strict=True):
+                    if self.upper and self.upper.subtype(t._operator, strict=True):
                         raise error.SubtypeMismatch(self, t)
                 else:
                     variables = t.variables(recursive=False)
