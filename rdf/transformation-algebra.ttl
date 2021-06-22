@@ -1,22 +1,62 @@
-:Transformation
-    rdf:label "A blank node representing a full transformation.".
-:Data
-    rdf:label "A blank node representing input, outpur or intermediary data.".
-:Operation
-    rdf:label "A blank node representing an operation.".
-:Variable
-    rdf:label "A node representing variable data or operation.".
-:source
-    rdf:label "The source for some input data.".
-:input
-    rdf:label "The input data for a transformation.".
-:output
-    rdf:label "The output data for a transformation.".
-:operation
-    rdf:label "Point to all constituent operations of a transformation.".
-:data
-    rdf:label "Point to all input, intermediary and output data of a transformation.".
 
-#hello
+:transformation
+    rdfs:comment "The object is a transformation represented by the subject.",
+    rdfs:range :Transformation.
+
+:Transformation
+    a rdfs:Class,
+    rdfs:comment "The class of full transformations.".
+
+:operation
+    rdfs:comment "A constituent operation of a transformation.",
+    rdfs:domain :Transformation,
+    rdfs:range :Operation.
+
+:data
+    rdfs:comment "Some input, intermediary or output data of a transformation.",
+    rdfs:domain :Transformation,
+    rdfs:range :Data.
+
+:Operation
+    a rdfs:Class,
+    rdfs:comment "The class of operations, representing the atomary constituents of conceptual transformations.".
+
+:Data
+    a rdfs:Class,
+    rdfs:comment "The class of data (input, output or intermediary) relevant to conceptual transformations.".
+
+:Variable
+    a rdfs:Class,
+    rdfs:comment "A node representing variable data or operation.".
+
+:source
+    rdfs:comment "The source for some input data.",
+    rdfs:domain :Data.
+
+:input
+    rdfs:comment "The input data for a transformation.",
+    rdfs:domain :Operation,
+    rdfs:range :Data.
+
+:output
+    rdfs:comment "The output data for a transformation.",
+    rdfs:domain :Operation,
+    rdfs:range :Data.
+
+# Types.
 :type
-    rdf:label "Point to a RDF node type.".
+    rdfs:comment "A .",
+    rdfs:domain :Data,
+    rdfs:range :Type.
+:Type
+    a rdfs:Class,
+    rdfs:comment "The class of all types".
+:TypeVariable
+    rdfs:comment "The class of type variables.",
+    a :Type.
+:TypeOperator
+    rdfs:comment "The class of concrete types.",
+    a :Type.
+:Function
+    rdfs:comment "The class of type operations for functions.";
+    a :TypeOperator.
