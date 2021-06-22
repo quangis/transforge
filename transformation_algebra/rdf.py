@@ -39,7 +39,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         Obtain the URI node for an operation or type operator.
         """
         assert value in self
-        if isinstance(value, TypeOperator):
+        if value == Function:
+            return TA.Function
+        elif isinstance(value, TypeOperator):
             return self.namespace.term(value.name)
         else:
             assert isinstance(value, Definition) and value.name
@@ -75,36 +77,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         return vocab
 
-    def rdf_type(self, graph: Graph, value: Type) -> Node:
-        """
-        Add an RDF representation of a type to the given graph.
-        """
-        t = value.instance()
-        if isinstance(t, TypeOperation):
-            if t.operator == Function:
-                operator_node = TA.Function
-            else:
-                operator_node = self.uri(t.operator)
-
-            node = BNode()
-            graph.add((node, RDF.type, operator_node))
-
-            if t.params:
-                graph.add((node, RDF.type, RDF.Seq))
-
-            for i, param in enumerate(t.params, start=1):
-                param_node = self.rdf_type(graph, param)
-                graph.add((node, RDF.term(f"_{i}"), param_node))
-
-            return node
-        else:
-            # TODO don't make new node if we already encountered this variable
-            assert isinstance(t, TypeVar)
-            node = BNode()
-            graph.add((node, RDF.type, TA.TypeVariable))
-            graph.add((node, TA.variable, Literal(str(t))))
-            return node
-
     def parse_rdf(self, graph: Graph, string: str) -> BNode:
         """
         Convenience function to parse an expression and add it to an RDF graph
@@ -120,6 +92,28 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         g.bind("ta", TA)
         g.bind(self.prefix, self.namespace)
+
+    def rdf_type(self, graph: Graph, value: Type) -> Node:
+        """
+        Translate the given type to a representation in RDF and add it to the
+        given graph. Return the top-level node.
+        """
+        t = value.instance()
+        node = BNode()
+        if isinstance(t, TypeOperation):
+            graph.add((node, RDF.type, self.uri(t._operator)))
+
+            if t.params:
+                graph.add((node, RDF.type, RDF.Seq))
+            for i, param in enumerate(t.params, start=1):
+                param_node = self.rdf_type(graph, param)
+                graph.add((node, RDF.term(f"_{i}"), param_node))
+        else:
+            # TODO don't make new node if we already encountered this variable
+            assert isinstance(t, TypeVar)
+            graph.add((node, RDF.type, TA.TypeVariable))
+            graph.add((node, RDF.label, Literal(str(t))))
+        return node
 
     def rdf_expr(self, g: Graph, expr: Expr,
             inputs: Dict[str, Node] = {},
@@ -178,10 +172,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             g.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
-            # arguments to present), make a new intermediate node for the data
+            # arguments to present), make a new intermediate/output node
             if expr.type.operator != Function:
                 intermediate = BNode()
                 g.add((f, TA.output, intermediate))
+                g.add((root, TA.data, intermediate))
 
         # Add semantic information on the type of node
         if not isinstance(expr, Application) or expr.type.operator != Function:
@@ -208,7 +203,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             yield (
                 f"?{name} "
                 f"rdf:type "
-                f"<{self.uri(t.operator)}>."
+                f"<{self.uri(t._operator)}>."
             )
             for i, param in enumerate(t.params, start=1):
                 next_name = next(name_generator)
@@ -240,7 +235,8 @@ class Chain(object):
 
     The same can also be described in terms of semantic linear time logic
     formulae (SLTL), but since we will be using SPARQL to search through
-    workflows, the approach chosen here makes for a straightforward translation.
+    workflows, the approach chosen here makes for a straightforward
+    translation.
     """
 
     def __init__(self, *chain: Union[None, Type, Operation, List[Chain]]):
@@ -317,9 +313,7 @@ class Chain(object):
                 skip = False
                 previous = name, current
 
-    def path(self,
-            before: Union[Type, Operation],
-            after: Union[Type, Operation],
+    def path(self, before: Union[Type, Operation], after: Union[Type, Operation],
             skip: bool) -> str:
         """
         Produce a SPARQL property path describing the connection between two
