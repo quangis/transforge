@@ -38,10 +38,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         Obtain the URI node for an operation or type operator.
         """
-        assert value in self
         if value == Function:
             return TA.Function
-        elif isinstance(value, TypeOperator):
+
+        assert value in self, f"{value} is not in algebra"
+        if isinstance(value, TypeOperator):
             return self.namespace.term(value.name)
         else:
             assert isinstance(value, Definition) and value.name
@@ -112,7 +113,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
             graph.add((node, RDF.type, TA.TypeVariable))
-            graph.add((node, RDF.label, Literal(str(t))))
+            graph.add((node, RDFS.label, Literal(str(t))))
         return node
 
     def rdf_expr(self, g: Graph, expr: Expr,
