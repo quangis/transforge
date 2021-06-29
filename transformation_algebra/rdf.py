@@ -5,6 +5,7 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
+from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
@@ -84,8 +85,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         in one go.
         """
         expr = self.parse(string)
+        root = BNode()
         if expr:
-            return self.rdf_expr(graph, expr.primitive())
+            return self.rdf_expr(graph, root, expr.primitive())
 
     def bindings(self, g: Graph) -> None:
         """
@@ -116,30 +118,22 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             graph.add((node, RDFS.label, Literal(str(t))))
         return node
 
-    def rdf_expr(self, g: Graph, expr: Expr,
+    def rdf_expr(self, g: Graph, root: Node, expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
-            root: Optional[Node] = None,
             intermediate: Optional[Node] = None) -> Node:
         """
         Translate the given expression to  a representation in RDF and add it
-        to the given graph. Eventually return the root node to which all
-        intermediary data and operation nodes connect. Data input nodes that
-        match the labels in the expression are appropriately attached via
-        `ta:source`.
+        to the given graph, connecting all intermediary data and operation
+        nodes to the given root. Inputs that match the labels in the expression
+        are appropriately attached, either as data sources or as input
+        expressions.
         """
         assert isinstance(expr.type, TypeInstance)
 
-        # If no root was given, we are on the top level and create one for
-        # returning
-        top_level = not root
-        if not root:
-            root = BNode()
-            g.add((root, TA.type, TA.Transformation))
+        g.add((root, RDF.type, TA.Transformation))
 
-        # If no intermediate node was provided, we make a fresh one for this
-        # node
-        if not intermediate:
-            intermediate = BNode()
+        # If no intermediate node was provided, make a fresh one
+        intermediate = intermediate or BNode()
 
         # Determine and attach the kind of this node
         if isinstance(expr, Variable):
@@ -169,20 +163,19 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                             g.add((intermediate, TA.source, source))
                         else:
                             source_node, source_expr = source
-                            assert \
-                                isinstance(source_node, Node) and \
-                                isinstance(source_expr, Expr) and \
-                                source_expr.type.match(expr.type, subtype=True)
+                            assert isinstance(source_node, Node) and \
+                                isinstance(source_expr, Expr)
+                            source_expr.type.unify(expr.type, subtype=True)
                             return source_node
                 g.add((root, TA.data, intermediate))
 
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr)
-            f = self.rdf_expr(g, expr.body, inputs, root)
+            f = self.rdf_expr(g, root, expr.body, inputs)
             g.add((intermediate, TA.input, f))
         elif isinstance(expr, Application):
-            f = self.rdf_expr(g, expr.f, inputs, root, intermediate)
-            x = self.rdf_expr(g, expr.x, inputs, root)
+            f = self.rdf_expr(g, root, expr.f, inputs, intermediate)
+            x = self.rdf_expr(g, root, expr.x, inputs)
             g.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
@@ -198,7 +191,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             g.add((intermediate, RDF.type, node_kind))
             g.add((intermediate, TA.type, node_type))
 
-        return root if top_level else intermediate
+        return intermediate
 
     def sparql_type(self, type: Type, name: str,
             name_generator: Iterator[str]) -> Iterator[str]:
