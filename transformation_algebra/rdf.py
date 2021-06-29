@@ -116,7 +116,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         return node
 
     def rdf_expr(self, g: Graph, expr: Expr,
-            inputs: Dict[str, Node] = {},
+            inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             root: Optional[Node] = None,
             intermediate: Optional[Node] = None) -> Node:
         """
@@ -150,18 +150,31 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         # Add connections to input or output nodes
         if isinstance(expr, Base):
-            g.add((intermediate, RDF.type, self.uri(expr.definition)))
             if isinstance(expr.definition, Operation):
                 g.add((root, TA.operation, intermediate))
+                g.add((intermediate, RDF.type, self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
-                g.add((root, TA.data, intermediate))
                 if expr.label:
+                    # Source nodes are attached to inputs. Blank nodes are from
+                    # other expressions, URIs are from data sources.
                     try:
-                        g.add((intermediate, TA.source, inputs[expr.label]))
+                        source = inputs[expr.label]
                     except KeyError as e:
                         msg = f"no input node named '{expr.label}'"
                         raise RuntimeError(msg) from e
+                    else:
+                        if isinstance(source, URIRef):
+                            g.add((intermediate, TA.source, source))
+                        else:
+                            source_node, source_expr = source
+                            assert \
+                                isinstance(source_node, Node) and \
+                                isinstance(source_expr, Expr) and \
+                                source_expr.type.match(expr.type, subtype=True)
+                            return source_node
+                g.add((root, TA.data, intermediate))
+
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr)
             f = self.rdf_expr(g, expr.body, inputs, root)
