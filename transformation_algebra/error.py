@@ -51,6 +51,11 @@ class RBracketMismatch(BracketMismatch):
     pass
 
 
+class Empty(TAParseError):
+    def msg(self) -> str:
+        return "Empty parse."
+
+
 class Undefined(TAParseError):
     def __init__(self, token: str):
         self.token = token

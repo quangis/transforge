@@ -394,7 +394,7 @@ class TransformationAlgebra(object):
         for t in chain(nargs, kwargs.values()):
             self.types.add(t)
 
-    def parse(self, string: str) -> Optional[Expr]:
+    def parse(self, string: str) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
@@ -446,9 +446,11 @@ class TransformationAlgebra(object):
 
         if len(stack) == 1:
             result = stack[0]
-            if result:
+            if not result:
+                raise error.Empty
+            else:
                 result.rename()
-            return result
+                return result
         else:
             raise error.RBracketMismatch
 
