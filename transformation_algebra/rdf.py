@@ -165,7 +165,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                             source_node, source_expr = source
                             assert isinstance(source_node, Node) and \
                                 isinstance(source_expr, Expr)
-                            source_expr.type.unify(expr.type, subtype=True)
+                            try:
+                                source_expr.type.unify(expr.type, subtype=True)
+                            except error.TATypeError as e:
+                                e.while_unifying(source_expr, expr)
+                                raise
                             return source_node
                 g.add((root, TA.data, intermediate))
 

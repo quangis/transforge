@@ -75,21 +75,33 @@ class TATypeError(TAError):
     def __init__(self, t1: 'ta.type.Type', t2: 'ta.type.Type'):
         self.t1 = t1
         self.t2 = t2
-        self.fn = None
-        self.arg = None
+        self.e1 = None
+        self.e2 = None
+        self.application = True
         super().__init__()
 
     def while_applying(self, fn: 'ta.expr.Expr', arg: 'ta.expr.Expr'):
-        self.fn = fn
-        self.arg = arg
+        self.e1 = fn
+        self.e2 = arg
+        self.app = True
+
+    def while_unifying(self, x: 'ta.expr.Expr', y: 'ta.expr.Expr'):
+        self.e1 = x
+        self.e2 = y
+        self.app = False
 
     @abstractmethod
     def specify(self) -> str:
         return NotImplemented
 
     def msg(self) -> str:
-        clause = f" while applying {self.fn} to {self.arg}" \
-            if self.fn and self.arg else ""
+        if self.e1 and self.e2:
+            verb = "applying" if self.app else "unifying"
+            x1 = f"{self.e1} : {self.e1.type}"
+            x2 = f"{self.e2} : {self.e2.type}"
+            clause = f" while {verb} {x1} to {x2}"
+        else:
+            clause = ""
         return f"A type error occurred{clause}: {self.specify()}"
 
 
