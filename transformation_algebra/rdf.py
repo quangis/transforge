@@ -135,14 +135,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         # If no intermediate node was provided, make a fresh one
         intermediate = intermediate or BNode()
 
-        # Determine and attach the kind of this node
-        if isinstance(expr, Variable):
-            node_kind = TA.Variable
-        elif expr.type.operator == Function:
-            node_kind = TA.Operation
-        else:
-            node_kind = TA.Data
-
         # Add connections to input or output nodes
         if isinstance(expr, Base):
             if isinstance(expr.definition, Operation):
@@ -172,11 +164,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                                 raise
                             return source_node
                 g.add((root, TA.data, intermediate))
+                g.add((intermediate, RDF.type, TA.Data))
 
-        elif isinstance(expr, Abstraction):
-            assert isinstance(expr.body, Expr)
-            f = self.rdf_expr(g, root, expr.body, inputs)
-            g.add((intermediate, TA.input, f))
         elif isinstance(expr, Application):
             f = self.rdf_expr(g, root, expr.f, inputs, intermediate)
             x = self.rdf_expr(g, root, expr.x, inputs)
@@ -186,14 +175,24 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # arguments to present), make a new intermediate/output node
             if expr.type.operator != Function:
                 intermediate = BNode()
-                g.add((f, TA.output, intermediate))
                 g.add((root, TA.data, intermediate))
+                g.add((f, TA.output, intermediate))
+                g.add((intermediate, RDF.type, TA.Data))
 
-        # Add semantic information on the type of node
-        if not isinstance(expr, Application) or expr.type.operator != Function:
-            node_type = self.rdf_type(g, expr.type)
-            g.add((intermediate, RDF.type, node_kind))
-            g.add((intermediate, TA.type, node_type))
+        elif isinstance(expr, Abstraction):
+            assert isinstance(expr.body, Expr) and expr.type and \
+                expr.type.operator == Function
+            f = self.rdf_expr(g, root, expr.body, inputs)
+            g.add((intermediate, TA.input, f))
+            g.add((intermediate, RDF.type, TA.Operation))
+
+        else:
+            assert isinstance(expr, Variable)
+            g.add((intermediate, RDF.type, TA.Variable))
+
+        # Add information on the type of node, but only for data nodes
+        if expr.type.operator != Function:
+            g.add((intermediate, TA.type, self.rdf_type(g, expr.type)))
 
         return intermediate
 
