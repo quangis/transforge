@@ -22,10 +22,7 @@ from rdflib.plugins import sparql
 
 from typing import Dict, Union, List, Iterator, Optional, Tuple
 
-TA = Namespace(
-    "https://github.com/quangis/transformation-algebra/"
-    "TransformationAlgebra.rdf#"
-)
+TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 
 class TransformationAlgebraRDF(TransformationAlgebra):
@@ -130,6 +127,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         assert isinstance(expr.type, TypeInstance)
 
+        # Ensure some basic properties of the graph
+        g.bind("ta", TA)
+        g.bind(self.prefix, self.namespace)
         g.add((root, RDF.type, TA.Transformation))
 
         # If no intermediate node was provided, make a fresh one

@@ -1,14 +1,9 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 
-:transformation
-    a rdf:Property;
-    rdfs:comment "The object is a transformation represented by the subject.";
-    rdfs:range :Transformation.
-
 :Transformation
     a rdfs:Class,
-    rdfs:comment "The class of full transformations.".
+    rdfs:comment "The class of conceptual transformations expressible in a transformation algebra.".
 
 :operation
     a rdf:Property;
