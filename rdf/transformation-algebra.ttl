@@ -59,10 +59,10 @@
     rdfs:comment "The class of all types".
 :TypeVariable
     rdfs:comment "The class of type variables.";
-    a :Type.
+    rdfs:subClassOf :Type.
 :TypeOperator
     rdfs:comment "The class of concrete types.";
-    a :Type.
+    rdfs:subClassOf :Type.
 :Function
     rdfs:comment "The class of type operations for functions.";
     a :TypeOperator.
