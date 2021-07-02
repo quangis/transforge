@@ -14,6 +14,7 @@ from typing import Optional, Dict, Callable, Union, List, Iterator, Set
 from transformation_algebra import error
 from transformation_algebra.type import \
     Type, TypeVar, TypeSchema, TypeOperator, TypeInstance, Function
+from transformation_algebra.chain import Chain
 
 
 class Definition(ABC):
@@ -58,7 +59,7 @@ class Data(Definition):
         assert not self.type.is_function()
 
 
-class Operation(Definition):
+class Operation(Definition, Chain):
     """
     The definition of a transformation. An instance of such a definition is a
     base expression.
