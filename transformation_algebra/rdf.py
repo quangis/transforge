@@ -239,7 +239,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if previous:
                 yield (
                     f"?{previous[0]} "
-                    f"{self.path(previous[1], previous[2], current)} "
+                    f"({self.path(previous[1], previous[2], current)}) "
                     f"?{name}.")
 
             if isinstance(current, Operation):
@@ -287,7 +287,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
         ]
         query.extend(self.trace("output_node", chain))
-        query.append("} GROUP BY ?workflow")
+        query.append("}")
 
         print()
         print("\n".join(query))
@@ -312,14 +312,17 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 return f"(^ta:output/ta:input){repeat}"
             else:
                 assert isinstance(b, Operation)
-                return f"(^ta:output){repeat}"
+                return "^ta:output/((ta:input/^ta:output)*)" if repeat else "^ta:output"
         else:
             assert isinstance(a, Operation)
             if isinstance(b, Type):
-                return f"(ta:input){repeat}"
+                return "ta:input/((^ta:output/ta:input)*)" if repeat else "ta:input"
             else:
-                assert isinstance(b, Type)
-                return f"(ta.input/^ta:output){repeat}"
+                assert isinstance(b, Operation)
+                return f"(ta:input/^ta:output){repeat}"
+
+    def query(self, g: Graph, flow: process.Chain) -> sparql.QueryResult:
+        return g.query(self.sparql_chain(flow))
 
 
 def dot(g: Graph) -> str:
