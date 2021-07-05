@@ -11,10 +11,9 @@ from itertools import groupby, chain
 from inspect import signature, Signature, Parameter
 from typing import Optional, Dict, Callable, Union, List, Iterator, Set
 
-from transformation_algebra import error
+from transformation_algebra import error, process
 from transformation_algebra.type import \
     Type, TypeVar, TypeSchema, TypeOperator, TypeInstance, Function
-from transformation_algebra.chain import Chain
 
 
 class Definition(ABC):
@@ -59,7 +58,7 @@ class Data(Definition):
         assert not self.type.is_function()
 
 
-class Operation(Definition, Chain):
+class Operation(Definition, process.Unit):
     """
     The definition of a transformation. An instance of such a definition is a
     base expression.
@@ -376,7 +375,8 @@ class TransformationAlgebra(object):
         that names ending with an underscore will be stripped of that symbol.
         """
 
-        for k, v in chain(kwargs.items(), ((v.name, v) for v in nargs)):
+        for k, v in chain(kwargs.items(),
+                ((v.name, v) for v in nargs)):
             assert k is not None
             if isinstance(v, Definition):
                 k = k.rstrip("_")

@@ -10,8 +10,7 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Union, Callable, List, Set
 
-from transformation_algebra import error
-from transformation_algebra.chain import Chain
+from transformation_algebra import error, process
 
 
 class Variance(Enum):
@@ -127,7 +126,7 @@ class TypeSchema(Type):
         return self.schema(*(TypeVar() for _ in range(self.n)))
 
 
-class TypeOperator(Type, Chain):
+class TypeOperator(Type, process.Unit):
     """
     An n-ary type constructor. If 0-ary, can also be treated as an instance of
     the corresponding type operation (that is, a base type).
@@ -161,7 +160,7 @@ class TypeOperator(Type, Chain):
         return TypeOperation(self)
 
 
-class TypeInstance(Type, Chain):
+class TypeInstance(Type, process.Unit):
     """
     Base class for type instances (type operations and -variables). Note that
     base types are just 0-ary type operators and functions are just particular
