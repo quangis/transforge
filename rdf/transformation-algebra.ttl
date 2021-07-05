@@ -19,6 +19,12 @@
     rdfs:domain :Transformation;
     rdfs:range :Data.
 
+:target
+    a rdf:Property;
+    rdfs:comment "The output data for a transformation as a whole.";
+    rdfs:domain :Transformation;
+    rdfs:range :Data.
+
 :Operation
     a rdfs:Class;
     rdfs:comment "The class of operations; representing the atomary constituents of conceptual transformations.".
@@ -38,13 +44,13 @@
 
 :input
     a rdf:Property;
-    rdfs:comment "The input data for a transformation.";
+    rdfs:comment "The input data for an operation.";
     rdfs:domain :Operation;
     rdfs:range :Data.
 
 :output
     a rdf:Property;
-    rdfs:comment "The output data for a transformation.";
+    rdfs:comment "The output data for an operation.";
     rdfs:domain :Operation;
     rdfs:range :Data.
 

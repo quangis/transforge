@@ -84,7 +84,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         expr = self.parse(string)
         root = BNode()
         if expr:
-            return self.rdf_expr(graph, root, expr.primitive())
+            output = self.rdf_expr(graph, root, expr.primitive())
+            graph.add((root, TA.output, output))
 
     def bindings(self, g: Graph) -> None:
         """
@@ -283,8 +284,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             "SELECT ?workflow ?description WHERE {",
             "?workflow rdf:type ta:Transformation.",
             "?workflow rdfs:comment ?description.",
-            "?workflow ta:data ?output_node.",
-            "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
+            "?workflow ta:target ?output_node.",
+            # "?workflow ta:data ?output_node.",
+            # "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
         ]
         query.extend(self.trace("output_node", chain))
         query.append("}")
