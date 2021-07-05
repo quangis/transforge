@@ -19,11 +19,11 @@ that is, `...`.
 Skip = Union[None, type(Ellipsis)]  # type: Any
 
 
-class Chain(ABC):
+class Flow(ABC):
     """
-    A chain captures some relevant aspects of a conceptual process, in terms of
+    A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
-    chain holds that there must be datatypes A and B that are fed to an
+    flow holds that there must be datatypes A and B that are fed to an
     operation f that eventually results in a datatype C:
 
     C << ... << f << (A & B)
@@ -33,14 +33,14 @@ class Chain(ABC):
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    def __and__(self, other: Chain) -> Parallel:
+    def __and__(self, other: Flow) -> Parallel:
         if isinstance(self, Parallel):
             self.branches.append(other)
             return self
         else:
             return Parallel(self, other)
 
-    def __lshift__(self, other: Union[Chain, Skip]) -> Serial:
+    def __lshift__(self, other: Union[Flow, Skip]) -> Serial:
         x = None if other == ... else other
         if isinstance(self, Serial):
             self.sequence.append(x)
@@ -49,35 +49,35 @@ class Chain(ABC):
             return Serial(self, x)
 
 
-class Unit(Chain, ABC):
+class Unit(Flow, ABC):
     """
-    A single element of a chain.
+    A single element of a Flow.
     """
     pass
 
 
-class Serial(Chain):
+class Serial(Flow):
     """
     Describes which transformation elements must occur, in what order. A `None`
     value (or `...` ellipsis) indicates that we may skip zero or more steps.
     """
 
-    def __init__(self, *sequence: Union[Chain, None]):
+    def __init__(self, *sequence: Union[Flow, None]):
         # assert len(list(x for x in sequence if x)) > 1
         self.sequence = list(sequence)
 
-    # def pairs(self) -> Iterator[Tuple[Optional[Chain], bool, Optional[Chain]]]:
+    # def pairs(self) -> Iterator[Tuple[Optional[Flow], bool, Optional[Flow]]]:
     #     """
     #     Return a pairwise iterator of connections between units in the series,
     #     with a boolean indicating whether the connection is direct or not.
     #     """
 
 
-class Parallel(Chain):
+class Parallel(Flow):
     """
     Describes which transformation elements must occur conjunctively.
     """
 
-    def __init__(self, *branches: Chain):
+    def __init__(self, *branches: Flow):
         # assert len(list(x for x in branches if x)) > 1
         self.branches = list(branches)

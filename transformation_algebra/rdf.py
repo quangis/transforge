@@ -5,7 +5,7 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra import error, process
+from transformation_algebra import error, flow
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
@@ -226,8 +226,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
     def trace(self,
             name: str,
-            current: process.Chain,
-            previous: Optional[Tuple[str, process.Unit, bool]] = None,
+            current: flow.Chain,
+            previous: Optional[Tuple[str, flow.Unit, bool]] = None,
             name_generator: Optional[Iterator[str]] = None) -> \
             Iterator[str]:
         """
@@ -236,7 +236,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         name_generator = name_generator or iter(f"n{i}" for i in count())
 
-        if isinstance(current, process.Unit):
+        if isinstance(current, flow.Unit):
             if previous:
                 yield (
                     f"?{previous[0]} "
@@ -252,16 +252,16 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             else:
                 raise NotImplementedError
 
-        elif isinstance(current, process.Parallel):
+        elif isinstance(current, flow.Parallel):
             for sub in current.branches:
                 yield from self.trace(next(name_generator), sub, previous,
                     name_generator)
 
         else:
-            assert isinstance(current, process.Serial)
+            assert isinstance(current, flow.Serial)
 
             # TODO remove this assumption when possible
-            assert all(not isinstance(x, process.Parallel)
+            assert all(not isinstance(x, flow.Parallel)
                 for x in current.sequence[:-1])
 
             for n, x in zip(chain([name], name_generator), current.sequence):
@@ -270,12 +270,12 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         previous = previous[0], previous[1], True
                 else:
                     yield from self.trace(n, x, previous, name_generator)
-                    if isinstance(x, process.Unit):
+                    if isinstance(x, flow.Unit):
                         previous = n, x, False
                     else:
                         break
 
-    def sparql_chain(self, chain: process.Chain) -> sparql.Query:
+    def sparql_chain(self, chain: flow.Chain) -> sparql.Query:
         """
         Convert this chain to a SPARQL query.
         """
@@ -300,7 +300,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     self.prefix: self.namespace}
         )
 
-    def path(self, a: process.Unit, skip: bool, b: process.Unit) -> str:
+    def path(self, a: flow.Unit, skip: bool, b: flow.Unit) -> str:
         """
         Produce a SPARQL property path describing the connection between two
         nodes that represent either a data type or an operation. `skip`
@@ -323,7 +323,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 assert isinstance(b, Operation)
                 return f"(ta:input/^ta:output){repeat}"
 
-    def query(self, g: Graph, flow: process.Chain) -> sparql.QueryResult:
+    def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
         return g.query(self.sparql_chain(flow))
 
 
