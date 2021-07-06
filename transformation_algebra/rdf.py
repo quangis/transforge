@@ -228,9 +228,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     yield from self.sparql_type(bnode, param, name_generator,
                         index=i)
             else:
-                op = next(name_generator)
-                yield f"?{name} {pred} ?{op}."
-                yield f"?{op} rdfs:subClassOf* <{self.uri(t._operator)}>."
+                yield f"?{name} {pred}/(rdfs:subClassOf*) <{self.uri(t._operator)}>."
 
     def trace(self,
             name: str,
