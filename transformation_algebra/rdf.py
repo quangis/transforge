@@ -293,7 +293,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
         ]
         query.extend(self.trace("output_node", chain))
-        query.append("}")
+        query.append("} GROUP BY ?workflow")
 
         print()
         print("\n".join(query))
