@@ -72,7 +72,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             type_node = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, type_node))
             if d.description:
-                vocab.add((node, RDFS.label, Literal(d.description)))
+                vocab.add((node, RDFS.comment, Literal(d.description)))
 
         return vocab
 
@@ -117,7 +117,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
             node = BNode()
-            graph.add((node, RDF.type, TA.TypeVariable))
+            graph.add((node, RDF.type, TA.TypeVar))
             graph.add((node, RDFS.label, Literal(str(t))))
         return node
 

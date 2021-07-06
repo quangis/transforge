@@ -368,7 +368,7 @@ class TypeInstance(Type, flow.Unit):
                 var.unify(op, subtype=subtype)
 
     def instance(self) -> TypeInstance:
-        return self
+        return self.follow()
 
     @property
     def operator(self) -> Optional[TypeOperator]:

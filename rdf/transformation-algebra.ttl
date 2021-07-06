@@ -63,7 +63,7 @@
 :Type
     a rdfs:Class;
     rdfs:comment "The class of all types".
-:TypeVariable
+:TypeVar
     rdfs:comment "The class of type variables.";
     rdfs:subClassOf :Type.
 :TypeOperator
