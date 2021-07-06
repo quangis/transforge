@@ -250,6 +250,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     f"?{name}.")
 
             if isinstance(current, Operation):
+                assert current.primitive(), \
+                    "operation in a flow query must be primitive"
                 yield f"?{name} rdf:type <{self.uri(current)}>."
             elif isinstance(current, Type):
                 yield from self.sparql_type(name, current, name_generator)
@@ -279,9 +281,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     else:
                         break
 
-    def sparql_chain(self, chain: flow.Chain) -> sparql.Query:
+    def sparql_flow(self, flow: flow.Flow) -> sparql.Query:
         """
-        Convert this chain to a SPARQL query.
+        Convert this Flow to a SPARQL query.
         """
 
         query = [
@@ -292,7 +294,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # "?workflow ta:data ?output_node.",
             # "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
         ]
-        query.extend(self.trace("output_node", chain))
+        query.extend(self.trace("output_node", flow))
         query.append("} GROUP BY ?workflow")
 
         print()
@@ -328,7 +330,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 return f"(ta:input/^ta:output){repeat}"
 
     def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
-        return g.query(self.sparql_chain(flow))
+        return g.query(self.sparql_flow(flow))
 
 
 def dot(g: Graph) -> str:
