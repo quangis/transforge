@@ -56,15 +56,20 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         # Add type operators to the vocabulary
         for t in self.types:
-            previous_uri = None
-            current: Optional[TypeOperator] = t
-            while current:
-                current_uri = self.uri(current)
+            if t.arity > 0:
+                current_uri = self.uri(t)
                 vocab.add((current_uri, RDF.type, TA.Type))
-                if previous_uri:
-                    vocab.add((previous_uri, RDFS.subClassOf, current_uri))
-                previous_uri = current_uri
-                current = current.supertype
+                vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
+            else:
+                previous_uri = None
+                current: Optional[TypeOperator] = t
+                while current:
+                    current_uri = self.uri(current)
+                    vocab.add((current_uri, RDF.type, TA.Type))
+                    if previous_uri:
+                        vocab.add((previous_uri, RDFS.subClassOf, current_uri))
+                    previous_uri = current_uri
+                    current = current.supertype
 
         # Add operations to the vocabulary
         for d in self.definitions.values():
@@ -105,9 +110,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if t.params:
                 node = BNode()
                 graph.add((node, RDF.type, self.uri(t._operator)))
-
-                if t.params:
-                    graph.add((node, RDF.type, RDF.Seq))
                 for i, param in enumerate(t.params, start=1):
                     param_node = self.rdf_type(graph, param)
                     graph.add((node, RDF.term(f"_{i}"), param_node))
