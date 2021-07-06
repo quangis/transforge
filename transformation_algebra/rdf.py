@@ -62,7 +62,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 current_uri = self.uri(current)
                 vocab.add((current_uri, RDF.type, TA.Type))
                 if previous_uri:
-                    vocab.add((previous_uri, RDF.type, current_uri))
+                    vocab.add((previous_uri, RDFS.subClassOf, current_uri))
                 previous_uri = current_uri
                 current = current.supertype
 
@@ -228,11 +228,13 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     yield from self.sparql_type(bnode, param, name_generator,
                         index=i)
             else:
-                yield f"?{name} {pred} <{self.uri(t._operator)}>."
+                op = next(name_generator)
+                yield f"?{name} {pred} ?{op}."
+                yield f"?{op} rdfs:subClassOf* <{self.uri(t._operator)}>."
 
     def trace(self,
             name: str,
-            current: flow.Chain,
+            current: flow.Flow,
             previous: Optional[Tuple[str, flow.Unit, bool]] = None,
             name_generator: Optional[Iterator[str]] = None) -> \
             Iterator[str]:
