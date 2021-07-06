@@ -86,11 +86,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         Convenience function to parse an expression and add it to an RDF graph
         in one go.
         """
-        expr = self.parse(string)
         root = BNode()
-        if expr:
-            output = self.rdf_expr(graph, root, expr.primitive())
-            graph.add((root, TA.output, output))
+        self.rdf_expr(graph, root, self.parse(string).primitive())
+        return root
 
     def bindings(self, g: Graph) -> None:
         """
