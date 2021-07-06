@@ -100,18 +100,23 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         given graph. Return the top-level node.
         """
         t = value.instance()
-        node = BNode()
         if isinstance(t, TypeOperation):
-            graph.add((node, RDF.type, self.uri(t._operator)))
 
             if t.params:
-                graph.add((node, RDF.type, RDF.Seq))
-            for i, param in enumerate(t.params, start=1):
-                param_node = self.rdf_type(graph, param)
-                graph.add((node, RDF.term(f"_{i}"), param_node))
+                node = BNode()
+                graph.add((node, RDF.type, self.uri(t._operator)))
+
+                if t.params:
+                    graph.add((node, RDF.type, RDF.Seq))
+                for i, param in enumerate(t.params, start=1):
+                    param_node = self.rdf_type(graph, param)
+                    graph.add((node, RDF.term(f"_{i}"), param_node))
+            else:
+                return self.uri(t._operator)
         else:
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
+            node = BNode()
             graph.add((node, RDF.type, TA.TypeVariable))
             graph.add((node, RDFS.label, Literal(str(t))))
         return node
@@ -198,8 +203,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         return intermediate
 
-    def sparql_type(self, type: Type, name: str,
-            name_generator: Iterator[str]) -> Iterator[str]:
+    def sparql_type(self, name: str, type: Type,
+            name_generator: Iterator[str],
+            index: Optional[int] = None) -> Iterator[str]:
         """
         Produce SPARQL constraints for the given (non-function) type.
         """
@@ -212,17 +218,17 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             assert t.wildcard
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
-            yield (
-                f"?{name} "
-                f"rdf:type "
-                f"<{self.uri(t._operator)}>."
-            )
-            for i, param in enumerate(t.params, start=1):
-                next_name = next(name_generator)
-                yield (
-                    f"?{name} rdf:_{i} ?{next_name}."
-                )
-                yield from self.sparql_type(param, next_name, name_generator)
+
+            pred = "ta:type" if index is None else f"rdf:_{index}"
+            if t.params:
+                bnode = next(name_generator)
+                yield f"?{name} {pred} ?{bnode}."
+                yield f"?{bnode} rdf:type <{self.uri(t._operator)}>."
+                for i, param in enumerate(t.params, start=1):
+                    yield from self.sparql_type(bnode, param, name_generator,
+                        index=i)
+            else:
+                yield f"?{name} {pred} <{self.uri(t._operator)}>."
 
     def trace(self,
             name: str,
@@ -246,9 +252,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if isinstance(current, Operation):
                 yield f"?{name} rdf:type <{self.uri(current)}>."
             elif isinstance(current, Type):
-                type_name = next(name_generator)
-                yield f"?{name} ta:type ?{type_name}."
-                yield from self.sparql_type(current, type_name, name_generator)
+                yield from self.sparql_type(name, current, name_generator)
             else:
                 raise NotImplementedError
 
