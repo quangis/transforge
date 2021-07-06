@@ -317,17 +317,17 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         repeat = "+" if skip else ""
         if isinstance(a, Type):
             if isinstance(b, Type):
-                return f"(^ta:output/ta:input){repeat}"
+                return f"(^ta:output/ta:input+){repeat}"
             else:
                 assert isinstance(b, Operation)
-                return "^ta:output/((ta:input/^ta:output)*)" if repeat else "^ta:output"
+                return "^ta:output/((ta:input+/^ta:output)*)" if repeat else "^ta:output"
         else:
             assert isinstance(a, Operation)
             if isinstance(b, Type):
-                return "ta:input/((^ta:output/ta:input)*)" if repeat else "ta:input"
+                return "ta:input/((^ta:output/ta:input+)*)" if repeat else "ta:input+"
             else:
                 assert isinstance(b, Operation)
-                return f"(ta:input/^ta:output){repeat}"
+                return f"(ta:input+/^ta:output){repeat}"
 
     def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
         return g.query(self.sparql_flow(flow))
