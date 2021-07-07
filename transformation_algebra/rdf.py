@@ -60,11 +60,13 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 current_uri = self.uri(t)
                 vocab.add((current_uri, RDF.type, TA.Type))
                 vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
+                vocab.add((current_uri, RDFS.label, Literal(str(t))))
             else:
                 previous_uri = None
                 current: Optional[TypeOperator] = t
                 while current:
                     current_uri = self.uri(current)
+                    vocab.add((current_uri, RDFS.label, Literal(str(t))))
                     vocab.add((current_uri, RDF.type, TA.Type))
                     if previous_uri:
                         vocab.add((previous_uri, RDFS.subClassOf, current_uri))
@@ -76,6 +78,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             node = self.uri(d)
             type_node = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, type_node))
+            vocab.add((node, RDFS.label, Literal(str(d.name))))
             if d.description:
                 vocab.add((node, RDFS.comment, Literal(d.description)))
 
@@ -107,6 +110,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
             if t.params:
                 node = BNode()
+                graph.add((node, RDFS.label, Literal(str(t))))
                 graph.add((node, RDF.type, self.uri(t._operator)))
                 for i, param in enumerate(t.params, start=1):
                     param_node = self.rdf_type(graph, param)
