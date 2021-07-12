@@ -147,8 +147,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         # Add connections to input or output nodes
         if isinstance(expr, Base):
-            # assert expr.definition.primitive
             if isinstance(expr.definition, Operation):
+                assert expr.definition.primitive(), \
+                    f"{expr.definition} is not a primitive"
                 g.add((root, TA.operation, intermediate))
                 g.add((intermediate, RDF.type, self.uri(expr.definition)))
             else:
@@ -193,8 +194,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr) and expr.type and \
                 expr.type.operator == Function
+            assert expr.body.type.operator != Function
             f = self.rdf_expr(g, root, expr.body, inputs)
             g.add((intermediate, TA.input, f))
+            g.add((root, TA.operation, intermediate))
+            g.add((root, TA.data, f))
             g.add((intermediate, RDF.type, TA.Operation))
 
         else:
