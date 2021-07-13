@@ -45,6 +45,35 @@ class TestAlgebra(unittest.TestCase):
         #  │     └─╼ one : Int
         #  └─╼ one : Int
 
+    def test_equality(self):
+        """
+        Ensure that expressions can be compared to one another.
+        """
+        A = Type.declare('A')
+        x = Data(A)
+        f = Operation(A ** A, name='f')
+        g = Operation(A ** A, name='g')
+        self.assertEqual(f(x), f(x))
+        self.assertNotEqual(f(x), g(x))
+
+    def test_primitive_high(self):
+        """
+        Test that non-primitive expressions defined in terms of
+        other non-primitive expressions are expanded properly.
+        """
+        A = Type.declare('A')
+        x = Data(A)
+        f = Operation(A ** A, name='f')
+        g = Operation(A ** A, name='g',
+            derived=lambda x: f(x))
+        h = Operation(A ** A, name='h',
+            derived=lambda x: g(x))
+        algebra = TransformationAlgebra()
+        algebra.add(f, g, h)
+        expr = h(x).primitive()
+        self.assertEqual(f(x), f(x))
+        self.assertEqual(expr, f(x))
+
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         f = Operation(A ** B)
