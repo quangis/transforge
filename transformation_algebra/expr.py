@@ -160,7 +160,7 @@ class Expr(ABC):
             if not self.params:
                 return self.body.normalize(recurse)
             elif isinstance(self.body, Abstraction):
-                self.add_params(self.body.params)
+                self.params = self.params + self.body.params
                 self.body = self.body.body.normalize(recurse)
             elif recurse:
                 self.body = self.body.normalize(recurse)
@@ -279,14 +279,20 @@ class Abstraction(Expr):
     def __init__(self, composition: Callable[..., Expr]):
         params = [Variable() for _ in signature(composition).parameters]
         self.body: Expr = composition(*params)
-        self.type = self.body.type
-        self.params: List[Variable] = []
-        self.add_params(*params)
+        self.params = params
 
-    def add_params(self, *variables: Variable) -> None:
-        self.params.extend(variables)
-        for param in reversed(variables):
-            self.type = param.type ** self.type
+    @property
+    def params(self) -> List[Variable]:
+        return self._params
+
+    @params.setter
+    def params(self, params: List[Variable]) -> None:
+        # To avoid having to keep track of the type of an abstraction
+        # expression after adding parameters, we compute it automatically when
+        # changing parameters
+        self._params = params
+        self.type = reduce(lambda x, y: y.type ** x,
+            reversed(params), self.body.type)
 
     def __str__(self) -> str:
         return f"(λ{' '.join(str(p) for p in self.params)}. {self.body})"
