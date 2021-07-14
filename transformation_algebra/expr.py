@@ -246,11 +246,11 @@ class Expr(ABC):
             if isinstance(expr, Variable):
                 expr_vars.add(expr)
 
-        for expr, name in zip(expr_vars, varnames("x")):
-            expr.name = name
+        for i, expr in enumerate(expr_vars):
+            expr.name = f"x{subscript(i)}"
 
-        for var, name in zip(type_vars, varnames("τ")):
-            var.name = name
+        for i, var in enumerate(type_vars):
+            var.name = f"τ{subscript(i)}"
 
 
 class Base(Expr):
@@ -481,11 +481,8 @@ class Token(Enum):
             return Token.IDENT
 
 
-def varnames(prefix: str, i: int = 1) -> Iterator[str]:
+def subscript(i: int) -> str:
     """
-    An endless iterator of variable names.
+    Convert a number into a subscripted string.
     """
-    while True:
-        num = "".join(chr(ord("₀") - ord("0") + ord(d)) for d in str(i))
-        yield f"{prefix}{num}"
-        i += 1
+    return "".join(chr(ord("₀") - ord("0") + ord(d)) for d in str(i))
