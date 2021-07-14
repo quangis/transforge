@@ -243,7 +243,7 @@ class Expr(ABC):
         type_vars: Set[TypeVar] = set()
 
         for expr in self.leaves():
-            type_vars = type_vars.union(expr.type.variables())
+            type_vars.update(expr.type.variables())
             if isinstance(expr, Variable):
                 expr_vars.add(expr)
 
