@@ -7,47 +7,42 @@ from transformation_algebra.expr import \
 
 
 class TestAlgebra(unittest.TestCase):
-    def test_primitive(self):
-        Int = Type.declare('Int')
-        add = Operation(Int ** Int ** Int)
-        one = Data(Int)
-        algebra = TransformationAlgebra()
-        algebra.add(
-            one=one,
-            add1=Operation(
-                Int ** Int,
-                derived=lambda x: add(x, one)
-            ),
-            compose=Operation(
-                lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-                derived=lambda f, g, x: f(g(x))
-            )
-        )
-        t = algebra.parse("compose add1 add1 one")
-        # TODO should be equal to:
-        # Int
-        #  ├─Int ** Int
-        #  │  ├─(Int ** Int) ** Int ** Int
-        #  │  │  ├─╼ compose : (β ** γ) ** (α ** β) ** α ** γ
-        #  │  │  └─╼ add1 : Int ** Int
-        #  │  └─╼ add1 : Int ** Int
-        #  └─╼ one : Int
 
-        t = t.primitive()
-        # TODO should be equal to:
-        # Int
-        #  ├─Int ** Int
-        #  │  ├─╼ add : Int ** Int ** Int
-        #  │  └─Int
-        #  │     ├─Int ** Int
-        #  │     │  ├─╼ add : Int ** Int ** Int
-        #  │     │  └─╼ one : Int
-        #  │     └─╼ one : Int
-        #  └─╼ one : Int
-
-    def test_equality(self):
+    def test_currying(self):
         """
-        Ensure that expressions can be compared to one another.
+        Multiple arguments may be provided through partial or full application.
+        """
+        A = Type.declare('A')
+        x = Data(A)
+        f = Operation(A ** A ** A)
+        self.assertTrue(f(x, x).match(f(x)(x)))
+
+    def test_primitive(self):
+        """
+        Expressions can be converted to primitive form.
+        """
+        Int = Type.declare('Int')
+        one = Data(Int, name='one')
+        add = Operation(Int ** Int ** Int, name='add')
+        add1 = Operation(
+            Int ** Int,
+            derived=lambda x: add(x, one),
+            name='add1'
+        )
+        compose = Operation(
+            lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            derived=lambda f, g, x: f(g(x)),
+            name='compose'
+        )
+        algebra = TransformationAlgebra()
+        algebra.add(add, one, add1, compose)
+        a = compose(add1, add1, one)
+        b = add(add(one, one), one)
+        self.assertTrue(a.primitive().match(b))
+
+    def test_matching(self):
+        """
+        Expressions can be compared to one another.
         """
         A = Type.declare('A')
         x = Data(A)

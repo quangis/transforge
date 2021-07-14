@@ -140,9 +140,9 @@ class Expr(ABC):
             if isinstance(self, Abstraction):
                 param = self.params.pop(0)
                 param.bind(arg)
-                return self if self.params else self.body
+                return self.normalize(False)
             else:
-                return Application(self, arg)
+                return Application(self, arg).normalize(False)
         except error.TATypeError as e:
             e.while_applying(self, arg)
             raise
@@ -161,10 +161,13 @@ class Expr(ABC):
                 self.params += self.body.params
                 self.body = self.body.body.normalize(recurse)
             elif recurse:
-                self.body = self.body.normalize(True)
-        elif isinstance(self, Application) and recurse:
-            self.f = self.f.normalize(True)
-            self.x = self.x.normalize(True)
+                self.body = self.body.normalize(recurse)
+        elif isinstance(self, Application):
+            if recurse:
+                self.f = self.f.normalize(recurse)
+                self.x = self.x.normalize(recurse)
+            if isinstance(self.f, Abstraction):
+                return self.f.apply(self.x).normalize(recurse)
         return self
 
     def primitive(self, rename: bool = True) -> Expr:
@@ -182,7 +185,7 @@ class Expr(ABC):
             self.body = self.body.primitive(False)
         if rename:
             result.rename()
-        return result.normalize(False)
+        return result.normalize(True)
 
     def match(self, other: Expr) -> bool:
         """
