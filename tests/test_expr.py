@@ -53,8 +53,8 @@ class TestAlgebra(unittest.TestCase):
         x = Data(A)
         f = Operation(A ** A, name='f')
         g = Operation(A ** A, name='g')
-        self.assertEqual(f(x), f(x))
-        self.assertNotEqual(f(x), g(x))
+        self.assertTrue(f(x).match(f(x)))
+        self.assertFalse(f(x).match(g(x)))
 
     def test_primitive_high(self):
         """
@@ -70,9 +70,11 @@ class TestAlgebra(unittest.TestCase):
             derived=lambda x: g(x))
         algebra = TransformationAlgebra()
         algebra.add(f, g, h)
-        expr = h(x).primitive()
-        self.assertEqual(f(x), f(x))
-        self.assertEqual(expr, f(x))
+        self.assertTrue(f(x).match(f(x)))
+        self.assertFalse(h(x).match(f(x)))
+        self.assertTrue(g(x).primitive().match(f(x)))
+        self.assertTrue(h(x).primitive().match(f(x)))
+        self.assertTrue(h(x).primitive().match(g(x).primitive()))
 
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')

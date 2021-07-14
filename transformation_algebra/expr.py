@@ -184,6 +184,21 @@ class Expr(ABC):
             result.rename()
         return result.normalize(False)
 
+    def match(self, other: Expr) -> bool:
+        """
+        Check that the normalized expressions are the same.
+        """
+        a = self.normalize(recurse=False)
+        b = other.normalize(recurse=False)
+        if isinstance(a, Base) and isinstance(b, Base):
+            return a.definition == b.definition and a.label == b.label
+        elif isinstance(a, Application) and isinstance(b, Application):
+            return a.f.match(b.f) and a.x.match(b.x)
+        elif isinstance(a, Abstraction) and isinstance(b, Abstraction):
+            return all(x.match(y) for x, y in zip(a.params, b.params)) and \
+                a.body.match(b.body)
+        return a == b
+
     def replace(self, label: str, new: Expr) -> Expr:
         """
         Substitute all labelled expressions with the new expression.
