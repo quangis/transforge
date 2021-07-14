@@ -140,6 +140,7 @@ class Expr(ABC):
             if isinstance(self, Abstraction):
                 param = self.params.pop(0)
                 param.bind(arg)
+                self.type = self.type.apply(arg.type)
                 return self.normalize(False)
             else:
                 return Application(self, arg).normalize(False)
@@ -149,8 +150,9 @@ class Expr(ABC):
 
     def normalize(self, recurse: bool = False) -> Expr:
         """
-        Follow bound variables to their bindings, and replace nested
-        abstractions λx.λy.… with a single abstraction λx y.….
+        Follow bound variables to their bindings, replace nested abstractions
+        λx.λy.… with a single abstraction λx y.…, remove abstractions without
+        parameters.
         """
         if isinstance(self, Variable) and self.bound:
             return self.bound.normalize(recurse)
@@ -158,7 +160,7 @@ class Expr(ABC):
             if not self.params:
                 return self.body.normalize(recurse)
             elif isinstance(self.body, Abstraction):
-                self.params += self.body.params
+                self.add_params(self.body.params)
                 self.body = self.body.body.normalize(recurse)
             elif recurse:
                 self.body = self.body.normalize(recurse)
@@ -275,14 +277,19 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        self.params: List[Variable] = [
-            Variable() for _ in signature(composition).parameters]
-        self.body: Expr = composition(*self.params)
-        self.type = reduce(lambda t, p: p.type ** t,
-            reversed(self.params), self.body.type)
+        params = [Variable() for _ in signature(composition).parameters]
+        self.body: Expr = composition(*params)
+        self.type = self.body.type
+        self.params: List[Variable] = []
+        self.add_params(*params)
+
+    def add_params(self, *variables: Variable) -> None:
+        self.params.extend(variables)
+        for param in reversed(variables):
+            self.type = param.type ** self.type
 
     def __str__(self) -> str:
-        return f"λ{' '.join(str(p) for p in self.params)}. {self.body}"
+        return f"(λ{' '.join(str(p) for p in self.params)}. {self.body})"
 
 
 class Variable(Expr):
@@ -310,7 +317,7 @@ class Variable(Expr):
     def bind(self, expr: Expr) -> None:
         assert not self.bound
         self.bound = expr
-        expr.type.unify(self.type, subtype=True)
+        # expr.type.unify(self.type, subtype=True)
 
 
 ###############################################################################
