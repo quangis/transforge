@@ -202,13 +202,14 @@ class Expr(ABC):
         """
         Obtain leaf expressions.
         """
-        if isinstance(self, (Base, Variable)):
-            yield self
-        elif isinstance(self, Abstraction):
-            yield from self.body.leaves()
+        a = self.normalize(recurse=False)
+        if isinstance(a, (Base, Variable)):
+            yield a
+        elif isinstance(a, Abstraction):
+            yield from a.body.leaves()
         else:
             assert isinstance(self, Application)
-            yield from chain(self.f.leaves(), self.x.leaves())
+            yield from chain(a.f.leaves(), a.x.leaves())
 
     def labels(self) -> List[str]:
         """
