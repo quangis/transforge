@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC
-from functools import reduce, partial
+from functools import reduce
 from itertools import groupby, chain
 from inspect import signature, Signature, Parameter
 from typing import Optional, Dict, Callable, Union, List, Iterator, Set
@@ -37,6 +37,9 @@ class Definition(ABC):
         return f"{self.name or '[?]'} : {self.type}"
 
     def __call__(self, *args: Union[Definition, Expr]) -> Expr:
+        """
+        Calling a definition instantiates it as an expression.
+        """
         return self.instance().__call__(*args)
 
     def instance(self, identifier: Optional[str] = None) -> Expr:
@@ -55,7 +58,7 @@ class Data(Definition):
     def __init__(self, *nargs, **kwargs):
         self.composition = None
         super().__init__(*nargs, **kwargs)
-        assert not self.type.is_function()
+        assert self.type.instance().operator != Function
 
 
 class Operation(Definition, flow.Unit):
@@ -69,7 +72,7 @@ class Operation(Definition, flow.Unit):
             derived: Optional[Callable[..., Expr]] = None, **kwargs):
         self.composition = derived  # a transformation may be non-primitive
         super().__init__(*nargs, **kwargs)
-        assert self.type.is_function()
+        assert self.type.instance().operator == Function
 
     def validate(self) -> None:
         """
@@ -124,7 +127,6 @@ class Expr(ABC):
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
         elif isinstance(self, Abstraction):
-            assert isinstance(self.body, Expr) and self.params and self.type
             return (
                 f"λ{' '.join(str(p) for p in self.params)}. ... : "
                 f"{self.type.str_with_constraints()}\n"
@@ -136,20 +138,36 @@ class Expr(ABC):
     def apply(self, arg: Expr) -> Expr:
         try:
             if isinstance(self, Abstraction):
-                assert not isinstance(self.body, Expr)
-                self.body = partial(self.body, arg)
-                return self.complete()
-            elif isinstance(arg, Abstraction):
-                other = arg.complete(force=True)
-                other.type.resolve()
-                return Application(self, other)
+                param = self.params.pop(0)
+                param.bind(arg)
+                return self if self.params else self.body
             else:
                 return Application(self, arg)
         except error.TATypeError as e:
             e.while_applying(self, arg)
             raise
 
-    def primitive(self, complete: bool = True) -> Expr:
+    def normalize(self, recurse: bool = False) -> Expr:
+        """
+        Follow bound variables to their bindings, and replace nested
+        abstractions λx.λy.… with a single abstraction λx y.….
+        """
+        if isinstance(self, Variable) and self.bound:
+            return self.bound.normalize(recurse)
+        elif isinstance(self, Abstraction):
+            if not self.params:
+                return self.body.normalize(recurse)
+            elif isinstance(self.body, Abstraction):
+                self.params += self.body.params
+                self.body = self.body.body.normalize(recurse)
+            elif recurse:
+                self.body = self.body.normalize(True)
+        elif isinstance(self, Application) and recurse:
+            self.f = self.f.normalize(True)
+            self.x = self.x.normalize(True)
+        return self
+
+    def primitive(self, rename: bool = True) -> Expr:
         """
         Expand this expression into its simplest form.
         """
@@ -157,15 +175,14 @@ class Expr(ABC):
         if isinstance(self, Base):
             d = self.definition
             if isinstance(d, Operation) and d.composition:
-                result = Abstraction(d.composition)
-        else:
-            result = self.f.primitive(complete=False).apply(
-                self.x.primitive(complete=False))
-        if isinstance(result, Abstraction) and complete:
-            result = result.complete(force=True)
-        if complete:
+                result = Abstraction(d.composition).primitive(False)
+        elif isinstance(self, Application):
+            result = self.f.primitive(False).apply(self.x.primitive(False))
+        elif isinstance(self, Abstraction):
+            self.body = self.body.primitive(False)
+        if rename:
             result.rename()
-        return result
+        return result.normalize(False)
 
     def replace(self, label: str, new: Expr) -> Expr:
         """
@@ -175,7 +192,6 @@ class Expr(ABC):
             new.type.unify(self.type, subtype=True)
             return new
         elif isinstance(self, Abstraction):
-            assert isinstance(self.body, Expr)
             self.body = self.body.replace(label, new)
         elif isinstance(self, Application):
             self.f = self.f.replace(label, new)
@@ -189,14 +205,14 @@ class Expr(ABC):
         if isinstance(self, (Base, Variable)):
             yield self
         elif isinstance(self, Abstraction):
-            assert isinstance(self.body, Expr)
             yield from self.body.leaves()
-        elif isinstance(self, Application):
+        else:
+            assert isinstance(self, Application)
             yield from chain(self.f.leaves(), self.x.leaves())
 
     def labels(self) -> List[str]:
         """
-        Obtain the all labels in this expression in alphabetical order.
+        Obtain all labels in this expression in alphabetical order.
         """
         labels: Set[str] = set()
         for expr in self.leaves():
@@ -277,34 +293,13 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        self.body: Union[Expr, Callable[..., Expr]] = composition
-        self.type: Optional[TypeInstance] = None  # only provided once complete
-        self.params: Optional[List[Variable]] = None  # same
-
-    def complete(self, force: bool = False) -> Expr:
-        """
-        If no further arguments will be supplied, call this function to get the
-        final expression (or a partial expression containing variables).
-        """
-        if isinstance(self.body, Expr):
-            return self
-        else:
-            params = list(signature(self.body).parameters)
-            if params and force:
-                self.params = [Variable() for _ in params]
-                self.body = self.body(*self.params)
-                t = self.body.type
-                for p in reversed(self.params):
-                    t = Function(p.type, t)
-                self.type = t
-                return self
-            elif not params:
-                return self.body()
-            else:
-                return self
+        self.params: List[Variable] = [
+            Variable() for _ in signature(composition).parameters]
+        self.body: Expr = composition(*self.params)
+        self.type = reduce(lambda t, p: p.type ** t,
+            reversed(self.params), self.body.type)
 
     def __str__(self) -> str:
-        assert self.params
         return f"λ{' '.join(str(p) for p in self.params)}. {self.body}"
 
 
@@ -315,6 +310,7 @@ class Variable(Expr):
 
     def __init__(self, name: Optional[str] = None):
         self._name = name
+        self.bound: Optional[Expr] = None
         super().__init__(type=TypeVar())
 
     @property
@@ -323,10 +319,18 @@ class Variable(Expr):
 
     @name.setter
     def name(self, value: str) -> None:
+        assert not self.bound
         self._name = value
 
     def __str__(self) -> str:
         return self.name
+
+    def bind(self, expr: Expr) -> None:
+        a = self.normalize(False)
+        b = expr.normalize(False)
+        assert not a.bound
+        a.bound = b
+        a.type.unify(b.type)
 
 
 ###############################################################################
