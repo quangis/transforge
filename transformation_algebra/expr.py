@@ -199,20 +199,6 @@ class Expr(ABC):
                 a.body.match(b.body)
         return a == b
 
-    def replace(self, label: str, new: Expr) -> Expr:
-        """
-        Substitute all labelled expressions with the new expression.
-        """
-        if isinstance(self, Base) and self.label == label:
-            new.type.unify(self.type, subtype=True)
-            return new
-        elif isinstance(self, Abstraction):
-            self.body = self.body.replace(label, new)
-        elif isinstance(self, Application):
-            self.f = self.f.replace(label, new)
-            self.x = self.x.replace(label, new)
-        return self
-
     def leaves(self) -> Iterator[Expr]:
         """
         Obtain leaf expressions.
@@ -225,29 +211,6 @@ class Expr(ABC):
         else:
             assert isinstance(self, Application)
             yield from chain(a.f.leaves(), a.x.leaves())
-
-    def labels(self) -> List[str]:
-        """
-        Obtain all labels in this expression in alphabetical order.
-        """
-        labels: Set[str] = set()
-        for expr in self.leaves():
-            if isinstance(expr, Base) and expr.label:
-                labels.add(expr.label)
-        return sorted(labels)
-
-    def supply(self, *nargs: Expr, **kwargs: Expr) -> Expr:
-        """
-        Treat labelled inputs as parameters and supply them. Note that
-        arguments are in alphabetical order.
-        """
-        sig = Signature([Parameter(v, Parameter.POSITIONAL_OR_KEYWORD)
-            for v in self.labels()])
-        binding = sig.bind(*nargs, **kwargs)
-        result = self
-        for param, value in binding.arguments.items():
-            result = result.replace(param, value)
-        return result
 
     def rename(self) -> None:
         """
@@ -342,11 +305,9 @@ class Variable(Expr):
         return self.name
 
     def bind(self, expr: Expr) -> None:
-        a = self.normalize(False)
-        b = expr.normalize(False)
-        assert not a.bound
-        a.bound = b
-        a.type.unify(b.type)
+        assert not self.bound
+        self.bound = expr
+        self.type.unify(self.bound.type)
 
 
 ###############################################################################
