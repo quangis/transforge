@@ -212,7 +212,7 @@ class Expr(ABC):
         elif isinstance(a, Abstraction):
             yield from a.body.leaves()
         else:
-            assert isinstance(self, Application)
+            assert isinstance(a, Application)
             yield from chain(a.f.leaves(), a.x.leaves())
 
     def rename(self) -> None:
@@ -310,7 +310,7 @@ class Variable(Expr):
     def bind(self, expr: Expr) -> None:
         assert not self.bound
         self.bound = expr
-        self.type.unify(self.bound.type)
+        expr.type.unify(self.type, subtype=True)
 
 
 ###############################################################################
