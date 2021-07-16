@@ -8,7 +8,7 @@ from enum import Enum, auto
 from abc import ABC
 from functools import reduce
 from itertools import groupby, chain
-from inspect import signature, Signature, Parameter
+from inspect import signature
 from typing import Optional, Dict, Callable, Union, List, Iterator, Set
 
 from transformation_algebra import error, flow
@@ -137,57 +137,72 @@ class Expr(ABC):
 
     def apply(self, arg: Expr) -> Expr:
         try:
-            if isinstance(self, Abstraction):
-                param = self.params.pop(0)
-                param.bind(arg)
-                self.type = self.type.apply(arg.type)
-                return self.normalize(False)
-            else:
-                return Application(self, arg).normalize(False)
+            return Application(self, arg).normalize(False)
         except error.TATypeError as e:
             e.while_applying(self, arg)
             raise
 
     def normalize(self, recurse: bool = False) -> Expr:
         """
-        Follow bound variables to their bindings, replace nested abstractions
-        λx.λy.… with a single abstraction λx y.…, remove abstractions without
-        parameters.
+        -   Follow bound variables to their bindings.
+        -   Apply arguments to abstractions where possible.
+        -   Replace nested abstractions (λx.λy. …) with a single (λx y. …).
+        -   Collapse abstractions without parameters.
         """
         if isinstance(self, Variable) and self.bound:
             return self.bound.normalize(recurse)
+
         elif isinstance(self, Abstraction):
+            if recurse:
+                self.body = self.body.normalize(recurse)
+
             if not self.params:
                 return self.body.normalize(recurse)
             elif isinstance(self.body, Abstraction):
-                self.params = self.params + self.body.params
-                self.body = self.body.body.normalize(recurse)
-            elif recurse:
-                self.body = self.body.normalize(recurse)
+                self.params += self.body.params
+                self.body = self.body.body
+                self.type = self.calculate_type()
+                return self.normalize(recurse)
+
         elif isinstance(self, Application):
             if recurse:
                 self.f = self.f.normalize(recurse)
                 self.x = self.x.normalize(recurse)
+
             if isinstance(self.f, Abstraction):
-                return self.f.apply(self.x).normalize(recurse)
+                if self.f.params:
+                    self.f.params.pop(0).bind(self.x)
+                    self.f.type = self.f.calculate_type()
+                    return self.f.normalize(False)
+                else:
+                    assert not recurse
+                    self.f = self.f.normalize(False)
+                    return self.normalize(False)
+
         return self
 
     def primitive(self, rename: bool = True) -> Expr:
         """
         Expand this expression into its simplest form.
         """
-        result = self
-        if isinstance(self, Base):
+        result = self.normalize(False)
+
+        if isinstance(result, Base):
             d = self.definition
             if isinstance(d, Operation) and d.composition:
                 result = Abstraction(d.composition).primitive(False)
-        elif isinstance(self, Application):
-            result = self.f.primitive(False).apply(self.x.primitive(False))
-        elif isinstance(self, Abstraction):
-            self.body = self.body.primitive(False)
+
+        elif isinstance(result, Application):
+            result.f = result.f.primitive(False)
+            result.x = result.x.primitive(False)
+
+        elif isinstance(result, Abstraction):
+            result.body = result.body.primitive(False)
+
         if rename:
             result.rename()
-        return result.normalize(True)
+
+        return result.normalize(False)
 
     def match(self, other: Expr) -> bool:
         """
@@ -206,12 +221,13 @@ class Expr(ABC):
 
     def leaves(self) -> Iterator[Expr]:
         """
-        Obtain leaf expressions.
+        Obtain all base expressions and variables in an expression.
         """
         a = self.normalize(recurse=False)
         if isinstance(a, (Base, Variable)):
             yield a
         elif isinstance(a, Abstraction):
+            yield from a.params
             yield from a.body.leaves()
         else:
             assert isinstance(a, Application)
@@ -277,22 +293,17 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        params = [Variable() for _ in signature(composition).parameters]
-        self.body: Expr = composition(*params)
-        self.params = params
+        self.params: List[Variable] = [
+            Variable() for _ in signature(composition).parameters]
+        self.body: Expr = composition(*self.params)
+        super().__init__(type=self.calculate_type())
 
-    @property
-    def params(self) -> List[Variable]:
-        return self._params
-
-    @params.setter
-    def params(self, params: List[Variable]) -> None:
-        # To avoid having to keep track of the type of an abstraction
-        # expression after adding parameters, we compute it automatically when
-        # changing parameters
-        self._params = params
-        self.type = reduce(lambda x, y: y.type ** x,
-            reversed(params), self.body.type)
+    def calculate_type(self) -> TypeInstance:
+        """
+        (Re)calculate the type of an abstraction expression.
+        """
+        return reduce(lambda x, y: y.type ** x,
+            reversed(self.params), self.body.type)
 
     def __str__(self) -> str:
         return f"(λ{' '.join(str(p) for p in self.params)}. {self.body})"
@@ -323,7 +334,6 @@ class Variable(Expr):
     def bind(self, expr: Expr) -> None:
         assert not self.bound
         self.bound = expr
-        # expr.type.unify(self.type, subtype=True)
 
 
 ###############################################################################
