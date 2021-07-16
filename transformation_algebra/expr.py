@@ -1,5 +1,8 @@
 """
-Classes to define generic transformation algebras.
+A generic transformation algebra consists of *definitions* (of operations and
+of data constructors). Those definitions can be instantiated and combined into
+transformation algebra *expressions*, which describe applications of operations
+to data.
 """
 
 from __future__ import annotations
