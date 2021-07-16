@@ -176,15 +176,14 @@ class Expr(ABC):
                 if self.f.params:
                     self.f.params.pop(0).bind(self.x)
                     self.f.type = self.f.calculate_type()
-                    return self.f.normalize(False)
+                    return self.f.normalize()
                 else:
                     assert not recurse
-                    self.f = self.f.normalize(False)
-                    return self.normalize(False)
+                    return self.f.normalize()
 
         return self
 
-    def primitive(self, rename: bool = True) -> Expr:
+    def primitive(self, recurse: bool = True) -> Expr:
         """
         Expand this expression into its simplest form.
         """
@@ -193,7 +192,7 @@ class Expr(ABC):
         if isinstance(result, Base):
             d = self.definition
             if isinstance(d, Operation) and d.composition:
-                result = Abstraction(d.composition).primitive(False)
+                return Abstraction(d.composition).primitive(False).normalize()
 
         elif isinstance(result, Application):
             result.f = result.f.primitive(False)
@@ -202,10 +201,7 @@ class Expr(ABC):
         elif isinstance(result, Abstraction):
             result.body = result.body.primitive(False)
 
-        if rename:
-            result.rename()
-
-        return result.normalize(False)
+        return result.normalize(recurse)
 
     def match(self, other: Expr) -> bool:
         """
