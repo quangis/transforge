@@ -140,75 +140,78 @@ class Expr(ABC):
 
     def apply(self, arg: Expr) -> Expr:
         try:
-            return Application(self, arg).normalize(False)
+            return Application(self, arg).normalize(recursive=False)
         except error.TATypeError as e:
             e.while_applying(self, arg)
             raise
 
-    def normalize(self, recurse: bool = False) -> Expr:
+    def normalize(self, recursive: bool = True) -> Expr:
         """
         -   Follow bound variables to their bindings.
         -   Apply arguments to abstractions where possible.
         -   Replace nested abstractions (λx.λy. …) with a single (λx y. …).
         -   Collapse abstractions without parameters.
+
+        Set recursive to False to only guarantee that the top level expression
+        is in normal form.
         """
         if isinstance(self, Variable) and self.bound:
-            return self.bound.normalize(recurse)
+            return self.bound.normalize(recursive)
 
         elif isinstance(self, Abstraction):
-            if recurse:
-                self.body = self.body.normalize(recurse)
+            if recursive:
+                self.body = self.body.normalize(recursive)
 
             if not self.params:
-                return self.body.normalize(recurse)
+                return self.body.normalize(recursive)
             elif isinstance(self.body, Abstraction):
                 self.params += self.body.params
                 self.body = self.body.body
                 self.type = self.calculate_type()
-                return self.normalize(recurse)
+                return self.normalize(recursive)
 
         elif isinstance(self, Application):
-            if recurse:
-                self.f = self.f.normalize(recurse)
-                self.x = self.x.normalize(recurse)
+            if recursive:
+                self.f = self.f.normalize(recursive)
+                self.x = self.x.normalize(recursive)
 
             if isinstance(self.f, Abstraction):
                 if self.f.params:
                     self.f.params.pop(0).bind(self.x)
                     self.f.type = self.f.calculate_type()
-                    return self.f.normalize()
+                    return self.f.normalize(recursive)
                 else:
-                    assert not recurse
-                    return self.f.normalize()
+                    assert not recursive
+                    return self.f.normalize(recursive)
 
         return self
 
-    def primitive(self, recurse: bool = True) -> Expr:
+    def primitive(self, normalize: bool = True) -> Expr:
         """
         Expand this expression into its simplest form.
         """
-        result = self.normalize(False)
+        result = self.normalize(recursive=False)
 
         if isinstance(result, Base):
-            d = self.definition
+            d = result.definition
             if isinstance(d, Operation) and d.composition:
-                return Abstraction(d.composition).primitive(False).normalize()
+                result = Abstraction(d.composition).primitive(normalize=False)
 
         elif isinstance(result, Application):
-            result.f = result.f.primitive(False)
-            result.x = result.x.primitive(False)
+            result.f = result.f.primitive(normalize=False)
+            result.x = result.x.primitive(normalize=False)
 
         elif isinstance(result, Abstraction):
-            result.body = result.body.primitive(False)
+            result.body = result.body.primitive(normalize=False)
 
-        return result.normalize(recurse)
+        return result.normalize(recursive=normalize)
 
     def match(self, other: Expr) -> bool:
         """
         Check that the normalized expressions are the same.
         """
-        a = self.normalize(recurse=False)
-        b = other.normalize(recurse=False)
+        a = self.normalize(recursive=False)
+        b = other.normalize(recursive=False)
         if isinstance(a, Base) and isinstance(b, Base):
             return a.definition == b.definition and a.label == b.label
         elif isinstance(a, Application) and isinstance(b, Application):
@@ -222,7 +225,7 @@ class Expr(ABC):
         """
         Obtain all base expressions and variables in an expression.
         """
-        a = self.normalize(recurse=False)
+        a = self.normalize(recursive=False)
         if isinstance(a, (Base, Variable)):
             yield a
         elif isinstance(a, Abstraction):
