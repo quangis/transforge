@@ -71,6 +71,16 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(h(x).primitive().match(f(x)))
         self.assertTrue(h(x).primitive().match(g(x).primitive()))
 
+    def test_primitives_retain_types(self):
+        """
+        Make sure that primitives have the correct type.
+        """
+        A = Type.declare('A')
+        x = Data(A)
+        f = Operation(lambda α: α ** α, name='f')
+        g = Operation(lambda α: α ** α, name='g', derived=lambda x: f(x))
+        self.assertTrue(g(x).primitive().type.match(A.instance()))
+
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         f = Operation(A ** B)

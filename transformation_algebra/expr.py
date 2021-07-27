@@ -89,7 +89,7 @@ class Operation(Definition, flow.Unit):
             if self.composition:
                 type_decl = self.type.instance()
                 vars_decl = list(type_decl.variables())
-                type_infer = self.instance().primitive().type
+                type_infer = self.instance().primitive(unify=False).type
 
                 type_decl.unify(type_infer, subtype=True)
                 type_decl = type_decl.resolve()
@@ -186,25 +186,31 @@ class Expr(ABC):
 
         return self
 
-    def primitive(self, normalize: bool = True) -> Expr:
+    def primitive(self, normalize: bool = True, unify: bool = True) -> Expr:
         """
         Expand this expression into its simplest form.
         """
-        result = self.normalize(recursive=False)
+        expr = self.normalize(recursive=False)
 
-        if isinstance(result, Base):
-            d = result.definition
+        if isinstance(expr, Base):
+            d = expr.definition
             if isinstance(d, Operation) and d.composition:
-                result = Abstraction(d.composition).primitive(normalize=False)
+                expr_primitive = Abstraction(d.composition)
+                # The type of the original expression may be less general than
+                # that of the primitive expression, but not more general.
+                if unify:
+                    expr.type.unify(expr_primitive.type, subtype=True)
+                    expr_primitive.type.resolve()
+                expr = expr_primitive.primitive(normalize=False)
 
-        elif isinstance(result, Application):
-            result.f = result.f.primitive(normalize=False)
-            result.x = result.x.primitive(normalize=False)
+        elif isinstance(expr, Application):
+            expr.f = expr.f.primitive(normalize=False)
+            expr.x = expr.x.primitive(normalize=False)
 
-        elif isinstance(result, Abstraction):
-            result.body = result.body.primitive(normalize=False)
+        elif isinstance(expr, Abstraction):
+            expr.body = expr.body.primitive(normalize=False)
 
-        return result.normalize(recursive=normalize)
+        return expr.normalize(recursive=normalize)
 
     def match(self, other: Expr) -> bool:
         """
