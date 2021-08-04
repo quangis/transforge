@@ -217,32 +217,26 @@ class TypeInstance(Type, flow.Unit):
             any(b in t for t in a.params))
 
     def variables(self, indirect: bool = True,
-            initial: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
+            target: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
         """
         Obtain all distinct type variables currently in the type instance, and
         optionally also those variables indirectly related via constraints.
         """
         direct_variables = set(t for t in self
-            if isinstance(t, TypeVar) and (not initial or t not in initial))
-
-        if initial:
-            initial.update(direct_variables)
-        result = initial or set(direct_variables)
+            if isinstance(t, TypeVar) and (not target or t not in target))
 
         if indirect:
+            target = target or set()
+            target.update(direct_variables)
             for v in direct_variables:
-                for constraint in v._constraints:
-                    constraint.variables(indirect=True, initial=result)
-        return result
-
-    def constraints(self, recursive: bool = True) -> Set[Constraint]:
-        """
-        Obtain all constraints attached to variables in the type instance.
-        """
-        result = set()
-        for v in self.variables(indirect=recursive):
-            result.update(v._constraints)
-        return result
+                for c in v._constraints:
+                    for e in chain(c.reference, *c.alternatives):
+                        e.variables(indirect=True, target=target)
+            return target
+        else:
+            if target:
+                target.update(direct_variables)
+            return target or direct_variables
 
     def operators(self, indirect: bool = True) -> Set[TypeOperator]:
         """
@@ -251,9 +245,18 @@ class TypeInstance(Type, flow.Unit):
         result = set(t._operator for t in self
             if isinstance(t, TypeOperation) and t._operator != Function)
         if indirect:
-            for constraint in self.constraints():
-                result.update(*(p.operators(False) for p in
+            for constraint in self.constraints(indirect=True):
+                result.update(*(p.operators(indirect=False) for p in
                     chain(constraint.reference, *constraint.alternatives)))
+        return result
+
+    def constraints(self, indirect: bool = True) -> Set[Constraint]:
+        """
+        Obtain all constraints attached to variables in the type instance.
+        """
+        result = set()
+        for v in self.variables(indirect=indirect):
+            result.update(v._constraints)
         return result
 
     def follow(self) -> TypeInstance:
@@ -574,11 +577,10 @@ class Constraint(object):
     def __str__(self) -> str:
         return f"{self.reference} @ {self.alternatives}"
 
-    def variables(self, indirect: bool = True,
-            initial: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
-        result: Set[TypeVar] = initial or set()
-        for t in chain(self.reference, *self.alternatives):
-            result.update(t.variables(indirect=indirect, initial=result))
+    def variables(self, indirect: bool = True) -> Set[TypeVar]:
+        result: Set[TypeVar] = set()
+        for e in chain(self.reference, *self.alternatives):
+            result.update(e.variables(indirect=indirect, target=result))
         return result
 
     def set_context(self, context: TypeInstance) -> None:
