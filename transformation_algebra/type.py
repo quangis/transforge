@@ -216,13 +216,13 @@ class TypeInstance(Type, flow.Unit):
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
-    def variables(self, recursive: bool = True) -> Set[TypeVar]:
+    def variables(self, indirect: bool = True) -> Set[TypeVar]:
         """
         Obtain all distinct type variables currently in the type instance, and
         optionally also those variables indirectly related via constraints.
         """
         result = set(t for t in self if isinstance(t, TypeVar))
-        if not recursive:
+        if not indirect:
             return result
         stack = list(result)
         while stack:
@@ -240,7 +240,7 @@ class TypeInstance(Type, flow.Unit):
         Obtain all constraints attached to variables in the type instance.
         """
         result = set()
-        for v in self.variables(recursive=recursive):
+        for v in self.variables(indirect=recursive):
             result.update(v._constraints)
         return result
 
@@ -495,7 +495,7 @@ class TypeVar(TypeInstance):
                     if self.upper and self.upper.subtype(t._operator, True):
                         raise error.SubtypeMismatch(self, t)
                 else:
-                    variables = t.variables(recursive=False)
+                    variables = t.variables(indirect=False)
 
                     self._constraints.update(chain(*(
                         v._constraints for v in variables
@@ -596,7 +596,7 @@ class Constraint(object):
         return bool(self.context and all(
             var.wildcard or var in self.context
             for el in self.parts()
-            for var in el.variables(recursive=False)))
+            for var in el.variables(indirect=False)))
 
     def minimize(self) -> None:
         """
