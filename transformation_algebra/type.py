@@ -515,15 +515,16 @@ class TypeVar(TypeInstance):
         Constrain this variable to be a basic type with the given type as lower
         bound.
         """
-        assert not self.unification
-        lower, upper = self.lower or new, self.upper or new
+        a = self.follow()
+        assert isinstance(a, TypeVar)
+        lower, upper = a.lower or new, a.upper or new
         if upper.subtype(new, True):  # fail when lower bound higher than upper
             raise error.SubtypeMismatch(new, upper)
         elif new.subtype(lower, True):  # ignore lower bound lower than current
             pass
         elif lower.subtype(new):  # tighten the lower bound
-            self.lower = new
-            self.check_constraints()
+            a.lower = new
+            a.check_constraints()
         else:  # fail on bound from other lineage (neither sub- nor supertype)
             raise error.SubtypeMismatch(lower, new)
 
@@ -533,15 +534,16 @@ class TypeVar(TypeInstance):
         upper bound.
         """
         # symmetric to `above`
-        assert not self.unification
-        lower, upper = self.lower or new, self.upper or new
+        a = self.follow()
+        assert isinstance(a, TypeVar)
+        lower, upper = a.lower or new, a.upper or new
         if new.subtype(lower, True):
             raise error.SubtypeMismatch(lower, new)
         elif upper.subtype(new, True):
             pass
         elif new.subtype(upper):
-            self.upper = new
-            self.check_constraints()
+            a.upper = new
+            a.check_constraints()
         else:
             raise error.SubtypeMismatch(new, upper)
 

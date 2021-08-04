@@ -104,7 +104,9 @@ class TestAlgebra(unittest.TestCase):
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
             derived=lambda f, x, y: select(eq, prod(f, x, y))
         )
-        app(eq, data, data).primitive()
+        self.assertTrue(app(eq, data, data).primitive().match(
+            select(eq, prod(eq, data, data))
+        ))
 
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
