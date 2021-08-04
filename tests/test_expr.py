@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import Type
+from transformation_algebra.type import Type, _
 from transformation_algebra.expr import \
     TransformationAlgebra, Data, Operation
 
@@ -80,6 +80,31 @@ class TestAlgebra(unittest.TestCase):
         f = Operation(lambda α: α ** α, name='f')
         g = Operation(lambda α: α ** α, name='g', derived=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
+
+    def test_double_binding(self):
+        """
+        An issue once arised in which the assertion that variables may only be
+        bound once was violated, due to complex interactions of primitive
+        operations. This test makes sure that issue no longer exists.
+        """
+        Value = Type.declare('Val')
+        Bool = Type.declare('Bool', supertype=Value)
+        Map = Type.declare('Map', params=2)
+        data = Data(Map(Value, Bool))
+        eq = Operation(Value ** Value ** Bool)
+        select = Operation(
+            lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
+            | τ @ [Map(α, _), Map(_, α)]
+            | τ @ [Map(β, _), Map(_, β)]
+        )
+        prod = Operation(lambda α, β, γ, τ:
+            (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
+        )
+        app = Operation(lambda α, β, γ, τ:
+            (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
+            derived=lambda f, x, y: select(eq, prod(f, x, y))
+        )
+        app(eq, data, data).primitive()
 
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
