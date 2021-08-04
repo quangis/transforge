@@ -8,13 +8,19 @@ not necessarily associated with any concrete data structure or implementation:
 they merely describe input and output in terms of some *conceptual properties* 
 that are deemed relevant.
 
-To enable reasoning about its expressions, we implemented [type 
-inference](https://en.wikipedia.org/wiki/Type_inference) in Python. While the 
-algorithm is probably also useful in the more traditional context of catching 
-implementation errors, it was written to be separate from such concerns. It 
-accommodates both [subtype](https://en.wikipedia.org/wiki/Subtyping) and 
-[parametric 
-polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism).
+-  In order to reason about about transformations, we implemented [type 
+   inference](https://en.wikipedia.org/wiki/Type_inference) in Python. While 
+   the algorithm is perhaps also useful in the more traditional programming 
+   context of catching implementation errors, it was written to be separate 
+   from such concerns. It accommodates both 
+   [subtype](https://en.wikipedia.org/wiki/Subtyping) and [parametric 
+   polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism).
+
+-  To enable flexible searching through the tool workflows described in this 
+   way, algebra expressions can be serialized into 
+   [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and 
+   queried through [SPARQL](https://en.wikipedia.org/wiki/SPARQL). 
+
 
 For now, refer to the [source 
 code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
