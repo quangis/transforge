@@ -216,23 +216,23 @@ class TypeInstance(Type, flow.Unit):
             isinstance(a, TypeOperation) and
             any(b in t for t in a.params))
 
-    def variables(self, indirect: bool = True) -> Set[TypeVar]:
+    def variables(self, indirect: bool = True,
+            initial: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
         """
         Obtain all distinct type variables currently in the type instance, and
         optionally also those variables indirectly related via constraints.
         """
-        result = set(t for t in self if isinstance(t, TypeVar))
-        if not indirect:
-            return result
-        stack = list(result)
-        while stack:
-            var = stack.pop()
-            for constraint in var._constraints:
-                for element in constraint.parts():
-                    for extra_var in element.variables(False):
-                        if extra_var not in result:
-                            stack.append(extra_var)
-                            result.add(extra_var)
+        direct_variables = set(t for t in self
+            if isinstance(t, TypeVar) and (not initial or t not in initial))
+
+        if initial:
+            initial.update(direct_variables)
+        result = initial or set(direct_variables)
+
+        if indirect:
+            for v in direct_variables:
+                for constraint in v._constraints:
+                    constraint.variables(indirect=True, initial=result)
         return result
 
     def constraints(self, recursive: bool = True) -> Set[Constraint]:
@@ -244,15 +244,16 @@ class TypeInstance(Type, flow.Unit):
             result.update(v._constraints)
         return result
 
-    def operators(self, recursive: bool = True) -> Set[TypeOperator]:
+    def operators(self, indirect: bool = True) -> Set[TypeOperator]:
         """
         Obtain all distinct non-function operators in the type instance.
         """
         result = set(t._operator for t in self
             if isinstance(t, TypeOperation) and t._operator != Function)
-        if recursive:
+        if indirect:
             for constraint in self.constraints():
-                result.update(*(p.operators(False) for p in constraint.parts()))
+                result.update(*(p.operators(False) for p in
+                    chain(constraint.reference, *constraint.alternatives)))
         return result
 
     def follow(self) -> TypeInstance:
@@ -573,14 +574,12 @@ class Constraint(object):
     def __str__(self) -> str:
         return f"{self.reference} @ {self.alternatives}"
 
-    def parts(self) -> Iterator[TypeInstance]:
-        """
-        An iterator of the constituent parts of this constraint.
-        """
-        return chain(self.reference, *self.alternatives)
-
-    def variables(self) -> Set[TypeVar]:
-        return self.reference.variables(True)
+    def variables(self, indirect: bool = True,
+            initial: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
+        result: Set[TypeVar] = initial or set()
+        for t in chain(self.reference, *self.alternatives):
+            result.update(t.variables(indirect=indirect, initial=result))
+        return result
 
     def set_context(self, context: TypeInstance) -> None:
         self.context = context
@@ -593,10 +592,9 @@ class Constraint(object):
         Are all variables in this constraint bound to a variable in the
         context in which it is applied?
         """
-        return bool(self.context and all(
-            var.wildcard or var in self.context
-            for el in self.parts()
-            for var in el.variables(indirect=False)))
+        return bool(self.context and all(v.wildcard or v in self.context
+            for v in self.variables(indirect=False)
+        ))
 
     def minimize(self) -> None:
         """
