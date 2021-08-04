@@ -155,6 +155,7 @@ class Expr(ABC):
         Set recursive to False to only guarantee that the top level expression
         is in normal form.
         """
+
         if isinstance(self, Variable) and self.bound:
             return self.bound.normalize(recursive)
 
@@ -200,7 +201,7 @@ class Expr(ABC):
                 # that of the primitive expression, but not more general.
                 if unify:
                     expr.type.unify(expr_primitive.type, subtype=True)
-                    expr_primitive.type.resolve()
+                    expr_primitive.type = expr_primitive.type.resolve()
                 expr = expr_primitive.primitive(normalize=False)
 
         elif isinstance(expr, Application):
@@ -340,7 +341,7 @@ class Variable(Expr):
         return self.name
 
     def bind(self, expr: Expr) -> None:
-        assert not self.bound
+        assert not self.bound, "cannot bind variable twice"
         self.bound = expr
 
 

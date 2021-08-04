@@ -167,6 +167,9 @@ class TypeInstance(Type, flow.Unit):
     2-ary type operators.
     """
 
+    def normalized(self) -> bool:
+        return not (isinstance(self, TypeVar) and self.unification)
+
     def str_with_constraints(self) -> str:
         """
         Like str(), but includes constraints.
@@ -215,7 +218,8 @@ class TypeInstance(Type, flow.Unit):
 
     def variables(self, recursive: bool = True) -> Set[TypeVar]:
         """
-        Obtain all distinct type variables currently in the type instance.
+        Obtain all distinct type variables currently in the type instance, and
+        optionally also those variables indirectly related via constraints.
         """
         result = set(t for t in self if isinstance(t, TypeVar))
         if not recursive:
@@ -263,6 +267,7 @@ class TypeInstance(Type, flow.Unit):
         """
         A copy in which base types are substituted with fresh variables.
         """
+        assert self.normalized()
         if isinstance(self, TypeOperation):
             if self.basic:
                 return TypeVar()
@@ -460,8 +465,7 @@ class TypeVar(TypeInstance):
         self._name = value
 
     def bind(self, t: TypeInstance) -> None:
-        assert (not self.unification or t == self.unification), \
-            "variable cannot be unified twice"
+        assert not self.unification, "variable cannot be unified twice"
 
         # Once a wildcard variable is bound, it is no longer wildcard
         self.wildcard = False
@@ -486,9 +490,9 @@ class TypeVar(TypeInstance):
 
             elif isinstance(t, TypeOperation):
                 if t.basic:
-                    if self.lower and t._operator.subtype(self.lower, strict=True):
+                    if self.lower and t._operator.subtype(self.lower, True):
                         raise error.SubtypeMismatch(t, self)
-                    if self.upper and self.upper.subtype(t._operator, strict=True):
+                    if self.upper and self.upper.subtype(t._operator, True):
                         raise error.SubtypeMismatch(self, t)
                 else:
                     variables = t.variables(recursive=False)
@@ -507,6 +511,7 @@ class TypeVar(TypeInstance):
         Constrain this variable to be a basic type with the given type as lower
         bound.
         """
+        assert not self.unification
         lower, upper = self.lower or new, self.upper or new
         if upper.subtype(new, True):  # fail when lower bound higher than upper
             raise error.SubtypeMismatch(new, upper)
@@ -524,6 +529,7 @@ class TypeVar(TypeInstance):
         upper bound.
         """
         # symmetric to `above`
+        assert not self.unification
         lower, upper = self.lower or new, self.upper or new
         if new.subtype(lower, True):
             raise error.SubtypeMismatch(lower, new)
@@ -607,7 +613,8 @@ class Constraint(object):
                         minimized[i] = obj
                     add = False
             if add:
-                minimized.append(obj)
+                minimized.append(obj.follow())
+        self.reference = self.reference.follow()
         self.alternatives = minimized
 
     def fulfilled(self) -> bool:
@@ -621,11 +628,14 @@ class Constraint(object):
         # binding. Make this more efficient?
         self.minimize()
 
+        assert self.reference.normalized() and all(p.normalized() for p in
+                self.alternatives)
+
         compatibility = [
             self.reference.match(t, subtype=True, accept_wildcard=True)
             for t in self.alternatives]
-        self.alternatives = [t for t, c in zip(self.alternatives, compatibility)
-            if c is not False]
+        self.alternatives = [t for t, c
+            in zip(self.alternatives, compatibility) if c is not False]
 
         if len(self.alternatives) == 0:
             raise error.ConstraintViolation(self)
@@ -639,8 +649,8 @@ class Constraint(object):
 
         # Fulfillment is achieved if the reference is fully concrete and there
         # is at least one definitely compatible alternative
-        return (not any(self.reference.variables()) and any(compatibility)) or \
-            self.reference in self.alternatives
+        return (not any(self.reference.variables()) and any(compatibility)) \
+            or self.reference in self.alternatives
 
 
 "The special constructor for function types."
