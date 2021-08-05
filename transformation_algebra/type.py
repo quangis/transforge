@@ -263,9 +263,10 @@ class TypeInstance(Type, flow.Unit):
         """
         Follow a unification until bumping into a type that is not yet bound.
         """
-        if isinstance(self, TypeVar) and self.unification:
-            return self.unification.follow()
-        return self
+        a = self
+        while isinstance(a, TypeVar) and a.unification:
+            a = a.unification
+        return a
 
     def skeleton(self) -> TypeInstance:
         """
