@@ -120,7 +120,7 @@ class TypeSchema(Type):
     def __str__(self) -> str:
         return self.schema(
             *(TypeVar(v) for v in signature(self.schema).parameters)
-        ).resolve().str_with_constraints()
+        ).resolve().string(include_constraints=True)
 
     def instance(self) -> TypeInstance:
         return self.schema(*(TypeVar() for _ in range(self.n)))
@@ -170,18 +170,43 @@ class TypeInstance(Type, flow.Unit):
     def normalized(self) -> bool:
         return not (isinstance(self, TypeVar) and self.unification)
 
-    def str_with_constraints(self) -> str:
+    def __str__(self) -> str:
+        return self.string(include_constraints=True)
+
+    def string(self, include_constraints: bool = False) -> str:
         """
-        Like str(), but includes constraints.
+        Convert the given type to a textual representation.
         """
-        result = [str(self)]
-        for v in self.variables():
-            if v.lower:
-                result.append(f"{v} >= {v.lower}")
-            if v.upper:
-                result.append(f"{v} <= {v.upper}")
-        result.extend(str(c) for c in self.constraints())
-        return ' | '.join(result)
+
+        if isinstance(self, TypeOperation):
+            if self._operator == Function:
+                i, o = self.params
+                if isinstance(i, TypeOperation) and i._operator == Function:
+                    result = f"({i}) ** {o}"
+                else:
+                    result = f"{i} ** {o}"
+            else:
+                result = str(self._operator)
+                if self.params:
+                    result += f'({", ".join(t.string() for t in self.params)})'
+        else:
+            assert isinstance(self, TypeVar)
+            if self.unification:
+                result = self.unification.string()
+            else:
+                result = "_" if self.wildcard else self.name
+
+        if include_constraints:
+            result_aux = [result]
+            for v in self.variables():
+                if v.lower:
+                    result_aux.append(f"{v} >= {v.lower}")
+                if v.upper:
+                    result_aux.append(f"{v} <= {v.upper}")
+            result_aux.extend(str(c) for c in self.constraints())
+            return ' | '.join(result_aux)
+        else:
+            return result
 
     def resolve(self, prefer_lower: bool = True) -> TypeInstance:
         """
@@ -421,17 +446,6 @@ class TypeOperation(TypeInstance):
                 f"{len(self.params)} given"
             )
 
-    def __str__(self) -> str:
-        if self._operator == Function:
-            inT, outT = self.params
-            if isinstance(inT, TypeOperation) and inT._operator == Function:
-                return f"({inT}) ** {outT}"
-            return f"{inT} ** {outT}"
-        elif self.params:
-            return f'{self._operator}({", ".join(str(t) for t in self.params)})'
-        else:
-            return str(self._operator)
-
     def __eq__(self, other: object) -> bool:
         return isinstance(other, TypeInstance) and bool(self.match(other))
 
@@ -456,10 +470,7 @@ class TypeVar(TypeInstance):
         self.upper: Optional[TypeOperator] = None
         self._constraints: Set[Constraint] = set()
 
-    def __str__(self) -> str:
-        if self.unification:
-            return str(self.unification)
-        return "_" if self.wildcard else self.name
+
 
     @property
     def name(self) -> str:
@@ -578,7 +589,10 @@ class Constraint(object):
         self.fulfilled()
 
     def __str__(self) -> str:
-        return f"{self.reference} @ {self.alternatives}"
+        return (
+            f"{self.reference.string()}"
+            f" @ [{', '.join(a.string() for a in self.alternatives)}]"
+        )
 
     def variables(self, indirect: bool = True) -> Set[TypeVar]:
         result: Set[TypeVar] = set()

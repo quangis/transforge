@@ -125,18 +125,18 @@ class Expr(ABC):
         """
         if isinstance(self, Application):
             return (
-                f"{self.type.str_with_constraints()}\n"
+                f"{self.type.string(include_constraints=True)}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
         elif isinstance(self, Abstraction):
             return (
                 f"λ{' '.join(str(p) for p in self.params)}. ... : "
-                f"{self.type.str_with_constraints()}\n"
+                f"{self.type.string(include_constraints=True)}\n"
                 f"{lvl} └─{self.body.tree(lvl + '   ')}"
             )
         else:
-            return f"╼ {self} : {self.type.str_with_constraints()}"
+            return f"╼ {self} : {self.type.string(include_constraints=True)}"
 
     def apply(self, arg: Expr) -> Expr:
         try:
