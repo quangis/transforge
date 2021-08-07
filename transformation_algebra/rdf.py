@@ -148,7 +148,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         # Add connections to input or output nodes
         if isinstance(expr, Base):
             if isinstance(expr.definition, Operation):
-                assert expr.definition.primitive(), \
+                assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
                 g.add((root, TA.operation, intermediate))
                 g.add((intermediate, RDF.type, self.uri(expr.definition)))
@@ -258,7 +258,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     f"?{name}.")
 
             if isinstance(current, Operation):
-                assert current.primitive(), \
+                assert current.is_primitive(), \
                     "operation in a flow query must be primitive"
                 yield f"?{name} rdf:type <{self.uri(current)}>."
             elif isinstance(current, Type):
