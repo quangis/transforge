@@ -83,13 +83,6 @@ class Type(ABC):
         else:
             raise error.FunctionApplicationError(f, x)
 
-    def is_function(self) -> bool:
-        """
-        Does this type represent a function?
-        """
-        t = self.instance()
-        return isinstance(t, TypeOperation) and t._operator == Function
-
     @abstractmethod
     def instance(self) -> TypeInstance:
         return NotImplemented
