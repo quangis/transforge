@@ -12,15 +12,13 @@ from transformation_algebra.expr import \
     TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
     Operation, Variable, Definition
 
-import io
 from itertools import count, chain
 from rdflib import URIRef, Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
-from rdflib.tools.rdf2dot import rdf2dot
 from rdflib.plugins import sparql
 
-from typing import Dict, Union, Iterator, Optional, Tuple, List
+from typing import Dict, Union, Iterator, Optional, Tuple
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
@@ -339,17 +337,3 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
     def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
         return g.query(self.sparql_flow(flow))
-
-
-def dot(g: Graph) -> str:
-    """
-    Return a string of GraphViz dot syntax. You can pass the output to such
-    programs as `xdot` to visualize the RDF graph.
-    """
-    # rdf2dot uses deprecated cgi.escape function; this hack solves that
-    import cgi
-    import html
-    stream = io.StringIO()
-    cgi.escape = html.escape  # type: ignore
-    rdf2dot(g, stream)
-    return stream.getvalue()
