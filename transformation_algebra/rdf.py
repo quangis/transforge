@@ -98,32 +98,32 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         g.bind("ta", TA)
         g.bind(self.prefix, self.namespace)
 
-    def rdf_type(self, graph: Graph, value: Type) -> Node:
+    def rdf_type(self, output: Graph, type: Type) -> Node:
         """
         Translate the given type to a representation in RDF and add it to the
         given graph. Return the top-level node.
         """
-        t = value.instance()
+        t = type.instance()
         if isinstance(t, TypeOperation):
 
             if t.params:
                 node = BNode()
-                graph.add((node, RDFS.label, Literal(str(t))))
-                graph.add((node, RDF.type, self.uri(t._operator)))
+                output.add((node, RDFS.label, Literal(str(t))))
+                output.add((node, RDF.type, self.uri(t._operator)))
                 for i, param in enumerate(t.params, start=1):
-                    param_node = self.rdf_type(graph, param)
-                    graph.add((node, RDF.term(f"_{i}"), param_node))
+                    param_node = self.rdf_type(output, param)
+                    output.add((node, RDF.term(f"_{i}"), param_node))
             else:
                 return self.uri(t._operator)
         else:
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
             node = BNode()
-            graph.add((node, RDF.type, TA.TypeVar))
-            graph.add((node, RDFS.label, Literal(str(t))))
+            output.add((node, RDF.type, TA.TypeVar))
+            output.add((node, RDFS.label, Literal(str(t))))
         return node
 
-    def rdf_expr(self, g: Graph, root: Node, expr: Expr,
+    def rdf_expr(self, output: Graph, root: Node, expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             intermediate: Optional[Node] = None) -> Node:
         """
@@ -136,9 +136,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         assert isinstance(expr.type, TypeInstance)
 
         # Ensure some basic properties of the graph
-        g.bind("ta", TA)
-        g.bind(self.prefix, self.namespace)
-        g.add((root, RDF.type, TA.Transformation))
+        output.bind("ta", TA)
+        output.bind(self.prefix, self.namespace)
+        output.add((root, RDF.type, TA.Transformation))
 
         # If no intermediate node was provided, make a fresh one
         intermediate = intermediate or BNode()
@@ -148,8 +148,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if isinstance(expr.definition, Operation):
                 assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
-                g.add((root, TA.operation, intermediate))
-                g.add((intermediate, RDF.type, self.uri(expr.definition)))
+                output.add((root, TA.operation, intermediate))
+                output.add((intermediate, RDF.type, self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
                 if expr.label:
@@ -162,7 +162,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         raise RuntimeError(msg) from e
                     else:
                         if isinstance(source, URIRef):
-                            g.add((intermediate, TA.source, source))
+                            output.add((intermediate, TA.source, source))
                         else:
                             source_node, source_expr = source
                             assert isinstance(source_node, Node) and \
@@ -173,39 +173,40 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                                 e.while_unifying(source_expr, expr)
                                 raise
                             return source_node
-                g.add((root, TA.data, intermediate))
-                g.add((intermediate, RDF.type, TA.Data))
+                output.add((root, TA.data, intermediate))
+                output.add((intermediate, RDF.type, TA.Data))
 
         elif isinstance(expr, Application):
-            f = self.rdf_expr(g, root, expr.f, inputs, intermediate)
-            x = self.rdf_expr(g, root, expr.x, inputs)
-            g.add((f, TA.input, x))
+            f = self.rdf_expr(output, root, expr.f, inputs, intermediate)
+            x = self.rdf_expr(output, root, expr.x, inputs)
+            output.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
             # arguments to present), make a new intermediate/output node
             if expr.type.operator != Function:
                 intermediate = BNode()
-                g.add((root, TA.data, intermediate))
-                g.add((f, TA.output, intermediate))
-                g.add((intermediate, RDF.type, TA.Data))
+                output.add((root, TA.data, intermediate))
+                output.add((f, TA.output, intermediate))
+                output.add((intermediate, RDF.type, TA.Data))
 
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr) and expr.type and \
                 expr.type.operator == Function
             assert expr.body.type.operator != Function
-            f = self.rdf_expr(g, root, expr.body, inputs)
-            g.add((intermediate, TA.input, f))
-            g.add((root, TA.operation, intermediate))
-            g.add((root, TA.data, f))
-            g.add((intermediate, RDF.type, TA.Operation))
+            f = self.rdf_expr(output, root, expr.body, inputs)
+            output.add((intermediate, TA.input, f))
+            output.add((root, TA.operation, intermediate))
+            output.add((root, TA.data, f))
+            output.add((intermediate, RDF.type, TA.Operation))
 
         else:
             assert isinstance(expr, Variable)
-            g.add((intermediate, RDF.type, TA.Variable))
+            output.add((intermediate, RDF.type, TA.Variable))
 
         # Add information on the type of node, but only for data nodes
-        if expr.type.operator != Function:
-            g.add((intermediate, TA.type, self.rdf_type(g, expr.type)))
+        if expr.type._operator != Function:
+            t = self.rdf_type(output, expr.type)
+            output.add((intermediate, TA.type, t))
 
         return intermediate
 
