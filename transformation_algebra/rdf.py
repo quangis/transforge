@@ -125,7 +125,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
     def rdf_expr(self, output: Graph, root: Node, expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
-            intermediate: Optional[Node] = None) -> Node:
+            intermediate: Optional[Node] = None,
+            annotate_types: bool = True) -> Node:
         """
         Translate the given expression to  a representation in RDF and add it
         to the given graph, connecting all intermediary data and operation
@@ -177,8 +178,10 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 output.add((intermediate, RDF.type, TA.Data))
 
         elif isinstance(expr, Application):
-            f = self.rdf_expr(output, root, expr.f, inputs, intermediate)
-            x = self.rdf_expr(output, root, expr.x, inputs)
+            f = self.rdf_expr(output, root, expr.f, inputs, intermediate,
+                annotate_types)
+            x = self.rdf_expr(output, root, expr.x, inputs, None,
+                annotate_types)
             output.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
@@ -193,7 +196,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             assert isinstance(expr.body, Expr) and expr.type and \
                 expr.type.operator == Function
             assert expr.body.type.operator != Function
-            f = self.rdf_expr(output, root, expr.body, inputs)
+            f = self.rdf_expr(output, root, expr.body, inputs, None,
+                annotate_types)
             output.add((intermediate, TA.input, f))
             output.add((root, TA.operation, intermediate))
             output.add((root, TA.data, f))
@@ -204,7 +208,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output.add((intermediate, RDF.type, TA.Variable))
 
         # Add information on the type of node, but only for data nodes
-        if expr.type._operator != Function:
+        if annotate_types and expr.type._operator != Function:
             t = self.rdf_type(output, expr.type)
             output.add((intermediate, TA.type, t))
 
