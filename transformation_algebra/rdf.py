@@ -126,7 +126,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
     def rdf_expr(self, output: Graph, root: Node, expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             intermediate: Optional[Node] = None,
-            annotate_types: bool = True) -> Node:
+            annotate_types: bool = True,
+            include_labels: bool = True) -> Node:
         """
         Translate the given expression to  a representation in RDF and add it
         to the given graph, connecting all intermediary data and operation
@@ -141,11 +142,15 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         output.bind(self.prefix, self.namespace)
         output.add((root, RDF.type, TA.Transformation))
 
-        # If no intermediate node was provided, make a fresh one
+        # The intermediate node is the node that will act as the output node of
+        # the final expression. If no such node was provided, make it.
         intermediate = intermediate or BNode()
 
         # Add connections to input or output nodes
         if isinstance(expr, Base):
+            if include_labels:
+                label = Literal(expr.definition.name) + "()"
+                output.add((intermediate, RDFS.label, label))
             if isinstance(expr.definition, Operation):
                 assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
@@ -179,15 +184,18 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         elif isinstance(expr, Application):
             f = self.rdf_expr(output, root, expr.f, inputs, intermediate,
-                annotate_types)
+                annotate_types, include_labels)
             x = self.rdf_expr(output, root, expr.x, inputs, None,
-                annotate_types)
+                annotate_types, include_labels)
             output.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
             # arguments to present), make a new intermediate/output node
             if expr.type.operator != Function:
                 intermediate = BNode()
+                if include_labels:
+                    label = Literal("(transformed)")
+                    output.add((intermediate, RDFS.label, label))
                 output.add((root, TA.data, intermediate))
                 output.add((f, TA.output, intermediate))
                 output.add((intermediate, RDF.type, TA.Data))
@@ -197,7 +205,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 expr.type.operator == Function
             assert expr.body.type.operator != Function
             f = self.rdf_expr(output, root, expr.body, inputs, None,
-                annotate_types)
+                annotate_types, include_labels)
             output.add((intermediate, TA.input, f))
             output.add((root, TA.operation, intermediate))
             output.add((root, TA.data, f))
