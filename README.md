@@ -194,21 +194,21 @@ If desired, the underlying primitive expression can be derived using
      └─╼ one : Int
 
 
-## RDF
+## Graphs and queries
 
-A transformation can be represented as an RDF graph using the optional `transformation_algebra.rdf` module. In that case, it will be represented as follows:
+Beyond *expressing* transformations, an additional goal of the library is to 
+enable *querying* them for their constituent operations and the types of data 
+that are conceptualized along the way.
 
--  At the root, we have a blank node of `rdf:type` `ta:Transformation` that is 
-   also an `rdf:Bag` with blank nodes as members. To attach it to a tool or 
-   workflow, point the predicate `ta:Transformation` to this node.
--  The member nodes are of `rdf:type` `ta:Operation`, and additionally of some 
-   `rdf:type` corresponding to the operations defined in your algebra --- for 
-   CCT, that would be `cct:fcont`, `cct:ratio`, etcetera.
--  The `ta:Operation`s have `ta:input` and `ta:output`s to blank nodes of type 
-   `ta:Data`. (The `ta:Data` nodes may itself be annotated with the `ta:type` 
-   to the types defined in your transformation algebra, though this idea needs 
-   refinement --- you would probably need to explicitly provide a mapping, as 
-   there are a possibly infinite number of types.)
--  Finally, any `ta:Operation` may have a `ta:parameter` that is itself a 
-   `ta:Transformation`, following the same logic as above. This allows us to 
-   express the internals of functions that take other functions.
+To turn an expression into a searchable structure, we convert it to an RDF 
+graph using the optional `transformation_algebra.rdf` module. Every use of a 
+primitive operation becomes a node that is connected to nodes that represent 
+their input and output data, which are, in turn, annotated with nodes 
+describing their type. Chains of nodes are thus obtained that are easily 
+subjected to queries along the lines of: 'find me a transformation containing 
+operations *f* and *g* that, somewhere downstream, combine into data of type 
+*t*, that is then used in an operation *h*'.
+
+This process is relatively straightforward when operations only take data as 
+input. However, expressions in an algebra may also take other operations.
+
