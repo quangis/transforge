@@ -126,7 +126,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
     def rdf_expr(self, output: Graph, root: Node, expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             intermediate: Optional[Node] = None,
-            annotate_types: bool = True,
+            include_types: bool = True,
             include_labels: bool = True) -> Node:
         """
         Translate the given expression to  a representation in RDF and add it
@@ -184,9 +184,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         elif isinstance(expr, Application):
             f = self.rdf_expr(output, root, expr.f, inputs, intermediate,
-                annotate_types, include_labels)
+                include_types, include_labels)
             x = self.rdf_expr(output, root, expr.x, inputs, None,
-                annotate_types, include_labels)
+                include_types, include_labels)
             output.add((f, TA.input, x))
 
             # If the output of this application is data (that is, no more
@@ -205,7 +205,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 expr.type.operator == Function
             assert expr.body.type.operator != Function
             f = self.rdf_expr(output, root, expr.body, inputs, None,
-                annotate_types, include_labels)
+                include_types, include_labels)
             output.add((intermediate, TA.input, f))
             output.add((root, TA.operation, intermediate))
             output.add((root, TA.data, f))
@@ -216,7 +216,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output.add((intermediate, RDF.type, TA.Variable))
 
         # Add information on the type of node, but only for data nodes
-        if annotate_types and expr.type._operator != Function:
+        if include_types and expr.type.operator != Function:
             t = self.rdf_type(output, expr.type)
             output.add((intermediate, TA.type, t))
 
