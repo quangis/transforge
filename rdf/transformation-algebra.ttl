@@ -33,6 +33,11 @@
     a rdfs:Class;
     rdfs:comment "The class of data (input, output or intermediary) relevant to conceptual transformations.".
 
+:InternalData
+    a rdfs:Class;
+    rdfs:subClassOf :Data;
+    rdfs:comment "Data produced by any operation that is passed as parameter to another operation. The structure of this internal data is unknown.".
+
 :Variable
     a rdfs:Class;
     rdfs:comment "A node representing variable data or operation.".
@@ -53,6 +58,12 @@
     rdfs:comment "The output data for an operation.";
     rdfs:domain :Operation;
     rdfs:range :Data.
+
+:internal
+    a rdf:Property;
+    rdfs:comment "An operation that is internal to another operation.";
+    rdfs:domain :Operation;
+    rdfs:range :Operation.
 
 # Types.
 :type

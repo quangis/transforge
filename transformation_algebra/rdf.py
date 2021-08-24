@@ -123,7 +123,10 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output.add((node, RDFS.label, Literal(str(t))))
         return node
 
-    def rdf_expr(self, output: Graph, root: Node, expr: Expr,
+    def rdf_expr(self,
+            output: Graph,
+            root: Node,
+            expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             intermediate: Optional[Node] = None,
             include_types: bool = True,
@@ -183,33 +186,62 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 output.add((intermediate, RDF.type, TA.Data))
 
         elif isinstance(expr, Application):
+
             f = self.rdf_expr(output, root, expr.f, inputs, intermediate,
                 include_types, include_labels)
             x = self.rdf_expr(output, root, expr.x, inputs, None,
                 include_types, include_labels)
-            output.add((f, TA.input, x))
 
-            # If the output of this application is data (that is, no more
-            # arguments to present), make a new intermediate/output node
+            # If f takes a *function* x as parameter, we attach an imaginary
+            # data input to f that is the output of the function x. This
+            # represents the internal operations that might happen inside f.
+            # Since we don't know exactly what the operation needs, all inputs
+            # to f should be made inputs to x also.
+            # TODO what happens when f takes multiple function parameters?
+            if expr.x.type.operator == Function:
+                internal = BNode()
+                output.add((internal, RDF.type, TA.InternalData))
+                output.add((root, TA.data, internal))
+                output.add((x, TA.output, internal))
+                output.add((f, TA.input, internal))
+                output.add((f, TA.internal, x))
+
+                if include_labels:
+                    output.add((internal, RDFS.label, Literal("internal")))
+
+                data = internal
+            else:
+                output.add((f, TA.input, x))
+                data = x
+
+            # Every operation that is internal to f should also take x (or x's
+            # output) as input
+            for internal_operation in output.objects(f, TA.internal):
+                if internal_operation != x:
+                    output.add((internal_operation, TA.input, data))
+
+            # If the *output* of this application is data (that is, not another
+            # function), make a new intermediate/output node
             if expr.type.operator != Function:
                 intermediate = BNode()
+                output.add((intermediate, RDF.type, TA.Data))
                 if include_labels:
-                    label = Literal("(transformed)")
+                    label = Literal("intermediate")
                     output.add((intermediate, RDFS.label, label))
                 output.add((root, TA.data, intermediate))
                 output.add((f, TA.output, intermediate))
-                output.add((intermediate, RDF.type, TA.Data))
 
         elif isinstance(expr, Abstraction):
             assert isinstance(expr.body, Expr) and expr.type and \
-                expr.type.operator == Function
-            assert expr.body.type.operator != Function
-            f = self.rdf_expr(output, root, expr.body, inputs, None,
+                expr.type.operator == Function and \
+                expr.body.type.operator != Function
+
+            return self.rdf_expr(output, root, expr.body, inputs, None,
                 include_types, include_labels)
-            output.add((intermediate, TA.input, f))
-            output.add((root, TA.operation, intermediate))
-            output.add((root, TA.data, f))
-            output.add((intermediate, RDF.type, TA.Operation))
+            # output.add((intermediate, TA.input, f))
+            # output.add((root, TA.operation, intermediate))
+            # output.add((root, TA.data, f))
+            # output.add((intermediate, RDF.type, TA.Operation))
 
         else:
             assert isinstance(expr, Variable)
@@ -316,7 +348,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         query.extend(self.trace("output_node", flow))
         query.append("} GROUP BY ?workflow")
 
-        print()
+        print("Query is:")
         print("\n".join(query))
         print()
 
