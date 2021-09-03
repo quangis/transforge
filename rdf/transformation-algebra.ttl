@@ -38,10 +38,6 @@
     rdfs:subClassOf :Data;
     rdfs:comment "Data produced by any operation that is passed as parameter to another operation. The structure of this internal data is unknown.".
 
-:Variable
-    a rdfs:Class;
-    rdfs:comment "A node representing variable data or operation.".
-
 :source
     a rdf:Property;
     rdfs:comment "The source for some input data.";

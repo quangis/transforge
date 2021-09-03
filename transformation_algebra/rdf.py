@@ -129,6 +129,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             expr: Expr,
             inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
             current: Optional[Node] = None,
+            variables: Dict[Variable, Node] = {},
             include_types: bool = True,
             include_labels: bool = True) -> Node:
         """
@@ -150,7 +151,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         # Add connections to input or output nodes
         if isinstance(expr, Base):
             if include_labels:
-                label = Literal(expr.definition.name) + "()"
+                label = Literal(f"instance of {expr.definition.name}")
                 output.add((current, RDFS.label, label))
 
             if isinstance(expr.definition, Operation):
@@ -188,39 +189,76 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         elif isinstance(expr, Application):
 
-            f = self.rdf_expr(output, root, expr.f, inputs, current,
-                include_types, include_labels)
-            x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
+            assert not isinstance(expr.f, Abstraction), \
+                "abstractions can only occur as parameters, otherwise " \
+                "they could have been β-reduced"
+
+            # A function application with multiple arguments will look
+            # something like `(f x) y`. By recursively adding the function part
+            # to the current node, and attaching a new node for the argument
+            # part, we eventually get a node for the function to which nodes
+            # for all parameters are attached.
+            f = self.rdf_expr(output, root, expr.f, inputs, current, variables,
                 include_types, include_labels)
 
-            # If f takes a *function* x as parameter, we attach a data input
-            # node to f that is the imaginary internal "output" of x. This
-            # represents the data produced by x while inside f. Since we don't
-            # know exactly what the operation x needs, all inputs to f should
-            # be made inputs to x also.
+            # Attaching that parameter is straightforward for simple data:
+            if expr.x.type.operator != Function:
+                x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
+                    variables, include_types, include_labels)
+                output.add((f, TA.input, x))
+                x_data = x
+
+            # But when the parameter is a *function*, we need to be careful.
+            # 1. If `x` is a *primitive*, we attach a data input node to `f`
+            # that is the imaginary internal "output" of `x`. This represents
+            # the data produced by `x` while inside the black box of `f`. Since
+            # we don't know exactly what the operation `x` needs, all inputs to
+            # `f` should be made inputs to `x` also.
+            # 2. If `x` is an *abstraction* --- an anonymous operation for
+            # which we know the inner structure --- then the data produced by
+            # `x` while inside `f` is provided by the body of the abstraction,
+            # while the values of its parameters are synthesized by some
+            # internal process that, again, may use all other inputs to `f`.
+            # TODO what happens when params are supplied by outer functions
             # TODO what happens when f takes multiple function parameters?
-            if expr.x.type.operator == Function:
+            else:
                 internal_data = BNode()
                 output.add((internal_data, RDF.type, TA.InternalData))
+                if include_labels:
+                    output.add((internal_data, RDFS.label,
+                        Literal("internal data")))
                 # output.add((root, TA.data, internal_data))
+
+                if isinstance(expr.x, Abstraction):
+                    assert expr.x.body.type.operator != Function
+
+                    variables = dict(variables)
+                    for param in expr.x.params:
+                        variables[param] = internal_data
+
+                    x_data = self.rdf_expr(output, root, expr.x.body, inputs,
+                        BNode(), variables, include_types, include_labels)
+
+                    internal_operation = BNode()
+                    if include_labels:
+                        output.add((internal_operation, RDFS.label,
+                            Literal("internal operation")))
+
+                    x = internal_operation
+                else:
+                    x_data = internal_data
+                    x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
+                        variables, include_types, include_labels)
+
                 output.add((x, TA.output, internal_data))
                 output.add((f, TA.input, internal_data))
                 output.add((f, TA.internal, x))
 
-                if include_labels:
-                    label = Literal("internal data")
-                    output.add((internal_data, RDFS.label, label))
-
-                data_node = internal_data
-            else:
-                output.add((f, TA.input, x))
-                data_node = x
-
-            # Every operation that is internal to f should also take x (or x's
-            # output) as input
+            # Every operation that is internal to `f` should also take `x` (or
+            # the output of `x`) as input
             for internal_operation in output.objects(f, TA.internal):
                 if internal_operation != x:
-                    output.add((internal_operation, TA.input, data_node))
+                    output.add((internal_operation, TA.input, x_data))
 
             # If the *output* of this application is data (that is, not another
             # function), move on to a new node representing that output
@@ -233,21 +271,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 output.add((root, TA.data, current))
                 output.add((f, TA.output, current))
 
-        elif isinstance(expr, Abstraction):
-            assert isinstance(expr.body, Expr) and expr.type and \
-                expr.type.operator == Function and \
-                expr.body.type.operator != Function
-
-            return self.rdf_expr(output, root, expr.body, inputs, current,
-                include_types, include_labels)
-            # output.add((intermediate, TA.input, f))
-            # output.add((root, TA.operation, intermediate))
-            # output.add((root, TA.data, f))
-            # output.add((intermediate, RDF.type, TA.Operation))
-
         else:
-            assert isinstance(expr, Variable)
-            output.add((current, RDF.type, TA.Variable))
+            assert isinstance(expr, Variable) and expr in variables
+            return variables[expr]
 
         # Add information on the type of node, but only for data nodes
         if include_types and expr.type.operator != Function:
