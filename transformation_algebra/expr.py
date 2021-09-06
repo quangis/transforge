@@ -466,6 +466,7 @@ class TransformationAlgebra(object):
             if not result:
                 raise error.Empty
             else:
+                assert result.type.operator != Function
                 result.rename()
                 return result
         else:
