@@ -207,28 +207,38 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     variables, include_types, include_labels)
                 output.add((f, TA.input, x))
                 x_data = x
+                current_internal_operation = None
 
             # But when the parameter is a *function*, we need to be careful.
-            # 1. If `x` is a *primitive*, we attach a data input node to `f`
-            # that is the imaginary internal "output" of `x`. This represents
-            # the data produced by `x` while inside the black box of `f`. Since
-            # we don't know exactly what the operation `x` needs, all inputs to
-            # `f` should be made inputs to `x` also.
-            # 2. If `x` is an *abstraction* --- an anonymous operation for
-            # which we know the inner structure --- then the data produced by
-            # `x` while inside `f` is provided by the body of the abstraction,
-            # while the values of its parameters are synthesized by some
-            # internal process that, again, may use all other inputs to `f`.
+            # Conceptually, `x` will be some operation that produces data while
+            # inside the black box of `f`. We don't know exactly what happens
+            # internally --- only that there is some process that passes data
+            # to `x` and that may synthesize its own input from any other data
+            # known to `f`.
+            # Now, if `x` is an abstraction --- an anonymous operation with an
+            # inner structure --- then its body represents the data (TODO or
+            # the function) that `f` may use. For primitive functions, we add a
+            # data node between `x` and `f` to represent this data.
+            # The mysterious input to `x` (or, in the case of abstractions, the
+            # values of `x`'s parameters) is then a single unspecified internal
+            # data node produced by an internal operation. All inputs to `f`
+            # should be made inputs to this operation also.
             else:
-                internal_data = BNode()
+                internal_data, internal_op = BNode(), BNode()
                 output.add((internal_data, RDF.type, TA.InternalData))
+                output.add((internal_op, RDF.type, TA.InternalOperation))
+                output.add((internal_op, TA.output, internal_data))
+                # output.add((root, TA.data, internal_data))
+                # output.add((root, TA.operation, internal_op))
+
                 if include_labels:
+                    output.add((internal_op, RDFS.label,
+                        Literal("internal operation")))
                     output.add((internal_data, RDFS.label,
                         Literal("internal data")))
-                # output.add((root, TA.data, internal_data))
 
                 if isinstance(expr.x, Abstraction):
-                    assert expr.x.body.type.operator != Function
+                    assert expr.x.body.type.operator != Function  # TODO why
 
                     variables = dict(variables)
                     for param in expr.x.params:
@@ -236,27 +246,24 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
                     x_data = self.rdf_expr(output, root, expr.x.body, inputs,
                         BNode(), variables, include_types, include_labels)
-
-                    internal_operation = BNode()
-                    if include_labels:
-                        output.add((internal_operation, RDFS.label,
-                            Literal("internal operation")))
-
-                    x = internal_operation
                 else:
-                    x_data = internal_data
+                    x_data = BNode()
+                    output.add((x_data, RDF.type, TA.Data))  # TODO add type
+
                     x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
                         variables, include_types, include_labels)
+                    output.add((x, TA.input, internal_data))
+                    output.add((x, TA.output, x_data))
 
-                output.add((x, TA.output, internal_data))
-                output.add((f, TA.input, internal_data))
-                output.add((f, TA.internal, x))
+                output.add((f, TA.input, x_data))
+                output.add((f, TA.internal, internal_op))
+                current_internal_operation = internal_op
 
             # Every operation that is internal to `f` should also take `x` (or
             # the output of `x`) as input
-            for internal_operation in output.objects(f, TA.internal):
-                if internal_operation != x:
-                    output.add((internal_operation, TA.input, x_data))
+            for internal_op in output.objects(f, TA.internal):
+                if internal_op != current_internal_operation:
+                    output.add((internal_op, TA.input, x_data))
 
             # If the *output* of this application is data (that is, not another
             # function), move on to a new node representing that output

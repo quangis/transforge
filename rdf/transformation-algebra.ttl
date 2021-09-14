@@ -29,6 +29,11 @@
     a rdfs:Class;
     rdfs:comment "The class of operations; representing the atomary constituents of conceptual transformations.".
 
+:InternalOperation
+    a rdfs:Class;
+    rdfs:subClassOf :Operation;
+    rdfs:comment "Any internal process for which the structure is unknown and that produces internal data.".
+
 :Data
     a rdfs:Class;
     rdfs:comment "The class of data (input, output or intermediary) relevant to conceptual transformations.".
