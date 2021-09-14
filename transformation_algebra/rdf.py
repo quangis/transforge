@@ -127,7 +127,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output: Graph,
             root: Node,
             expr: Expr,
-            inputs: Dict[str, Union[URIRef, Tuple[Node, Expr]]] = {},
+            inputs: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
             current: Optional[Node] = None,
             variables: Dict[Variable, Node] = {},
             include_types: bool = True,
@@ -170,7 +170,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         msg = f"no input node named '{expr.label}'"
                         raise RuntimeError(msg) from e
                     else:
-                        if isinstance(source, URIRef):
+                        if isinstance(source, Node):
                             output.add((current, TA.source, source))
                         else:
                             source_node, source_expr = source
@@ -219,8 +219,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # `x` while inside `f` is provided by the body of the abstraction,
             # while the values of its parameters are synthesized by some
             # internal process that, again, may use all other inputs to `f`.
-            # TODO what happens when params are supplied by outer functions
-            # TODO what happens when f takes multiple function parameters?
             else:
                 internal_data = BNode()
                 output.add((internal_data, RDF.type, TA.InternalData))
@@ -280,6 +278,54 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output.add((current, TA.type, self.rdf_type(output, expr.type)))
 
         return current
+
+    def rdf_workflow(self,
+            output: Graph,
+            root: Node,
+            sources: set[Node],
+            steps: dict[Node, tuple[Expr, list[Node]]]) -> Node:
+        """
+        Convert a workflow to an RDF graph by converting its individual steps
+        to representations of expressions in RDF and combining them. Return the
+        final 'output' node of the expression.
+
+        A workflow consists of:
+
+        -   A collection of RDF nodes representing data sources.
+        -   A collection of algebra expressions for each step (e.g. application
+            of a tool), paired with the inputs to those expressions. Every
+            input must be either a source node or a node representing another
+            step from the same collection.
+        """
+        # TODO cycles can occur
+
+        cache: Dict[Node, Node] = {}
+
+        def to_expr_node(step_node: Node) -> Node:
+            try:
+                return cache[step_node]
+            except KeyError:
+                expr, inputs = steps[step_node]
+                assert all(x in steps or x in sources for x in inputs), \
+                    "unknown input data source"
+                cache[step_node] = self.rdf_expr(output, root, expr, inputs={
+                    f"x{i}": (to_expr_node(x), steps[x][0]) if x in steps else x
+                    for i, x in enumerate(inputs, start=1)
+                })
+                return cache[step_node]
+
+        # One of the tool expressions must be 'last', in that it represents the
+        # tool finally producing the output and so isn't an input to another.
+        all_inputs = set(input_node
+            for step in steps.values() for input_node in step[1])
+        final_tool_node = [step_node for step_node in steps.keys()
+            if step_node not in all_inputs]
+        assert len(final_tool_node) == 1, \
+            "workflow must have exactly one final step"
+
+        final_expr_node = to_expr_node(final_tool_node[0])
+        output.add((root, TA.target, final_expr_node))
+        return final_expr_node
 
     def sparql_type(self, name: str, type: Type,
             name_generator: Iterator[str],
