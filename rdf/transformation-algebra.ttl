@@ -3,84 +3,72 @@
 
 :Transformation
     a rdfs:Class,
-    rdfs:comment "The class of conceptual transformations expressible in a transformation algebra.".
+    rdfs:comment "The class of composite conceptual transformations of a transformation algebra.".
 
-:operation
+:step
     a rdf:Property;
-    rdfs:label "contains operation";
-    rdfs:comment "A constituent operation of a transformation.";
-    rdfs:domain :Transformation;
-    rdfs:range :Operation.
-
-:data
-    a rdf:Property;
-    rdfs:label "contains data";
-    rdfs:comment "Some input, intermediary or output data of a transformation.";
+    rdfs:comment "Constituent steps of a transformation in terms of the data that is conceptualized along the way.";
     rdfs:domain :Transformation;
     rdfs:range :Data.
 
-:target
+:result
     a rdf:Property;
-    rdfs:comment "The output data for a transformation as a whole.";
+    rdfs:comment "Identifies the target data: the final output data of a transformation as a whole.";
     rdfs:domain :Transformation;
-    rdfs:range :Data.
+    rdfs:range :TransformedData.
 
-:Operation
-    a rdfs:Class;
-    rdfs:comment "The class of operations; representing the atomary constituents of conceptual transformations.".
-
-:InternalOperation
-    a rdfs:Class;
-    rdfs:subClassOf :Operation;
-    rdfs:comment "Any internal process for which the structure is unknown and that produces internal data.".
 
 :Data
     a rdfs:Class;
-    rdfs:comment "The class of data (input, output or intermediary) relevant to conceptual transformations.".
+    rdfs:comment "The class of data instances that are conceptualized at some point during a transformation.".
+
+:SourceData
+    a rdfs:Class;
+    rdfs:subClassOf :Data.
+
+:TransformedData
+    a rdfs:Class;
+    rdfs:subClassOf :Data.
 
 :InternalData
     a rdfs:Class;
-    rdfs:subClassOf :Data;
-    rdfs:comment "Data produced by any operation that is passed as parameter to another operation. The structure of this internal data is unknown.".
+    rdfs:subClassOf :Data
+    rdfs:comment "Data produced by some internal process for which the structure is unknown. For example, when an operation *g* is passed as a parameter to some other operation *f*, the data produced by *g* within *f* may be preprocessed by unknown internals.".
 
-:source
+:origin
     a rdf:Property;
-    rdfs:comment "The source for some input data.";
-    rdfs:domain :Data.
+    rdfs:comment "Identifies the node that represents the source of some input data.";
+    rdfs:domain :SourceData.
 
-:input
+:feeds
     a rdf:Property;
-    rdfs:comment "The input data for an operation.";
-    rdfs:domain :Operation;
-    rdfs:range :Data.
+    rdfs:comment "Connects input data to the transformed data that is based on it.";
+    rdfs:domain :Data;
+    rdfs:range :TransformedData.
 
-:output
+:transformer
     a rdf:Property;
-    rdfs:comment "The output data for an operation.";
-    rdfs:domain :Operation;
-    rdfs:range :Data.
+    rdfs:comment "The conceptual operation by which the data was transformed.";
+    rdfs:domain :TransformedData;
+    rdfs:range :Operation.
 
 :internal
     a rdf:Property;
-    rdfs:comment "An operation that is internal to another operation.";
-    rdfs:domain :Operation;
-    rdfs:range :Operation.
+    rdfs:comment "Indicate that the transformer that produced this data is involved in some internal process.";
+    rdfs:domain :TransformedData;
+    rdfs:range :InternalData.
 
-# Types.
-:type
-    a rdf:Property;
-    rdfs:label "has type";
-    rdfs:comment "The type of some data or operation.";
-    rdfs:range :Type.
+
+:Operation
+    a rdfs:Class;
+    rdfs:comment "The class of atomary conceptual transformations.".
+
+
 :Type
     a rdfs:Class;
-    rdfs:comment "The class of all types".
-:TypeVar
-    rdfs:comment "The class of type variables.";
-    rdfs:subClassOf :Type.
-:TypeOperator
-    rdfs:comment "The class of concrete types.";
-    rdfs:subClassOf :Type.
+    rdfs:comment "The class of all transformation types.".
+
 :Function
-    rdfs:comment "The class of type operations for functions.";
-    a :TypeOperator.
+    a rdfs:Class;
+    rdfs:subClassOf :TypeOperator;
+    rdfs:comment "The class of function types.".
