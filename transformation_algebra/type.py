@@ -398,6 +398,15 @@ class TypeInstance(Type, flow.Unit):
     def instance(self) -> TypeInstance:
         return self.follow()
 
+    def output(self) -> TypeInstance:
+        """
+        Obtain the final uncurried output type of a given function type.
+        """
+        if isinstance(self, TypeOperation) and self._operator is Function:
+            return self.params[1].output()
+        else:
+            return self
+
     @property
     def operator(self) -> Optional[TypeOperator]:
         return self._operator if isinstance(self, TypeOperation) else None
