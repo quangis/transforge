@@ -352,13 +352,15 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         Trace the paths between each node in a chain to produce SPARQL
         constraints.
         """
+        # See rdflib.paths: (~TA.feeds * OneOrMore).n3(g.namespace_manager)
+
         name_generator = name_generator or iter(f"n{i}" for i in count())
 
         if isinstance(current, flow.Unit):
             if previous:
                 yield (
                     f"?{previous[0]} "
-                    f"({self.path(previous[1], previous[2], current)}) "
+                    f"({'^ta:feeds' + ('+' if previous[2] else '')}) "
                     f"?{name}.")
 
             if isinstance(current, Operation):
@@ -403,8 +405,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             "?workflow rdf:type ta:Transformation.",
             "?workflow rdfs:comment ?description.",
             "?workflow ta:result ?output_node.",
-            # "?workflow ta:data ?output_node.",
-            # "FILTER NOT EXISTS {?next_step ta:input ?output_node}."
         ]
         query.extend(self.trace("output_node", flow))
         query.append("} GROUP BY ?workflow")
@@ -417,19 +417,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS,
                     self.prefix: self.namespace}
         )
-
-    def path(self, a: flow.Unit, skip: bool, b: flow.Unit) -> str:
-        """
-        Produce a SPARQL property path describing the connection between two
-        nodes that represent either a data type or an operation. `skip`
-        indicates that multiple intermediaries may lie between.
-        """
-        # See also rdflib.paths
-
-        # if skip:
-        # (~TA.feeds * OneOrMore).n3(output.namespace_manager)
-
-        return "(^ta:feeds)" + ("+" if skip else "")
 
     def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
         return g.query(self.sparql_flow(flow))
