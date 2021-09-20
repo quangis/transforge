@@ -127,8 +127,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output: Graph,
             expr: Expr,
             root: Node,
-            inputs: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
             current: Optional[Node] = None,
+            sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
             variables: Dict[Variable, Node] = {},
             include_types: bool = True,
             include_labels: bool = True) -> Node:
@@ -170,7 +170,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
                 if expr.label:
                     try:
-                        source = inputs[expr.label]
+                        source = sources[expr.label]
                     except KeyError as e:
                         msg = f"no input node named '{expr.label}'"
                         raise RuntimeError(msg) from e
@@ -202,8 +202,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.rdf_expr(output, expr.f, root, inputs, current,
-                variables, include_types, include_labels)
+            f = self.rdf_expr(output, expr.f, root, current,
+                sources, variables, include_types, include_labels)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -241,15 +241,15 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     variables = variables | \
                         {p: internal for p in expr.x.params}
 
-                    x = self.rdf_expr(output, expr.x.body, root, inputs,
-                        BNode(), variables, include_types, include_labels)
+                    x = self.rdf_expr(output, expr.x.body, root, BNode(),
+                        sources, variables, include_types, include_labels)
                 else:
-                    x = self.rdf_expr(output, expr.x, root, inputs, BNode(),
-                        variables, include_types, include_labels)
+                    x = self.rdf_expr(output, expr.x, root, BNode(),
+                        sources, variables, include_types, include_labels)
                     output.add((internal, TA.feeds, x))
             else:
-                x = self.rdf_expr(output, expr.x, root, inputs, BNode(),
-                    variables, include_types, include_labels)
+                x = self.rdf_expr(output, expr.x, root, BNode(),
+                    sources, variables, include_types, include_labels)
             output.add((x, TA.feeds, f))
 
             # Every operation that is internal to `f` should also take `x` (or
@@ -296,7 +296,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 expr, inputs = steps[step_node]
                 assert all(x in steps or x in sources for x in inputs), \
                     "unknown input data source"
-                cache[step_node] = self.rdf_expr(output, expr, root, inputs={
+                cache[step_node] = self.rdf_expr(output, expr, root, sources={
                     f"x{i}": (to_expr_node(x), steps[x][0]) if x in steps else x
                     for i, x in enumerate(inputs, start=1)
                 })
