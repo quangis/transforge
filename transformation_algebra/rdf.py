@@ -109,7 +109,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if t.params:
                 node = BNode()
                 output.add((node, RDFS.label, Literal(str(t))))
-                output.add((node, RDF.type, self.uri(t._operator)))
+                output.add((node, RDFS.subClassOf, self.uri(t._operator)))
                 for i, param in enumerate(t.params, start=1):
                     param_node = self.rdf_type(output, param)
                     output.add((node, RDF[f"_{i}"], param_node))
@@ -125,8 +125,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
     def rdf_expr(self,
             output: Graph,
-            root: Node,
             expr: Expr,
+            root: Node,
             inputs: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
             current: Optional[Node] = None,
             variables: Dict[Variable, Node] = {},
@@ -140,33 +140,29 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         assert isinstance(expr.type, TypeInstance)
 
-        # Ensure some basic properties of the graph
-        output.bind("ta", TA)
-        output.bind(self.prefix, self.namespace)
-        output.add((root, RDF.type, TA.Transformation))
-
         current = current or BNode()
+
+        output.add((root, RDF.type, TA.Transformation))
         output.add((root, TA.step, current))
 
         if isinstance(expr, Base):
-
-            # Every node --- even nodes that translate expressions for
-            # operations --- represents *data*
-            t = expr.type.output()
+            datatype = expr.type.output()
 
             if include_types:
-                output.add((current, RDF.type, self.rdf_type(output, t)))
+                output.add((current, RDF.type,
+                    self.rdf_type(output, datatype)))
 
             if include_labels:
-                output.add((current, RDFS.label, Literal(
-                    f"{t} via {expr.definition.name}")))
+                output.add((current, RDFS.label,
+                    Literal(f"{datatype} via {expr.definition.name}")))
 
             if isinstance(expr.definition, Operation):
                 assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
 
                 output.add((current, RDF.type, TA.TransformedData))
-                output.add((current, TA.transformer, self.uri(expr.definition)))
+                output.add((current, TA.transformer,
+                    self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
 
@@ -188,6 +184,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                             try:
                                 # TODO unification happens as we translate to
                                 # RDF, which means some might be outdated
+                                # instead match(subtype=False)?
                                 source_expr.type.unify(expr.type, subtype=True)
                             except error.TATypeError as e:
                                 e.while_unifying(source_expr, expr)
@@ -205,7 +202,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.rdf_expr(output, root, expr.f, inputs, current,
+            f = self.rdf_expr(output, expr.f, root, inputs, current,
                 variables, include_types, include_labels)
 
             # For simple data, we can simply attach the node for the parameter
@@ -244,14 +241,14 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     variables = variables | \
                         {p: internal for p in expr.x.params}
 
-                    x = self.rdf_expr(output, root, expr.x.body, inputs,
+                    x = self.rdf_expr(output, expr.x.body, root, inputs,
                         BNode(), variables, include_types, include_labels)
                 else:
-                    x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
+                    x = self.rdf_expr(output, expr.x, root, inputs, BNode(),
                         variables, include_types, include_labels)
                     output.add((internal, TA.feeds, x))
             else:
-                x = self.rdf_expr(output, root, expr.x, inputs, BNode(),
+                x = self.rdf_expr(output, expr.x, root, inputs, BNode(),
                     variables, include_types, include_labels)
             output.add((x, TA.feeds, f))
 
@@ -287,6 +284,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         # TODO cycles can occur
 
+        output.bind("ta", TA)
+        output.bind(self.prefix, self.namespace)
+
         cache: Dict[Node, Node] = {}
 
         def to_expr_node(step_node: Node) -> Node:
@@ -296,7 +296,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 expr, inputs = steps[step_node]
                 assert all(x in steps or x in sources for x in inputs), \
                     "unknown input data source"
-                cache[step_node] = self.rdf_expr(output, root, expr, inputs={
+                cache[step_node] = self.rdf_expr(output, expr, root, inputs={
                     f"x{i}": (to_expr_node(x), steps[x][0]) if x in steps else x
                     for i, x in enumerate(inputs, start=1)
                 })
@@ -335,7 +335,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if t.params:
                 bnode = next(name_generator)
                 yield f"?{name} {pred} ?{bnode}."
-                yield f"?{bnode} rdf:type <{self.uri(t._operator)}>."
+                yield f"?{bnode} rdfs:subClassOf <{self.uri(t._operator)}>."
                 for i, param in enumerate(t.params, start=1):
                     yield from self.sparql_type(bnode, param, name_generator,
                         index=i)
@@ -425,6 +425,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         indicates that multiple intermediaries may lie between.
         """
         # See also rdflib.paths
+
+        # if skip:
+        # (~TA.feeds * OneOrMore).n3(output.namespace_manager)
 
         return "(^ta:feeds)" + ("+" if skip else "")
 
