@@ -193,9 +193,9 @@ class TypeInstance(Type, flow.Unit):
             result_aux = [result]
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v} >= {v.lower}")
+                    result_aux.append(f"{v.string()} >= {v.lower}")
                 if v.upper:
-                    result_aux.append(f"{v} <= {v.upper}")
+                    result_aux.append(f"{v.string()} <= {v.upper}")
             result_aux.extend(str(c) for c in self.constraints())
             return ' | '.join(result_aux)
         else:
