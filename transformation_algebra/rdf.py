@@ -137,6 +137,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         to the given graph, connecting all steps to root. Inputs that match the
         labels in the expression are appropriately attached, either as data
         sources or as input expressions.
+
+        This is a lossy conversion, because the order of arguments and the
+        exact structure of functions-as-arguments is not preserved.
         """
         assert isinstance(expr.type, TypeInstance)
 
