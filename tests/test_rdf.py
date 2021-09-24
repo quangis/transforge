@@ -25,11 +25,11 @@ class Step(object):
             transformer: Optional[URIRef],
             *inputs: Any,
             type: Optional[Type] = None,
-            internals: list[Any] = []):
+            internal_to: Optional[Any] = None):
         self.inputs = inputs
         self.type = type
         self.transformer = transformer
-        self.internals = internals
+        self.internal_to = internal_to
 
 
 class TestAlgebraRDF(unittest.TestCase):
@@ -80,15 +80,14 @@ class TestAlgebraRDF(unittest.TestCase):
                 assert step.inputs
                 kind = TA.TransformedData
                 expected.add((nodes[i], TA.transformer, step.transformer))
-            elif not step.inputs:
-                kind = TA.SourceData
-            else:
+            elif step.internal_to:
                 kind = TA.InternalData
+                expected.add((nodes[step.internal_to], TA.internal, nodes[i]))
+            else:
+                kind = TA.SourceData
 
             expected.add((root, TA.step, nodes[i]))
             expected.add((nodes[i], RDF.type, kind))
-            for internal in step.internals:
-                expected.add((nodes[i], TA.internal, nodes[internal]))
 
             for j in step.inputs:
                 expected.add((nodes[j], TA.feeds, nodes[i]))
@@ -107,7 +106,22 @@ class TestAlgebraRDF(unittest.TestCase):
             {1: Step(None), 2: Step(ALG.f, 1)}
         )
 
-    def test_operation_as_parameter_with_argument(self):
+    def test_operation_as_sole_parameter(self):
+        A = Type.declare("A")
+        f = Operation((A ** A) ** A, name="f")
+        g = Operation(A ** A, name="g")
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, g)
+
+        self.compare(alg,
+            f(g), {
+                "λ": Step(None, internal_to="f"),
+                "f": Step(ALG.f, "g"),
+                "g": Step(ALG.g, "λ")
+            }
+        )
+
+    def test_operation_as_parameter(self):
         A = Type.declare("A")
         x = Data(A, name="x")
         f = Operation((A ** A) ** A ** A, name="f")
@@ -118,8 +132,8 @@ class TestAlgebraRDF(unittest.TestCase):
         self.compare(alg,
             f(g, x), {
                 "x": Step(None),
-                "λ": Step(None, "x"),
-                "f": Step(ALG.f, "g", "x", internals=["λ"]),
+                "λ": Step(None, "x", internal_to="f"),
+                "f": Step(ALG.f, "g", "x"),
                 "g": Step(ALG.g, "λ")
             }
         )
