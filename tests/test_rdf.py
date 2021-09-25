@@ -10,7 +10,7 @@ from rdflib.term import Node
 from rdflib.compare import to_isomorphic, graph_diff
 from rdflib.tools.rdf2dot import rdf2dot
 
-from typing import Iterator, Dict, Optional, Any
+from typing import Iterator, Dict, Optional
 
 from transformation_algebra import error
 from transformation_algebra.type import Type
@@ -23,10 +23,10 @@ ALG = Namespace('ALG#')
 
 class Step(object):
     def __init__(self,
-            *inputs: Any,
+            *inputs: str,
             op: Optional[URIRef] = None,
             type: Optional[Type] = None,
-            internal_to: Optional[Any] = None):
+            internal_to: Optional[str] = None):
         self.inputs = inputs
         self.type = type
         self.transformer = op
@@ -41,7 +41,7 @@ def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
     return g
 
 
-def graph_manual(steps: Dict[Any, Step]) -> Graph:
+def graph_manual(**steps: Step) -> Graph:
     root = BNode()
     g = Graph()
     nodes = {i: BNode() for i in steps}
@@ -99,10 +99,10 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(
             graph_auto(alg, f(a)),
-            graph_manual({
-                1: Step(),
-                2: Step(1, op=ALG.f)
-            })
+            graph_manual(
+                a=Step(),
+                f=Step("a", op=ALG.f)
+            )
         )
 
     def test_operation_as_sole_parameter(self):
@@ -114,11 +114,11 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(
             graph_auto(alg, f(g)),
-            graph_manual({
-                "λ": Step(internal_to="f"),
-                "f": Step("g", op=ALG.f),
-                "g": Step("λ", op=ALG.g)
-            })
+            graph_manual(
+                λ=Step(internal_to="f"),
+                f=Step("g", op=ALG.f),
+                g=Step("λ", op=ALG.g)
+            )
         )
 
     def test_operation_as_parameter(self):
@@ -131,12 +131,12 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(
             graph_auto(alg, f(g, a)),
-            graph_manual({
-                "a": Step(),
-                "λ": Step("a", internal_to="f"),
-                "f": Step("g", "a", op=ALG.f),
-                "g": Step("λ", op=ALG.g),
-            })
+            graph_manual(
+                a=Step(),
+                λ=Step("a", internal_to="f"),
+                f=Step("g", "a", op=ALG.f),
+                g=Step("λ", op=ALG.g),
+            )
         )
 
     def test_abstraction_as_parameter(self):
@@ -150,11 +150,11 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(
             graph_auto(alg, h(g, a).primitive()),
-            graph_manual({
-                "h": Step("f₂", "a", op=ALG.h),
-                "f₂": Step("f₁", op=ALG.f),
-                "f₁": Step("λ", op=ALG.f),
-                "λ": Step("a", internal_to="h"),
-                "a": Step(),
-            })
+            graph_manual(
+                h=Step("f2", "a", op=ALG.h),
+                f2=Step("f1", op=ALG.f),
+                f1=Step("λ", op=ALG.f),
+                λ=Step("a", internal_to="h"),
+                a=Step(),
+            )
         )
