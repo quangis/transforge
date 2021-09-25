@@ -8,6 +8,7 @@ import unittest
 from rdflib import Namespace, Graph, BNode, RDF, URIRef
 from rdflib.term import Node
 from rdflib.compare import to_isomorphic, graph_diff
+from rdflib.tools.rdf2dot import rdf2dot
 
 from typing import Iterator, Dict, Optional, Any
 
@@ -77,7 +78,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         for i, step in manual.items():
             if step.transformer:
-                assert step.inputs
+                assert step.inputs and not step.internal_to
                 kind = TA.TransformedData
                 expected.add((nodes[i], TA.transformer, step.transformer))
             elif step.internal_to:
@@ -92,17 +93,20 @@ class TestAlgebraRDF(unittest.TestCase):
             for j in step.inputs:
                 expected.add((nodes[j], TA.feeds, nodes[i]))
 
+        # with open(f"actual{expr}.dot", 'w') as f:
+        #     rdf2dot(actual, f)
+
         self.assertIsomorphic(actual, expected)
 
     def test_basic(self):
         A = Type.declare("A")
-        x = Data(A, name="x")
+        a = Data(A, name="a")
         f = Operation(A ** A, name="f")
         alg = TransformationAlgebraRDF('alg', ALG)
-        alg.add(f, x)
+        alg.add(f, a)
 
         self.compare(alg,
-            f(x),
+            f(a),
             {1: Step(None), 2: Step(ALG.f, 1)}
         )
 
@@ -123,17 +127,36 @@ class TestAlgebraRDF(unittest.TestCase):
 
     def test_operation_as_parameter(self):
         A = Type.declare("A")
-        x = Data(A, name="x")
+        a = Data(A, name="a")
         f = Operation((A ** A) ** A ** A, name="f")
         g = Operation(A ** A, name="g")
         alg = TransformationAlgebraRDF('alg', ALG)
-        alg.add(f, g, x)
+        alg.add(f, g, a)
 
         self.compare(alg,
-            f(g, x), {
-                "x": Step(None),
-                "λ": Step(None, "x", internal_to="f"),
-                "f": Step(ALG.f, "g", "x"),
+            f(g, a), {
+                "a": Step(None),
+                "λ": Step(None, "a", internal_to="f"),
+                "f": Step(ALG.f, "g", "a"),
                 "g": Step(ALG.g, "λ")
+            }
+        )
+
+    def test_abstraction_as_parameter(self):
+        A = Type.declare("A")
+        a = Data(A, name="a")
+        f = Operation(A ** A, name="f")
+        g = Operation(A ** A, name="g", derived=lambda x: f(f(x)))
+        h = Operation((A ** A) ** A ** A, name="h")
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, g, h, a)
+
+        self.compare(alg,
+            h(g, a).primitive(), {
+                "h": Step(ALG.h, "f₂", "a"),
+                "f₂": Step(ALG.f, "f₁"),
+                "f₁": Step(ALG.f, "λ"),
+                "λ": Step(None, "a", internal_to="h"),
+                "a": Step(None),
             }
         )
