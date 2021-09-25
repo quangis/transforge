@@ -3,6 +3,10 @@ Tests for the graph conversion process of algebra expressions. To check the
 tests, it's recommended to draw out the graphs with a pen.
 """
 
+# Untested:
+# - source labels
+# - types
+
 import unittest
 
 from rdflib import Namespace, Graph, BNode, RDF, URIRef
@@ -22,6 +26,12 @@ ALG = Namespace('ALG#')
 
 
 class Step(object):
+    """
+    A step is a data structure only used for testing. It represents a data node
+    in a transformation graph, in a format that makes it easy to convert a
+    dictionary of them to a real `rdflib` `Graph`.
+    """
+
     def __init__(self,
             *inputs: str,
             op: Optional[URIRef] = None,
@@ -34,6 +44,9 @@ class Step(object):
 
 
 def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
+    """
+    Transform an expression to a transformation graph.
+    """
     root = BNode()
     g = Graph()
     alg.rdf_expr(g, expr, root,
@@ -42,6 +55,9 @@ def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
 
 
 def graph_manual(**steps: Step) -> Graph:
+    """
+    Manually construct a transformation graph.
+    """
     root = BNode()
     g = Graph()
     nodes = {i: BNode() for i in steps}
@@ -70,7 +86,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
     def assertIsomorphic(self, actual: Graph, expected: Graph) -> None:
         """
-        Compare two graphs to test if they are equal
+        Compare two graphs to test if they are isomorphic.
         """
         actual = to_isomorphic(actual)
         expected = to_isomorphic(expected)
@@ -91,6 +107,10 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_basic(self):
+        """
+        Test the basic case of converting an expression consisting of an
+        operation and a data source.
+        """
         A = Type.declare("A")
         a = Data(A, name="a")
         f = Operation(A ** A, name="f")
@@ -106,6 +126,9 @@ class TestAlgebraRDF(unittest.TestCase):
         )
 
     def test_operation_as_sole_parameter(self):
+        """
+        Operations passed as a parameter must have an internal operation.
+        """
         A = Type.declare("A")
         f = Operation((A ** A) ** A, name="f")
         g = Operation(A ** A, name="g")
@@ -122,6 +145,10 @@ class TestAlgebraRDF(unittest.TestCase):
         )
 
     def test_operation_as_parameter(self):
+        """
+        Operations passed as a parameter must have an internal operation that
+        gets the same input as the operation that got the parameter operation.
+        """
         A = Type.declare("A")
         a = Data(A, name="a")
         f = Operation((A ** A) ** A ** A, name="f")
@@ -140,6 +167,11 @@ class TestAlgebraRDF(unittest.TestCase):
         )
 
     def test_abstraction_as_parameter(self):
+        """
+        Test that abstractions have a sensible representation, with an internal
+        operation that synthesizes the value of variables.
+        """
+
         A = Type.declare("A")
         a = Data(A, name="a")
         f = Operation(A ** A, name="f")
