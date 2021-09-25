@@ -143,8 +143,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         assert isinstance(expr.type, TypeInstance)
 
-        current = current or BNode()
+        if isinstance(expr, Variable):
+            assert expr in variables
+            return variables[expr]
 
+        current = current or BNode()
         output.add((root, RDF.type, TA.Transformation))
         output.add((root, TA.step, current))
 
@@ -194,8 +197,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                                 raise
                             return source_node
 
-        elif isinstance(expr, Application):
-
+        else:
+            assert isinstance(expr, Application)
             assert not isinstance(expr.f, Abstraction), \
                 "abstractions can only occur as parameters, otherwise " \
                 "they could have been β-reduced"
@@ -260,10 +263,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             for internal in output.objects(f, TA.internal):
                 if internal != current_internal:
                     output.add((x, TA.feeds, internal))
-
-        else:
-            assert isinstance(expr, Variable) and expr in variables
-            return variables[expr]
 
         return current
 
