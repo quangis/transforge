@@ -23,13 +23,13 @@ ALG = Namespace('ALG#')
 
 class Step(object):
     def __init__(self,
-            transformer: Optional[URIRef],
             *inputs: Any,
+            op: Optional[URIRef] = None,
             type: Optional[Type] = None,
             internal_to: Optional[Any] = None):
         self.inputs = inputs
         self.type = type
-        self.transformer = transformer
+        self.transformer = op
         self.internal_to = internal_to
 
 
@@ -99,7 +99,10 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(
             graph_auto(alg, f(a)),
-            graph_manual({1: Step(None), 2: Step(ALG.f, 1)})
+            graph_manual({
+                1: Step(),
+                2: Step(1, op=ALG.f)
+            })
         )
 
     def test_operation_as_sole_parameter(self):
@@ -112,9 +115,9 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, f(g)),
             graph_manual({
-                "λ": Step(None, internal_to="f"),
-                "f": Step(ALG.f, "g"),
-                "g": Step(ALG.g, "λ")
+                "λ": Step(internal_to="f"),
+                "f": Step("g", op=ALG.f),
+                "g": Step("λ", op=ALG.g)
             })
         )
 
@@ -129,10 +132,10 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, f(g, a)),
             graph_manual({
-                "a": Step(None),
-                "λ": Step(None, "a", internal_to="f"),
-                "f": Step(ALG.f, "g", "a"),
-                "g": Step(ALG.g, "λ"),
+                "a": Step(),
+                "λ": Step("a", internal_to="f"),
+                "f": Step("g", "a", op=ALG.f),
+                "g": Step("λ", op=ALG.g),
             })
         )
 
@@ -148,10 +151,10 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, h(g, a).primitive()),
             graph_manual({
-                "h": Step(ALG.h, "f₂", "a"),
-                "f₂": Step(ALG.f, "f₁"),
-                "f₁": Step(ALG.f, "λ"),
-                "λ": Step(None, "a", internal_to="h"),
-                "a": Step(None),
+                "h": Step("f₂", "a", op=ALG.h),
+                "f₂": Step("f₁", op=ALG.f),
+                "f₁": Step("λ", op=ALG.f),
+                "λ": Step("a", internal_to="h"),
+                "a": Step(),
             })
         )
