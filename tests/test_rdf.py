@@ -86,10 +86,18 @@ def graph_manual(**steps: Step) -> Graph:
 
 class TestAlgebraRDF(unittest.TestCase):
 
-    def assertIsomorphic(self, actual: Graph, expected: Graph) -> None:
+    def assertIsomorphic(self, actual: Graph, expected: Graph,
+            visualize: bool = False) -> None:
         """
         Compare two graphs to test if they are isomorphic.
         """
+
+        if visualize:
+            with open('actual.dot', 'w') as handle:
+                rdf2dot(actual, handle)
+            with open('expected.dot', 'w') as handle:
+                rdf2dot(expected, handle)
+
         actual = to_isomorphic(actual)
         expected = to_isomorphic(expected)
 
