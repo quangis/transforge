@@ -14,7 +14,7 @@ from rdflib.term import Node
 from rdflib.compare import to_isomorphic, graph_diff
 from rdflib.tools.rdf2dot import rdf2dot
 
-from typing import Iterator, Dict, Optional
+from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
 from transformation_algebra.type import Type
@@ -36,11 +36,12 @@ class Step(object):
             *inputs: str,
             op: Optional[URIRef] = None,
             type: Optional[Type] = None,
-            internal_to: Optional[str] = None):
+            internal_to: Union[str, list[str]] = []):
         self.inputs = inputs
         self.type = type
         self.transformer = op
-        self.internal_to = internal_to
+        self.internal_to = [internal_to] if isinstance(internal_to, str) \
+            else internal_to
 
 
 def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
@@ -70,7 +71,8 @@ def graph_manual(**steps: Step) -> Graph:
             g.add((nodes[i], TA.transformer, step.transformer))
         elif step.internal_to:
             kind = TA.InternalData
-            g.add((nodes[step.internal_to], TA.internal, nodes[i]))
+            for internal in step.internal_to:
+                g.add((nodes[internal], TA.internal, nodes[i]))
         else:
             kind = TA.SourceData
 
@@ -147,7 +149,7 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_operation_as_parameter(self):
         """
         Operations passed as a parameter must have an internal operation that
-        gets the same input as the operation that got the parameter operation.
+        gets the same inputs as the operation that got the parameter operation.
         """
         A = Type.declare("A")
         a = Data(A, name="a")
@@ -206,9 +208,6 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebraRDF('alg', ALG)
         alg.add(f, g, h, a, b)
 
-        with open('act.dot', 'w') as handle:
-            rdf2dot(graph_auto(alg, h(g, a, b).primitive()), handle)
-
         self.assertIsomorphic(
             graph_auto(alg, h(g, a, b).primitive()),
             graph_manual(
@@ -218,5 +217,99 @@ class TestAlgebraRDF(unittest.TestCase):
                 λ=Step("a", "b", internal_to="h"),
                 a=Step(),
                 b=Step(),
+            )
+        )
+
+    def test_empty_abstraction_as_parameter(self):
+        """
+        Test that an abstraction that does nothing, as in `f (λx.x)`, indeed
+        has only nodes `λ → f`.
+        """
+
+        A = Type.declare("A")
+        f = Operation((A ** A) ** A, name="f")
+        id = Operation(A ** A, name="id", derived=lambda x: x)
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, id)
+
+        self.assertIsomorphic(
+            graph_auto(alg, f(id).primitive()),
+            graph_manual(
+                f=Step("λ", op=ALG.f),
+                λ=Step(internal_to="f"),
+            )
+        )
+
+    def test_abstraction_same_as_primitive(self):
+        """
+        Test that an abstraction of the form `f (λx.g x)` is not only
+        conceptually the same as `f g`, but actually leads to the same graph.
+        """
+
+        A = Type.declare("A")
+        f = Operation((A ** A) ** A, name="f")
+        g = Operation(A ** A, name="g")
+        h = Operation(A ** A, name="h", derived=lambda x: g(x))
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, g, h)
+
+        self.assertIsomorphic(
+            graph_auto(alg, f(h).primitive()),
+            graph_auto(alg, f(g))
+        )
+
+    def test_cycle(self):
+        """
+        It is possible to get a cyclic transformation graph when passing
+        multiple operations as parameter.
+        """
+        A = Type.declare("A")
+        a = Data(A, name="a")
+        f = Operation((A ** A) ** (A ** A) ** (A ** A) ** A ** A, name="f")
+        g = Operation(A ** A, name="g")
+        h = Operation(A ** A, name="h")
+        e = Operation(A ** A, name="e")
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(a, f, g, h, e)
+
+        self.assertIsomorphic(
+            graph_auto(alg, f(g, h, e, a)),
+            graph_manual(
+                a=Step(),
+                f=Step("a", "g", "h", "e", op=ALG.f),
+                gλ=Step("a", "h", "e", internal_to="f"),
+                hλ=Step("a", "g", "e", internal_to="f"),
+                eλ=Step("a", "g", "h", internal_to="f"),
+                g=Step("gλ", op=ALG.g),
+                h=Step("hλ", op=ALG.h),
+                e=Step("eλ", op=ALG.e),
+            )
+        )
+
+    def test_nested_operation_as_parameter(self):
+        """
+        When an operator is used as a parameter that in turn uses an operator
+        as parameter, all the values passed to the outer operation should be
+        available to all internal operations. We do that by making sure to
+        share the internal operation.
+        """
+        A = Type.declare("A")
+        a = Data(A, name="a")
+        b = Data(A, name="b")
+        f = Operation((A ** A) ** A ** A, name="f")
+        g = Operation((A ** A) ** A ** (A ** A), name="g")
+        h = Operation(A ** A, name="h")
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(a, b, f, g, h)
+
+        self.assertIsomorphic(
+            graph_auto(alg, f(g(h, a), b)),
+            graph_manual(
+                a=Step(),
+                b=Step(),
+                f=Step("g", "b", op=ALG.f),
+                g=Step("h", "a", op=ALG.g),
+                h=Step("λ", op=ALG.h),
+                λ=Step("a", "b", internal_to=["f", "g"]),
             )
         )
