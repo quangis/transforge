@@ -190,3 +190,33 @@ class TestAlgebraRDF(unittest.TestCase):
                 a=Step(),
             )
         )
+
+    def test_complex_abstraction_as_parameter(self):
+        """
+        Same as before, but with a more complex abstraction that uses multiple
+        variables.
+        """
+
+        A = Type.declare("A")
+        a = Data(A, name="a")
+        b = Data(A, name="b")
+        f = Operation(A ** A ** A, name="f")
+        g = Operation(A ** A ** A, name="g", derived=lambda x, y: f(y, f(x, y)))
+        h = Operation((A ** A ** A) ** A ** A ** A, name="h")
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, g, h, a, b)
+
+        with open('act.dot', 'w') as handle:
+            rdf2dot(graph_auto(alg, h(g, a, b).primitive()), handle)
+
+        self.assertIsomorphic(
+            graph_auto(alg, h(g, a, b).primitive()),
+            graph_manual(
+                h=Step("f2", "a", "b", op=ALG.h),
+                f2=Step("λ", "f1", op=ALG.f),
+                f1=Step("λ", op=ALG.f),
+                λ=Step("a", "b", internal_to="h"),
+                a=Step(),
+                b=Step(),
+            )
+        )
