@@ -33,6 +33,39 @@ class Step(object):
         self.internal_to = internal_to
 
 
+def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
+    root = BNode()
+    g = Graph()
+    alg.rdf_expr(g, expr, root,
+        include_labels=False, include_types=False)
+    return g
+
+
+def graph_manual(steps: Dict[Any, Step]) -> Graph:
+    root = BNode()
+    g = Graph()
+    nodes = {i: BNode() for i in steps}
+    g.add((root, RDF.type, TA.Transformation))
+
+    for i, step in steps.items():
+        if step.transformer:
+            assert step.inputs and not step.internal_to
+            kind = TA.TransformedData
+            g.add((nodes[i], TA.transformer, step.transformer))
+        elif step.internal_to:
+            kind = TA.InternalData
+            g.add((nodes[step.internal_to], TA.internal, nodes[i]))
+        else:
+            kind = TA.SourceData
+
+        g.add((root, TA.step, nodes[i]))
+        g.add((nodes[i], RDF.type, kind))
+
+        for j in step.inputs:
+            g.add((nodes[j], TA.feeds, nodes[i]))
+    return g
+
+
 class TestAlgebraRDF(unittest.TestCase):
 
     def assertIsomorphic(self, actual: Graph, expected: Graph) -> None:
@@ -57,47 +90,6 @@ class TestAlgebraRDF(unittest.TestCase):
         # If all nodes are there, there must be some wrong connection
         self.assertEqual(actual, expected)
 
-    def compare(self,
-            alg: TransformationAlgebraRDF,
-            expr: Expr,
-            manual: Dict[Any, Step]) -> None:
-        """
-        Compare the automatically constructed graph with a manual counterpart.
-        """
-        root = BNode()
-
-        # Calculate the graph from the expression
-        actual = Graph()
-        alg.rdf_expr(actual, expr, root,
-            include_labels=False, include_types=False)
-
-        # Manually construct the expected graph
-        expected = Graph()
-        nodes = {i: BNode() for i in manual}
-        expected.add((root, RDF.type, TA.Transformation))
-
-        for i, step in manual.items():
-            if step.transformer:
-                assert step.inputs and not step.internal_to
-                kind = TA.TransformedData
-                expected.add((nodes[i], TA.transformer, step.transformer))
-            elif step.internal_to:
-                kind = TA.InternalData
-                expected.add((nodes[step.internal_to], TA.internal, nodes[i]))
-            else:
-                kind = TA.SourceData
-
-            expected.add((root, TA.step, nodes[i]))
-            expected.add((nodes[i], RDF.type, kind))
-
-            for j in step.inputs:
-                expected.add((nodes[j], TA.feeds, nodes[i]))
-
-        # with open(f"actual{expr}.dot", 'w') as f:
-        #     rdf2dot(actual, f)
-
-        self.assertIsomorphic(actual, expected)
-
     def test_basic(self):
         A = Type.declare("A")
         a = Data(A, name="a")
@@ -105,9 +97,9 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebraRDF('alg', ALG)
         alg.add(f, a)
 
-        self.compare(alg,
-            f(a),
-            {1: Step(None), 2: Step(ALG.f, 1)}
+        self.assertIsomorphic(
+            graph_auto(alg, f(a)),
+            graph_manual({1: Step(None), 2: Step(ALG.f, 1)})
         )
 
     def test_operation_as_sole_parameter(self):
@@ -117,12 +109,13 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebraRDF('alg', ALG)
         alg.add(f, g)
 
-        self.compare(alg,
-            f(g), {
+        self.assertIsomorphic(
+            graph_auto(alg, f(g)),
+            graph_manual({
                 "λ": Step(None, internal_to="f"),
                 "f": Step(ALG.f, "g"),
                 "g": Step(ALG.g, "λ")
-            }
+            })
         )
 
     def test_operation_as_parameter(self):
@@ -133,13 +126,14 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebraRDF('alg', ALG)
         alg.add(f, g, a)
 
-        self.compare(alg,
-            f(g, a), {
+        self.assertIsomorphic(
+            graph_auto(alg, f(g, a)),
+            graph_manual({
                 "a": Step(None),
                 "λ": Step(None, "a", internal_to="f"),
                 "f": Step(ALG.f, "g", "a"),
-                "g": Step(ALG.g, "λ")
-            }
+                "g": Step(ALG.g, "λ"),
+            })
         )
 
     def test_abstraction_as_parameter(self):
@@ -151,12 +145,13 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebraRDF('alg', ALG)
         alg.add(f, g, h, a)
 
-        self.compare(alg,
-            h(g, a).primitive(), {
+        self.assertIsomorphic(
+            graph_auto(alg, h(g, a).primitive()),
+            graph_manual({
                 "h": Step(ALG.h, "f₂", "a"),
                 "f₂": Step(ALG.f, "f₁"),
                 "f₁": Step(ALG.f, "λ"),
                 "λ": Step(None, "a", internal_to="h"),
                 "a": Step(None),
-            }
+            })
         )
