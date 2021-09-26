@@ -258,11 +258,18 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     sources, variables, include_types, include_labels)
             output.add((x, TA.feeds, f))
 
-            # Every operation that is internal to `f` should also take `x` (or
-            # the output of `x`) as input
+            # Every operation that is internal to `f` should also take `x`'s
+            # output as input
             for internal in output.objects(f, TA.internal):
                 if internal != current_internal:
                     output.add((x, TA.feeds, internal))
+
+            # ... and every input to `f` should be an input to this internal
+            # operation
+            if current_internal:
+                for data_input in output.subjects(TA.feeds, f):
+                    if x != data_input:
+                        output.add((data_input, TA.feeds, current_internal))
 
         return current
 
