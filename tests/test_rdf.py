@@ -33,15 +33,15 @@ class Step(object):
     """
 
     def __init__(self,
-            *inputs: str,
             op: Optional[URIRef] = None,
+            input: Union[str, list[str]] = [],
             type: Optional[Type] = None,
-            internal_to: Union[str, list[str]] = []):
-        self.inputs = inputs
+            internal: Optional[str] = None):
+        self.inputs = [input] if isinstance(input, str) else input
         self.type = type
         self.transformer = op
-        self.internal_to = [internal_to] if isinstance(internal_to, str) \
-            else internal_to
+        self.internal = internal
+        assert not (internal and op) and not (op and not input)
 
 
 def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
@@ -66,13 +66,11 @@ def graph_manual(**steps: Step) -> Graph:
 
     for i, step in steps.items():
         if step.transformer:
-            assert step.inputs and not step.internal_to
             kind = TA.TransformedData
             g.add((nodes[i], TA.transformer, step.transformer))
-        elif step.internal_to:
+        elif step.internal:
             kind = TA.InternalData
-            for internal in step.internal_to:
-                g.add((nodes[internal], TA.internal, nodes[i]))
+            g.add((nodes[step.internal], TA.internal, nodes[i]))
         else:
             kind = TA.SourceData
 
@@ -131,7 +129,7 @@ class TestAlgebraRDF(unittest.TestCase):
             graph_auto(alg, f(a)),
             graph_manual(
                 a=Step(),
-                f=Step("a", op=ALG.f)
+                f=Step(ALG.f, input="a")
             )
         )
 
@@ -148,9 +146,9 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, f(g)),
             graph_manual(
-                λ=Step(internal_to="f"),
-                f=Step("g", op=ALG.f),
-                g=Step("λ", op=ALG.g)
+                λ=Step(internal="f"),
+                f=Step(ALG.f, input="g"),
+                g=Step(ALG.g, input="λ")
             )
         )
 
@@ -170,9 +168,9 @@ class TestAlgebraRDF(unittest.TestCase):
             graph_auto(alg, f(g, a)),
             graph_manual(
                 a=Step(),
-                λ=Step("a", internal_to="f"),
-                f=Step("g", "a", op=ALG.f),
-                g=Step("λ", op=ALG.g),
+                λ=Step(internal="f", input="a"),
+                f=Step(ALG.f, input=["g", "a"]),
+                g=Step(ALG.g, input="λ"),
             )
         )
 
@@ -193,10 +191,10 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, h(g, a).primitive()),
             graph_manual(
-                h=Step("f2", "a", op=ALG.h),
-                f2=Step("f1", op=ALG.f),
-                f1=Step("λ", op=ALG.f),
-                λ=Step("a", internal_to="h"),
+                h=Step(ALG.h, input=["f2", "a"]),
+                f2=Step(ALG.f, input="f1"),
+                f1=Step(ALG.f, input="λ"),
+                λ=Step(internal="h", input="a"),
                 a=Step(),
             )
         )
@@ -219,10 +217,10 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, h(g, a, b).primitive()),
             graph_manual(
-                h=Step("f2", "a", "b", op=ALG.h),
-                f2=Step("λ", "f1", op=ALG.f),
-                f1=Step("λ", op=ALG.f),
-                λ=Step("a", "b", internal_to="h"),
+                h=Step(ALG.h, input=["f2", "a", "b"]),
+                f2=Step(ALG.f, input=["λ", "f1"]),
+                f1=Step(ALG.f, input="λ"),
+                λ=Step(internal="h", input=["a", "b"]),
                 a=Step(),
                 b=Step(),
             )
@@ -243,8 +241,8 @@ class TestAlgebraRDF(unittest.TestCase):
         self.assertIsomorphic(
             graph_auto(alg, f(id).primitive()),
             graph_manual(
-                f=Step("λ", op=ALG.f),
-                λ=Step(internal_to="f"),
+                f=Step(ALG.f, input="λ"),
+                λ=Step(internal="f"),
             )
         )
 
@@ -284,13 +282,13 @@ class TestAlgebraRDF(unittest.TestCase):
             graph_auto(alg, f(g, h, e, a)),
             graph_manual(
                 a=Step(),
-                f=Step("a", "g", "h", "e", op=ALG.f),
-                gλ=Step("a", "h", "e", internal_to="f"),
-                hλ=Step("a", "g", "e", internal_to="f"),
-                eλ=Step("a", "g", "h", internal_to="f"),
-                g=Step("gλ", op=ALG.g),
-                h=Step("hλ", op=ALG.h),
-                e=Step("eλ", op=ALG.e),
+                f=Step(ALG.f, input=["a", "g", "h", "e"]),
+                gλ=Step(internal="f", input=["a", "h", "e"]),
+                hλ=Step(internal="f", input=["a", "g", "e"]),
+                eλ=Step(internal="f", input=["a", "g", "h"]),
+                g=Step(ALG.g, input="gλ"),
+                h=Step(ALG.h, input="hλ"),
+                e=Step(ALG.e, input="eλ"),
             )
         )
 
@@ -316,10 +314,10 @@ class TestAlgebraRDF(unittest.TestCase):
             graph_manual(
                 a=Step(),
                 b=Step(),
-                outer=Step("inner", "b", op=ALG.outer),
-                inner=Step("f", "a", "outerλ", op=ALG.inner),
-                f=Step("innerλ", op=ALG.f),
-                innerλ=Step("a", "outerλ", internal_to="inner"),
-                outerλ=Step("b", internal_to="outer"),
+                outer=Step(ALG.outer, input=["inner", "b"]),
+                inner=Step(ALG.inner, input=["f", "a", "outerλ"]),
+                f=Step(ALG.f, input="innerλ"),
+                innerλ=Step(internal="inner", input=["a", "outerλ"]),
+                outerλ=Step(internal="outer", input="b"),
             )
         )
