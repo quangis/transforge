@@ -131,7 +131,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
             variables: Dict[Variable, Node] = {},
             include_types: bool = True,
-            include_labels: bool = True) -> Node:
+            include_labels: bool = True,
+            include_steps: bool = True) -> Node:
         """
         Translate the given expression to a representation in RDF and add it
         to the given graph, connecting all steps to root. Inputs that match the
@@ -149,7 +150,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         current = current or BNode()
         output.add((root, RDF.type, TA.Transformation))
-        output.add((root, TA.step, current))
+
+        if include_steps:
+            output.add((root, TA.step, current))
 
         if isinstance(expr, Base):
             datatype = expr.type.output()
@@ -209,7 +212,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
             f = self.rdf_expr(output, expr.f, root, current,
-                sources, variables, include_types, include_labels)
+                sources, variables, include_types, include_labels,
+                include_steps)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -235,7 +239,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 internal = BNode()
                 current_internal = internal
                 output.add((internal, RDF.type, TA.InternalData))
-                output.add((root, TA.step, internal))
                 output.add((f, TA.internal, internal))
 
                 if include_labels:
@@ -246,14 +249,17 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         {p: internal for p in expr.x.params}
 
                     x = self.rdf_expr(output, expr.x.body, root, BNode(),
-                        sources, variables, include_types, include_labels)
+                        sources, variables, include_types, include_labels,
+                        include_steps)
                 else:
                     x = self.rdf_expr(output, expr.x, root, BNode(),
-                        sources, variables, include_types, include_labels)
+                        sources, variables, include_types, include_labels,
+                        include_steps)
                     output.add((internal, TA.feeds, x))
             else:
                 x = self.rdf_expr(output, expr.x, root, BNode(),
-                    sources, variables, include_types, include_labels)
+                    sources, variables, include_types, include_labels,
+                    include_steps)
             output.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
@@ -283,7 +289,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             output: Graph,
             root: Node,
             sources: set[Node],
-            steps: dict[Node, tuple[Expr, list[Node]]]) -> Node:
+            steps: dict[Node, tuple[Expr, list[Node]]],
+            **kwargs) -> Node:
         """
         Convert a workflow to a full transformation graph by converting its
         individual steps to representations of expressions in RDF and combining
@@ -312,9 +319,10 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 assert all(x in steps or x in sources for x in inputs), \
                     "unknown input data source"
                 cache[step_node] = self.rdf_expr(output, expr, root, sources={
-                    f"x{i}": (to_expr_node(x), steps[x][0]) if x in steps else x
+                    f"x{i}": (to_expr_node(x), steps[x][0])
+                    if x in steps else x
                     for i, x in enumerate(inputs, start=1)
-                })
+                }, **kwargs)
                 return cache[step_node]
 
         # One of the tool expressions must be 'last', in that it represents the
