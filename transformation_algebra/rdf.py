@@ -242,8 +242,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     output.add((internal, RDFS.label, Literal("internal")))
 
                 if isinstance(expr.x, Abstraction):
-                    assert expr.x.body.type.operator != Function  # TODO why
-
                     variables = variables | \
                         {p: internal for p in expr.x.params}
 

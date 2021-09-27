@@ -321,3 +321,25 @@ class TestAlgebraRDF(unittest.TestCase):
                 outerλ=Step(internal="outer", input="b"),
             )
         )
+
+    def test_function_abstraction_body(self):
+        """
+        The body of an abstraction may be a function.
+        """
+        A = Type.declare("A")
+        a = Data(A, name="a")
+        f = Operation((A ** A ** A) ** A ** A, name="f")
+        g = Operation(A ** A ** A, name="g")
+        h = Operation(A ** A ** A, name="h", derived=lambda x: g(x))
+        alg = TransformationAlgebraRDF('alg', ALG)
+        alg.add(f, g, a)
+
+        self.assertIsomorphic(
+            graph_auto(alg, f(h, a).primitive()),
+            graph_manual(
+                a=Step(),
+                g=Step(ALG.g, input="λ"),
+                f=Step(ALG.f, input=["g", "a"]),
+                λ=Step(internal="f", input="a"),
+            )
+        )
