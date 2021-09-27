@@ -231,7 +231,7 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_empty_abstraction_as_parameter(self):
         """
         Test that an abstraction that does nothing, as in `f (λx.x)`, indeed
-        has only nodes `λ → f`.
+        has only an internal node `λ` that directly feeds `f`.
         """
 
         A = Type.declare("A")
@@ -298,26 +298,28 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         When an operator is used as a parameter that in turn uses an operator
         as parameter, all the values passed to the outer operation should be
-        available to all internal operations. We do that by making sure to
-        share the internal operation.
+        available at the beginning of the pipeline of the inner operations. We
+        do that by feeding the outer internal operation to the inner one. See
+        issues #37 and #41.
         """
         A = Type.declare("A")
         a = Data(A, name="a")
         b = Data(A, name="b")
-        f = Operation((A ** A) ** A ** A, name="f")
-        g = Operation((A ** A) ** A ** (A ** A), name="g")
-        h = Operation(A ** A, name="h")
+        outer = Operation((A ** A) ** A ** A, name="outer")
+        inner = Operation((A ** A) ** A ** (A ** A), name="inner")
+        f = Operation(A ** A, name="f")
         alg = TransformationAlgebraRDF('alg', ALG)
-        alg.add(a, b, f, g, h)
+        alg.add(a, b, outer, inner, f)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(g(h, a), b)),
+            graph_auto(alg, outer(inner(f, a), b)),
             graph_manual(
                 a=Step(),
                 b=Step(),
-                f=Step("g", "b", op=ALG.f),
-                g=Step("h", "a", op=ALG.g),
-                h=Step("λ", op=ALG.h),
-                λ=Step("a", "b", internal_to=["f", "g"]),
+                outer=Step("inner", "b", op=ALG.outer),
+                inner=Step("f", "a", "outerλ", op=ALG.inner),
+                f=Step("innerλ", op=ALG.f),
+                innerλ=Step("a", "outerλ", internal_to="inner"),
+                outerλ=Step("b", internal_to="outer"),
             )
         )

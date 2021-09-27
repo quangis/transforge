@@ -258,6 +258,14 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     sources, variables, include_types, include_labels)
             output.add((x, TA.feeds, f))
 
+            # If `x` has internal operations of its own, then those inner
+            # operations should be fed by the current (outer) internal
+            # operation, which has access to additional parameters that may be
+            # used by the inner one. See issues #37 and #41.
+            if current_internal:
+                for internal in output.objects(x, TA.internal):
+                    output.add((current_internal, TA.feeds, internal))
+
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
             for internal in output.objects(f, TA.internal):
