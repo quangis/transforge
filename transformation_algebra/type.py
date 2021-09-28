@@ -218,6 +218,15 @@ class TypeInstance(Type, flow.Unit):
                 a.bind(a.upper())
         return a.follow()
 
+    def normalize(self) -> TypeInstance:
+        """
+        Ensure that all variables in a type are followed to their binding.
+        """
+        a = self.follow()
+        if isinstance(a, TypeOperation):
+            a.params = tuple(p.normalize() for p in a.params())
+        return a
+
     def __iter__(self) -> Iterator[TypeInstance]:
         """
         Iterate through all substructures of this type instance.
@@ -439,7 +448,7 @@ class TypeOperation(TypeInstance):
 
     def __init__(self, op: TypeOperator, *params: TypeInstance):
         self._operator = op
-        self.params = list(params)
+        self.params = tuple(params)
 
         if len(self.params) != self._operator.arity:
             raise ValueError(
@@ -453,6 +462,15 @@ class TypeOperation(TypeInstance):
 
     def __getitem__(self, key: int) -> TypeInstance:
         return self.params[key]
+
+    def __hash__(self) -> int:
+        """
+        Hash this type. Be aware that variables are not normalized, so a type
+        `F(A)` may look and act the same (including __eq__) and yet not have
+        the same hash as a type `F(x)` in which `x` is bound to `A`. Call
+        `.normalize()` before hashing to avoid issues.
+        """
+        return hash((self._operator,) + self.params)
 
     @property
     def basic(self) -> bool:
@@ -471,8 +489,6 @@ class TypeVar(TypeInstance):
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self._constraints: Set[Constraint] = set()
-
-
 
     @property
     def name(self) -> str:
