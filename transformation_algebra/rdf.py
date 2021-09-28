@@ -241,6 +241,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 output.add((internal, RDF.type, TA.InternalData))
                 output.add((f, TA.internal, internal))
 
+                if include_steps:
+                    output.add((root, TA.step, internal))
+
                 if include_labels:
                     output.add((internal, RDFS.label, Literal("internal")))
 
