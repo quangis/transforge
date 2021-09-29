@@ -221,10 +221,18 @@ class TypeInstance(Type, flow.Unit):
     def normalize(self) -> TypeInstance:
         """
         Ensure that all variables in a type are followed to their binding.
+
+        Be aware that that normalizing a type instance is recommended before
+        storing it in a set, using it as a dict key or otherwise hashing it.
+        This is because variables are not automatically followed to their
+        binding when hashing, and so a type `F(x)` may look the same and even
+        be equal to `F(y)` when `y` is bound to `x`, and yet not have the same
+        hash. As a result, binding a variable after hashing will also cause
+        issues.
         """
         a = self.follow()
         if isinstance(a, TypeOperation):
-            a.params = tuple(p.normalize() for p in a.params())
+            a.params = tuple(p.normalize() for p in a.params)
         return a
 
     def __iter__(self) -> Iterator[TypeInstance]:
