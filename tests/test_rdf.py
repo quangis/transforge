@@ -20,7 +20,8 @@ from transformation_algebra import error
 from transformation_algebra.type import Type
 from transformation_algebra.expr import \
     Expr, TransformationAlgebra, Data, Operation
-from transformation_algebra.rdf import TransformationAlgebraRDF, TA
+from transformation_algebra.rdf import TransformationAlgebraRDF, TA, \
+    TransformationGraph
 
 ALG = Namespace('ALG#')
 
@@ -49,10 +50,10 @@ def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
     Transform an expression to a transformation graph.
     """
     root = BNode()
-    g = Graph()
-    alg.rdf_expr(g, expr, root,
+    g = TransformationGraph(alg, alg.namespace,
         include_labels=False, include_types=False)
-    return g
+    g.expr(expr, root)
+    return g.graph
 
 
 def graph_manual(**steps: Step) -> Graph:

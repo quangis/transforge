@@ -23,37 +23,43 @@ from typing import Dict, Union, Iterator, Optional, Tuple
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 
-class TransformationAlgebraRDF(TransformationAlgebra):
-    def __init__(self, prefix: str, namespace: Union[Namespace, str]):
-        self.prefix = prefix
+class TransformationGraph(object):
+    """
+    A transformation graph represents expressions of a transformation algebra
+    as an RDF graph.
+    """
+
+    def __init__(self, algebra: TransformationAlgebra,
+            namespace: Union[Namespace, str],
+            include_types: bool = True,
+            include_steps: bool = True,
+            include_labels: bool = True,
+            include_classes: bool = True):
+
+        # TODO would prefer to subclass a Graph but would need to figure out
+        # how plugins would know what they are dealing with
+        # super().__init__(self, store)
+
+        self.graph = Graph()
+        self.algebra = algebra
         self.namespace = Namespace(namespace) \
             if isinstance(namespace, str) else namespace
-        super().__init__()
+        self.include_types = include_types
+        self.include_labels = include_labels
+        self.include_steps = include_steps
 
-    def uri(self, value: Union[TypeOperator, Definition]) -> URIRef:
-        """
-        Obtain the URI node for an operation or type operator.
-        """
-        if value == Function:
-            return TA.Function
-
-        assert value in self, f"{value} is not in algebra"
-        if isinstance(value, TypeOperator):
-            return self.namespace.term(value.name)
-        else:
-            assert isinstance(value, Definition) and value.name
-            return self.namespace.term(value.name)
+        self.graph.bind("ta", TA)
+        # self.graph.bind("test", self.namespace)
 
     def vocabulary(self) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.
         """
-        vocab = Graph()
-        self.bindings(vocab)
+        vocab = self.graph
 
         # Add type operators to the vocabulary
-        for t in self.types:
+        for t in self.algebra.types:
             if t.arity > 0:
                 current_uri = self.uri(t)
                 vocab.add((current_uri, RDF.type, TA.Type))
@@ -72,7 +78,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     current = current.supertype
 
         # Add operations to the vocabulary
-        for d in self.definitions.values():
+        for d in self.algebra.definitions.values():
             node = self.uri(d)
             type_node = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, type_node))
@@ -82,62 +88,54 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         return vocab
 
-    def parse_rdf(self, graph: Graph, string: str) -> BNode:
+    def uri(self, value: Union[TypeOperator, Definition]) -> URIRef:
         """
-        Convenience function to parse an expression and add it to an RDF graph
-        in one go.
+        Obtain the URI node for an operation or type operator.
         """
-        root = BNode()
-        self.rdf_expr(graph, root, self.parse(string).primitive())
-        return root
+        if value == Function:
+            return TA.Function
 
-    def bindings(self, g: Graph) -> None:
-        """
-        Add namespace bindings to RDF.
-        """
-        g.bind("ta", TA)
-        g.bind(self.prefix, self.namespace)
+        assert value in self.algebra, f"{value} is not in algebra"
+        if isinstance(value, TypeOperator):
+            return self.namespace.term(value.name)
+        else:
+            assert isinstance(value, Definition) and value.name
+            return self.namespace.term(value.name)
 
-    def rdf_type(self, output: Graph, type: Type) -> Node:
+    def type(self, type: Type) -> Node:
         """
-        Translate the given type to a representation in RDF and add it to the
-        given graph. Return the top-level node.
+        Translate and add the given type. Return the top-level node.
         """
         t = type.instance()
         if isinstance(t, TypeOperation):
 
             if t.params:
                 node = BNode()
-                output.add((node, RDFS.label, Literal(str(t))))
-                output.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                self.graph.add((node, RDFS.label, Literal(str(t))))
+                self.graph.add((node, RDFS.subClassOf, self.uri(t._operator)))
                 for i, param in enumerate(t.params, start=1):
-                    param_node = self.rdf_type(output, param)
-                    output.add((node, RDF[f"_{i}"], param_node))
+                    param_node = self.type(param)
+                    self.graph.add((node, RDF[f"_{i}"], param_node))
             else:
                 return self.uri(t._operator)
         else:
             # TODO don't make new node if we already encountered this variable
             assert isinstance(t, TypeVar)
             node = BNode()
-            output.add((node, RDF.type, TA.TypeVar))
-            output.add((node, RDFS.label, Literal(str(t))))
+            self.graph.add((node, RDF.type, TA.TypeVar))
+            self.graph.add((node, RDFS.label, Literal(str(t))))
         return node
 
-    def rdf_expr(self,
-            output: Graph,
-            expr: Expr,
+    def expr(self, expr: Expr,
             root: Node,
             current: Optional[Node] = None,
             sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
-            variables: Dict[Variable, Node] = {},
-            include_types: bool = True,
-            include_labels: bool = True,
-            include_steps: bool = True) -> Node:
+            variables: Dict[Variable, Node] = {}) -> Node:
         """
-        Translate the given expression to a representation in RDF and add it
-        to the given graph, connecting all steps to root. Inputs that match the
-        labels in the expression are appropriately attached, either as data
-        sources or as input expressions.
+        Translate and add the given expression to a representation in RDF and
+        add it to the given graph. Inputs that match the labels in the
+        expression are appropriately attached, either as data sources or as
+        input expressions.
 
         This is a lossy conversion, because the order of arguments and the
         exact structure of functions-as-arguments is not preserved.
@@ -149,33 +147,32 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             return variables[expr]
 
         current = current or BNode()
-        output.add((root, RDF.type, TA.Transformation))
+        self.graph.add((root, RDF.type, TA.Transformation))
 
-        if include_steps:
-            output.add((root, TA.step, current))
+        if self.include_steps:
+            self.graph.add((root, TA.step, current))
 
         if isinstance(expr, Base):
             datatype = expr.type.output()
 
-            if include_types:
-                output.add((current, RDF.type,
-                    self.rdf_type(output, datatype)))
+            if self.include_types:
+                self.graph.add((current, RDF.type, self.type(datatype)))
 
-            if include_labels:
-                output.add((current, RDFS.label,
+            if self.include_labels:
+                self.graph.add((current, RDFS.label,
                     Literal(f"{datatype} via {expr.definition.name}")))
 
             if isinstance(expr.definition, Operation):
                 assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
 
-                output.add((current, RDF.type, TA.TransformedData))
-                output.add((current, TA.transformer,
+                self.graph.add((current, RDF.type, TA.TransformedData))
+                self.graph.add((current, TA.transformer,
                     self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
 
-                output.add((current, RDF.type, TA.SourceData))
+                self.graph.add((current, RDF.type, TA.SourceData))
 
                 if expr.label:
                     try:
@@ -185,7 +182,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         raise RuntimeError(msg) from e
                     else:
                         if isinstance(source, Node):
-                            output.add((current, TA.source, source))
+                            self.graph.add((current, TA.source, source))
                         else:
                             source_node, source_expr = source
                             assert isinstance(source_node, Node) and \
@@ -211,9 +208,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.rdf_expr(output, expr.f, root, current,
-                sources, variables, include_types, include_labels,
-                include_steps)
+            f = self.expr(expr.f, root, current, sources, variables)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -238,62 +233,53 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if expr.x.type.operator == Function:
                 internal = BNode()
                 current_internal = internal
-                output.add((internal, RDF.type, TA.InternalData))
-                output.add((f, TA.internal, internal))
+                self.graph.add((internal, RDF.type, TA.InternalData))
+                self.graph.add((f, TA.internal, internal))
 
-                if include_steps:
-                    output.add((root, TA.step, internal))
+                if self.include_steps:
+                    self.graph.add((root, TA.step, internal))
 
-                if include_labels:
-                    output.add((internal, RDFS.label, Literal("internal")))
+                if self.include_labels:
+                    self.graph.add((internal, RDFS.label, Literal("internal")))
 
                 if isinstance(expr.x, Abstraction):
                     variables = variables | \
                         {p: internal for p in expr.x.params}
 
-                    x = self.rdf_expr(output, expr.x.body, root, BNode(),
-                        sources, variables, include_types, include_labels,
-                        include_steps)
+                    x = self.expr(expr.x.body, root, BNode(), sources,
+                        variables)
                 else:
-                    x = self.rdf_expr(output, expr.x, root, BNode(),
-                        sources, variables, include_types, include_labels,
-                        include_steps)
-                    output.add((internal, TA.feeds, x))
+                    x = self.expr(expr.x, root, BNode(), sources, variables)
+                    self.graph.add((internal, TA.feeds, x))
             else:
-                x = self.rdf_expr(output, expr.x, root, BNode(),
-                    sources, variables, include_types, include_labels,
-                    include_steps)
-            output.add((x, TA.feeds, f))
+                x = self.expr(expr.x, root, BNode(), sources, variables)
+            self.graph.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
             # operation, which has access to additional parameters that may be
             # used by the inner one. See issues #37 and #41.
             if current_internal:
-                for internal in output.objects(x, TA.internal):
-                    output.add((current_internal, TA.feeds, internal))
+                for internal in self.graph.objects(x, TA.internal):
+                    self.graph.add((current_internal, TA.feeds, internal))
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
-            for internal in output.objects(f, TA.internal):
+            for internal in self.graph.objects(f, TA.internal):
                 if internal != current_internal:
-                    output.add((x, TA.feeds, internal))
+                    self.graph.add((x, TA.feeds, internal))
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
-                for data_input in output.subjects(TA.feeds, f):
+                for data_input in self.graph.subjects(TA.feeds, f):
                     if x != data_input:
-                        output.add((data_input, TA.feeds, current_internal))
+                        self.graph.add((data_input, TA.feeds, current_internal))
 
         return current
 
-    def rdf_workflow(self,
-            output: Graph,
-            root: Node,
-            sources: set[Node],
-            steps: dict[Node, tuple[Expr, list[Node]]],
-            **kwargs) -> Node:
+    def workflow(self, root: Node, sources: set[Node],
+            steps: dict[Node, tuple[Expr, list[Node]]]) -> Node:
         """
         Convert a workflow to a full transformation graph by converting its
         individual steps to representations of expressions in RDF and combining
@@ -309,9 +295,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         """
         # TODO cycles can occur
 
-        output.bind("ta", TA)
-        output.bind(self.prefix, self.namespace)
-
         cache: Dict[Node, Node] = {}
 
         def to_expr_node(step_node: Node) -> Node:
@@ -321,11 +304,11 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 expr, inputs = steps[step_node]
                 assert all(x in steps or x in sources for x in inputs), \
                     "unknown input data source"
-                cache[step_node] = self.rdf_expr(output, expr, root, sources={
+                cache[step_node] = self.expr(expr, root, sources={
                     f"x{i}": (to_expr_node(x), steps[x][0])
                     if x in steps else x
                     for i, x in enumerate(inputs, start=1)
-                }, **kwargs)
+                })
                 return cache[step_node]
 
         # One of the tool expressions must be 'last', in that it represents the
@@ -338,8 +321,31 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             "workflow must have exactly one final step"
 
         final_expr_node = to_expr_node(final_tool_node[0])
-        output.add((root, TA.result, final_expr_node))
+        self.graph.add((root, TA.result, final_expr_node))
         return final_expr_node
+
+
+class TransformationAlgebraRDF(TransformationAlgebra):
+    def __init__(self, prefix: str, namespace: Union[Namespace, str]):
+        self.prefix = prefix
+        self.namespace = Namespace(namespace) \
+            if isinstance(namespace, str) else namespace
+        super().__init__()
+
+    def parse_rdf(self, graph: TransformationGraph, string: str) -> BNode:
+        """
+        Convenience function to parse an expression and add it to an RDF graph
+        in one go.
+        """
+        root = BNode()
+        graph.expr(root, self.parse(string).primitive())
+        return root
+
+    def uri(self, value) -> URIRef:
+        """
+        Temporary solution while moving functionality to TransformationGraph.
+        """
+        return TransformationGraph(self, self.namespace).uri(value)
 
     def sparql_type(self, name: str, type: Type,
             name_generator: Iterator[str],
