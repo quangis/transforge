@@ -214,7 +214,7 @@ In practical terms, to obtain a graph representation of the previous expression,
 
     >>> from transformation_algebra.rdf import TransformationGraph
     >>> g = TransformationGraph()
-    >>> g.expr(expr)
+    >>> g.add_expr(expr)
 
 You could then use `rdflib`'s tools to visualize it as a GraphViz file:
 
