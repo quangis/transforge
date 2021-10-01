@@ -46,7 +46,9 @@ class TransformationGraph(Graph):
         self.include_labels = include_labels
         self.include_steps = include_steps
         self.include_kinds = include_steps
+
         self.type_nodes: Dict[TypeInstance, Node] = dict()
+        self.var_nodes: Dict[Variable, Node] = dict()
 
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
@@ -137,11 +139,8 @@ class TransformationGraph(Graph):
             self.type_nodes[t] = node
             return node
 
-    def add_expr(self, expr: Expr,
-            root: Node,
-            current: Optional[Node] = None,
-            sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
-            variables: Dict[Variable, Node] = {}) -> Node:
+    def add_expr(self, expr: Expr, root: Node, current: Optional[Node] = None,
+            sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {}) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -154,8 +153,8 @@ class TransformationGraph(Graph):
         assert isinstance(expr.type, TypeInstance)
 
         if isinstance(expr, Variable):
-            assert expr in variables
-            return variables[expr]
+            assert expr in self.var_nodes
+            return self.var_nodes[expr]
 
         current = current or BNode()
 
@@ -225,7 +224,7 @@ class TransformationGraph(Graph):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.add_expr(expr.f, root, current, sources, variables)
+            f = self.add_expr(expr.f, root, current, sources)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -262,16 +261,15 @@ class TransformationGraph(Graph):
                     self.add((internal, RDFS.label, Literal("internal")))
 
                 if isinstance(expr.x, Abstraction):
-                    variables = variables | \
-                        {p: internal for p in expr.x.params}
+                    for p in expr.x.params:
+                        self.var_nodes[p] = internal
 
-                    x = self.add_expr(expr.x.body, root, BNode(), sources,
-                        variables)
+                    x = self.add_expr(expr.x.body, root, BNode(), sources)
                 else:
-                    x = self.add_expr(expr.x, root, BNode(), sources, variables)
+                    x = self.add_expr(expr.x, root, BNode(), sources)
                     self.add((internal, TA.feeds, x))
             else:
-                x = self.add_expr(expr.x, root, BNode(), sources, variables)
+                x = self.add_expr(expr.x, root, BNode(), sources)
             self.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
