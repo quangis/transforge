@@ -197,18 +197,27 @@ If desired, the underlying primitive expression can be derived using
 ## Graphs and queries
 
 Beyond *expressing* transformations, an additional goal of the library is to 
-enable *querying* them for their constituent operations and the types of data 
-that are conceptualized along the way.
+enable *querying* them for their constituent operations and data types.
 
 To turn an expression into a searchable structure, we convert it to an RDF 
-graph using the optional `transformation_algebra.rdf` module. Every use of a 
-primitive operation becomes a node that is connected to nodes that represent 
-their input and output data, which are, in turn, annotated with nodes 
-describing their type. Chains of nodes are thus obtained that are easily 
-subjected to queries along the lines of: 'find me a transformation containing 
-operations *f* and *g* that, somewhere downstream, combine into data of type 
-*t*, that is then used in an operation *h*'.
+graph. Every data source and every operation applied to it becomes a node, 
+representing the type of data that is conceptualized at that particular step in 
+the transformation. Chains of nodes are thus obtained that are easily subjected 
+to queries along the lines of: 'find me a transformation containing operations 
+*f* and *g* that, somewhere downstream, combine into data of type *t*'.
 
-This process is relatively straightforward when operations only take data as 
-input. However, expressions in an algebra may also take other operations.
+The process is straightforward when operations only take data as input. 
+However, expressions in an algebra may also take other operations, in which 
+case the process is more involved; for now, consult the source code.
 
+In practical terms, to obtain a graph representation of the previous expression, you may do:
+
+    >>> from transformation_algebra.rdf import TransformationGraph
+    >>> g = TransformationGraph()
+    >>> g.expr(expr)
+
+You could then use `rdflib`'s tools to visualize it as a GraphViz file:
+
+    >>> from rdflib.tools.rdf2dot import rdf2dot
+    >>> with open("output.dot", 'w') as f:
+    >>>     rdf2dot(g.graph, f)
