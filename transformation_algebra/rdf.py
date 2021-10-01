@@ -47,6 +47,7 @@ class TransformationGraph(object):
         self.include_types = include_types
         self.include_labels = include_labels
         self.include_steps = include_steps
+        self.type_nodes: Dict[TypeInstance, Node] = dict()
 
         self.graph.bind("ta", TA)
         # self.graph.bind("test", self.namespace)
@@ -95,7 +96,7 @@ class TransformationGraph(object):
         if value == Function:
             return TA.Function
 
-        assert value in self.algebra, f"{value} is not in algebra"
+        # assert value in self.algebra, f"{value} is not in algebra"
         if isinstance(value, TypeOperator):
             return self.namespace.term(value.name)
         else:
@@ -106,25 +107,29 @@ class TransformationGraph(object):
         """
         Translate and add the given type. Return the top-level node.
         """
-        t = type.instance()
-        if isinstance(t, TypeOperation):
+        t = type.instance().normalize()
 
-            if t.params:
-                node = BNode()
-                self.graph.add((node, RDFS.label, Literal(str(t))))
-                self.graph.add((node, RDFS.subClassOf, self.uri(t._operator)))
-                for i, param in enumerate(t.params, start=1):
-                    param_node = self.type(param)
-                    self.graph.add((node, RDF[f"_{i}"], param_node))
+        try:
+            return self.type_nodes[t]
+        except KeyError:
+            if isinstance(t, TypeOperation):
+                if t.params:
+                    node = BNode()
+                    self.graph.add((node, RDFS.label, Literal(str(t))))
+                    self.graph.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                    for i, param in enumerate(t.params, start=1):
+                        param_node = self.type(param)
+                        self.graph.add((node, RDF[f"_{i}"], param_node))
+                else:
+                    node = self.uri(t._operator)
             else:
-                return self.uri(t._operator)
-        else:
-            # TODO don't make new node if we already encountered this variable
-            assert isinstance(t, TypeVar)
-            node = BNode()
-            self.graph.add((node, RDF.type, TA.TypeVar))
-            self.graph.add((node, RDFS.label, Literal(str(t))))
-        return node
+                assert isinstance(t, TypeVar)
+                node = BNode()
+                self.graph.add((node, RDF.type, TA.TypeVar))
+                self.graph.add((node, RDFS.label, Literal(str(t))))
+
+            self.type_nodes[t] = node
+            return node
 
     def expr(self, expr: Expr,
             root: Node,

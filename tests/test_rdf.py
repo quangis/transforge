@@ -9,7 +9,7 @@ tests, it's recommended to draw out the graphs with a pen.
 
 import unittest
 
-from rdflib import Namespace, Graph, BNode, RDF, URIRef
+from rdflib import Namespace, Graph, BNode, Literal, RDF, RDFS, URIRef
 from rdflib.term import Node
 from rdflib.compare import to_isomorphic, graph_diff
 from rdflib.tools.rdf2dot import rdf2dot
@@ -17,7 +17,7 @@ from rdflib.tools.rdf2dot import rdf2dot
 from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type
+from transformation_algebra.type import Type, TypeVar
 from transformation_algebra.expr import \
     Expr, TransformationAlgebra, Data, Operation
 from transformation_algebra.rdf import TransformationAlgebraRDF, TA, \
@@ -45,14 +45,19 @@ class Step(object):
         assert not (internal and op) and not (op and not input)
 
 
-def graph_auto(alg: TransformationAlgebraRDF, expr: Expr) -> Graph:
+def graph_auto(alg: TransformationAlgebraRDF,
+        value: Union[Expr, Type]) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
-    root = BNode()
     g = TransformationGraph(alg, alg.namespace,
         include_labels=False, include_types=False)
-    g.expr(expr, root)
+    if isinstance(value, Expr):
+        root = BNode()
+        g.expr(value, root)
+    else:
+        assert isinstance(value, Type)
+        g.type(value)
     return g.graph
 
 
@@ -343,4 +348,48 @@ class TestAlgebraRDF(unittest.TestCase):
                 f=Step(ALG.f, input=["g", "a"]),
                 λ=Step(internal="f", input="a"),
             )
+        )
+
+    def test_type_reuse(self):
+        """
+        Test that type nodes are reused when transformed to RDF.
+        """
+        A = Type.declare("A")
+        F = Type.declare("F", params=1)
+        G = Type.declare("G", params=2)
+        alg = TransformationAlgebraRDF('alg', ALG)
+        g = Graph()
+        n1 = BNode()
+        n2 = BNode()
+        g.add((n1, RDFS.label, Literal("F(A)")))
+        g.add((n1, RDFS.subClassOf, ALG.F))
+        g.add((n1, RDF._1, ALG.A))
+        g.add((n2, RDFS.label, Literal("G(F(A), F(A))")))
+        g.add((n2, RDFS.subClassOf, ALG.G))
+        g.add((n2, RDF._1, n1))
+        g.add((n2, RDF._2, n1))
+        self.assertIsomorphic(
+            graph_auto(alg, G(F(A), F(A))),
+            g
+        )
+
+    def test_type_variable_reuse(self):
+        """
+        Test that bound type variables are properly reused.
+        """
+        A = Type.declare("A")
+        F = Type.declare("F", params=2)
+        alg = TransformationAlgebraRDF('alg', ALG)
+        g = Graph()
+        x, y = TypeVar(), TypeVar()
+        x.bind(A)
+        y.bind(A)
+        n1 = BNode()
+        g.add((n1, RDFS.label, Literal("F(A, A)")))
+        g.add((n1, RDFS.subClassOf, ALG.F))
+        g.add((n1, RDF._1, ALG.A))
+        g.add((n1, RDF._2, ALG.A))
+        self.assertIsomorphic(
+            graph_auto(alg, F(x, y)),
+            g
         )

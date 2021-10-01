@@ -149,6 +149,9 @@ class TypeOperator(Type, flow.Unit):
         return ((not strict and self == other) or
             bool(self.supertype and self.supertype.subtype(other)))
 
+    def normalize(self) -> TypeInstance:
+        return self.instance()
+
     def instance(self) -> TypeInstance:
         return TypeOperation(self)
 
