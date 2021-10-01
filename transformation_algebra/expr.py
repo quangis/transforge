@@ -393,7 +393,7 @@ class TransformationAlgebra(object):
 
         for k, v in chain(kwargs.items(),
                 ((v.name, v) for v in nargs)):
-            assert k is not None
+            assert k is not None, f"unknown name for a {type(v)}"
             if isinstance(v, Definition):
                 k = k.rstrip("_")
                 assert v.name is None or k == v.name
