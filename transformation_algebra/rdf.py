@@ -33,7 +33,8 @@ class TransformationGraph(object):
             namespace: Union[Namespace, str],
             include_types: bool = True,
             include_steps: bool = False,
-            include_labels: bool = True):
+            include_labels: bool = True,
+            include_kinds: bool = False):
 
         # TODO would prefer to subclass a Graph but would need to figure out
         # how plugins would know what they are dealing with
@@ -46,6 +47,7 @@ class TransformationGraph(object):
         self.include_types = include_types
         self.include_labels = include_labels
         self.include_steps = include_steps
+        self.include_kinds = include_steps
         self.type_nodes: Dict[TypeInstance, Node] = dict()
 
         self.graph.bind("ta", TA)
@@ -114,18 +116,24 @@ class TransformationGraph(object):
             if isinstance(t, TypeOperation):
                 if t.params:
                     node = BNode()
-                    self.graph.add((node, RDFS.label, Literal(str(t))))
                     self.graph.add((node, RDFS.subClassOf, self.uri(t._operator)))
+
                     for i, param in enumerate(t.params, start=1):
-                        param_node = self.type(param)
-                        self.graph.add((node, RDF[f"_{i}"], param_node))
+                        self.graph.add((node, RDF[f"_{i}"], self.type(param)))
+
+                    if self.include_labels:
+                        self.graph.add((node, RDFS.label, Literal(str(t))))
                 else:
                     node = self.uri(t._operator)
             else:
                 assert isinstance(t, TypeVar)
                 node = BNode()
-                self.graph.add((node, RDF.type, TA.TypeVar))
-                self.graph.add((node, RDFS.label, Literal(str(t))))
+
+                if self.include_labels:
+                    self.graph.add((node, RDFS.label, Literal(str(t))))
+
+                if self.include_kinds:
+                    self.graph.add((node, RDF.type, TA.TypeVar))
 
             self.type_nodes[t] = node
             return node
@@ -151,6 +159,9 @@ class TransformationGraph(object):
             return variables[expr]
 
         current = current or BNode()
+
+        # always label transformation; ignore self.include_kinds because this
+        # information is actually used by our queries
         self.graph.add((root, RDF.type, TA.Transformation))
 
         if self.include_steps:
@@ -170,13 +181,16 @@ class TransformationGraph(object):
                 assert expr.definition.is_primitive(), \
                     f"{expr.definition} is not a primitive"
 
-                self.graph.add((current, RDF.type, TA.TransformedData))
+                if self.include_kinds:
+                    self.graph.add((current, RDF.type, TA.TransformedData))
+
                 self.graph.add((current, TA.transformer,
                     self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
 
-                self.graph.add((current, RDF.type, TA.SourceData))
+                if self.include_kinds:
+                    self.graph.add((current, RDF.type, TA.SourceData))
 
                 if expr.label:
                     try:
@@ -237,8 +251,10 @@ class TransformationGraph(object):
             if expr.x.type.operator == Function:
                 internal = BNode()
                 current_internal = internal
-                self.graph.add((internal, RDF.type, TA.InternalData))
                 self.graph.add((f, TA.internal, internal))
+
+                if self.include_kinds:
+                    self.graph.add((internal, RDF.type, TA.InternalData))
 
                 if self.include_steps:
                     self.graph.add((root, TA.step, internal))

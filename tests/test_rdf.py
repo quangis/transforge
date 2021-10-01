@@ -51,7 +51,7 @@ def graph_auto(alg: TransformationAlgebraRDF,
     Transform an expression to a transformation graph.
     """
     g = TransformationGraph(alg, alg.namespace,
-        include_labels=False, include_types=False)
+        include_labels=False, include_types=False, include_kinds=False)
     if isinstance(value, Expr):
         root = BNode()
         g.expr(value, root)
@@ -61,7 +61,8 @@ def graph_auto(alg: TransformationAlgebraRDF,
     return g.graph
 
 
-def graph_manual(include_steps: bool = False, **steps: Step) -> Graph:
+def graph_manual(include_steps: bool = False, include_kinds: bool = False,
+        **steps: Step) -> Graph:
     """
     Manually construct a transformation graph.
     """
@@ -82,7 +83,9 @@ def graph_manual(include_steps: bool = False, **steps: Step) -> Graph:
 
         if include_steps:
             g.add((root, TA.step, nodes[i]))
-        g.add((nodes[i], RDF.type, kind))
+
+        if include_kinds:
+            g.add((nodes[i], RDF.type, kind))
 
         for j in step.inputs:
             g.add((nodes[j], TA.feeds, nodes[i]))
@@ -362,10 +365,8 @@ class TestAlgebraRDF(unittest.TestCase):
         g = Graph()
         n1 = BNode()
         n2 = BNode()
-        g.add((n1, RDFS.label, Literal("F(A)")))
         g.add((n1, RDFS.subClassOf, ALG.F))
         g.add((n1, RDF._1, ALG.A))
-        g.add((n2, RDFS.label, Literal("G(F(A), F(A))")))
         g.add((n2, RDFS.subClassOf, ALG.G))
         g.add((n2, RDF._1, n1))
         g.add((n2, RDF._2, n1))
@@ -386,7 +387,6 @@ class TestAlgebraRDF(unittest.TestCase):
         x.bind(A)
         y.bind(A)
         n1 = BNode()
-        g.add((n1, RDFS.label, Literal("F(A, A)")))
         g.add((n1, RDFS.subClassOf, ALG.F))
         g.add((n1, RDF._1, ALG.A))
         g.add((n1, RDF._2, ALG.A))
