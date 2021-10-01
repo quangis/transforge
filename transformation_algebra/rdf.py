@@ -23,7 +23,7 @@ from typing import Dict, Union, Iterator, Optional, Tuple
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 
-class TransformationGraph(object):
+class TransformationGraph(Graph):
     """
     A transformation graph represents expressions of a transformation algebra
     as an RDF graph.
@@ -34,13 +34,11 @@ class TransformationGraph(object):
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
-            include_kinds: bool = False):
+            include_kinds: bool = False,
+            *nargs, **kwargs):
 
-        # TODO would prefer to subclass a Graph but would need to figure out
-        # how plugins would know what they are dealing with
-        # super().__init__(self, store)
+        super().__init__(*nargs, **kwargs)
 
-        self.graph = Graph()
         self.algebra = algebra
         self.namespace = Namespace(namespace) \
             if isinstance(namespace, str) else namespace
@@ -50,15 +48,15 @@ class TransformationGraph(object):
         self.include_kinds = include_steps
         self.type_nodes: Dict[TypeInstance, Node] = dict()
 
-        self.graph.bind("ta", TA)
-        # self.graph.bind("test", self.namespace)
+        self.bind("ta", TA)
+        # self.bind("test", self.namespace)
 
     def vocabulary(self) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.
         """
-        vocab = self.graph
+        vocab = self
 
         # Add type operators to the vocabulary
         for t in self.algebra.types:
@@ -116,13 +114,13 @@ class TransformationGraph(object):
             if isinstance(t, TypeOperation):
                 if t.params:
                     node = BNode()
-                    self.graph.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                    self.add((node, RDFS.subClassOf, self.uri(t._operator)))
 
                     for i, param in enumerate(t.params, start=1):
-                        self.graph.add((node, RDF[f"_{i}"], self.type(param)))
+                        self.add((node, RDF[f"_{i}"], self.type(param)))
 
                     if self.include_labels:
-                        self.graph.add((node, RDFS.label, Literal(str(t))))
+                        self.add((node, RDFS.label, Literal(str(t))))
                 else:
                     node = self.uri(t._operator)
             else:
@@ -130,10 +128,10 @@ class TransformationGraph(object):
                 node = BNode()
 
                 if self.include_labels:
-                    self.graph.add((node, RDFS.label, Literal(str(t))))
+                    self.add((node, RDFS.label, Literal(str(t))))
 
                 if self.include_kinds:
-                    self.graph.add((node, RDF.type, TA.TypeVar))
+                    self.add((node, RDF.type, TA.TypeVar))
 
             self.type_nodes[t] = node
             return node
@@ -162,19 +160,19 @@ class TransformationGraph(object):
 
         # always label transformation; ignore self.include_kinds because this
         # information is actually used by our queries
-        self.graph.add((root, RDF.type, TA.Transformation))
+        self.add((root, RDF.type, TA.Transformation))
 
         if self.include_steps:
-            self.graph.add((root, TA.step, current))
+            self.add((root, TA.step, current))
 
         if isinstance(expr, Base):
             datatype = expr.type.output()
 
             if self.include_types:
-                self.graph.add((current, RDF.type, self.type(datatype)))
+                self.add((current, RDF.type, self.type(datatype)))
 
             if self.include_labels:
-                self.graph.add((current, RDFS.label,
+                self.add((current, RDFS.label,
                     Literal(f"{datatype} via {expr.definition.name}")))
 
             if isinstance(expr.definition, Operation):
@@ -182,15 +180,15 @@ class TransformationGraph(object):
                     f"{expr.definition} is not a primitive"
 
                 if self.include_kinds:
-                    self.graph.add((current, RDF.type, TA.TransformedData))
+                    self.add((current, RDF.type, TA.TransformedData))
 
-                self.graph.add((current, TA.transformer,
+                self.add((current, TA.transformer,
                     self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
 
                 if self.include_kinds:
-                    self.graph.add((current, RDF.type, TA.SourceData))
+                    self.add((current, RDF.type, TA.SourceData))
 
                 if expr.label:
                     try:
@@ -200,7 +198,7 @@ class TransformationGraph(object):
                         raise RuntimeError(msg) from e
                     else:
                         if isinstance(source, Node):
-                            self.graph.add((current, TA.source, source))
+                            self.add((current, TA.source, source))
                         else:
                             source_node, source_expr = source
                             assert isinstance(source_node, Node) and \
@@ -251,16 +249,16 @@ class TransformationGraph(object):
             if expr.x.type.operator == Function:
                 internal = BNode()
                 current_internal = internal
-                self.graph.add((f, TA.internal, internal))
+                self.add((f, TA.internal, internal))
 
                 if self.include_kinds:
-                    self.graph.add((internal, RDF.type, TA.InternalData))
+                    self.add((internal, RDF.type, TA.InternalData))
 
                 if self.include_steps:
-                    self.graph.add((root, TA.step, internal))
+                    self.add((root, TA.step, internal))
 
                 if self.include_labels:
-                    self.graph.add((internal, RDFS.label, Literal("internal")))
+                    self.add((internal, RDFS.label, Literal("internal")))
 
                 if isinstance(expr.x, Abstraction):
                     variables = variables | \
@@ -270,31 +268,31 @@ class TransformationGraph(object):
                         variables)
                 else:
                     x = self.expr(expr.x, root, BNode(), sources, variables)
-                    self.graph.add((internal, TA.feeds, x))
+                    self.add((internal, TA.feeds, x))
             else:
                 x = self.expr(expr.x, root, BNode(), sources, variables)
-            self.graph.add((x, TA.feeds, f))
+            self.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
             # operation, which has access to additional parameters that may be
             # used by the inner one. See issues #37 and #41.
             if current_internal:
-                for internal in self.graph.objects(x, TA.internal):
-                    self.graph.add((current_internal, TA.feeds, internal))
+                for internal in self.objects(x, TA.internal):
+                    self.add((current_internal, TA.feeds, internal))
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
-            for internal in self.graph.objects(f, TA.internal):
+            for internal in self.objects(f, TA.internal):
                 if internal != current_internal:
-                    self.graph.add((x, TA.feeds, internal))
+                    self.add((x, TA.feeds, internal))
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
-                for data_input in self.graph.subjects(TA.feeds, f):
+                for data_input in self.subjects(TA.feeds, f):
                     if x != data_input:
-                        self.graph.add((data_input, TA.feeds, current_internal))
+                        self.add((data_input, TA.feeds, current_internal))
 
         return current
 
@@ -341,7 +339,7 @@ class TransformationGraph(object):
             "workflow must have exactly one final step"
 
         final_expr_node = to_expr_node(final_tool_node[0])
-        self.graph.add((root, TA.result, final_expr_node))
+        self.add((root, TA.result, final_expr_node))
         return final_expr_node
 
 

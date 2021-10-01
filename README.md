@@ -220,4 +220,4 @@ You could then use `rdflib`'s tools to visualize it as a GraphViz file:
 
     >>> from rdflib.tools.rdf2dot import rdf2dot
     >>> with open("output.dot", 'w') as f:
-    >>>     rdf2dot(g.graph, f)
+    >>>     rdf2dot(g, f)

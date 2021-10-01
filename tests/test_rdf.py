@@ -58,7 +58,7 @@ def graph_auto(alg: TransformationAlgebraRDF,
     else:
         assert isinstance(value, Type)
         g.type(value)
-    return g.graph
+    return g
 
 
 def graph_manual(include_steps: bool = False, include_kinds: bool = False,
