@@ -54,10 +54,10 @@ def graph_auto(alg: TransformationAlgebraRDF,
         include_labels=False, include_types=False, include_kinds=False)
     if isinstance(value, Expr):
         root = BNode()
-        g.expr(value, root)
+        g.add_expr(value, root)
     else:
         assert isinstance(value, Type)
-        g.type(value)
+        g.add_type(value)
     return g
 
 

@@ -102,9 +102,10 @@ class TransformationGraph(Graph):
             assert isinstance(value, Definition) and value.name
             return self.namespace.term(value.name)
 
-    def type(self, type: Type) -> Node:
+    def add_type(self, type: Type) -> Node:
         """
-        Translate and add the given type. Return the top-level node.
+        Translate and add an RDF representation of the given type. Return the
+        top-level node.
         """
         t = type.instance().normalize()
 
@@ -117,7 +118,7 @@ class TransformationGraph(Graph):
                     self.add((node, RDFS.subClassOf, self.uri(t._operator)))
 
                     for i, param in enumerate(t.params, start=1):
-                        self.add((node, RDF[f"_{i}"], self.type(param)))
+                        self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
                     if self.include_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
@@ -136,7 +137,7 @@ class TransformationGraph(Graph):
             self.type_nodes[t] = node
             return node
 
-    def expr(self, expr: Expr,
+    def add_expr(self, expr: Expr,
             root: Node,
             current: Optional[Node] = None,
             sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {},
@@ -169,7 +170,7 @@ class TransformationGraph(Graph):
             datatype = expr.type.output()
 
             if self.include_types:
-                self.add((current, RDF.type, self.type(datatype)))
+                self.add((current, RDF.type, self.add_type(datatype)))
 
             if self.include_labels:
                 self.add((current, RDFS.label,
@@ -224,7 +225,7 @@ class TransformationGraph(Graph):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.expr(expr.f, root, current, sources, variables)
+            f = self.add_expr(expr.f, root, current, sources, variables)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -264,13 +265,13 @@ class TransformationGraph(Graph):
                     variables = variables | \
                         {p: internal for p in expr.x.params}
 
-                    x = self.expr(expr.x.body, root, BNode(), sources,
+                    x = self.add_expr(expr.x.body, root, BNode(), sources,
                         variables)
                 else:
-                    x = self.expr(expr.x, root, BNode(), sources, variables)
+                    x = self.add_expr(expr.x, root, BNode(), sources, variables)
                     self.add((internal, TA.feeds, x))
             else:
-                x = self.expr(expr.x, root, BNode(), sources, variables)
+                x = self.add_expr(expr.x, root, BNode(), sources, variables)
             self.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
@@ -296,7 +297,7 @@ class TransformationGraph(Graph):
 
         return current
 
-    def workflow(self, root: Node, sources: set[Node],
+    def add_workflow(self, root: Node, sources: set[Node],
             steps: dict[Node, tuple[Expr, list[Node]]]) -> Node:
         """
         Convert a workflow to a full transformation graph by converting its
@@ -322,7 +323,7 @@ class TransformationGraph(Graph):
                 expr, inputs = steps[step_node]
                 assert all(x in steps or x in sources for x in inputs), \
                     "unknown input data source"
-                cache[step_node] = self.expr(expr, root, sources={
+                cache[step_node] = self.add_expr(expr, root, sources={
                     f"x{i}": (to_expr_node(x), steps[x][0])
                     if x in steps else x
                     for i, x in enumerate(inputs, start=1)
@@ -356,7 +357,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
         in one go.
         """
         root = BNode()
-        graph.expr(root, self.parse(string).primitive())
+        graph.add_expr(root, self.parse(string).primitive())
         return root
 
     def uri(self, value) -> URIRef:
