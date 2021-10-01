@@ -61,7 +61,7 @@ def graph_auto(alg: TransformationAlgebraRDF,
     return g.graph
 
 
-def graph_manual(**steps: Step) -> Graph:
+def graph_manual(include_steps: bool = False, **steps: Step) -> Graph:
     """
     Manually construct a transformation graph.
     """
@@ -80,7 +80,8 @@ def graph_manual(**steps: Step) -> Graph:
         else:
             kind = TA.SourceData
 
-        g.add((root, TA.step, nodes[i]))
+        if include_steps:
+            g.add((root, TA.step, nodes[i]))
         g.add((nodes[i], RDF.type, kind))
 
         for j in step.inputs:

@@ -32,9 +32,8 @@ class TransformationGraph(object):
     def __init__(self, algebra: TransformationAlgebra,
             namespace: Union[Namespace, str],
             include_types: bool = True,
-            include_steps: bool = True,
-            include_labels: bool = True,
-            include_classes: bool = True):
+            include_steps: bool = False,
+            include_labels: bool = True):
 
         # TODO would prefer to subclass a Graph but would need to figure out
         # how plugins would know what they are dealing with
