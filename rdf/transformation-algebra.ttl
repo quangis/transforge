@@ -46,7 +46,7 @@
     rdfs:domain :Data;
     rdfs:range :TransformedData.
 
-:transformer
+:via
     a rdf:Property;
     rdfs:comment "The conceptual operation by which the data was transformed.";
     rdfs:domain :TransformedData;

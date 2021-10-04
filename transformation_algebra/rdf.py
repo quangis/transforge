@@ -182,8 +182,7 @@ class TransformationGraph(Graph):
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.transformer,
-                    self.uri(expr.definition)))
+                self.add((current, TA.via, self.uri(expr.definition)))
             else:
                 assert isinstance(expr.definition, Data)
 
@@ -415,7 +414,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if isinstance(current, Operation):
                 assert current.is_primitive(), \
                     "operation in a flow query must be primitive"
-                yield f"?{name} ta:transformer <{self.uri(current)}>."
+                yield f"?{name} ta:via <{self.uri(current)}>."
             elif isinstance(current, Type):
                 yield from self.sparql_type(name, current, name_generator)
             else:

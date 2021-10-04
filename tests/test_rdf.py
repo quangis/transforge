@@ -74,7 +74,7 @@ def graph_manual(include_steps: bool = False, include_kinds: bool = False,
     for i, step in steps.items():
         if step.transformer:
             kind = TA.TransformedData
-            g.add((nodes[i], TA.transformer, step.transformer))
+            g.add((nodes[i], TA.via, step.transformer))
         elif step.internal:
             kind = TA.InternalData
             g.add((nodes[step.internal], TA.internal, nodes[i]))
