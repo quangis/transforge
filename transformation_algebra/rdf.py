@@ -392,8 +392,8 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
     def trace(self,
             name: str,
-            current: flow.Flow,
-            previous: Optional[Tuple[str, flow.Unit, bool]] = None,
+            current: Type | Operation | None | flow.Flow,
+            previous: Optional[Tuple[str, Type | Operation, bool]] = None,
             name_generator: Optional[Iterator[str]] = None) -> \
             Iterator[str]:
         """
@@ -404,7 +404,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         name_generator = name_generator or iter(f"n{i}" for i in count())
 
-        if isinstance(current, flow.Unit):
+        if isinstance(current, (Type, Operation)):
             if previous:
                 yield (
                     f"?{previous[0]} "
@@ -438,7 +438,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                         previous = previous[0], previous[1], True
                 else:
                     yield from self.trace(n, x, previous, name_generator)
-                    if isinstance(x, flow.Unit):
+                    if isinstance(x, (Type, Operation)):
                         previous = n, x, False
                     else:
                         break

@@ -14,7 +14,7 @@ from itertools import groupby, chain
 from inspect import signature
 from typing import Optional, Dict, Callable, Union, List, Iterator, Set
 
-from transformation_algebra import error, flow
+from transformation_algebra import error
 from transformation_algebra.type import \
     Type, TypeVar, TypeSchema, TypeOperator, TypeInstance, Function
 
@@ -64,7 +64,7 @@ class Data(Definition):
         assert self.type.instance().operator != Function
 
 
-class Operation(Definition, flow.Unit):
+class Operation(Definition):
     """
     The definition of a transformation. An instance of such a definition is a
     base expression.

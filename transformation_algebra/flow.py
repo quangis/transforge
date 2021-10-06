@@ -1,22 +1,60 @@
 """
-This module intends to provide a way to express chains of transformation
-elements (i.e. data and operations) in such a way that a query might use it to
-check if a given transformation expression contains all of them in the
-specified order. Anything that can act as a single transformation element (e.g.
-data or operations) should inherit from Unit.
+This module intends to provide a way to express transformation trees (i.e.
+chains of types and operations) in such a way that a query might use it to
+check if a given transformation expression contains types and operations in the
+specified order.
 """
 
 from __future__ import annotations
 
 from abc import ABC
-from typing import Union, Any
+from transformation_algebra import Operation, Type
+from typing import TYPE_CHECKING, Protocol, TypeVar, Iterator, Any, Union, \
+    overload
+
+# We use '...' to indicate that steps may be skipped. This workaround allows us
+# to refer to the ellipsis' type. See github.com/python/typing/issues/684
+if TYPE_CHECKING:
+    from builtins import ellipsis
+else:
+    ellipsis = type(Ellipsis)
+
+# For convenience, we allow nested sequences in `Flow.serial()`. The following
+# temporary solution to the recursive type thus introduced has been lifted from
+# github.com/python/mypy/issues/731
+_T_co = TypeVar("_T_co")
 
 
-"""
-`None` represents a skip, which may alternatively be written as an ellipsis,
-that is, `...`.
-"""
-Skip = Union[None, type(Ellipsis)]  # type: Any
+class _RecursiveSequence(Protocol[_T_co]):
+    def __len__(self) -> int:
+        ...
+
+    @overload
+    def __getitem__(self, __index: int) -> _T_co | _RecursiveSequence[_T_co]:
+        ...
+
+    @overload
+    def __getitem__(self, __index: slice) -> _RecursiveSequence[_T_co]:
+        ...
+
+    def __contains__(self, __x: object) -> bool:
+        ...
+
+    def __iter__(self) -> Iterator[_T_co | _RecursiveSequence[_T_co]]:
+        ...
+
+    def __reversed__(self) -> Iterator[_T_co | _RecursiveSequence[_T_co]]:
+        ...
+
+    def count(self, __value: Any) -> int:
+        ...
+
+    def index(self, __value: Any, __start: int = ...,
+            __stop: int = ...) -> int:
+        ...
+
+
+Unit = Union[Type, Operation, ellipsis]
 
 
 class Flow(ABC):
@@ -26,58 +64,67 @@ class Flow(ABC):
     flow holds that there must be datatypes A and B that are fed to an
     operation f that eventually results in a datatype C:
 
-    C << ... << f << (A & B)
+    Flow.serial(C, ..., f, [A, B])
     """
     # The same can also be described in terms of semantic linear time logic
     # formulae (SLTL), but since we will be using SPARQL to search through
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    def __and__(self, other: Flow) -> Parallel:
-        if isinstance(self, Parallel):
-            self.branches.append(other)
-            return self
-        else:
-            return Parallel(self, other)
+    @staticmethod
+    def serial(*steps: Unit | _RecursiveSequence[Unit]) -> Serial:
+        """
+        A convenience function for more readable queries. Tuples indicate
+        sequences, lists indicate branches, the ellipsis indicates we may skip
+        any number of steps.
+        """
+        args: list[Type | Operation | None | Parallel] = []
+        for step in steps:
+            if step == ...:
+                args.append(None)
+            elif isinstance(step, (Type, Operation)):
+                args.append(step)
+            elif isinstance(step, tuple):
+                args.extend(Flow.serial(*step).sequence)
+            elif isinstance(step, list):
+                args.append(Flow.parallel(*step))
+            else:
+                raise ValueError
 
-    def __lshift__(self, other: Union[Flow, Skip]) -> Serial:
-        x = None if other == ... else other
-        if isinstance(self, Serial):
-            self.sequence.append(x)
-            return self
-        else:
-            return Serial(self, x)
+        return Serial(*args)
 
+    @staticmethod
+    def parallel(*steps: Unit | _RecursiveSequence[Unit]) -> Parallel:
+        """
+        Counterpart to `serial`.
+        """
+        args: list[Type | Operation | Serial] = []
+        for step in steps:
+            if isinstance(step, (Type, Operation)):
+                args.append(step)
+            elif isinstance(step, list):
+                args.extend(Flow.parallel(*step).branches)
+            elif isinstance(step, tuple):
+                args.append(Flow.serial(*step))
+            else:
+                raise ValueError
 
-class Unit(Flow, ABC):
-    """
-    A single element of a Flow.
-    """
-    pass
+        return Parallel(*args)
 
 
 class Serial(Flow):
     """
-    Describes which transformation elements must occur, in what order. A `None`
-    value (or `...` ellipsis) indicates that we may skip zero or more steps.
+    Describes which transformation elements must occur, in what order.
     """
 
-    def __init__(self, *sequence: Union[Flow, None]):
-        # assert len(list(x for x in sequence if x)) > 1
+    def __init__(self, *sequence: Type | Operation | None | Parallel):
         self.sequence = list(sequence)
-
-    # def pairs(self) -> Iterator[Tuple[Optional[Flow], bool, Optional[Flow]]]:
-    #     """
-    #     Return a pairwise iterator of connections between units in the series,
-    #     with a boolean indicating whether the connection is direct or not.
-    #     """
 
 
 class Parallel(Flow):
     """
-    Describes which transformation elements must occur conjunctively.
+    Describes which transformation paths must occur conjunctively.
     """
 
-    def __init__(self, *branches: Flow):
-        # assert len(list(x for x in branches if x)) > 1
+    def __init__(self, *branches: Type | Operation | Serial):
         self.branches = list(branches)
