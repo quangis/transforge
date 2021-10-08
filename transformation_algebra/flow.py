@@ -25,25 +25,25 @@ else:
 _T_co = TypeVar("_T_co")
 
 
-class _RecursiveSequence(Protocol[_T_co]):
+class Nested(Protocol[_T_co]):
     def __len__(self) -> int:
         ...
 
     @overload
-    def __getitem__(self, __index: int) -> _T_co | _RecursiveSequence[_T_co]:
+    def __getitem__(self, __index: int) -> _T_co | Nested[_T_co]:
         ...
 
     @overload
-    def __getitem__(self, __index: slice) -> _RecursiveSequence[_T_co]:
+    def __getitem__(self, __index: slice) -> Nested[_T_co]:
         ...
 
     def __contains__(self, __x: object) -> bool:
         ...
 
-    def __iter__(self) -> Iterator[_T_co | _RecursiveSequence[_T_co]]:
+    def __iter__(self) -> Iterator[_T_co | Nested[_T_co]]:
         ...
 
-    def __reversed__(self) -> Iterator[_T_co | _RecursiveSequence[_T_co]]:
+    def __reversed__(self) -> Iterator[_T_co | Nested[_T_co]]:
         ...
 
     def count(self, __value: Any) -> int:
@@ -54,77 +54,77 @@ class _RecursiveSequence(Protocol[_T_co]):
         ...
 
 
-Unit = Union[Type, Operation, ellipsis]
+Unit = Union[Type, Operation, ellipsis, 'TransformationFlow']
 
 
-class Flow(ABC):
+class TransformationFlow(ABC):
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
     flow holds that there must be datatypes A and B that are fed to an
     operation f that eventually results in a datatype C:
 
-    Flow.serial(C, ..., f, [A, B])
+    Serial(C, ..., f, [A, B])
+
+    Note that, for succinct notation, nested tuples are interpreted as `Serial`
+    and lists as `Parallel` transformation flows. The ellipsis indicates we may
+    skip any number of steps.
+
     """
     # The same can also be described in terms of semantic linear time logic
     # formulae (SLTL), but since we will be using SPARQL to search through
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    @staticmethod
-    def serial(*steps: Unit | _RecursiveSequence[Unit]) -> Serial:
-        """
-        A convenience function for more readable queries. Tuples indicate
-        sequences, lists indicate branches, the ellipsis indicates we may skip
-        any number of steps.
-        """
-        args: list[Type | Operation | None | Parallel] = []
-        for step in steps:
-            if step == ...:
-                args.append(None)
-            elif isinstance(step, (Type, Operation)):
-                args.append(step)
-            elif isinstance(step, tuple):
-                args.extend(Flow.serial(*step).sequence)
-            elif isinstance(step, list):
-                args.append(Flow.parallel(*step))
-            else:
-                raise ValueError
-
-        return Serial(*args)
+    def __init__(self, *items: Unit | Nested[Unit]):
+        self.items: list[Type | Operation | TransformationFlow] = [
+            TransformationFlow.shorthand(x) for x in items]
 
     @staticmethod
-    def parallel(*steps: Unit | _RecursiveSequence[Unit]) -> Parallel:
+    def shorthand(value: Unit | Nested[Unit]) \
+            -> Union[Type, Operation, TransformationFlow]:
         """
-        Counterpart to `serial`.
+        Translate shorthand data structures (ellipsis for skips, tuples for
+        serials, lists for parallels) to real flows.
         """
-        args: list[Type | Operation | Serial] = []
-        for step in steps:
-            if isinstance(step, (Type, Operation)):
-                args.append(step)
-            elif isinstance(step, list):
-                args.extend(Flow.parallel(*step).branches)
-            elif isinstance(step, tuple):
-                args.append(Flow.serial(*step))
-            else:
-                raise ValueError
+        if value == ...:
+            return Skip()
+        elif isinstance(value, tuple):
+            return Serial(*value)
+        elif isinstance(value, list):
+            return Parallel(*value)
+        elif isinstance(value, (Type, Operation, TransformationFlow)):
+            return value
+        else:
+            raise ValueError(
+                f"{value} cannot be interpreted as a TransformationFlow")
 
-        return Parallel(*args)
 
-
-class Serial(Flow):
+class Skip(TransformationFlow):
     """
-    Describes which transformation elements must occur, in what order.
-    """
-
-    def __init__(self, *sequence: Type | Operation | None | Parallel):
-        self.sequence = list(sequence)
-
-
-class Parallel(Flow):
-    """
-    Describes which transformation paths must occur conjunctively.
+    Indicate that any number of steps may be skipped over.
     """
 
-    def __init__(self, *branches: Type | Operation | Serial):
-        self.branches = list(branches)
+    def __init__(self):
+        pass
+
+
+class Serial(TransformationFlow):
+    """
+    Indicate the order in which transformation elements must occur.
+    """
+    pass
+
+
+class Parallel(TransformationFlow):
+    """
+    Indicate which transformation paths must occur conjunctively.
+    """
+    pass
+
+
+class Choice(TransformationFlow):
+    """
+    Indicate which transformation paths can occur disjunctively.
+    """
+    pass
