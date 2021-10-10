@@ -8,9 +8,10 @@ specified order.
 from __future__ import annotations
 
 from abc import ABC
-from transformation_algebra import Operation, Type
+from transformation_algebra.type import Type, TypeInstance
+from transformation_algebra.expr import Operation
 from typing import TYPE_CHECKING, Protocol, TypeVar, Iterator, Any, Union, \
-    overload
+    overload, Optional
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
@@ -54,7 +55,7 @@ class Nested(Protocol[_T_co]):
         ...
 
 
-Unit = Union[Type, Operation, ellipsis, 'TransformationFlow']
+Element = Union[Type, Operation, ellipsis, 'TransformationFlow']
 
 
 class TransformationFlow(ABC):
@@ -76,13 +77,13 @@ class TransformationFlow(ABC):
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    def __init__(self, *items: Unit | Nested[Unit]):
-        self.items: list[Type | Operation | TransformationFlow] = [
+    def __init__(self, *items: Element | Nested[Element]):
+        self.items: list[TransformationFlow] = [
             TransformationFlow.shorthand(x) for x in items]
 
     @staticmethod
-    def shorthand(value: Unit | Nested[Unit]) \
-            -> Union[Type, Operation, TransformationFlow]:
+    def shorthand(value: Element | Nested[Element]) \
+            -> TransformationFlow:
         """
         Translate shorthand data structures (ellipsis for skips, tuples for
         serials, lists for parallels) to real flows.
@@ -93,11 +94,19 @@ class TransformationFlow(ABC):
             return Serial(*value)
         elif isinstance(value, list):
             return Parallel(*value)
-        elif isinstance(value, (Type, Operation, TransformationFlow)):
+        elif isinstance(value, (Type, Operation)):
+            return Unit(value)
+        elif isinstance(value, TransformationFlow):
             return value
         else:
             raise ValueError(
                 f"{value} cannot be interpreted as a TransformationFlow")
+
+
+class Unit(TransformationFlow):
+    def __init__(self, value: Type | Operation):
+        self.content: Type | Operation = value
+        self.skip = False
 
 
 class Skip(TransformationFlow):
