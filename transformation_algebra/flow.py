@@ -62,15 +62,17 @@ class TransformationFlow(ABC):
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
-    flow holds that there must be datatypes A and B that are fed to an
-    operation f that eventually results in a datatype C:
+    flow holds that there must be datatypes `A` and `B` that are fed to an
+    operation f that eventually results in a datatype `C`:
 
     Serial(C, ..., f, [A, B])
 
-    Note that, for succinct notation, nested tuples are interpreted as `Serial`
-    and lists as `Parallel` transformation flows. The ellipsis indicates we may
-    skip any number of steps.
+    Note that the flow is 'reversed' (from output to input). This allows for a
+    convenient tree-like notation, but it may trip you up.
 
+    Furthermore, for succinct notation, nested tuples are interpreted as
+    `Serial` and lists as `Parallel` transformation flows. The ellipsis
+    indicates we may skip any number of steps.
     """
     # The same can also be described in terms of semantic linear time logic
     # formulae (SLTL), but since we will be using SPARQL to search through
@@ -78,6 +80,8 @@ class TransformationFlow(ABC):
     # translation.
 
     def __init__(self, *items: Element | Nested[Element]):
+        # Does a skip occur after? (e.g. *before* in the reversed sequence)
+        self.skip = False
         self.items: list[TransformationFlow] = [
             TransformationFlow.shorthand(x) for x in items]
 
@@ -88,14 +92,15 @@ class TransformationFlow(ABC):
         Translate shorthand data structures (ellipsis for skips, tuples for
         serials, lists for parallels) to real flows.
         """
-        if value == ...:
-            return Skip()
-        elif isinstance(value, tuple):
+        assert value != ..., "ellipses may only occur in serials"
+        if isinstance(value, tuple):
             return Serial(*value)
         elif isinstance(value, list):
             return Parallel(*value)
-        elif isinstance(value, (Type, Operation)):
-            return Unit(value)
+        elif isinstance(value, Type):
+            return Unit(type=value)
+        elif isinstance(value, Operation):
+            return Unit(operation=value)
         elif isinstance(value, TransformationFlow):
             return value
         else:
@@ -104,25 +109,43 @@ class TransformationFlow(ABC):
 
 
 class Unit(TransformationFlow):
-    def __init__(self, value: Type | Operation):
-        self.content: Type | Operation = value
-        self.skip = False
-
-
-class Skip(TransformationFlow):
     """
-    Indicate that any number of steps may be skipped over.
+    A unit represents a single data instance in the flow.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, type: Optional[Type] = None,
+            operation: Optional[Operation] = None):
+        self.via = operation
+        self.immediate = False
+        self.type = type
+        super().__init__()
 
 
 class Serial(TransformationFlow):
     """
     Indicate the order in which transformation elements must occur.
     """
-    pass
+
+    def __init__(self, *items: Element | Nested[Element]):
+        super().__init__()
+
+        skip: bool = False
+        then: Type | Operation | None = None  # 'previous', in reversed flow
+        for current in items:
+            if current == ...:
+                skip = True
+                continue
+            if isinstance(current, Operation) and isinstance(then, Type):
+                assert isinstance(self.items[-1], Unit)
+                self.items[-1].via = current
+                self.items[-1].immediate = skip
+            else:
+                item = TransformationFlow.shorthand(current)
+                item.skip = skip
+                self.items.append(item)
+            skip = False
+            if isinstance(current, (Type, Operation)):
+                then = current
 
 
 class Parallel(TransformationFlow):
