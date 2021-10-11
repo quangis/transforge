@@ -39,7 +39,7 @@ class TANamespace(ClosedNamespace):
         return rt
 
     def term(self, value) -> URIRef:
-        if isinstance(value, (Operation, TypeOperator)):
+        if isinstance(value, (Definition, TypeOperator)):
             return super().term(value.name)
         else:
             return super().term(value)
@@ -52,7 +52,7 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, algebra: TransformationAlgebra,
-            namespace: Union[Namespace, str],
+            namespace: TANamespace,
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
@@ -62,8 +62,7 @@ class TransformationGraph(Graph):
         super().__init__(*nargs, **kwargs)
 
         self.algebra = algebra
-        self.namespace = Namespace(namespace) \
-            if isinstance(namespace, str) else namespace
+        self.namespace = namespace
         self.include_types = include_types
         self.include_labels = include_labels
         self.include_steps = include_steps
@@ -85,7 +84,7 @@ class TransformationGraph(Graph):
         # Add type operators to the vocabulary
         for t in self.algebra.types:
             if t.arity > 0:
-                current_uri = self.uri(t)
+                current_uri = self.namespace[t]
                 vocab.add((current_uri, RDF.type, TA.Type))
                 vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
                 vocab.add((current_uri, RDFS.label, Literal(str(t))))
@@ -93,7 +92,7 @@ class TransformationGraph(Graph):
                 previous_uri = None
                 current: Optional[TypeOperator] = t
                 while current:
-                    current_uri = self.uri(current)
+                    current_uri = self.namespace[current]
                     vocab.add((current_uri, RDFS.label, Literal(str(t))))
                     vocab.add((current_uri, RDF.type, TA.Type))
                     if previous_uri:
@@ -103,7 +102,7 @@ class TransformationGraph(Graph):
 
         # Add operations to the vocabulary
         for d in self.algebra.definitions.values():
-            node = self.uri(d)
+            node = self.namespace[d]
             type_node = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, type_node))
             vocab.add((node, RDFS.label, Literal(str(d.name))))
@@ -111,20 +110,6 @@ class TransformationGraph(Graph):
                 vocab.add((node, RDFS.comment, Literal(d.description)))
 
         return vocab
-
-    def uri(self, value: Union[TypeOperator, Definition]) -> URIRef:
-        """
-        Obtain the URI node for an operation or type operator.
-        """
-        if value == Function:
-            return TA.Function
-
-        # assert value in self.algebra, f"{value} is not in algebra"
-        if isinstance(value, TypeOperator):
-            return self.namespace.term(value.name)
-        else:
-            assert isinstance(value, Definition) and value.name
-            return self.namespace.term(value.name)
 
     def add_type(self, type: Type) -> Node:
         """
@@ -139,7 +124,8 @@ class TransformationGraph(Graph):
             if isinstance(t, TypeOperation):
                 if t.params:
                     node = BNode()
-                    self.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                    self.add((node, RDFS.subClassOf,
+                        self.namespace[t._operator]))
 
                     for i, param in enumerate(t.params, start=1):
                         self.add((node, RDF[f"_{i}"], self.add_type(param)))
@@ -147,7 +133,7 @@ class TransformationGraph(Graph):
                     if self.include_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
                 else:
-                    node = self.uri(t._operator)
+                    node = self.namespace[t._operator]
             else:
                 assert isinstance(t, TypeVar)
                 node = BNode()
@@ -204,7 +190,7 @@ class TransformationGraph(Graph):
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.via, self.uri(expr.definition)))
+                self.add((current, TA.via, self.namespace[expr.definition]))
             else:
                 assert isinstance(expr.definition, Data)
 
