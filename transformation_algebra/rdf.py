@@ -391,9 +391,9 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                 yield f"?{name} {pred}/(rdfs:subClassOf*) <{self.uri(t._operator)}>."
 
     def trace(self,
-            name: str,
-            current: Type | Operation | None | flow.Flow,
-            previous: Optional[Tuple[str, Type | Operation, bool]] = None,
+            f: flow.TransformationFlow,
+            current: str,
+            previous: Optional[str] = None,
             name_generator: Optional[Iterator[str]] = None) -> \
             Iterator[str]:
         """
@@ -404,46 +404,36 @@ class TransformationAlgebraRDF(TransformationAlgebra):
 
         name_generator = name_generator or iter(f"n{i}" for i in count())
 
-        if isinstance(current, (Type, Operation)):
+        if isinstance(f, flow.Unit):
             if previous:
                 yield (
-                    f"?{previous[0]} "
-                    f"({'^ta:feeds' + ('+' if previous[2] else '')}) "
-                    f"?{name}.")
+                    f"?{previous} "
+                    f"({'^ta:feeds' + ('+' if f.skip else '')}) "
+                    f"?{current}.")
 
-            if isinstance(current, Operation):
-                assert current.is_primitive(), \
+            if f.via:
+                assert f.via.is_primitive(), \
                     "operation in a flow query must be primitive"
-                yield f"?{name} ta:via <{self.uri(current)}>."
-            elif isinstance(current, Type):
-                yield from self.sparql_type(name, current, name_generator)
-            else:
-                raise NotImplementedError
+                yield f"?{current} ta:via <{self.uri(f.via)}>."
+            if f.type:
+                yield from self.sparql_type(current, f.type, name_generator)
 
-        elif isinstance(current, flow.Parallel):
-            for sub in current.branches:
-                yield from self.trace(next(name_generator), sub, previous,
+        elif isinstance(f, flow.Parallel):
+            for sub in f.items:
+                yield from self.trace(sub, next(name_generator), previous,
                     name_generator)
 
         else:
-            assert isinstance(current, flow.Serial)
+            assert isinstance(f, flow.Serial)
 
             # TODO remove this assumption when possible
-            assert all(not isinstance(x, flow.Parallel)
-                for x in current.sequence[:-1])
+            assert all(isinstance(x, flow.Unit) for x in f.items[:-1])
 
-            for n, x in zip(chain([name], name_generator), current.sequence):
-                if x is None:
-                    if previous is not None:
-                        previous = previous[0], previous[1], True
-                else:
-                    yield from self.trace(n, x, previous, name_generator)
-                    if isinstance(x, (Type, Operation)):
-                        previous = n, x, False
-                    else:
-                        break
+            for n, x in zip(chain([current], name_generator), f.items):
+                yield from self.trace(x, n, previous, name_generator)
+                previous = n
 
-    def sparql_flow(self, flow: flow.Flow) -> sparql.Query:
+    def sparql_flow(self, flow: flow.TransformationFlow) -> sparql.Query:
         """
         Convert this Flow to a SPARQL query.
         """
@@ -454,7 +444,7 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             "?workflow rdfs:comment ?description.",
             "?workflow ta:result ?output_node.",
         ]
-        query.extend(self.trace("output_node", flow))
+        query.extend(self.trace(flow, "output_node"))
         query.append("} GROUP BY ?workflow")
 
         print("Query is:")
@@ -466,5 +456,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
                     self.prefix: self.namespace}
         )
 
-    def query(self, g: Graph, flow: flow.Flow) -> sparql.QueryResult:
+    def query(self, g: Graph,
+            flow: flow.TransformationFlow) -> sparql.QueryResult:
         return g.query(self.sparql_flow(flow))
