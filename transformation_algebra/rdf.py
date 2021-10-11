@@ -356,15 +356,6 @@ class TransformationAlgebraRDF(TransformationAlgebra):
             if isinstance(namespace, str) else namespace
         super().__init__()
 
-    def parse_rdf(self, graph: TransformationGraph, string: str) -> BNode:
-        """
-        Convenience function to parse an expression and add it to an RDF graph
-        in one go.
-        """
-        root = BNode()
-        graph.add_expr(root, self.parse(string).primitive())
-        return root
-
     def uri(self, value) -> URIRef:
         """
         Temporary solution while moving functionality to TransformationGraph.
