@@ -80,7 +80,7 @@ class TransformationFlow(ABC):
     # translation.
 
     def __init__(self, *items: Element | Nested[Element]):
-        # Does a skip occur after? (e.g. *before* in the reversed sequence)
+        # Does a skip occur after? (i.e. *before* in the reversed sequence)
         self.skip = False
         self.items: list[TransformationFlow] = [
             TransformationFlow.shorthand(x) for x in items]
