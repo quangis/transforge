@@ -15,12 +15,34 @@ from transformation_algebra.expr import \
 from itertools import count, chain
 from rdflib import URIRef, Graph, Namespace, BNode, Literal
 from rdflib.term import Node
-from rdflib.namespace import RDF, RDFS
+from rdflib.namespace import RDF, RDFS, ClosedNamespace
 from rdflib.plugins import sparql
 
 from typing import Dict, Union, Iterator, Optional, Tuple
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
+
+
+class TANamespace(ClosedNamespace):
+    """
+    An `rdflib.Namespace` that allows writing URI's as `Namespace[Operation]`
+    and that makes sure that the referenced URIs are actually part of the
+    relevant transformation algebra.
+    """
+
+    def __new__(cls, uri, alg: TransformationAlgebra):
+        terms = chain(
+            alg.definitions.keys(),
+            (t.name for t in alg.types)
+        )
+        rt = super().__new__(cls, uri, terms)
+        return rt
+
+    def term(self, value) -> URIRef:
+        if isinstance(value, (Operation, TypeOperator)):
+            return super().term(value.name)
+        else:
+            return super().term(value)
 
 
 class TransformationGraph(Graph):
