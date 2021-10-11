@@ -79,11 +79,13 @@ class TransformationFlow(ABC):
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    def __init__(self, *items: Element | Nested[Element]):
-        # Does a skip occur after? (i.e. *before* in the reversed sequence)
-        self.skip = False
+    def __init__(self, *items: Element | Nested[Element], skip: bool = False):
         self.items: list[TransformationFlow] = [
             TransformationFlow.shorthand(x) for x in items]
+
+    def set_skip(self) -> None:
+        for x in self.items:
+            x.set_skip()
 
     @staticmethod
     def shorthand(value: Element | Nested[Element]) \
@@ -116,9 +118,17 @@ class Unit(TransformationFlow):
     def __init__(self, type: Optional[Type] = None,
             operation: Optional[Operation] = None):
         self.via = operation
+        # Does the operation immediately output the type? (i.e. is `...`
+        # specified before the type and after the operation?)
         self.immediate = False
         self.type = type
+        # Does a skip occur after this unit? (i.e. is `...` specified *before*
+        # this unit in the reversed sequence)
+        self.skip = False
         super().__init__()
+
+    def set_skip(self) -> None:
+        self.skip = True
 
 
 class Serial(TransformationFlow):
@@ -141,11 +151,15 @@ class Serial(TransformationFlow):
                 self.items[-1].immediate = skip
             else:
                 item = TransformationFlow.shorthand(current)
-                item.skip = skip
+                if skip:
+                    item.set_skip()
                 self.items.append(item)
             skip = False
             if isinstance(current, (Type, Operation)):
                 then = current
+
+    def set_skip(self) -> None:
+        self.items[0].set_skip()
 
 
 class Parallel(TransformationFlow):
