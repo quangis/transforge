@@ -20,7 +20,7 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVar
 from transformation_algebra.expr import Expr, Data, Operation
 from transformation_algebra.alg import TransformationAlgebra
-from transformation_algebra.rdf import TA, TransformationGraph, TANamespace
+from transformation_algebra.rdf import TA, TransformationGraph, AlgebraNamespace
 
 
 class Step(object):
@@ -131,7 +131,7 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation(A ** A, name="f")
         alg = TransformationAlgebra()
         alg.add(f, a)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(a)),
@@ -150,7 +150,7 @@ class TestAlgebraRDF(unittest.TestCase):
         g = Operation(A ** A, name="g")
         alg = TransformationAlgebra()
         alg.add(f, g)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g)),
@@ -172,7 +172,7 @@ class TestAlgebraRDF(unittest.TestCase):
         g = Operation(A ** A, name="g")
         alg = TransformationAlgebra()
         alg.add(f, g, a)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g, a)),
@@ -197,7 +197,7 @@ class TestAlgebraRDF(unittest.TestCase):
         h = Operation((A ** A) ** A ** A, name="h")
         alg = TransformationAlgebra()
         alg.add(f, g, h, a)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, h(g, a).primitive()),
@@ -224,7 +224,7 @@ class TestAlgebraRDF(unittest.TestCase):
         h = Operation((A ** A ** A) ** A ** A ** A, name="h")
         alg = TransformationAlgebra()
         alg.add(f, g, h, a, b)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, h(g, a, b).primitive()),
@@ -249,7 +249,7 @@ class TestAlgebraRDF(unittest.TestCase):
         id = Operation(A ** A, name="id", derived=lambda x: x)
         alg = TransformationAlgebra()
         alg.add(f, id)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(id).primitive()),
@@ -271,7 +271,7 @@ class TestAlgebraRDF(unittest.TestCase):
         h = Operation(A ** A, name="h", derived=lambda x: g(x))
         alg = TransformationAlgebra()
         alg.add(f, g, h)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(h).primitive()),
@@ -291,7 +291,7 @@ class TestAlgebraRDF(unittest.TestCase):
         e = Operation(A ** A, name="e")
         alg = TransformationAlgebra()
         alg.add(a, f, g, h, e)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g, h, e, a)),
@@ -323,7 +323,7 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation(A ** A, name="f")
         alg = TransformationAlgebra()
         alg.add(a, b, outer, inner, f)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, outer(inner(f, a), b)),
@@ -349,7 +349,7 @@ class TestAlgebraRDF(unittest.TestCase):
         h = Operation(A ** A ** A, name="h", derived=lambda x: g(x))
         alg = TransformationAlgebra()
         alg.add(f, g, a)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(h, a).primitive()),
@@ -370,7 +370,7 @@ class TestAlgebraRDF(unittest.TestCase):
         G = Type.declare("G", params=2)
         alg = TransformationAlgebra()
         alg.add_types(A, F, G)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
 
         g = Graph()
         n1 = BNode()
@@ -393,7 +393,7 @@ class TestAlgebraRDF(unittest.TestCase):
         F = Type.declare("F", params=2)
         alg = TransformationAlgebra()
         alg.add_types(A, F)
-        ALG = TANamespace('ALG#', alg)
+        ALG = AlgebraNamespace('ALG#', alg)
         g = Graph()
         x, y = TypeVar(), TypeVar()
         x.bind(A)
