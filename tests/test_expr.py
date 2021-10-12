@@ -2,8 +2,8 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, _
-from transformation_algebra.expr import \
-    TransformationAlgebra, Data, Operation
+from transformation_algebra.expr import Data, Operation
+from transformation_algebra.alg import TransformationAlgebra
 
 
 class TestAlgebra(unittest.TestCase):

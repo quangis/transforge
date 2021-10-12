@@ -18,8 +18,8 @@ from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVar
-from transformation_algebra.expr import \
-    Expr, TransformationAlgebra, Data, Operation
+from transformation_algebra.expr import Expr, Data, Operation
+from transformation_algebra.alg import TransformationAlgebra
 from transformation_algebra.rdf import TA, TransformationGraph, TANamespace
 
 

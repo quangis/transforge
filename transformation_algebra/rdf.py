@@ -9,8 +9,8 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
-    TransformationAlgebra, Expr, Base, Application, Abstraction, Data, \
-    Operation, Variable, Definition
+    Expr, Base, Application, Abstraction, Data, Operation, Variable, Definition
+from transformation_algebra.alg import TransformationAlgebra
 
 from itertools import count, chain
 from rdflib import URIRef, Graph, Namespace, BNode, Literal
