@@ -16,7 +16,7 @@ from transformation_algebra.rdf import AlgebraNamespace, TA
 import typing
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional
-from rdflib.plugins import sparql
+# from rdflib.plugins import sparql
 from rdflib.namespace import RDF, RDFS
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
@@ -140,12 +140,15 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                 yield from self.trace(x, n, previous, name_generator)
                 previous = n
 
-    def sparql(self) -> sparql.Query:
+    def sparql(self) -> str:
         """
         Convert this Flow to a SPARQL query.
         """
 
         query = [
+            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+            "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+            "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             "SELECT ?workflow ?description WHERE {",
             "?workflow rdf:type ta:Transformation.",
             "?workflow rdfs:comment ?description.",
@@ -153,14 +156,13 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         ]
         query.extend(self.trace(self.flow, "output_node"))
         query.append("} GROUP BY ?workflow")
+        return "\n".join(query)
 
-        print("Query is:")
-        print("\n".join(query))
-        print()
-
-        return sparql.prepareQuery("\n".join(query),
-                initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS}
-        )
+        # TODO return sparql.Query instead, to avoid parsing at all. This does
+        # not avoid parsing:
+        # return sparql.prepareQuery("\n".join(query),
+        #         initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS}
+        # )
 
 
 class TransformationFlow(ABC):
