@@ -20,10 +20,7 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVar
 from transformation_algebra.expr import \
     Expr, TransformationAlgebra, Data, Operation
-from transformation_algebra.rdf import TransformationAlgebraRDF, TA, \
-    TransformationGraph
-
-ALG = Namespace('ALG#')
+from transformation_algebra.rdf import TA, TransformationGraph, TANamespace
 
 
 class Step(object):
@@ -45,12 +42,12 @@ class Step(object):
         assert not (internal and op) and not (op and not input)
 
 
-def graph_auto(alg: TransformationAlgebraRDF,
+def graph_auto(alg: TransformationAlgebra, namespace: Namespace,
         value: Union[Expr, Type]) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
-    g = TransformationGraph(alg, alg.namespace,
+    g = TransformationGraph(alg, namespace,
         include_labels=False, include_types=False, include_kinds=False)
     if isinstance(value, Expr):
         root = BNode()
@@ -132,11 +129,12 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         a = Data(A, name="a")
         f = Operation(A ** A, name="f")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, a)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(a)),
+            graph_auto(alg, ALG, f(a)),
             graph_manual(
                 a=Step(),
                 f=Step(ALG.f, input="a")
@@ -150,11 +148,12 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         f = Operation((A ** A) ** A, name="f")
         g = Operation(A ** A, name="g")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(g)),
+            graph_auto(alg, ALG, f(g)),
             graph_manual(
                 λ=Step(internal="f"),
                 f=Step(ALG.f, input="g"),
@@ -171,11 +170,12 @@ class TestAlgebraRDF(unittest.TestCase):
         a = Data(A, name="a")
         f = Operation((A ** A) ** A ** A, name="f")
         g = Operation(A ** A, name="g")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g, a)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(g, a)),
+            graph_auto(alg, ALG, f(g, a)),
             graph_manual(
                 a=Step(),
                 λ=Step(internal="f", input="a"),
@@ -195,11 +195,12 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation(A ** A, name="f")
         g = Operation(A ** A, name="g", derived=lambda x: f(f(x)))
         h = Operation((A ** A) ** A ** A, name="h")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g, h, a)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, h(g, a).primitive()),
+            graph_auto(alg, ALG, h(g, a).primitive()),
             graph_manual(
                 h=Step(ALG.h, input=["f2", "a"]),
                 f2=Step(ALG.f, input="f1"),
@@ -221,11 +222,12 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation(A ** A ** A, name="f")
         g = Operation(A ** A ** A, name="g", derived=lambda x, y: f(y, f(x, y)))
         h = Operation((A ** A ** A) ** A ** A ** A, name="h")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g, h, a, b)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, h(g, a, b).primitive()),
+            graph_auto(alg, ALG, h(g, a, b).primitive()),
             graph_manual(
                 h=Step(ALG.h, input=["f2", "a", "b"]),
                 f2=Step(ALG.f, input=["λ", "f1"]),
@@ -245,11 +247,12 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         f = Operation((A ** A) ** A, name="f")
         id = Operation(A ** A, name="id", derived=lambda x: x)
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, id)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(id).primitive()),
+            graph_auto(alg, ALG, f(id).primitive()),
             graph_manual(
                 f=Step(ALG.f, input="λ"),
                 λ=Step(internal="f"),
@@ -266,12 +269,13 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation((A ** A) ** A, name="f")
         g = Operation(A ** A, name="g")
         h = Operation(A ** A, name="h", derived=lambda x: g(x))
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g, h)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(h).primitive()),
-            graph_auto(alg, f(g))
+            graph_auto(alg, ALG, f(h).primitive()),
+            graph_auto(alg, ALG, f(g))
         )
 
     def test_cycle(self):
@@ -285,11 +289,12 @@ class TestAlgebraRDF(unittest.TestCase):
         g = Operation(A ** A, name="g")
         h = Operation(A ** A, name="h")
         e = Operation(A ** A, name="e")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(a, f, g, h, e)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(g, h, e, a)),
+            graph_auto(alg, ALG, f(g, h, e, a)),
             graph_manual(
                 a=Step(),
                 f=Step(ALG.f, input=["a", "g", "h", "e"]),
@@ -316,11 +321,12 @@ class TestAlgebraRDF(unittest.TestCase):
         outer = Operation((A ** A) ** A ** A, name="outer")
         inner = Operation((A ** A) ** A ** (A ** A), name="inner")
         f = Operation(A ** A, name="f")
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(a, b, outer, inner, f)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, outer(inner(f, a), b)),
+            graph_auto(alg, ALG, outer(inner(f, a), b)),
             graph_manual(
                 a=Step(),
                 b=Step(),
@@ -341,11 +347,12 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operation((A ** A ** A) ** A ** A, name="f")
         g = Operation(A ** A ** A, name="g")
         h = Operation(A ** A ** A, name="h", derived=lambda x: g(x))
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
         alg.add(f, g, a)
+        ALG = TANamespace('ALG#', alg)
 
         self.assertIsomorphic(
-            graph_auto(alg, f(h, a).primitive()),
+            graph_auto(alg, ALG, f(h, a).primitive()),
             graph_manual(
                 a=Step(),
                 g=Step(ALG.g, input="λ"),
@@ -361,7 +368,10 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         F = Type.declare("F", params=1)
         G = Type.declare("G", params=2)
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
+        alg.add_types(A, F, G)
+        ALG = TANamespace('ALG#', alg)
+
         g = Graph()
         n1 = BNode()
         n2 = BNode()
@@ -371,7 +381,7 @@ class TestAlgebraRDF(unittest.TestCase):
         g.add((n2, RDF._1, n1))
         g.add((n2, RDF._2, n1))
         self.assertIsomorphic(
-            graph_auto(alg, G(F(A), F(A))),
+            graph_auto(alg, ALG, G(F(A), F(A))),
             g
         )
 
@@ -381,7 +391,9 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = Type.declare("A")
         F = Type.declare("F", params=2)
-        alg = TransformationAlgebraRDF('alg', ALG)
+        alg = TransformationAlgebra()
+        alg.add_types(A, F)
+        ALG = TANamespace('ALG#', alg)
         g = Graph()
         x, y = TypeVar(), TypeVar()
         x.bind(A)
@@ -391,6 +403,6 @@ class TestAlgebraRDF(unittest.TestCase):
         g.add((n1, RDF._1, ALG.A))
         g.add((n1, RDF._2, ALG.A))
         self.assertIsomorphic(
-            graph_auto(alg, F(x, y)),
+            graph_auto(alg, ALG, F(x, y)),
             g
         )

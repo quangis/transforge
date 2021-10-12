@@ -8,10 +8,16 @@ specified order.
 from __future__ import annotations
 
 from abc import ABC
-from transformation_algebra.type import Type, TypeInstance
+from itertools import count, chain
+from transformation_algebra.type import Type, TypeInstance, TypeOperation, \
+    Function, TypeVar
 from transformation_algebra.expr import Operation
-from typing import TYPE_CHECKING, Protocol, TypeVar, Iterator, Any, Union, \
+from transformation_algebra.rdf import TANamespace, TA
+import typing
+from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional
+from rdflib.plugins import sparql
+from rdflib.namespace import RDF, RDFS
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
@@ -23,7 +29,7 @@ else:
 # For convenience, we allow nested sequences in `Flow.serial()`. The following
 # temporary solution to the recursive type thus introduced has been lifted from
 # github.com/python/mypy/issues/731
-_T_co = TypeVar("_T_co")
+_T_co = typing.TypeVar("_T_co")
 
 
 class Nested(Protocol[_T_co]):
@@ -56,6 +62,105 @@ class Nested(Protocol[_T_co]):
 
 
 Element = Union[Type, Operation, ellipsis, 'TransformationFlow']
+NestedNotation = Union[Element, Nested[Element]]
+
+
+class TransformationQuery(object):  # TODO subclass rdflib.Query?
+    def __init__(self, *items: NestedNotation, namespace: TANamespace):
+        self.flow = Serial(*items)
+        self.namespace = namespace
+
+    def sparql_type(self, name: str, type: Type,
+            name_generator: Iterator[str],
+            index: Optional[int] = None) -> Iterator[str]:
+        """
+        Produce SPARQL constraints for the given (non-function) type.
+        """
+
+        t = type.instance()
+
+        if isinstance(t, TypeVar):
+            # If a type in a trace query contains variables, it must be a
+            # wildcard --- because we don't do anything with it
+            assert t.wildcard
+        else:
+            assert isinstance(t, TypeOperation) and t.operator != Function
+
+            pred = "rdf:type" if index is None else f"rdf:_{index}"
+            if t.params:
+                bnode = next(name_generator)
+                yield f"?{name} {pred} ?{bnode}."
+                yield f"?{bnode} rdfs:subClassOf <{self.namespace[t._operator]}>."
+                for i, param in enumerate(t.params, start=1):
+                    yield from self.sparql_type(bnode, param, name_generator,
+                        index=i)
+            else:
+                yield f"?{name} {pred}/(rdfs:subClassOf*) <{self.namespace[t._operator]}>."
+
+    def trace(self,
+            f: TransformationFlow,
+            current: str,
+            previous: Optional[str] = None,
+            name_generator: Optional[Iterator[str]] = None) -> \
+            Iterator[str]:
+        """
+        Trace the paths between each node in a chain to produce SPARQL
+        constraints.
+        """
+        # See rdflib.paths: (~TA.feeds * OneOrMore).n3(g.namespace_manager)
+
+        name_generator = name_generator or iter(f"n{i}" for i in count())
+
+        if isinstance(f, Unit):
+            if previous:
+                yield (
+                    f"?{previous} "
+                    f"({'^ta:feeds' + ('+' if f.skip else '')}) "
+                    f"?{current}.")
+
+            if f.via:
+                assert f.via.is_primitive(), \
+                    "operation in a flow query must be primitive"
+                yield f"?{current} ta:via <{self.namespace[f.via]}>."
+            if f.type:
+                yield from self.sparql_type(current, f.type, name_generator)
+
+        elif isinstance(f, Parallel):
+            for sub in f.items:
+                yield from self.trace(sub, next(name_generator), previous,
+                    name_generator)
+
+        else:
+            assert isinstance(f, Serial)
+
+            # TODO remove this assumption when possible
+            assert all(isinstance(x, Unit) for x in f.items[:-1])
+
+            for n, x in zip(chain([current], name_generator), f.items):
+                yield from self.trace(x, n, previous, name_generator)
+                previous = n
+
+    def sparql(self) -> sparql.Query:
+        """
+        Convert this Flow to a SPARQL query.
+        """
+
+        query = [
+            "SELECT ?workflow ?description WHERE {",
+            "?workflow rdf:type ta:Transformation.",
+            "?workflow rdfs:comment ?description.",
+            "?workflow ta:result ?output_node.",
+        ]
+        query.extend(self.trace(self.flow, "output_node"))
+        query.append("} GROUP BY ?workflow")
+
+        print("Query is:")
+        print("\n".join(query))
+        print()
+
+        return sparql.prepareQuery("\n".join(query),
+                initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS}
+        )
 
 
 class TransformationFlow(ABC):
