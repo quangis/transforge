@@ -35,16 +35,16 @@ class TransformationAlgebra(object):
             return key in self.types
         elif isinstance(key, Definition):
             assert key.name
-            return self.definitions.get(key.name.lower()) is key
+            return self.definitions.get(key.name) is key
         else:
             assert isinstance(key, str)
-            return key.lower() in self.definitions
+            return key in self.definitions
 
     def __getitem__(self, key: str) -> Definition:
-        return self.definitions[key.lower()]
+        return self.definitions[key]
 
     def __setitem__(self, key: str, value: Definition) -> None:
-        self.definitions[key.lower()] = value
+        self.definitions[key] = value
 
         # Validation only happens once an operation is added to the algebra. If
         # we did it at define-time, it would lead to issues --- see issue #3
