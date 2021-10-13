@@ -162,7 +162,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             "?workflow ta:result ?n0.",
         ]
         query.extend(self.trace(self.flow, current="n0"))
-        query.append("} GROUP BY ?workflow")
+        query.append("} GROUP BY ?workflow ?description")
         return "\n".join(query)
 
         # TODO return sparql.Query instead, to avoid parsing at all. This does
