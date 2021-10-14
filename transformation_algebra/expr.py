@@ -71,8 +71,8 @@ class Operation(Definition):
 
     def __init__(
             self, *nargs,
-            derived: Optional[Callable[..., Expr]] = None, **kwargs):
-        self.composition = derived  # a transformation may be non-primitive
+            define: Optional[Callable[..., Expr]] = None, **kwargs):
+        self.composition = define  # a transformation may be non-primitive
         super().__init__(*nargs, **kwargs)
         assert self.type.instance().operator == Function
 
