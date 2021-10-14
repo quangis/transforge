@@ -26,12 +26,12 @@ class TestAlgebra(unittest.TestCase):
         add = Operation(Int ** Int ** Int, name='add')
         add1 = Operation(
             Int ** Int,
-            derived=lambda x: add(x, one),
+            define=lambda x: add(x, one),
             name='add1'
         )
         compose = Operation(
             lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-            derived=lambda f, g, x: f(g(x)),
+            define=lambda f, g, x: f(g(x)),
             name='compose'
         )
         algebra = TransformationAlgebra()
@@ -60,9 +60,9 @@ class TestAlgebra(unittest.TestCase):
         x = Data(A)
         f = Operation(A ** A, name='f')
         g = Operation(A ** A, name='g',
-            derived=lambda x: f(x))
+            define=lambda x: f(x))
         h = Operation(A ** A, name='h',
-            derived=lambda x: g(x))
+            define=lambda x: g(x))
         algebra = TransformationAlgebra()
         algebra.add(f, g, h)
         self.assertTrue(f(x).match(f(x)))
@@ -78,7 +78,7 @@ class TestAlgebra(unittest.TestCase):
         A = Type.declare('A')
         x = Data(A)
         f = Operation(lambda α: α ** α, name='f')
-        g = Operation(lambda α: α ** α, name='g', derived=lambda x: f(x))
+        g = Operation(lambda α: α ** α, name='g', define=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
 
     def test_double_binding(self):
@@ -102,7 +102,7 @@ class TestAlgebra(unittest.TestCase):
         )
         app = Operation(lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
-            derived=lambda f, x, y: select(eq, prod(f, x, y))
+            define=lambda f, x, y: select(eq, prod(f, x, y))
         )
         self.assertTrue(app(eq, data, data).primitive().match(
             select(eq, prod(eq, data, data))
@@ -114,24 +114,24 @@ class TestAlgebra(unittest.TestCase):
         self.assertRaises(
             error.SubtypeMismatch,
             Operation.validate,
-            Operation(B ** B, derived=lambda x: f(x))
+            Operation(B ** B, define=lambda x: f(x))
         )
-        Operation(A ** B, derived=lambda x: f(x)).validate()
+        Operation(A ** B, define=lambda x: f(x)).validate()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         g = Operation(lambda α: α ** B)
-        Operation(A ** B, derived=lambda x: g(x)).validate()
-        Operation(B ** B, derived=lambda x: g(x)).validate()
+        Operation(A ** B, define=lambda x: g(x)).validate()
+        Operation(B ** B, define=lambda x: g(x)).validate()
 
     def test_looser_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         f, g = Operation(A ** B), Operation(lambda α: α ** B)
-        Operation(lambda α: α ** B, derived=lambda x: g(x)).validate()
+        Operation(lambda α: α ** B, define=lambda x: g(x)).validate()
         self.assertRaises(
             error.DeclaredTypeTooGeneral,
             Operation.validate,
-            Operation(lambda α: α ** B, derived=lambda x: f(x)))
+            Operation(lambda α: α ** B, define=lambda x: f(x)))
 
     def test_same_labels_unify(self):
         # See issue #10

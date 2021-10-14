@@ -48,7 +48,7 @@ class Definition(ABC):
         return Base(self, label=identifier)
 
     def is_primitive(self) -> bool:
-        return isinstance(self, Operation) and not self.composition
+        return isinstance(self, Operation) and not self.definition
 
 
 class Data(Definition):
@@ -58,7 +58,7 @@ class Data(Definition):
     """
 
     def __init__(self, *nargs, **kwargs):
-        self.composition = None
+        self.definition = None
         super().__init__(*nargs, **kwargs)
         assert self.type.instance().operator != Function
 
@@ -72,7 +72,7 @@ class Operation(Definition):
     def __init__(
             self, *nargs,
             define: Optional[Callable[..., Expr]] = None, **kwargs):
-        self.composition = define  # a transformation may be non-primitive
+        self.definition = define  # a transformation may be non-primitive
         super().__init__(*nargs, **kwargs)
         assert self.type.instance().operator == Function
 
@@ -80,12 +80,12 @@ class Operation(Definition):
         """
         This method raises an error if the operation is a composite operation,
         but the declared type cannot be reconciled with the type inferred from
-        the composition.
+        the definition.
         """
         # If the operation is composite, check that its declared type is no
-        # more general than the type we can infer from the composition function
+        # more general than the type we can infer from the definition
         try:
-            if self.composition:
+            if self.definition:
                 type_decl = self.type.instance()
                 vars_decl = list(type_decl.variables())
                 type_infer = self.instance().primitive(unify=False).type
@@ -194,8 +194,8 @@ class Expr(ABC):
 
         if isinstance(expr, Base):
             d = expr.definition
-            if isinstance(d, Operation) and d.composition:
-                expr_primitive = Abstraction(d.composition)
+            if isinstance(d, Operation) and d.definition:
+                expr_primitive = Abstraction(d.definition)
                 # The type of the original expression may be less general than
                 # that of the primitive expression, but not more general.
                 if unify:
