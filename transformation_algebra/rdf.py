@@ -75,17 +75,19 @@ class TransformationGraph(Graph):
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
 
-    def vocabulary(self) -> Graph:
+    @staticmethod
+    def vocabulary(algebra: TransformationAlgebra, namespace:
+            AlgebraNamespace) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.
         """
-        vocab = self
+        vocab = TransformationGraph(algebra, namespace)
 
         # Add type operators to the vocabulary
-        for t in self.algebra.types:
+        for t in algebra.types:
             if t.arity > 0:
-                current_uri = self.namespace[t]
+                current_uri = namespace[t]
                 vocab.add((current_uri, RDF.type, TA.Type))
                 vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
                 vocab.add((current_uri, RDFS.label, Literal(str(t))))
@@ -93,7 +95,7 @@ class TransformationGraph(Graph):
                 previous_uri = None
                 current: Optional[TypeOperator] = t
                 while current:
-                    current_uri = self.namespace[current]
+                    current_uri = namespace[current]
                     vocab.add((current_uri, RDFS.label, Literal(str(t))))
                     vocab.add((current_uri, RDF.type, TA.Type))
                     if previous_uri:
@@ -102,8 +104,8 @@ class TransformationGraph(Graph):
                     current = current.supertype
 
         # Add operations to the vocabulary
-        for d in self.algebra.definitions.values():
-            node = self.namespace[d]
+        for d in algebra.definitions.values():
+            node = namespace[d]
             type_node = TA.Data if isinstance(d, Data) else TA.Operation
             vocab.add((node, RDF.type, type_node))
             vocab.add((node, RDFS.label, Literal(str(d.name))))
