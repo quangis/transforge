@@ -76,7 +76,7 @@ class Operation(Definition):
         super().__init__(*nargs, **kwargs)
         assert self.type.instance().operator == Function
 
-    def validate(self) -> None:
+    def validate_type(self) -> None:
         """
         This method raises an error if the operation is a composite operation,
         but the declared type cannot be reconciled with the type inferred from

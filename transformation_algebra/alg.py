@@ -46,13 +46,15 @@ class TransformationAlgebra(object):
     def __setitem__(self, key: str, value: Definition) -> None:
         self.definitions[key] = value
 
-        # Validation only happens once an operation is added to the algebra. If
-        # we did it at define-time, it would lead to issues --- see issue #3
-        if isinstance(value, Operation):
-            value.validate()
-
         for op in value.type.instance().operators():
             self.types.add(op)
+
+    def validate(self) -> None:
+        # Validation only happens all operations have been defined. If we did
+        # it at define-time, it would lead to issues --- see issue #3
+        for d in self.definitions:
+            if isinstance(d, Operation):
+                d.validate_type()
 
     def add(self, *nargs: Definition, **kwargs: Definition) -> None:
         """

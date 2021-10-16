@@ -113,24 +113,24 @@ class TestAlgebra(unittest.TestCase):
         f = Operation(A ** B)
         self.assertRaises(
             error.SubtypeMismatch,
-            Operation.validate,
+            Operation.validate_type,
             Operation(B ** B, define=lambda x: f(x))
         )
-        Operation(A ** B, define=lambda x: f(x)).validate()
+        Operation(A ** B, define=lambda x: f(x)).validate_type()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         g = Operation(lambda α: α ** B)
-        Operation(A ** B, define=lambda x: g(x)).validate()
-        Operation(B ** B, define=lambda x: g(x)).validate()
+        Operation(A ** B, define=lambda x: g(x)).validate_type()
+        Operation(B ** B, define=lambda x: g(x)).validate_type()
 
     def test_looser_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         f, g = Operation(A ** B), Operation(lambda α: α ** B)
-        Operation(lambda α: α ** B, define=lambda x: g(x)).validate()
+        Operation(lambda α: α ** B, define=lambda x: g(x)).validate_type()
         self.assertRaises(
             error.DeclaredTypeTooGeneral,
-            Operation.validate,
+            Operation.validate_type,
             Operation(lambda α: α ** B, define=lambda x: f(x)))
 
     def test_same_labels_unify(self):
