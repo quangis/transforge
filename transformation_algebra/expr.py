@@ -15,66 +15,48 @@ from typing import Optional, Callable, Union, List, Iterator
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function
+    Type, TypeVar, TypeSchema, TypeInstance, Function, _
 
 
-class Definition(ABC):
+class Operation(object):
     """
-    A definition represents a non-instantiated data input or transformation.
+    An operation represents an atomary step of transformations. It may be
+    primitive, or it may be defined in terms of other operations. In the latter
+    case, it can be unfolded to reveal its inner structure.
     """
 
     def __init__(
             self,
             type: Union[Type, Callable[..., TypeInstance]],
+            define: Optional[Callable[..., Expr]] = None,
             doc: Optional[str] = None,
             name: Optional[str] = None):
         self.name = name
         self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.description = doc
+        self.definition = define  # a transformation may be non-primitive
+        self.is_function = self.type.instance().operator == Function
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.name or '[?]'} : {self.type}"
+        return f"{self.name or 'anonymous'} : {self.type}"
 
-    def __call__(self, *args: Union[Definition, Expr]) -> Expr:
+    def __call__(self, *args: Union[Operation, Expr]) -> Expr:
         """
-        Calling a definition instantiates it as an expression.
+        Calling an operation instantiates it as an expression.
         """
         return self.instance().__call__(*args)
 
-    def instance(self, identifier: Optional[str] = None) -> Expr:
-        return Base(self, label=identifier)
+    def instance(self) -> Expr:
+        if self.is_function:
+            return OperationInstance(self)
+        else:
+            return Source()
 
     def is_primitive(self) -> bool:
         return isinstance(self, Operation) and not self.definition
-
-
-class Data(Definition):
-    """
-    The definition of a data input. An instance of such a definition is a base
-    expression.
-    """
-
-    def __init__(self, *nargs, **kwargs):
-        self.definition = None
-        super().__init__(*nargs, **kwargs)
-        assert self.type.instance().operator != Function
-
-
-class Operation(Definition):
-    """
-    The definition of a transformation. An instance of such a definition is a
-    base expression.
-    """
-
-    def __init__(
-            self, *nargs,
-            define: Optional[Callable[..., Expr]] = None, **kwargs):
-        self.definition = define  # a transformation may be non-primitive
-        super().__init__(*nargs, **kwargs)
-        assert self.type.instance().operator == Function
 
     def validate_type(self) -> None:
         """
@@ -113,7 +95,7 @@ class Expr(ABC):
     def __repr__(self) -> str:
         return self.tree()
 
-    def __call__(self, *args: Union[Expr, Definition]) -> Expr:
+    def __call__(self, *args: Expr | Operation) -> Expr:
         return reduce(Expr.apply,
             (e if isinstance(e, Expr) else e.instance() for e in args),
             self)
@@ -192,10 +174,9 @@ class Expr(ABC):
         """
         expr = self.normalize(recursive=False)
 
-        if isinstance(expr, Base):
-            d = expr.definition
-            if isinstance(d, Operation) and d.definition:
-                expr_primitive = Abstraction(d.definition)
+        if isinstance(expr, OperationInstance):
+            if expr.operation.definition:
+                expr_primitive = Abstraction(expr.operation.definition)
                 # The type of the original expression may be less general than
                 # that of the primitive expression, but not more general.
                 if unify:
@@ -218,8 +199,11 @@ class Expr(ABC):
         """
         a = self.normalize(recursive=False)
         b = other.normalize(recursive=False)
-        if isinstance(a, Base) and isinstance(b, Base):
-            return a.definition == b.definition and a.label == b.label
+        if isinstance(a, Source) and isinstance(b, Source):
+            return bool(a.type.match(b.type)) and a.label == b.label
+        elif isinstance(a, OperationInstance) and isinstance(b,
+                OperationInstance):
+            return a.operation == b.operation
         elif isinstance(a, Application) and isinstance(b, Application):
             return a.f.match(b.f) and a.x.match(b.x)
         elif isinstance(a, Abstraction) and isinstance(b, Abstraction):
@@ -232,7 +216,7 @@ class Expr(ABC):
         Obtain all base expressions and variables in an expression.
         """
         a = self.normalize(recursive=False)
-        if isinstance(a, (Base, Variable)):
+        if isinstance(a, (Source, OperationInstance, Variable)):
             yield a
         elif isinstance(a, Abstraction):
             yield from a.params
@@ -261,21 +245,30 @@ class Expr(ABC):
             var.name = f"τ{subscript(i)}"
 
 
-class Base(Expr):
+class OperationInstance(Expr):
     """
-    A base expression represents either a single transformation or a data
-    input. Base expressions may be unfolded into multiple applications of
-    primitive transformations.
+    An instance of an operation.
     """
 
-    def __init__(self, definition: Definition, label: Optional[str] = None):
-        self.definition = definition
-        self.label: Optional[str] = label
-        super().__init__(type=definition.type.instance())
+    def __init__(self, operation: Operation):
+        self.operation = operation
+        super().__init__(type=operation.type.instance())
 
     def __str__(self) -> str:
-        name = self.definition.name or "[?]"
-        return f"({name} {self.label})" if self.label else name
+        return str(self.operation)
+
+
+class Source(Expr):
+    """
+    A source data input.
+    """
+
+    def __init__(self, type: Type = _, label: Optional[str] = None):
+        self.label: Optional[str] = label
+        super().__init__(type=type.instance())
+
+    def __str__(self) -> str:
+        return f"(source {self.label})" if self.label else "source"
 
 
 class Application(Expr):

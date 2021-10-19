@@ -18,7 +18,7 @@ from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVar
-from transformation_algebra.expr import Expr, Data, Operation
+from transformation_algebra.expr import Expr, Operation, Source
 from transformation_algebra.alg import TransformationAlgebra
 from transformation_algebra.rdf import TA, TransformationGraph, AlgebraNamespace
 
@@ -127,10 +127,10 @@ class TestAlgebraRDF(unittest.TestCase):
         operation and a data source.
         """
         A = Type.declare("A")
-        a = Data(A, name="a")
+        a = Source(A)
         f = Operation(A ** A, name="f")
         alg = TransformationAlgebra()
-        alg.add(f, a)
+        alg.add(f)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -167,11 +167,11 @@ class TestAlgebraRDF(unittest.TestCase):
         gets the same inputs as the operation that got the parameter operation.
         """
         A = Type.declare("A")
-        a = Data(A, name="a")
+        a = Source(A)
         f = Operation((A ** A) ** A ** A, name="f")
         g = Operation(A ** A, name="g")
         alg = TransformationAlgebra()
-        alg.add(f, g, a)
+        alg.add(f, g)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -191,12 +191,12 @@ class TestAlgebraRDF(unittest.TestCase):
         """
 
         A = Type.declare("A")
-        a = Data(A, name="a")
+        a = Source(A)
         f = Operation(A ** A, name="f")
         g = Operation(A ** A, name="g", define=lambda x: f(f(x)))
         h = Operation((A ** A) ** A ** A, name="h")
         alg = TransformationAlgebra()
-        alg.add(f, g, h, a)
+        alg.add(f, g, h)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -217,13 +217,13 @@ class TestAlgebraRDF(unittest.TestCase):
         """
 
         A = Type.declare("A")
-        a = Data(A, name="a")
-        b = Data(A, name="b")
+        a = Source(A)
+        b = Source(A)
         f = Operation(A ** A ** A, name="f")
         g = Operation(A ** A ** A, name="g", define=lambda x, y: f(y, f(x, y)))
         h = Operation((A ** A ** A) ** A ** A ** A, name="h")
         alg = TransformationAlgebra()
-        alg.add(f, g, h, a, b)
+        alg.add(f, g, h)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -284,13 +284,13 @@ class TestAlgebraRDF(unittest.TestCase):
         multiple operations as parameter.
         """
         A = Type.declare("A")
-        a = Data(A, name="a")
+        a = Source(A)
         f = Operation((A ** A) ** (A ** A) ** (A ** A) ** A ** A, name="f")
         g = Operation(A ** A, name="g")
         h = Operation(A ** A, name="h")
         e = Operation(A ** A, name="e")
         alg = TransformationAlgebra()
-        alg.add(a, f, g, h, e)
+        alg.add(f, g, h, e)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -316,13 +316,13 @@ class TestAlgebraRDF(unittest.TestCase):
         issues #37 and #41.
         """
         A = Type.declare("A")
-        a = Data(A, name="a")
-        b = Data(A, name="b")
+        a = Source(A)
+        b = Source(A)
         outer = Operation((A ** A) ** A ** A, name="outer")
         inner = Operation((A ** A) ** A ** (A ** A), name="inner")
         f = Operation(A ** A, name="f")
         alg = TransformationAlgebra()
-        alg.add(a, b, outer, inner, f)
+        alg.add(outer, inner, f)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -343,12 +343,12 @@ class TestAlgebraRDF(unittest.TestCase):
         The body of an abstraction may be a function.
         """
         A = Type.declare("A")
-        a = Data(A, name="a")
+        a = Source(A)
         f = Operation((A ** A ** A) ** A ** A, name="f")
         g = Operation(A ** A ** A, name="g")
         h = Operation(A ** A ** A, name="h", define=lambda x: g(x))
         alg = TransformationAlgebra()
-        alg.add(f, g, a)
+        alg.add(f, g)
         ALG = AlgebraNamespace('ALG#', alg)
 
         self.assertIsomorphic(

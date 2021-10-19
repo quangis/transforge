@@ -9,7 +9,7 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
-    Expr, Base, Application, Abstraction, Data, Operation, Variable, Definition
+    Expr, OperationInstance, Application, Abstraction, Source, Operation, Variable
 from transformation_algebra.alg import TransformationAlgebra
 
 from itertools import count, chain
@@ -40,7 +40,7 @@ class AlgebraNamespace(ClosedNamespace):
         return rt
 
     def term(self, value) -> URIRef:
-        if isinstance(value, (Definition, TypeOperator)):
+        if isinstance(value, (Operation, TypeOperator)):
             return super().term(value.name)
         else:
             return super().term(value)
@@ -106,7 +106,7 @@ class TransformationGraph(Graph):
         # Add operations to the vocabulary
         for d in algebra.definitions.values():
             node = namespace[d]
-            type_node = TA.Data if isinstance(d, Data) else TA.Operation
+            type_node = TA.Operation
             vocab.add((node, RDF.type, type_node))
             vocab.add((node, RDFS.label, Literal(str(d.name))))
             if d.description:
@@ -176,7 +176,7 @@ class TransformationGraph(Graph):
         if self.include_steps:
             self.add((root, TA.step, current))
 
-        if isinstance(expr, Base):
+        if isinstance(expr, (OperationInstance, Source)):
             datatype = expr.type.output()
 
             if self.include_types:
@@ -184,18 +184,18 @@ class TransformationGraph(Graph):
 
             if self.include_labels:
                 self.add((current, RDFS.label,
-                    Literal(f"{datatype} via {expr.definition.name}")))
+                    Literal(f"source : {datatype}")))
 
-            if isinstance(expr.definition, Operation):
-                assert expr.definition.is_primitive(), \
-                    f"{expr.definition} is not a primitive"
+            if isinstance(expr, OperationInstance):
+                assert expr.operation.is_primitive(), \
+                    f"{expr.operation} is not a primitive"
 
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.via, self.namespace[expr.definition]))
+                self.add((current, TA.via, self.namespace[expr.operation]))
             else:
-                assert isinstance(expr.definition, Data)
+                assert isinstance(expr, Source)
 
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.SourceData))

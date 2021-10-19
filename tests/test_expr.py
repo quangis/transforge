@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, _
-from transformation_algebra.expr import Data, Operation
+from transformation_algebra.expr import Operation, Source
 from transformation_algebra.alg import TransformationAlgebra
 
 
@@ -13,7 +13,7 @@ class TestAlgebra(unittest.TestCase):
         Multiple arguments may be provided through partial or full application.
         """
         A = Type.declare('A')
-        x = Data(A)
+        x = Source(A)
         f = Operation(A ** A ** A)
         self.assertTrue(f(x, x).match(f(x)(x)))
 
@@ -22,7 +22,7 @@ class TestAlgebra(unittest.TestCase):
         Expressions can be converted to primitive form.
         """
         Int = Type.declare('Int')
-        one = Data(Int, name='one')
+        one = Source(Int)
         add = Operation(Int ** Int ** Int, name='add')
         add1 = Operation(
             Int ** Int,
@@ -35,7 +35,7 @@ class TestAlgebra(unittest.TestCase):
             name='compose'
         )
         algebra = TransformationAlgebra()
-        algebra.add(add, one, add1, compose)
+        algebra.add(add, add1, compose)
         a = compose(add1, add1, one)
         b = add(add(one, one), one)
         self.assertTrue(a.primitive().match(b))
@@ -45,7 +45,7 @@ class TestAlgebra(unittest.TestCase):
         Expressions can be compared to one another.
         """
         A = Type.declare('A')
-        x = Data(A)
+        x = Source(A)
         f = Operation(A ** A, name='f')
         g = Operation(A ** A, name='g')
         self.assertTrue(f(x).match(f(x)))
@@ -57,7 +57,7 @@ class TestAlgebra(unittest.TestCase):
         other non-primitive expressions are expanded properly.
         """
         A = Type.declare('A')
-        x = Data(A)
+        x = Source(A)
         f = Operation(A ** A, name='f')
         g = Operation(A ** A, name='g',
             define=lambda x: f(x))
@@ -76,7 +76,7 @@ class TestAlgebra(unittest.TestCase):
         Make sure that primitives have the correct type.
         """
         A = Type.declare('A')
-        x = Data(A)
+        x = Source(A)
         f = Operation(lambda α: α ** α, name='f')
         g = Operation(lambda α: α ** α, name='g', define=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
@@ -90,7 +90,7 @@ class TestAlgebra(unittest.TestCase):
         Value = Type.declare('Val')
         Bool = Type.declare('Bool', supertype=Value)
         Map = Type.declare('Map', params=2)
-        data = Data(Map(Value, Bool))
+        data = Source(Map(Value, Bool))
         eq = Operation(Value ** Value ** Bool)
         select = Operation(
             lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
@@ -138,8 +138,8 @@ class TestAlgebra(unittest.TestCase):
         A, B = Type.declare('A'), Type.declare('B')
         algebra = TransformationAlgebra()
         algebra.add(
-            d1=Data(A),
-            d2=Data(B),
+            d1=Operation(A),
+            d2=Operation(B),
             f=Operation(A ** B ** A))
         algebra.parse("f (d1 x) (d2 y)")
         self.assertRaises(error.TATypeError, algebra.parse, "f (d1 x) (d2 x)")
