@@ -49,6 +49,21 @@ class TransformationAlgebra(object):
         for op in value.type.instance().operators():
             self.types.add(op)
 
+    def __getattr__(self, name: str) -> Definition:
+        result = self.definitions.get(name)
+        if result:
+            return result
+        else:
+            raise AttributeError(
+                f"The algebra defines no type or operation '{name}'.")
+
+    def __setattr__(self, name: str, value: Definition) -> None:
+        if isinstance(value, Definition):
+            assert value.name is None or value.name == name
+            value.name = name
+            self.definitions[name] = value
+        super().__setattr__(name, value)
+
     def validate(self) -> None:
         # Validation only happens all operations have been defined. If we did
         # it at define-time, it would lead to issues --- see issue #3
