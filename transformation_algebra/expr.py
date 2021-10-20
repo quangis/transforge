@@ -52,9 +52,9 @@ class Operator(object):
 
     def instance(self) -> Expr:
         if self.is_function:
-            return Operation(self)
+            return Operation(operator=self)
         else:
-            return Source()
+            return Source(type=self.type)
 
     def is_primitive(self) -> bool:
         return isinstance(self, Operator) and not self.definition
