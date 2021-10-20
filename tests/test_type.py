@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeSchema, TypeVar, _
+    Type, TypeSchema, TypeVariable, _
 
 
 class TestType(unittest.TestCase):
@@ -156,9 +156,9 @@ class TestType(unittest.TestCase):
         # that its parameters is exactly A: that might be too general a bound.
         F, A = Type.declare('F', params=1), Type.declare('A')
         f = TypeSchema(lambda x: x ** x | x @ F(A))
-        result = f.apply(TypeVar())
+        result = f.apply(TypeVariable())
         self.assertEqual(result.operator, F)
-        self.assertTrue(isinstance(result.params[0], TypeVar))
+        self.assertTrue(isinstance(result.params[0], TypeVariable))
 
     def test_multiple_bounds1(self):
         # This works because B ** B is acceptable for A ** B.
@@ -210,12 +210,12 @@ class TestType(unittest.TestCase):
         self.assertFalse(Basic ** Basic <= Basic ** Sub)
 
     def test_subtyping_of_variables(self):
-        x = TypeVar()
+        x = TypeVariable()
         self.assertEqual(x < x, False)
         self.assertEqual(x <= x, True)
 
     def test_subtyping_of_variable_functions(self):
-        x = TypeVar()
+        x = TypeVariable()
         Super = Type.declare('Super')
         Basic = Type.declare('Basic', supertype=Super)
         Sub = Type.declare('Sub', supertype=Basic)
@@ -280,7 +280,7 @@ class TestType(unittest.TestCase):
         A = Type.declare('A')
         F = Type.declare('F', params=2)
         self.assertEqual(F(A, _) <= F(_, A), True)
-        x = TypeVar()
+        x = TypeVariable()
         c = x @ [F(A, _), F(_, A)]
         self.assertEqual(len(c.alternatives), 2)
         c = x @ [F(_, _), F(_, _)]

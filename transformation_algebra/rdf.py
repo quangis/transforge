@@ -6,7 +6,7 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, TypeOperation, TypeVar, \
+from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source, Operator, Variable
@@ -138,14 +138,14 @@ class TransformationGraph(Graph):
                 else:
                     node = self.namespace[t._operator]
             else:
-                assert isinstance(t, TypeVar)
-                node = BNode()
+                assert isinstance(t, TypeVariable)
+                # node = BNode()
 
-                if self.include_labels:
-                    self.add((node, RDFS.label, Literal(str(t))))
+                # if self.include_labels:
+                #     self.add((node, RDFS.label, Literal(str(t))))
 
-                if self.include_kinds:
-                    self.add((node, RDF.type, TA.TypeVar))
+                # if self.include_kinds:
+                #     self.add((node, RDF.type, TA.TypeVariable))
 
             self.type_nodes[t] = node
             return node

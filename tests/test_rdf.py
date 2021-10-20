@@ -17,7 +17,7 @@ from rdflib.tools.rdf2dot import rdf2dot
 from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, TypeVar
+from transformation_algebra.type import Type, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.alg import TransformationAlgebra
 from transformation_algebra.rdf import TA, TransformationGraph, AlgebraNamespace
@@ -395,7 +395,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.add_types(A, F)
         ALG = AlgebraNamespace('ALG#', alg)
         g = Graph()
-        x, y = TypeVar(), TypeVar()
+        x, y = TypeVariable(), TypeVariable()
         x.bind(A)
         y.bind(A)
         n1 = BNode()

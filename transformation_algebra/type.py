@@ -72,8 +72,8 @@ class Type(ABC):
         f = self.instance().follow()
         x = arg.instance().follow()
 
-        if isinstance(f, TypeVar):
-            f.bind(Function(TypeVar(), TypeVar()))
+        if isinstance(f, TypeVariable):
+            f.bind(Function(TypeVariable(), TypeVariable()))
             f = f.follow()
 
         if isinstance(f, TypeOperation) and f._operator == Function:
@@ -112,11 +112,11 @@ class TypeSchema(Type):
 
     def __str__(self) -> str:
         return self.schema(
-            *(TypeVar(v) for v in signature(self.schema).parameters)
+            *(TypeVariable(v) for v in signature(self.schema).parameters)
         ).resolve().string(include_constraints=True)
 
     def instance(self) -> TypeInstance:
-        return self.schema(*(TypeVar() for _ in range(self.n)))
+        return self.schema(*(TypeVariable() for _ in range(self.n)))
 
 
 class TypeOperator(Type):
@@ -164,7 +164,7 @@ class TypeInstance(Type):
     """
 
     def normalized(self) -> bool:
-        return not (isinstance(self, TypeVar) and self.unification)
+        return not (isinstance(self, TypeVariable) and self.unification)
 
     def __str__(self) -> str:
         return self.string(include_constraints=True)
@@ -186,7 +186,7 @@ class TypeInstance(Type):
                 if self.params:
                     result += f'({", ".join(t.string() for t in self.params)})'
         else:
-            assert isinstance(self, TypeVar)
+            assert isinstance(self, TypeVariable)
             if self.unification:
                 result = self.unification.string()
             else:
@@ -214,7 +214,7 @@ class TypeInstance(Type):
         if isinstance(a, TypeOperation):
             for v, p in zip(a._operator.variance, a.params):
                 p.resolve(prefer_lower ^ (v == Variance.CONTRA))
-        elif isinstance(a, TypeVar):
+        elif isinstance(a, TypeVariable):
             if prefer_lower and a.lower:
                 a.bind(a.lower())
             elif not prefer_lower and a.upper:
@@ -255,13 +255,13 @@ class TypeInstance(Type):
             any(b in t for t in a.params))
 
     def variables(self, indirect: bool = True,
-            target: Optional[Set[TypeVar]] = None) -> Set[TypeVar]:
+            target: Optional[Set[TypeVariable]] = None) -> Set[TypeVariable]:
         """
         Obtain all distinct type variables currently in the type instance, and
         optionally also those variables indirectly related via constraints.
         """
         direct_variables = set(t for t in self
-            if isinstance(t, TypeVar) and (not target or t not in target))
+            if isinstance(t, TypeVariable) and (not target or t not in target))
 
         if indirect:
             target = target or set()
@@ -302,7 +302,7 @@ class TypeInstance(Type):
         Follow a unification until bumping into a type that is not yet bound.
         """
         a = self
-        while isinstance(a, TypeVar) and a.unification:
+        while isinstance(a, TypeVariable) and a.unification:
             a = a.unification
         return a
 
@@ -313,7 +313,7 @@ class TypeInstance(Type):
         assert self.normalized()
         if isinstance(self, TypeOperation):
             if self.basic:
-                return TypeVar()
+                return TypeVariable()
             else:
                 return TypeOperation(
                     self._operator,
@@ -348,21 +348,21 @@ class TypeInstance(Type):
                     elif r is None:
                         result = None
                 return result
-        elif isinstance(a, TypeOperation) and isinstance(b, TypeVar):
+        elif isinstance(a, TypeOperation) and isinstance(b, TypeVariable):
             if (b.upper or b.lower) and not a.basic:
                 return False
             if b.upper and b.upper.subtype(a._operator, strict=True):
                 return False
             if accept_wildcard and b.wildcard:
                 return True
-        elif isinstance(a, TypeVar) and isinstance(b, TypeOperation):
+        elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
             if (a.upper or a.lower) and not b.basic:
                 return False
             if a.lower and b._operator.subtype(a.lower, strict=True):
                 return False
             if accept_wildcard and a.wildcard:
                 return True
-        elif isinstance(a, TypeVar) and isinstance(b, TypeVar):
+        elif isinstance(a, TypeVariable) and isinstance(b, TypeVariable):
             if a == b or (a.wildcard and b.wildcard):
                 return True
             if accept_wildcard and (a.wildcard or b.wildcard):
@@ -380,7 +380,7 @@ class TypeInstance(Type):
         a = self.follow()
         b = other.follow()
 
-        if isinstance(a, TypeVar) and isinstance(b, TypeVar):
+        if isinstance(a, TypeVariable) and isinstance(b, TypeVariable):
             a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
@@ -398,11 +398,12 @@ class TypeInstance(Type):
             else:
                 raise error.TypeMismatch(a, b)
         else:
-            if isinstance(a, TypeOperation) and isinstance(b, TypeVar):
-                op, var, f = a, b, TypeVar.above
+            if isinstance(a, TypeOperation) and isinstance(b, TypeVariable):
+                op, var, f = a, b, TypeVariable.above
             else:
-                assert isinstance(a, TypeVar) and isinstance(b, TypeOperation)
-                op, var, f = b, a, TypeVar.below
+                assert isinstance(a, TypeVariable) and \
+                    isinstance(b, TypeOperation)
+                op, var, f = b, a, TypeVariable.below
 
             if var in op:
                 raise error.RecursiveType(var, op)
@@ -488,7 +489,7 @@ class TypeOperation(TypeInstance):
         return self._operator.arity == 0
 
 
-class TypeVar(TypeInstance):
+class TypeVariable(TypeInstance):
     """
     A type variable. This is not a schematic variable — it is instantiated!
     """
@@ -518,7 +519,7 @@ class TypeVar(TypeInstance):
         if self is not t:
             self.unification = t
 
-            if isinstance(t, TypeVar):
+            if isinstance(t, TypeVariable):
                 t._constraints.update(self._constraints)
                 self._constraints = t._constraints
                 t.check_constraints()
@@ -557,7 +558,7 @@ class TypeVar(TypeInstance):
         bound.
         """
         a = self.follow()
-        assert isinstance(a, TypeVar)
+        assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
         if upper.subtype(new, True):  # fail when lower bound higher than upper
             raise error.SubtypeMismatch(new, upper)
@@ -576,7 +577,7 @@ class TypeVar(TypeInstance):
         """
         # symmetric to `above`
         a = self.follow()
-        assert isinstance(a, TypeVar)
+        assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
         if new.subtype(lower, True):
             raise error.SubtypeMismatch(lower, new)
@@ -623,8 +624,8 @@ class Constraint(object):
             f" @ [{', '.join(a.string() for a in self.alternatives)}]"
         )
 
-    def variables(self, indirect: bool = True) -> Set[TypeVar]:
-        result: Set[TypeVar] = set()
+    def variables(self, indirect: bool = True) -> Set[TypeVariable]:
+        result: Set[TypeVariable] = set()
         for e in chain(self.reference, *self.alternatives):
             result.update(e.variables(indirect=indirect, target=result))
         return result
@@ -703,7 +704,7 @@ class Constraint(object):
 Function = TypeOperator('Function', params=[Variance.CONTRA, Variance.CO])
 
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
-_ = TypeSchema(lambda: TypeVar(wildcard=True))
+_ = TypeSchema(lambda: TypeVariable(wildcard=True))
 
 
 def operators(

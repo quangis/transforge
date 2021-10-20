@@ -15,7 +15,7 @@ from typing import Optional, Callable, Union, List, Iterator
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeVar, TypeSchema, TypeInstance, Function, _
+    Type, TypeVariable, TypeSchema, TypeInstance, Function, _
 
 
 class Operator(object):
@@ -78,7 +78,8 @@ class Operator(object):
 
                 # All the variables in the declared type must still be
                 # variables --- otherwise we were too general
-                if not all(isinstance(v.follow(), TypeVar) for v in vars_decl):
+                if not all(isinstance(v.follow(), TypeVariable) \
+                        for v in vars_decl):
                     raise error.DeclaredTypeTooGeneral(
                         self.type, self.instance().primitive().type)
 
@@ -232,7 +233,7 @@ class Expr(ABC):
         variable in the expression.
         """
         expr_vars: set[Variable] = set()
-        type_vars: set[TypeVar] = set()
+        type_vars: set[TypeVariable] = set()
 
         for expr in self.leaves():
             type_vars.update(expr.type.variables())
@@ -319,7 +320,7 @@ class Variable(Expr):
     def __init__(self, name: Optional[str] = None):
         self._name = name
         self.bound: Optional[Expr] = None
-        super().__init__(type=TypeVar())
+        super().__init__(type=TypeVariable())
 
     @property
     def name(self) -> str:
