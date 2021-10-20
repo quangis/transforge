@@ -18,11 +18,12 @@ from transformation_algebra.type import \
     Type, TypeVar, TypeSchema, TypeInstance, Function, _
 
 
-class Operation(object):
+class Operator(object):
     """
-    An operation represents an atomary step of transformations. It may be
-    primitive, or it may be defined in terms of other operations. In the latter
-    case, it can be unfolded to reveal its inner structure.
+    An operator can be instantiated into an operation, which is an atomary step
+    in a transformation. It may be primitive, or it may be defined in terms of
+    other operations. In the latter case, it can be unfolded to reveal its
+    inner structure.
     """
 
     def __init__(
@@ -43,7 +44,7 @@ class Operation(object):
     def __str__(self) -> str:
         return f"{self.name or 'anonymous'} : {self.type}"
 
-    def __call__(self, *args: Union[Operation, Expr]) -> Expr:
+    def __call__(self, *args: Union[Operator, Expr]) -> Expr:
         """
         Calling an operation instantiates it as an expression.
         """
@@ -51,12 +52,12 @@ class Operation(object):
 
     def instance(self) -> Expr:
         if self.is_function:
-            return OperationInstance(self)
+            return Operation(self)
         else:
             return Source()
 
     def is_primitive(self) -> bool:
-        return isinstance(self, Operation) and not self.definition
+        return isinstance(self, Operator) and not self.definition
 
     def validate_type(self) -> None:
         """
@@ -95,7 +96,7 @@ class Expr(ABC):
     def __repr__(self) -> str:
         return self.tree()
 
-    def __call__(self, *args: Expr | Operation) -> Expr:
+    def __call__(self, *args: Expr | Operator) -> Expr:
         return reduce(Expr.apply,
             (e if isinstance(e, Expr) else e.instance() for e in args),
             self)
@@ -174,9 +175,9 @@ class Expr(ABC):
         """
         expr = self.normalize(recursive=False)
 
-        if isinstance(expr, OperationInstance):
-            if expr.operation.definition:
-                expr_primitive = Abstraction(expr.operation.definition)
+        if isinstance(expr, Operation):
+            if expr.operator.definition:
+                expr_primitive = Abstraction(expr.operator.definition)
                 # The type of the original expression may be less general than
                 # that of the primitive expression, but not more general.
                 if unify:
@@ -201,9 +202,9 @@ class Expr(ABC):
         b = other.normalize(recursive=False)
         if isinstance(a, Source) and isinstance(b, Source):
             return bool(a.type.match(b.type)) and a.label == b.label
-        elif isinstance(a, OperationInstance) and isinstance(b,
-                OperationInstance):
-            return a.operation == b.operation
+        elif isinstance(a, Operation) and isinstance(b,
+                Operation):
+            return a.operator == b.operator
         elif isinstance(a, Application) and isinstance(b, Application):
             return a.f.match(b.f) and a.x.match(b.x)
         elif isinstance(a, Abstraction) and isinstance(b, Abstraction):
@@ -216,7 +217,7 @@ class Expr(ABC):
         Obtain all base expressions and variables in an expression.
         """
         a = self.normalize(recursive=False)
-        if isinstance(a, (Source, OperationInstance, Variable)):
+        if isinstance(a, (Source, Operation, Variable)):
             yield a
         elif isinstance(a, Abstraction):
             yield from a.params
@@ -245,17 +246,17 @@ class Expr(ABC):
             var.name = f"τ{subscript(i)}"
 
 
-class OperationInstance(Expr):
+class Operation(Expr):
     """
-    An instance of an operation.
+    An instance of an operator.
     """
 
-    def __init__(self, operation: Operation):
-        self.operation = operation
-        super().__init__(type=operation.type.instance())
+    def __init__(self, operator: Operator):
+        self.operator = operator
+        super().__init__(type=operator.type.instance())
 
     def __str__(self) -> str:
-        return str(self.operation)
+        return str(self.operator)
 
 
 class Source(Expr):

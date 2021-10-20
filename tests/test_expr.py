@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, _
-from transformation_algebra.expr import Operation, Source
+from transformation_algebra.expr import Operator, Source
 from transformation_algebra.alg import TransformationAlgebra
 
 
@@ -14,7 +14,7 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operation(A ** A ** A)
+        f = Operator(A ** A ** A)
         self.assertTrue(f(x, x).match(f(x)(x)))
 
     def test_primitive(self):
@@ -23,13 +23,13 @@ class TestAlgebra(unittest.TestCase):
         """
         Int = Type.declare('Int')
         one = Source(Int)
-        add = Operation(Int ** Int ** Int, name='add')
-        add1 = Operation(
+        add = Operator(Int ** Int ** Int, name='add')
+        add1 = Operator(
             Int ** Int,
             define=lambda x: add(x, one),
             name='add1'
         )
-        compose = Operation(
+        compose = Operator(
             lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
             define=lambda f, g, x: f(g(x)),
             name='compose'
@@ -46,8 +46,8 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operation(A ** A, name='f')
-        g = Operation(A ** A, name='g')
+        f = Operator(A ** A, name='f')
+        g = Operator(A ** A, name='g')
         self.assertTrue(f(x).match(f(x)))
         self.assertFalse(f(x).match(g(x)))
 
@@ -58,10 +58,10 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operation(A ** A, name='f')
-        g = Operation(A ** A, name='g',
+        f = Operator(A ** A, name='f')
+        g = Operator(A ** A, name='g',
             define=lambda x: f(x))
-        h = Operation(A ** A, name='h',
+        h = Operator(A ** A, name='h',
             define=lambda x: g(x))
         algebra = TransformationAlgebra()
         algebra.add(f, g, h)
@@ -77,30 +77,30 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operation(lambda α: α ** α, name='f')
-        g = Operation(lambda α: α ** α, name='g', define=lambda x: f(x))
+        f = Operator(lambda α: α ** α, name='f')
+        g = Operator(lambda α: α ** α, name='g', define=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
 
     def test_double_binding(self):
         """
         An issue once arised in which the assertion that variables may only be
         bound once was violated, due to complex interactions of primitive
-        operations. This test makes sure that issue no longer exists.
+        Operators. This test makes sure that issue no longer exists.
         """
         Value = Type.declare('Val')
         Bool = Type.declare('Bool', supertype=Value)
         Map = Type.declare('Map', params=2)
         data = Source(Map(Value, Bool))
-        eq = Operation(Value ** Value ** Bool)
-        select = Operation(
+        eq = Operator(Value ** Value ** Bool)
+        select = Operator(
             lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
             | τ @ [Map(α, _), Map(_, α)]
             | τ @ [Map(β, _), Map(_, β)]
         )
-        prod = Operation(lambda α, β, γ, τ:
+        prod = Operator(lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
         )
-        app = Operation(lambda α, β, γ, τ:
+        app = Operator(lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
             define=lambda f, x, y: select(eq, prod(f, x, y))
         )
@@ -110,37 +110,37 @@ class TestAlgebra(unittest.TestCase):
 
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
-        f = Operation(A ** B)
+        f = Operator(A ** B)
         self.assertRaises(
             error.SubtypeMismatch,
-            Operation.validate_type,
-            Operation(B ** B, define=lambda x: f(x))
+            Operator.validate_type,
+            Operator(B ** B, define=lambda x: f(x))
         )
-        Operation(A ** B, define=lambda x: f(x)).validate_type()
+        Operator(A ** B, define=lambda x: f(x)).validate_type()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
-        g = Operation(lambda α: α ** B)
-        Operation(A ** B, define=lambda x: g(x)).validate_type()
-        Operation(B ** B, define=lambda x: g(x)).validate_type()
+        g = Operator(lambda α: α ** B)
+        Operator(A ** B, define=lambda x: g(x)).validate_type()
+        Operator(B ** B, define=lambda x: g(x)).validate_type()
 
     def test_looser_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
-        f, g = Operation(A ** B), Operation(lambda α: α ** B)
-        Operation(lambda α: α ** B, define=lambda x: g(x)).validate_type()
+        f, g = Operator(A ** B), Operator(lambda α: α ** B)
+        Operator(lambda α: α ** B, define=lambda x: g(x)).validate_type()
         self.assertRaises(
             error.DeclaredTypeTooGeneral,
-            Operation.validate_type,
-            Operation(lambda α: α ** B, define=lambda x: f(x)))
+            Operator.validate_type,
+            Operator(lambda α: α ** B, define=lambda x: f(x)))
 
     def test_same_labels_unify(self):
         # See issue #10
         A, B = Type.declare('A'), Type.declare('B')
         algebra = TransformationAlgebra()
         algebra.add(
-            d1=Operation(A),
-            d2=Operation(B),
-            f=Operation(A ** B ** A))
+            d1=Operator(A),
+            d2=Operator(B),
+            f=Operator(A ** B ** A))
         algebra.parse("f (d1 x) (d2 y)")
         self.assertRaises(error.TATypeError, algebra.parse, "f (d1 x) (d2 x)")
 

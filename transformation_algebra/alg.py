@@ -13,7 +13,7 @@ from transformation_algebra import error
 from transformation_algebra.type import \
     TypeOperator, TypeInstance, Function
 from transformation_algebra.expr import \
-    Operation, Expr, Application, Source
+    Operator, Expr, Application, Source
 
 
 class TransformationAlgebra(object):
@@ -21,7 +21,7 @@ class TransformationAlgebra(object):
         """
         Initiate an empty transformation algebra.
         """
-        self.definitions: dict[str, Operation] = {}
+        self.definitions: dict[str, Operator] = {}
         self.types: set[TypeOperator] = set()
 
     def __repr__(self) -> str:
@@ -30,26 +30,26 @@ class TransformationAlgebra(object):
     def __str__(self) -> str:
         return "\n".join(str(d) for d in self.definitions.values()) + "\n"
 
-    def __contains__(self, key: Union[str, Operation, TypeOperator]) -> bool:
+    def __contains__(self, key: Union[str, Operator, TypeOperator]) -> bool:
         if isinstance(key, TypeOperator):
             return key in self.types
-        elif isinstance(key, Operation):
+        elif isinstance(key, Operator):
             assert key.name
             return self.definitions.get(key.name) is key
         else:
             assert isinstance(key, str)
             return key in self.definitions
 
-    def __getitem__(self, key: str) -> Operation:
+    def __getitem__(self, key: str) -> Operator:
         return self.definitions[key]
 
-    def __setitem__(self, key: str, value: Operation) -> None:
+    def __setitem__(self, key: str, value: Operator) -> None:
         self.definitions[key] = value
 
         for op in value.type.instance().operators():
             self.types.add(op)
 
-    def __getattr__(self, name: str) -> Operation:
+    def __getattr__(self, name: str) -> Operator:
         result = self.definitions.get(name)
         if result:
             return result
@@ -57,8 +57,8 @@ class TransformationAlgebra(object):
             raise AttributeError(
                 f"The algebra defines no type or operation '{name}'.")
 
-    def __setattr__(self, name: str, value: Operation) -> None:
-        if isinstance(value, Operation):
+    def __setattr__(self, name: str, value: Operator) -> None:
+        if isinstance(value, Operator):
             assert value.name is None or value.name == name
             value.name = name
             self.definitions[name] = value
@@ -68,10 +68,10 @@ class TransformationAlgebra(object):
         # Validation only happens all operations have been defined. If we did
         # it at define-time, it would lead to issues --- see issue #3
         for d in self.definitions:
-            if isinstance(d, Operation):
+            if isinstance(d, Operator):
                 d.validate_type()
 
-    def add(self, *nargs: Operation, **kwargs: Operation) -> None:
+    def add(self, *nargs: Operator, **kwargs: Operator) -> None:
         """
         Add data and operation definitions to this transformation algebra. Note
         that names ending with an underscore will be stripped of that symbol.
@@ -80,7 +80,7 @@ class TransformationAlgebra(object):
         for k, v in chain(kwargs.items(),
                 ((v.name, v) for v in nargs)):
             assert k is not None, f"unknown name for a {type(v)}"
-            if isinstance(v, Operation):
+            if isinstance(v, Operator):
                 k = k.rstrip("_")
                 assert v.name is None or k == v.name
                 v.name = k

@@ -18,7 +18,7 @@ from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVar
-from transformation_algebra.expr import Expr, Operation, Source
+from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.alg import TransformationAlgebra
 from transformation_algebra.rdf import TA, TransformationGraph, AlgebraNamespace
 
@@ -128,7 +128,7 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = Type.declare("A")
         a = Source(A)
-        f = Operation(A ** A, name="f")
+        f = Operator(A ** A, name="f")
         alg = TransformationAlgebra()
         alg.add(f)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -146,8 +146,8 @@ class TestAlgebraRDF(unittest.TestCase):
         Operations passed as a parameter must have an internal operation.
         """
         A = Type.declare("A")
-        f = Operation((A ** A) ** A, name="f")
-        g = Operation(A ** A, name="g")
+        f = Operator((A ** A) ** A, name="f")
+        g = Operator(A ** A, name="g")
         alg = TransformationAlgebra()
         alg.add(f, g)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -168,8 +168,8 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = Type.declare("A")
         a = Source(A)
-        f = Operation((A ** A) ** A ** A, name="f")
-        g = Operation(A ** A, name="g")
+        f = Operator((A ** A) ** A ** A, name="f")
+        g = Operator(A ** A, name="g")
         alg = TransformationAlgebra()
         alg.add(f, g)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -192,9 +192,9 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = Type.declare("A")
         a = Source(A)
-        f = Operation(A ** A, name="f")
-        g = Operation(A ** A, name="g", define=lambda x: f(f(x)))
-        h = Operation((A ** A) ** A ** A, name="h")
+        f = Operator(A ** A, name="f")
+        g = Operator(A ** A, name="g", define=lambda x: f(f(x)))
+        h = Operator((A ** A) ** A ** A, name="h")
         alg = TransformationAlgebra()
         alg.add(f, g, h)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -219,9 +219,9 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         a = Source(A)
         b = Source(A)
-        f = Operation(A ** A ** A, name="f")
-        g = Operation(A ** A ** A, name="g", define=lambda x, y: f(y, f(x, y)))
-        h = Operation((A ** A ** A) ** A ** A ** A, name="h")
+        f = Operator(A ** A ** A, name="f")
+        g = Operator(A ** A ** A, name="g", define=lambda x, y: f(y, f(x, y)))
+        h = Operator((A ** A ** A) ** A ** A ** A, name="h")
         alg = TransformationAlgebra()
         alg.add(f, g, h)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -245,8 +245,8 @@ class TestAlgebraRDF(unittest.TestCase):
         """
 
         A = Type.declare("A")
-        f = Operation((A ** A) ** A, name="f")
-        id = Operation(A ** A, name="id", define=lambda x: x)
+        f = Operator((A ** A) ** A, name="f")
+        id = Operator(A ** A, name="id", define=lambda x: x)
         alg = TransformationAlgebra()
         alg.add(f, id)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -266,9 +266,9 @@ class TestAlgebraRDF(unittest.TestCase):
         """
 
         A = Type.declare("A")
-        f = Operation((A ** A) ** A, name="f")
-        g = Operation(A ** A, name="g")
-        h = Operation(A ** A, name="h", define=lambda x: g(x))
+        f = Operator((A ** A) ** A, name="f")
+        g = Operator(A ** A, name="g")
+        h = Operator(A ** A, name="h", define=lambda x: g(x))
         alg = TransformationAlgebra()
         alg.add(f, g, h)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -285,10 +285,10 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = Type.declare("A")
         a = Source(A)
-        f = Operation((A ** A) ** (A ** A) ** (A ** A) ** A ** A, name="f")
-        g = Operation(A ** A, name="g")
-        h = Operation(A ** A, name="h")
-        e = Operation(A ** A, name="e")
+        f = Operator((A ** A) ** (A ** A) ** (A ** A) ** A ** A, name="f")
+        g = Operator(A ** A, name="g")
+        h = Operator(A ** A, name="h")
+        e = Operator(A ** A, name="e")
         alg = TransformationAlgebra()
         alg.add(f, g, h, e)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -318,9 +318,9 @@ class TestAlgebraRDF(unittest.TestCase):
         A = Type.declare("A")
         a = Source(A)
         b = Source(A)
-        outer = Operation((A ** A) ** A ** A, name="outer")
-        inner = Operation((A ** A) ** A ** (A ** A), name="inner")
-        f = Operation(A ** A, name="f")
+        outer = Operator((A ** A) ** A ** A, name="outer")
+        inner = Operator((A ** A) ** A ** (A ** A), name="inner")
+        f = Operator(A ** A, name="f")
         alg = TransformationAlgebra()
         alg.add(outer, inner, f)
         ALG = AlgebraNamespace('ALG#', alg)
@@ -344,9 +344,9 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = Type.declare("A")
         a = Source(A)
-        f = Operation((A ** A ** A) ** A ** A, name="f")
-        g = Operation(A ** A ** A, name="g")
-        h = Operation(A ** A ** A, name="h", define=lambda x: g(x))
+        f = Operator((A ** A ** A) ** A ** A, name="f")
+        g = Operator(A ** A ** A, name="g")
+        h = Operator(A ** A ** A, name="h", define=lambda x: g(x))
         alg = TransformationAlgebra()
         alg.add(f, g)
         ALG = AlgebraNamespace('ALG#', alg)

@@ -9,7 +9,7 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperation, TypeVar, \
     Function, TypeOperator, TypeInstance
 from transformation_algebra.expr import \
-    Expr, OperationInstance, Application, Abstraction, Source, Operation, Variable
+    Expr, Operation, Application, Abstraction, Source, Operator, Variable
 from transformation_algebra.alg import TransformationAlgebra
 
 from itertools import count, chain
@@ -40,7 +40,7 @@ class AlgebraNamespace(ClosedNamespace):
         return rt
 
     def term(self, value) -> URIRef:
-        if isinstance(value, (Operation, TypeOperator)):
+        if isinstance(value, (Operator, TypeOperator)):
             return super().term(value.name)
         else:
             return super().term(value)
@@ -176,7 +176,7 @@ class TransformationGraph(Graph):
         if self.include_steps:
             self.add((root, TA.step, current))
 
-        if isinstance(expr, (OperationInstance, Source)):
+        if isinstance(expr, (Operation, Source)):
             datatype = expr.type.output()
 
             if self.include_types:
@@ -186,14 +186,14 @@ class TransformationGraph(Graph):
                 self.add((current, RDFS.label,
                     Literal(f"source : {datatype}")))
 
-            if isinstance(expr, OperationInstance):
-                assert expr.operation.is_primitive(), \
-                    f"{expr.operation} is not a primitive"
+            if isinstance(expr, Operation):
+                assert expr.operator.is_primitive(), \
+                    f"{expr.operator} is not a primitive"
 
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.via, self.namespace[expr.operation]))
+                self.add((current, TA.via, self.namespace[expr.operator]))
             else:
                 assert isinstance(expr, Source)
 
