@@ -18,58 +18,27 @@ from transformation_algebra.expr import \
 
 class TransformationAlgebra(object):
     def __init__(self):
-        """
-        Initiate an empty transformation algebra.
-        """
-        self.definitions: dict[str, Operator] = {}
-        self.types: set[TypeOperator] = set()
+        self.operators: dict[str, Operator] = dict()
+        self.types: dict[str, TypeOperator] = dict()
 
-    def __repr__(self) -> str:
-        return str(self)
+    def insert(self, x: Operator | TypeOperator, name: Optional[str] = None):
 
-    def __str__(self) -> str:
-        return "\n".join(str(d) for d in self.definitions.values()) + "\n"
-
-    def __contains__(self, key: Union[str, Operator, TypeOperator]) -> bool:
-        if isinstance(key, TypeOperator):
-            return key in self.types
-        elif isinstance(key, Operator):
-            assert key.name
-            return self.definitions.get(key.name) is key
+        # The operation must already have a name or be named here
+        if name:
+            name = name.rstrip("_")
+            if not x.name:
+                x.name = name
+            elif x.name != name:
+                raise ValueError("operation has conflicting names")
+        elif not x.name:
+            raise ValueError("operation must have a name")
         else:
-            assert isinstance(key, str)
-            return key in self.definitions
+            name = x.name
 
-    def __getitem__(self, key: str) -> Operator:
-        return self.definitions[key]
-
-    def __setitem__(self, key: str, value: Operator) -> None:
-        self.definitions[key] = value
-
-        for op in value.type.instance().operators():
-            self.types.add(op)
-
-    def __getattr__(self, name: str) -> Operator:
-        result = self.definitions.get(name)
-        if result:
-            return result
+        if isinstance(x, Operator):
+            self.operators[name] = x
         else:
-            raise AttributeError(
-                f"The algebra defines no type or operation '{name}'.")
-
-    def __setattr__(self, name: str, value: Operator) -> None:
-        if isinstance(value, Operator):
-            assert value.name is None or value.name == name
-            value.name = name
-            self.definitions[name] = value
-        super().__setattr__(name, value)
-
-    def validate(self) -> None:
-        # Validation only happens all operations have been defined. If we did
-        # it at define-time, it would lead to issues --- see issue #3
-        for d in self.definitions:
-            if isinstance(d, Operator):
-                d.validate_type()
+            self.types[name] = x
 
     def add(self, *nargs: Operator, **kwargs: Operator) -> None:
         """
@@ -77,25 +46,55 @@ class TransformationAlgebra(object):
         that names ending with an underscore will be stripped of that symbol.
         """
 
-        for k, v in chain(kwargs.items(),
-                ((v.name, v) for v in nargs)):
-            assert k is not None, f"unknown name for a {type(v)}"
+        for k, v in chain(kwargs.items(), ((v.name, v) for v in nargs)):
             if isinstance(v, Operator):
-                k = k.rstrip("_")
-                assert v.name is None or k == v.name
-                v.name = k
-                self[k] = v
+                self.insert(v, k)
+            elif isinstance(v, TypeOperator):
+                self.insert(v, k)
             else:
                 # Only if we were fed globals() will we automatically filter
                 # out irrelevant types without complaining
                 assert '__builtins__' in kwargs
 
-    def add_types(self, *nargs: TypeOperator, **kwargs: TypeOperator) -> None:
-        """
-        Explicitly notify the algebra of type operators that may be used.
-        """
-        for t in chain(nargs, kwargs.values()):
-            self.types.add(t)
+    def add_types(self, *nargs, **kwargs):
+        self.add(*nargs, **kwargs)
+
+    def __getattr__(self, name: str) -> Operator | TypeOperator:
+        result = self.operators.get(name) or self.types.get(name)
+        if result:
+            return result
+        else:
+            raise AttributeError
+
+    def __setattr__(self, name: str, value: Operator | TypeOperator) -> None:
+        if isinstance(value, (Operator, TypeOperator)):
+            self.insert(value, name)
+        else:
+            super().__setattr__(name, value)
+
+    def __contains__(self, key: Union[str, Operator, TypeOperator]) -> bool:
+        if isinstance(key, str):
+            return key in self.operators or key in self.types
+        elif isinstance(key, TypeOperator):
+            return self.types.get(key.name) is key
+        elif isinstance(key, Operator):
+            assert isinstance(key.name, str)
+            return self.operators.get(key.name) is key
+        else:
+            return False
+
+    def validate(self) -> None:
+        # Validation can only happen once all operations have been defined. If
+        # we did it at define-time, it would lead to issues --- see issue #3
+
+        for op in self.operators.values():
+            # Check declared types of operations against their inferred type
+            op.validate_type()
+
+            # Check that every type is known to the algebra
+            for t in op.type.instance().operators():
+                if t not in self:
+                    raise ValueError
 
     def parse(self, string: str) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple
@@ -138,7 +137,7 @@ class TransformationAlgebra(object):
                     stack.append(previous)
                 else:
                     try:
-                        current = self[token].instance()
+                        current = self.operators[token].instance()
                     except KeyError as e:
                         raise error.Undefined(token) from e
                     else:

@@ -33,8 +33,8 @@ class AlgebraNamespace(ClosedNamespace):
 
     def __new__(cls, uri, alg: TransformationAlgebra):
         terms = chain(
-            alg.definitions.keys(),
-            (t.name for t in alg.types)
+            alg.operators.keys(),
+            alg.types.keys()
         )
         rt = super().__new__(cls, uri, terms)
         return rt
