@@ -17,47 +17,41 @@ from transformation_algebra.expr import \
 
 
 class TransformationAlgebra(object):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
 
-    def insert(self, x: Operator | TypeOperator, name: Optional[str] = None):
+        # For convenience, the user may specify the operations and types on
+        # initialization. When fed `globals()`, irrelevant items are filtered
+        # out without complaint
+        filter_irrelevant_args = '__builtins__' in kwargs
+        for k, v in kwargs.items():
+            if isinstance(v, (Operator, TypeOperator)):
+                self.add(item=v, name=k)
+            elif not filter_irrelevant_args:
+                raise RuntimeError
 
-        # The operation must already have a name or be named here
+    def add(self, item: Operator | TypeOperator, name: Optional[str] = None):
+
+        # The item must already have a name or be named here
         if name:
             name = name.rstrip("_")
-            if not x.name:
-                x.name = name
-            elif x.name != name:
-                raise ValueError("operation has conflicting names")
-        elif not x.name:
-            raise ValueError("operation must have a name")
+            if not item.name:
+                item.name = name
+            elif item.name != name:
+                raise ValueError("has conflicting names")
+        elif not item.name:
+            raise ValueError("must have a name")
         else:
-            name = x.name
+            name = item.name
 
-        if isinstance(x, Operator):
-            self.operators[name] = x
+        if name in self.operators or name in self.types:
+            raise ValueError("already exists")
+
+        if isinstance(item, Operator):
+            self.operators[name] = item
         else:
-            self.types[name] = x
-
-    def add(self, *nargs: Operator, **kwargs: Operator) -> None:
-        """
-        Add data and operation definitions to this transformation algebra. Note
-        that names ending with an underscore will be stripped of that symbol.
-        """
-
-        for k, v in chain(kwargs.items(), ((v.name, v) for v in nargs)):
-            if isinstance(v, Operator):
-                self.insert(v, k)
-            elif isinstance(v, TypeOperator):
-                self.insert(v, k)
-            else:
-                # Only if we were fed globals() will we automatically filter
-                # out irrelevant types without complaining
-                assert '__builtins__' in kwargs
-
-    def add_types(self, *nargs, **kwargs):
-        self.add(*nargs, **kwargs)
+            self.types[name] = item
 
     def __getattr__(self, name: str) -> Operator | TypeOperator:
         result = self.operators.get(name) or self.types.get(name)
@@ -68,7 +62,7 @@ class TransformationAlgebra(object):
 
     def __setattr__(self, name: str, value: Operator | TypeOperator) -> None:
         if isinstance(value, (Operator, TypeOperator)):
-            self.insert(value, name)
+            self.add(value, name)
         else:
             super().__setattr__(name, value)
 

@@ -34,8 +34,6 @@ class TestAlgebra(unittest.TestCase):
             define=lambda f, g, x: f(g(x)),
             name='compose'
         )
-        algebra = TransformationAlgebra()
-        algebra.add(add, add1, compose)
         a = compose(add1, add1, one)
         b = add(add(one, one), one)
         self.assertTrue(a.primitive().match(b))
@@ -63,8 +61,6 @@ class TestAlgebra(unittest.TestCase):
             define=lambda x: f(x))
         h = Operator(A ** A, name='h',
             define=lambda x: g(x))
-        algebra = TransformationAlgebra()
-        algebra.add(f, g, h)
         self.assertTrue(f(x).match(f(x)))
         self.assertFalse(h(x).match(f(x)))
         self.assertTrue(g(x).primitive().match(f(x)))
@@ -135,14 +131,14 @@ class TestAlgebra(unittest.TestCase):
 
     def test_same_labels_unify(self):
         # See issue #10
-        A, B = Type.declare('A'), Type.declare('B')
-        algebra = TransformationAlgebra()
-        algebra.add(
-            d1=Operator(A),
-            d2=Operator(B),
-            f=Operator(A ** B ** A))
-        algebra.parse("f (d1 x) (d2 y)")
-        self.assertRaises(error.TATypeError, algebra.parse, "f (d1 x) (d2 x)")
+        t = TransformationAlgebra()
+        t.A = A = Type.declare("A")
+        t.B = B = Type.declare("B")
+        t.d1 = Operator(A)
+        t.d2 = Operator(B)
+        t.f = Operator(A ** B ** A)
+        t.parse("f (d1 x) (d2 y)")
+        self.assertRaises(error.TATypeError, t.parse, "f (d1 x) (d2 x)")
 
 
 if __name__ == '__main__':
