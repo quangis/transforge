@@ -324,6 +324,13 @@ class TestType(unittest.TestCase):
             | c @ [b, _] | b @ [a, _] | a @ [A, _]).instance()
         self.assertEqual(f[1][1].operators(), {A})
 
+    def test_curried_function_signature_same_as_uncurried(self):
+        # See issue #53
+        A, B, C = Type.declare("A"), Type.declare("B"), Type.declare("B")
+        self.assertEqual(
+            A ** B ** C,
+            (A, B) ** C
+        )
 
 
 if __name__ == '__main__':

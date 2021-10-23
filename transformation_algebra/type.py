@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from abc import ABC, abstractmethod
+from functools import reduce
 from itertools import chain
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Union, Callable, List, Set
@@ -47,6 +48,19 @@ class Type(ABC):
         # arrow. The right-bitshift operator >> (for __rshift__) might have
         # been more intuitive visually, but would not have this property.
         return Function(self.instance(), other.instance())
+
+    def __rpow__(self, other: Type | tuple[Type]) -> TypeInstance:
+        """
+        The reflected exponentiation operator allows for a tuple to occur as
+        the first argument of a type. This allows us to make an uncurried type
+        of the form `(α, β) ** γ` into the curried type `α ** β ** γ`
+        transparently.
+        """
+        if isinstance(other, tuple):
+            return reduce(lambda x, y: Type.__pow__(y, x),
+                reversed(other), self).instance()
+        else:
+            return other.__pow__(self)
 
     def __lt__(self, other: Type) -> Optional[bool]:
         a, b = self.instance(), other.instance()
