@@ -182,13 +182,13 @@ class TransformationGraph(Graph):
             if self.include_types:
                 self.add((current, RDF.type, self.add_type(datatype)))
 
-            if self.include_labels:
-                self.add((current, RDFS.label,
-                    Literal(f"source : {datatype}")))
-
             if isinstance(expr, Operation):
                 assert expr.operator.is_primitive(), \
                     f"{expr.operator} is not a primitive"
+
+                if self.include_labels:
+                    self.add((current, RDFS.label,
+                        Literal(f"{datatype} via {expr.operator.name}")))
 
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
@@ -196,6 +196,10 @@ class TransformationGraph(Graph):
                 self.add((current, TA.via, self.namespace[expr.operator]))
             else:
                 assert isinstance(expr, Source)
+
+                if self.include_labels:
+                    self.add((current, RDFS.label,
+                        Literal(f"source {datatype}")))
 
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.SourceData))
