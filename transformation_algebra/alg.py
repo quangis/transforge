@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from itertools import groupby, chain
-from typing import Optional, Union
+from typing import Optional, Union, Iterator
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -97,20 +97,19 @@ class TransformationAlgebra(object):
         labels: dict[str, TypeInstance] = dict()
         stack: list[Optional[Expr]] = [None]
 
-        for token_group, chars in groupby(string, Token.ize):
-            if token_group is Token.RPAREN:
-                for rparen in chars:
-                    try:
-                        y = stack.pop()
-                        if y:
-                            x = stack.pop()
-                            stack.append(Application(x, y) if x else y)
-                    except IndexError as e:
-                        raise error.LBracketMismatch from e
-            elif token_group is Token.LPAREN:
-                for lparen in chars:
-                    stack.append(None)
-            elif token_group is Token.COMMA:
+        for token in tokenize(string, "(,)"):
+            assert not token.isspace()
+            if token == ')':
+                try:
+                    y = stack.pop()
+                    if y:
+                        x = stack.pop()
+                        stack.append(Application(x, y) if x else y)
+                except IndexError as e:
+                    raise error.LBracketMismatch from e
+            elif token == '(':
+                stack.append(None)
+            elif token == ',':
                 try:
                     y = stack.pop()
                     if y:
@@ -119,8 +118,7 @@ class TransformationAlgebra(object):
                     stack.append(None)
                 except IndexError as e:
                     raise error.LBracketMismatch from e
-            elif token_group is Token.IDENT:
-                token = "".join(chars)
+            else:
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
                     previous.label = token
@@ -151,22 +149,14 @@ class TransformationAlgebra(object):
             raise error.RBracketMismatch
 
 
-class Token(Enum):
-    LPAREN = auto()
-    RPAREN = auto()
-    SPACE = auto()
-    IDENT = auto()
-    COMMA = auto()
-
-    @staticmethod
-    def ize(char: str) -> Token:
-        if ord(char) == 40:
-            return Token.LPAREN
-        elif ord(char) == 41:
-            return Token.RPAREN
-        elif ord(char) == 44:
-            return Token.COMMA
-        elif char.isspace():
-            return Token.SPACE
-        else:
-            return Token.IDENT
+def tokenize(text: str, chars: str = "") -> Iterator[str]:
+    """
+    Break up a string into special characters and identifiers (that is, any
+    sequence of non-special characters). Skip spaces.
+    """
+    for group, tokens in groupby(text,
+            lambda x: -2 if x.isspace() else chars.find(x)):
+        if group == -1:
+            yield "".join(tokens)
+        elif group >= 0:
+            yield from tokens
