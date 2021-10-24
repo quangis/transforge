@@ -102,7 +102,8 @@ class Type(ABC):
         return NotImplemented
 
     @staticmethod
-    def declare(name: str, params: Union[int, Iterable[Variance]] = 0,
+    def declare(name: Optional[str] = None,
+            params: Union[int, Iterable[Variance]] = 0,
             supertype: Optional[TypeOperator] = None) -> TypeOperator:
         """
         Convenience function for defining a type.
@@ -141,7 +142,7 @@ class TypeOperator(Type):
 
     def __init__(
             self,
-            name: str,
+            name: Optional[str],
             params: List[Variance] = [],
             supertype: Optional[TypeOperator] = None):
         self.name = name
@@ -153,7 +154,7 @@ class TypeOperator(Type):
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
-        return self.name
+        return self.name or 'AnonymousType'
 
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
