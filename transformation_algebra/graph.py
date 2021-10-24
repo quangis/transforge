@@ -85,7 +85,7 @@ class TransformationGraph(Graph):
         vocab = TransformationGraph(algebra, namespace)
 
         # Add type operators to the vocabulary
-        for t in algebra.types:
+        for t in algebra.types.values():
             if t.arity > 0:
                 current_uri = namespace[t]
                 vocab.add((current_uri, RDF.type, TA.Type))
@@ -104,7 +104,7 @@ class TransformationGraph(Graph):
                     current = current.supertype
 
         # Add operations to the vocabulary
-        for d in algebra.definitions.values():
+        for d in algebra.operators.values():
             node = namespace[d]
             type_node = TA.Operation
             vocab.add((node, RDF.type, type_node))
@@ -139,13 +139,13 @@ class TransformationGraph(Graph):
                     node = self.namespace[t._operator]
             else:
                 assert isinstance(t, TypeVariable)
-                # node = BNode()
+                node = BNode()
 
-                # if self.include_labels:
-                #     self.add((node, RDFS.label, Literal(str(t))))
+                if self.include_labels:
+                    self.add((node, RDFS.label, Literal(str(t))))
 
-                # if self.include_kinds:
-                #     self.add((node, RDF.type, TA.TypeVariable))
+                if self.include_kinds:
+                    self.add((node, RDF.type, TA.TypeVariable))
 
             self.type_nodes[t] = node
             return node
