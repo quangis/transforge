@@ -11,7 +11,7 @@ from abc import ABC
 from itertools import count, chain
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
-from transformation_algebra.expr import Operation
+from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TransformationNamespace, TA
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional, TypeVar
@@ -60,7 +60,7 @@ class Nested(Protocol[_T_co]):
         ...
 
 
-Element = Union[Type, Operation, ellipsis, 'TransformationFlow']
+Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
 NestedNotation = Union[Element, Nested[Element]]
 
 
@@ -209,7 +209,7 @@ class TransformationFlow(ABC):
         serials, lists for parallels) to real flows.
         """
         assert value != ..., "ellipses may only occur in serials"
-        if isinstance(value, (Type, Operation)):
+        if isinstance(value, (Type, Operator)):
             return Unit(value)
         elif isinstance(value, tuple):
             return Serial(*value)
@@ -227,8 +227,8 @@ class Unit(TransformationFlow):
     A unit represents a single data instance in the flow.
     """
 
-    def __init__(self, value: Type | Operation):
-        if isinstance(value, Operation) and not value.is_primitive():
+    def __init__(self, value: Type | Operator):
+        if isinstance(value, Operator) and not value.is_primitive():
             raise ValueError("any operation in a flow query must be primitive")
         self.value = value
 
@@ -243,8 +243,8 @@ class Unit(TransformationFlow):
         return self.value if isinstance(self.value, Type) else None
 
     @property
-    def operation(self) -> Optional[Operation]:
-        return self.value if isinstance(self.value, Operation) else None
+    def operation(self) -> Optional[Operator]:
+        return self.value if isinstance(self.value, Operator) else None
 
     def set_skip(self) -> None:
         self.skip = True
