@@ -9,13 +9,12 @@ from __future__ import annotations
 
 from abc import ABC
 from itertools import count, chain
-from transformation_algebra.type import Type, TypeInstance, TypeOperation, \
-    Function, TypeVar
+from transformation_algebra.type import Type, TypeOperation, \
+    Function, TypeVariable
 from transformation_algebra.expr import Operation
 from transformation_algebra.graph import TransformationNamespace, TA
-import typing
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
-    overload, Optional
+    overload, Optional, TypeVar
 # from rdflib.plugins import sparql
 from rdflib.namespace import RDF, RDFS
 
@@ -29,7 +28,7 @@ else:
 # For convenience, we allow nested sequences in `Flow.serial()`. The following
 # temporary solution to the recursive type thus introduced has been lifted from
 # github.com/python/mypy/issues/731
-_T_co = typing.TypeVar("_T_co")
+_T_co = TypeVar("_T_co")
 
 
 class Nested(Protocol[_T_co]):
@@ -80,7 +79,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
 
         t = type.instance()
 
-        if isinstance(t, TypeVar):
+        if isinstance(t, TypeVariable):
             # If a type in a trace query contains variables, it must be a
             # wildcard --- because we don't do anything with it
             assert t.wildcard
