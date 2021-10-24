@@ -257,7 +257,7 @@ class Operation(Expr):
         super().__init__(type=operator.type.instance())
 
     def __str__(self) -> str:
-        return str(self.operator)
+        return str(self.operator.name or 'anonymous')
 
 
 class Source(Expr):
