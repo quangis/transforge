@@ -94,38 +94,29 @@ class TransformationAlgebra(object):
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
-        labels: dict[str, TypeInstance] = dict()
+        sources: dict[str, Source] = dict()
         stack: list[Optional[Expr]] = [None]
 
         for token in tokenize(string, "(,)"):
-            assert not token.isspace()
-            if token == ')':
-                try:
-                    y = stack.pop()
-                    if y:
-                        x = stack.pop()
-                        stack.append(Application(x, y) if x else y)
-                except IndexError as e:
-                    raise error.LBracketMismatch from e
-            elif token == '(':
-                stack.append(None)
-            elif token == ',':
-                try:
-                    y = stack.pop()
-                    if y:
-                        x = stack.pop()
-                        stack.append(Application(x, y) if x else y)
+            if token in "(,)":
+                if token in "),":
+                    try:
+                        y = stack.pop()
+                        if y:
+                            x = stack.pop()
+                            stack.append(Application(x, y) if x else y)
+                    except IndexError as e:
+                        raise error.LBracketMismatch from e
+                if token in "(,":
                     stack.append(None)
-                except IndexError as e:
-                    raise error.LBracketMismatch from e
             else:
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
                     previous.label = token
-                    if token in labels:
-                        labels[token].unify(previous.type)
+                    if token in sources:
+                        sources[token].type.unify(previous.type)
                     else:
-                        labels[token] = previous.type
+                        sources[token] = previous
                     stack.append(previous)
                 else:
                     try:
@@ -149,13 +140,13 @@ class TransformationAlgebra(object):
             raise error.RBracketMismatch
 
 
-def tokenize(text: str, chars: str = "") -> Iterator[str]:
+def tokenize(string: str, specials: str = "") -> Iterator[str]:
     """
     Break up a string into special characters and identifiers (that is, any
     sequence of non-special characters). Skip spaces.
     """
-    for group, tokens in groupby(text,
-            lambda x: -2 if x.isspace() else chars.find(x)):
+    for group, tokens in groupby(string,
+            lambda x: -2 if x.isspace() else specials.find(x)):
         if group == -1:
             yield "".join(tokens)
         elif group >= 0:
