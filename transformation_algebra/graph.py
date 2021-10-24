@@ -23,7 +23,7 @@ from typing import Dict, Union, Iterator, Optional, Tuple
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 
-class AlgebraNamespace(ClosedNamespace):
+class TransformationNamespace(ClosedNamespace):
     """
     A algebra-aware namespace for rdflib. That is, it allows URIs to be written
     as `NS[f]` for an operation or base type `f`. It is also closed: it fails
@@ -53,7 +53,7 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, algebra: TransformationAlgebra,
-            namespace: AlgebraNamespace,
+            namespace: TransformationNamespace,
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
@@ -77,7 +77,7 @@ class TransformationGraph(Graph):
 
     @staticmethod
     def vocabulary(algebra: TransformationAlgebra, namespace:
-            AlgebraNamespace) -> Graph:
+            TransformationNamespace) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.

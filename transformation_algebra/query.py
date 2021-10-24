@@ -12,7 +12,7 @@ from itertools import count, chain
 from transformation_algebra.type import Type, TypeInstance, TypeOperation, \
     Function, TypeVar
 from transformation_algebra.expr import Operation
-from transformation_algebra.rdf import AlgebraNamespace, TA
+from transformation_algebra.graph import TransformationNamespace, TA
 import typing
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional
@@ -66,7 +66,8 @@ NestedNotation = Union[Element, Nested[Element]]
 
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, *items: NestedNotation, namespace: AlgebraNamespace):
+    def __init__(self, *items: NestedNotation,
+            namespace: TransformationNamespace):
         self.flow = Serial(*items)
         self.namespace = namespace
 

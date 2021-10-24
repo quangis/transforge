@@ -20,7 +20,8 @@ from transformation_algebra import error
 from transformation_algebra.type import Type, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.alg import TransformationAlgebra
-from transformation_algebra.rdf import TA, TransformationGraph, AlgebraNamespace
+from transformation_algebra.graph import TA, TransformationGraph, \
+    TransformationNamespace
 
 
 class Step(object):
@@ -129,7 +130,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebra()
         alg.A = A = Type.declare("A")
         alg.f = f = Operator(type=A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         self.assertIsomorphic(
@@ -148,7 +149,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.A = A = Type.declare("A")
         alg.f = f = Operator(type=(A ** A) ** A)
         alg.g = g = Operator(type=A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g)),
@@ -168,7 +169,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.A = A = Type.declare("A")
         alg.f = f = Operator(type=(A ** A) ** A ** A)
         alg.g = g = Operator(type=A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         self.assertIsomorphic(
@@ -192,7 +193,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.f = f = Operator(type=A ** A)
         alg.g = g = Operator(type=A ** A, define=lambda x: f(f(x)))
         alg.h = h = Operator(type=(A ** A) ** A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         self.assertIsomorphic(
@@ -217,7 +218,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.f = f = Operator(type=A ** A ** A)
         alg.g = g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
         alg.h = h = Operator(type=(A ** A ** A) ** A ** A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         b = Source(A)
@@ -243,7 +244,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.A = A = Type.declare("A")
         alg.f = f = Operator(type=(A ** A) ** A)
         alg.id = id = Operator(type=A ** A, define=lambda x: x)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(id).primitive()),
@@ -264,7 +265,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.f = f = Operator((A ** A) ** A)
         alg.g = g = Operator(A ** A)
         alg.h = h = Operator(A ** A, define=lambda x: g(x))
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(h).primitive()),
@@ -282,7 +283,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.g = g = Operator(type=A ** A)
         alg.h = h = Operator(type=A ** A)
         alg.e = e = Operator(type=A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         self.assertIsomorphic(
@@ -312,7 +313,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.outer = outer = Operator(type=(A ** A) ** A ** A)
         alg.inner = inner = Operator(type=(A ** A) ** A ** (A ** A))
         alg.f = f = Operator(type=A ** A)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         b = Source(A)
@@ -338,7 +339,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.f = f = Operator(type=(A ** A ** A) ** A ** A)
         alg.g = g = Operator(type=A ** A ** A)
         alg.h = h = Operator(type=A ** A ** A, define=lambda x: g(x))
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         a = Source(A)
         self.assertIsomorphic(
@@ -359,7 +360,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg.A = A = Type.declare("A")
         alg.F = F = Type.declare("F", params=1)
         alg.G = G = Type.declare("G", params=2)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
 
         g = Graph()
         n1 = BNode()
@@ -381,7 +382,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = TransformationAlgebra()
         alg.A = A = Type.declare("A")
         alg.F = F = Type.declare("F", params=2)
-        ALG = AlgebraNamespace('ALG#', alg)
+        ALG = TransformationNamespace('ALG#', alg)
         g = Graph()
         x, y = TypeVariable(), TypeVariable()
         x.bind(A)
