@@ -13,16 +13,10 @@ from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TransformationNamespace, TA
-from typing import TYPE_CHECKING, Iterator, Any, Union, \
+from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional, TypeVar
 # from rdflib.plugins import sparql
 from rdflib.namespace import RDF, RDFS
-
-try:
-    from typing import Protocol
-except ImportError:
-    from typing_extensions import Protocol
-
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
