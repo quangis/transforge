@@ -128,6 +128,8 @@ class Expr(ABC):
             result = labels[self]
         if with_type:
             result = f"{result} : {self.type.text(with_constraints=True)}"
+        if isinstance(self, Source):
+            result = f"({result})"
         return result
 
     def tree(self, lvl: str = "") -> str:
