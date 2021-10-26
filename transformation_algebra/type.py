@@ -12,6 +12,7 @@ from inspect import signature
 from typing import Optional, Iterator, Iterable, Union, Callable, List, Set
 
 from transformation_algebra import error
+from transformation_algebra.label import Labels
 
 
 class Variance(Enum):
@@ -126,9 +127,11 @@ class TypeSchema(Type):
         self.n = len(signature(schema).parameters)
 
     def __str__(self) -> str:
-        return self.schema(
-            *(TypeVariable(v) for v in signature(self.schema).parameters)
-        ).resolve().string(include_constraints=True)
+        names = signature(self.schema).parameters
+        variables = [TypeVariable() for _ in names]
+        return self.schema(*variables).resolve().text(
+            with_constraints=True,
+            labels={v: k for k, v in zip(names, variables)})
 
     def instance(self) -> TypeInstance:
         return self.schema(*(TypeVariable() for _ in range(self.n)))
@@ -154,7 +157,7 @@ class TypeOperator(Type):
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
-        return self.name or 'AnonymousType'
+        return self.name or '<AnonymousType>'
 
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
@@ -181,10 +184,13 @@ class TypeInstance(Type):
     def normalized(self) -> bool:
         return not (isinstance(self, TypeVariable) and self.unification)
 
-    def __str__(self) -> str:
-        return self.string(include_constraints=True)
+    def __str__(self):
+        return self.text(with_constraints=True)
 
-    def string(self, include_constraints: bool = False) -> str:
+    def text(self,
+            labels: dict[TypeVariable, str] = Labels("τ", subscript=True),
+            with_constraints: bool = False,
+            arrow: str = "→") -> str:
         """
         Convert the given type to a textual representation.
         """
@@ -192,29 +198,32 @@ class TypeInstance(Type):
         if isinstance(self, TypeOperation):
             if self._operator == Function:
                 i, o = self.params
+                result = f"{i.text(labels)} {arrow} {o.text(labels)}"
                 if isinstance(i, TypeOperation) and i._operator == Function:
-                    result = f"({i}) ** {o}"
-                else:
-                    result = f"{i} ** {o}"
+                    result = f"({result})"
             else:
-                result = str(self._operator)
                 if self.params:
-                    result += f'({", ".join(t.string() for t in self.params)})'
+                    result = f"{self._operator}" \
+                        f"({', '.join(t.text(labels) for t in self.params)})"
+                else:
+                    result = str(self._operator)
         else:
             assert isinstance(self, TypeVariable)
             if self.unification:
-                result = self.unification.string()
+                result = self.unification.text(labels)
+            elif self.wildcard:
+                result = "_"
             else:
-                result = "_" if self.wildcard else self.name
+                result = labels[self]
 
-        if include_constraints:
+        if with_constraints:
             result_aux = [result]
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v.string()} >= {v.lower}")
+                    result_aux.append(f"{v.text(labels)} >= {v.lower}")
                 if v.upper:
-                    result_aux.append(f"{v.string()} <= {v.upper}")
-            result_aux.extend(str(c) for c in self.constraints())
+                    result_aux.append(f"{v.text(labels)} <= {v.upper}")
+            result_aux.extend(c.text(labels) for c in self.constraints())
             return ' | '.join(result_aux)
         else:
             return result
@@ -270,7 +279,7 @@ class TypeInstance(Type):
             any(b in t for t in a.params))
 
     def variables(self, indirect: bool = True,
-            target: Optional[Set[TypeVariable]] = None) -> Set[TypeVariable]:
+            target: Optional[set[TypeVariable]] = None) -> set[TypeVariable]:
         """
         Obtain all distinct type variables currently in the type instance, and
         optionally also those variables indirectly related via constraints.
@@ -291,7 +300,7 @@ class TypeInstance(Type):
                 target.update(direct_variables)
             return target or direct_variables
 
-    def operators(self, indirect: bool = True) -> Set[TypeOperator]:
+    def operators(self, indirect: bool = True) -> set[TypeOperator]:
         """
         Obtain all distinct non-function operators in the type instance.
         """
@@ -303,7 +312,7 @@ class TypeInstance(Type):
                     chain(constraint.reference, *constraint.alternatives)))
         return result
 
-    def constraints(self, indirect: bool = True) -> Set[Constraint]:
+    def constraints(self, indirect: bool = True) -> set[Constraint]:
         """
         Obtain all constraints attached to variables in the type instance.
         """
@@ -509,21 +518,12 @@ class TypeVariable(TypeInstance):
     A type variable. This is not a schematic variable — it is instantiated!
     """
 
-    def __init__(self, name: Optional[str] = None, wildcard: bool = False):
-        self._name = name
+    def __init__(self, wildcard: bool = False):
         self.wildcard = wildcard
         self.unification: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self._constraints: Set[Constraint] = set()
-
-    @property
-    def name(self) -> str:
-        return self._name or f"var{hash(self)}"
-
-    @name.setter
-    def name(self, value: str) -> None:
-        self._name = value
 
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
@@ -622,7 +622,6 @@ class Constraint(object):
             context: Optional[TypeInstance] = None):
         self.reference = reference
         self.alternatives = list(alternatives)
-        self.description = str(self)
         self.context = context
         self.skeleton: Optional[TypeInstance] = None
 
@@ -633,10 +632,10 @@ class Constraint(object):
 
         self.fulfilled()
 
-    def __str__(self) -> str:
+    def text(self, labels: dict[TypeVariable, str]) -> str:
         return (
-            f"{self.reference.string()}"
-            f" @ [{', '.join(a.string() for a in self.alternatives)}]"
+            f"{self.reference.text(labels)}"
+            f" @ [{', '.join(a.text(labels) for a in self.alternatives)}]"
         )
 
     def variables(self, indirect: bool = True) -> Set[TypeVariable]:
@@ -647,7 +646,6 @@ class Constraint(object):
 
     def set_context(self, context: TypeInstance) -> None:
         self.context = context
-        self.description = f"{context} | {self}"
         if not self.all_variables_occur_in_context():
             raise error.ConstrainFreeVariable(self)
 

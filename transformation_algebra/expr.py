@@ -11,9 +11,10 @@ from abc import ABC
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from typing import Optional, Callable, Union, List, Iterator
+from typing import Optional, Callable, Union, Iterator
 
 from transformation_algebra import error
+from transformation_algebra.label import Labels
 from transformation_algebra.type import \
     Type, TypeVariable, TypeSchema, TypeInstance, Function, _
 
@@ -38,13 +39,17 @@ class Operator(object):
         self.definition = define  # a transformation may be non-primitive
         self.is_function = self.type.instance().operator == Function
 
+        if isinstance(self.type, TypeInstance) and any(self.type.variables()):
+            raise ValueError(
+                "operator definitions musn't contain non-schematic variables")
+
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.name or 'anonymous'} : {self.type}"
+        return f"{self.name or 'anonymous operation'} : {self.type}"
 
-    def __call__(self, *args: Union[Operator, Expr]) -> Expr:
+    def __call__(self, *args: Operator | Expr) -> Expr:
         """
         Calling an operation instantiates it as an expression.
         """
@@ -94,13 +99,36 @@ class Expr(ABC):
     def __init__(self, type: TypeInstance):
         self.type = type
 
-    def __repr__(self) -> str:
-        return self.tree()
-
     def __call__(self, *args: Expr | Operator) -> Expr:
         return reduce(Expr.apply,
             (e if isinstance(e, Expr) else e.instance() for e in args),
             self)
+
+    def __repr__(self) -> str:
+        return self.tree()
+
+    def __str__(self) -> str:
+        return self.text(with_type=True)
+
+    def text(self,
+            labels: dict[Variable, str] = Labels("x", subscript=True),
+            with_type: bool = False):
+        if isinstance(self, Operation):
+            result = self.operator.name or '<anonymous_operation>'
+        elif isinstance(self, Source):
+            with_type = True
+            result = f"#{self.label or '-'}"
+        elif isinstance(self, Application):
+            result = f"({self.f.text(labels)} {self.x.text(labels)})"
+        elif isinstance(self, Abstraction):
+            params = " ".join(p.text(labels) for p in self.params)
+            result = f"(λ{params}. {self.body.text(labels)})"
+        else:
+            assert isinstance(self, Variable)
+            result = labels[self]
+        if with_type:
+            result = f"{result} : {self.type.text(with_constraints=True)}"
+        return result
 
     def tree(self, lvl: str = "") -> str:
         """
@@ -108,18 +136,18 @@ class Expr(ABC):
         """
         if isinstance(self, Application):
             return (
-                f"{self.type.string(include_constraints=True)}\n"
+                f"{self.type.text(with_constraints=True)}\n"
                 f"{lvl} ├─{self.f.tree(lvl + ' │ ')}\n"
                 f"{lvl} └─{self.x.tree(lvl + '   ')}"
             )
         elif isinstance(self, Abstraction):
             return (
-                f"λ{' '.join(str(p) for p in self.params)}. ... : "
-                f"{self.type.string(include_constraints=True)}\n"
+                f"λ{' '.join(p.text() for p in self.params)}. ... : "
+                f"{self.type.text(with_constraints=True)}\n"
                 f"{lvl} └─{self.body.tree(lvl + '   ')}"
             )
         else:
-            return f"╼ {self} : {self.type.string(include_constraints=True)}"
+            return f"╼ {self.text(with_type=True)}"
 
     def apply(self, arg: Expr) -> Expr:
         try:
@@ -227,25 +255,6 @@ class Expr(ABC):
             assert isinstance(a, Application)
             yield from chain(a.f.leaves(), a.x.leaves())
 
-    def rename(self) -> None:
-        """
-        Give readable variable names to any expression variable and type
-        variable in the expression.
-        """
-        expr_vars: set[Variable] = set()
-        type_vars: set[TypeVariable] = set()
-
-        for expr in self.leaves():
-            type_vars.update(expr.type.variables())
-            if isinstance(expr, Variable):
-                expr_vars.add(expr)
-
-        for i, expr in enumerate(expr_vars):
-            expr.name = f"x{subscript(i)}"
-
-        for i, var in enumerate(type_vars):
-            var.name = f"τ{subscript(i)}"
-
 
 class Operation(Expr):
     """
@@ -256,9 +265,6 @@ class Operation(Expr):
         self.operator = operator
         super().__init__(type=operator.type.instance())
 
-    def __str__(self) -> str:
-        return str(self.operator.name or 'anonymous')
-
 
 class Source(Expr):
     """
@@ -268,9 +274,6 @@ class Source(Expr):
     def __init__(self, type: Type = _, label: Optional[str] = None):
         self.label: Optional[str] = label
         super().__init__(type=type.instance())
-
-    def __str__(self) -> str:
-        return f"(source {self.label})" if self.label else "source"
 
 
 class Application(Expr):
@@ -284,9 +287,6 @@ class Application(Expr):
         self.x: Expr = x
         super().__init__(type=f.type.apply(x.type))
 
-    def __str__(self) -> str:
-        return f"({self.f} {self.x})"
-
 
 class Abstraction(Expr):
     """
@@ -296,7 +296,7 @@ class Abstraction(Expr):
     """
 
     def __init__(self, composition: Callable[..., Expr]):
-        self.params: List[Variable] = [
+        self.params: list[Variable] = [
             Variable() for _ in signature(composition).parameters]
         self.body: Expr = composition(*self.params)
         super().__init__(type=self.calculate_type())
@@ -308,39 +308,16 @@ class Abstraction(Expr):
         return reduce(lambda x, y: y.type ** x,
             reversed(self.params), self.body.type)
 
-    def __str__(self) -> str:
-        return f"(λ{' '.join(str(p) for p in self.params)}. {self.body})"
-
 
 class Variable(Expr):
     """
     An expression variable. See `Abstraction`.
     """
 
-    def __init__(self, name: Optional[str] = None):
-        self._name = name
+    def __init__(self):
         self.bound: Optional[Expr] = None
         super().__init__(type=TypeVariable())
-
-    @property
-    def name(self) -> str:
-        return self._name or f"var{hash(self)}"
-
-    @name.setter
-    def name(self, value: str) -> None:
-        assert not self.bound
-        self._name = value
-
-    def __str__(self) -> str:
-        return self.name
 
     def bind(self, expr: Expr) -> None:
         assert not self.bound, "cannot bind variable twice"
         self.bound = expr
-
-
-def subscript(i: int) -> str:
-    """
-    Convert a number into a subscripted string.
-    """
-    return "".join(chr(ord("₀") - ord("0") + ord(d)) for d in str(i))
