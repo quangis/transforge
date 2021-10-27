@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeSchema, TypeVariable, _
+    Type, TypeSchema, TypeVariable, _, with_parameters
 
 
 class TestType(unittest.TestCase):
@@ -22,6 +22,18 @@ class TestType(unittest.TestCase):
             self.assertEqual(actual, expected)
         else:
             f.apply(x)
+
+    def test_parameter_auxiliary(self):
+        F, G = Type.declare(params=2), Type.declare(params=2)
+        A = Type.declare()
+        self.assertEqual(
+            with_parameters(F, param=A),
+            [F(A, _), F(_, A)]
+        )
+        self.assertEqual(
+            with_parameters(F, G, param=A, at=1),
+            [F(A, _), G(A, _)]
+        )
 
     def test_apply_non_function(self):
         A = Type.declare('A')

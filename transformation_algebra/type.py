@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from typing import Optional, Iterator, Iterable, Union, Callable, List, Set
+from typing import Optional, Iterator, Iterable, Union, Callable
 
 from transformation_algebra import error
 from transformation_algebra.label import Labels
@@ -146,7 +146,7 @@ class TypeOperator(Type):
     def __init__(
             self,
             name: Optional[str],
-            params: List[Variance] = [],
+            params: list[Variance] = [],
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype: Optional[TypeOperator] = supertype
@@ -534,7 +534,7 @@ class TypeVariable(TypeInstance):
         self.unification: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
-        self._constraints: Set[Constraint] = set()
+        self._constraints: set[Constraint] = set()
 
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
@@ -649,8 +649,8 @@ class Constraint(object):
             f" @ [{', '.join(a.text(labels) for a in self.alternatives)}]"
         )
 
-    def variables(self, indirect: bool = True) -> Set[TypeVariable]:
-        result: Set[TypeVariable] = set()
+    def variables(self, indirect: bool = True) -> set[TypeVariable]:
+        result: set[TypeVariable] = set()
         for e in chain(self.reference, *self.alternatives):
             result.update(e.variables(indirect=indirect, target=result))
         return result
@@ -675,7 +675,7 @@ class Constraint(object):
         alternatives that are equal to, or more general versions of, other
         alternatives.
         """
-        minimized: List[TypeInstance] = []
+        minimized: list[TypeInstance] = []
         for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
@@ -731,16 +731,16 @@ Function = TypeOperator('Function', params=[Variance.CONTRA, Variance.CO])
 _ = TypeSchema(lambda: TypeVariable(wildcard=True))
 
 
-def operators(
-        *ops: TypeOperator,
+def with_parameters(
+        *type_operators: TypeOperator,
         param: Optional[Type] = None,
-        at: int = None) -> List[TypeInstance]:
+        at: int = None) -> list[TypeInstance]:
     """
     Generate a list of instances of type operations. Optionally, the generated
     type operations must contain a certain parameter (at some index, if given).
     """
-    options: List[TypeInstance] = []
-    for op in ops:
+    options: list[TypeInstance] = []
+    for op in type_operators:
         for i in ([at - 1] if at else range(op.arity)) if param else [-1]:
             if i < op.arity:
                 options.append(op(*(
