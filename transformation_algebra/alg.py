@@ -70,6 +70,7 @@ class TransformationAlgebra(object):
         if isinstance(key, str):
             return key in self.operators or key in self.types
         elif isinstance(key, TypeOperator):
+            assert isinstance(key.name, str)
             return self.types.get(key.name) is key
         elif isinstance(key, Operator):
             assert isinstance(key.name, str)

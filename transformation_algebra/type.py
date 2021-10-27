@@ -129,7 +129,7 @@ class TypeSchema(Type):
     def __str__(self) -> str:
         names = signature(self.schema).parameters
         variables = [TypeVariable() for _ in names]
-        return self.schema(*variables).resolve().text(
+        return self.schema(*variables).text(
             with_constraints=True,
             labels={v: k for k, v in zip(names, variables)})
 
@@ -214,7 +214,18 @@ class TypeInstance(Type):
             elif self.wildcard:
                 result = "_"
             else:
-                result = labels[self]
+                try:
+                    result = labels[self]
+                except KeyError:
+                    # TODO the fact that this is necessary exposes a
+                    # fundamental flaw: sometimes variables that are the same
+                    # nevertheless get different labels
+                    result = ""
+                    for var in labels:
+                        if var.follow() is self:
+                            result = labels[var]
+                            break
+                    assert result
 
         if with_constraints:
             result_aux = [result]
