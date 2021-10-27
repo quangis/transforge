@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra.type import Type
 from transformation_algebra.expr import Operator
-from transformation_algebra.alg import TransformationAlgebra
+from transformation_algebra.lang import Language
 
 
 class TestAlgebra(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestAlgebra(unittest.TestCase):
         Test that schematic types are printed with the names of their schematic
         variables.
         """
-        lang = TransformationAlgebra()
+        lang = Language()
         lang.A = Type.declare()
         lang.f = Operator(type=lambda x: x | x @ lang.A)
         self.assertEqual(str(lang.f), "f : x | x @ [A]")

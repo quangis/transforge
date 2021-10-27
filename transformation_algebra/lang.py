@@ -16,7 +16,7 @@ from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
 
-class TransformationAlgebra(object):
+class Language(object):
     def __init__(self, **kwargs):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()

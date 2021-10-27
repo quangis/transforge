@@ -3,7 +3,7 @@ import unittest
 from transformation_algebra import error
 from transformation_algebra.type import Type, _
 from transformation_algebra.expr import Operator, Source
-from transformation_algebra.alg import TransformationAlgebra
+from transformation_algebra.lang import Language
 
 
 class TestAlgebra(unittest.TestCase):
@@ -131,7 +131,7 @@ class TestAlgebra(unittest.TestCase):
 
     def test_same_labels_unify(self):
         # See issue #10
-        t = TransformationAlgebra()
+        t = Language()
         t.A = A = Type.declare("A")
         t.B = B = Type.declare("B")
         t.d1 = Operator(A)

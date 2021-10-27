@@ -12,7 +12,7 @@ from itertools import count, chain
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
-from transformation_algebra.graph import TransformationNamespace, TA
+from transformation_algebra.graph import LanguageNamespace, TA
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional, TypeVar
 # from rdflib.plugins import sparql
@@ -66,7 +66,7 @@ NestedNotation = Union[Element, Nested[Element]]
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
     def __init__(self, *items: NestedNotation,
-            namespace: TransformationNamespace):
+            namespace: LanguageNamespace):
         self.flow = Serial(*items)
         self.namespace = namespace
 
