@@ -100,7 +100,7 @@ class Language(object):
         stackT: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
         type_mode: bool = False
 
-        for token in tokenize(string, "(,):"):
+        for token in tokenize(string, "(,):;"):
             if type_mode:
                 if token == "(":
                     stackT.append([])
@@ -147,24 +147,35 @@ class Language(object):
                     stack.append(None)
             elif token == ":":
                 type_mode = True
+            elif token == ";":
+                stack.clear()
+                stack.append(None)
             else:
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
+                    current = None
                     previous.label = token
                     if token in sources:
                         sources[token].type.unify(previous.type)
                     else:
                         sources[token] = previous
                     stack.append(previous)
+                    continue
+                if token == "-":
+                    current = Source()
+                elif token.isnumeric():
+                    try:
+                        current = sources[token]
+                    except KeyError:
+                        current = sources[token] = Source(label=token)
                 else:
                     try:
                         current = self.operators[token].instance()
                     except KeyError as e:
                         raise error.Undefined(token) from e
-                    else:
-                        if previous:
-                            current = Application(previous, current)
-                        stack.append(current)
+                if previous and current:
+                    current = Application(previous, current)
+                stack.append(current)
 
         if len(stack) == 1:
             result = stack[0]

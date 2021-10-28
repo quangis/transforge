@@ -27,6 +27,16 @@ class TestAlgebra(unittest.TestCase):
 
         lang.parse("f x : A")
 
+    def test_parse_sources(self):
+        lang = Language()
+        A = Type.declare()
+        B = Type.declare()
+        x = Operator(type=A)
+        f = Operator(type=lambda x: x ** x)
+        lang.add_scope(locals())
+        lang.parse("f 1 : A")
+        lang.parse("1 : B; f 1 : A")
+
 
 if __name__ == '__main__':
     unittest.main()

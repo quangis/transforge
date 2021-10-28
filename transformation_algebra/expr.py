@@ -97,10 +97,16 @@ class Expr(ABC):
     def __init__(self, type: TypeInstance):
         self.type = type
 
-    def __call__(self, *args: Expr | Operator) -> Expr:
-        return reduce(Expr.apply,
-            (e if isinstance(e, Expr) else e.instance() for e in args),
-            self)
+    def __call__(self, *args: Expr | Operator | int | Type) -> Expr:
+        return reduce(Expr.apply, (Expr.shorthand(e) for e in args), self)
+
+    @staticmethod
+    def shorthand(value: Expr | Operator) -> Expr:
+        if isinstance(value, Expr):
+            return value
+        else:
+            assert isinstance(value, Operator)
+            return value.instance()
 
     def __repr__(self) -> str:
         return self.tree()
@@ -115,7 +121,7 @@ class Expr(ABC):
             result = self.operator.name or '<anonymous_operation>'
         elif isinstance(self, Source):
             with_type = True
-            result = f"#{self.label or '-'}"
+            result = self.label or '-'
         elif isinstance(self, Application):
             result = f"({self.f.text(labels)} {self.x.text(labels)})"
         elif isinstance(self, Abstraction):
