@@ -12,29 +12,27 @@ class TestAlgebra(unittest.TestCase):
         Test that schematic types are printed with the names of their schematic
         variables.
         """
-        lang = Language()
         A = Type.declare()
         f = Operator(type=lambda x: x | x @ A)
-        lang.add_scope(locals())
+        lang = Language(scope=locals())
 
         self.assertEqual(str(lang.f), "f : x | x @ [A]")
 
     def test_parse_inline_typing(self):
-        lang = Language()
         A = Type.declare()
         x = Operator(type=A)
         f = Operator(type=A ** A)
-        lang.add_scope(locals())
+        lang = Language(scope=locals())
 
         lang.parse("f x : A")
 
     def test_parse_sources(self):
-        lang = Language()
         A = Type.declare()
         B = Type.declare()
         x = Operator(type=A)
         f = Operator(type=lambda x: x ** x)
-        lang.add_scope(locals())
+        lang = Language(scope=locals())
+
         lang.parse("f 1 : A")
         self.assertRaises(error.SubtypeMismatch, lang.parse, "1 : B; f 1 : A")
 

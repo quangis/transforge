@@ -127,9 +127,9 @@ class TestAlgebraRDF(unittest.TestCase):
         Test the basic case of converting an expression consisting of an
         operation and a data source.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=A ** A)
+        A = Type.declare()
+        f = Operator(type=A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -145,10 +145,10 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Operations passed as a parameter must have an internal operation.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=(A ** A) ** A)
-        alg.g = g = Operator(type=A ** A)
+        A = Type.declare()
+        f = Operator(type=(A ** A) ** A)
+        g = Operator(type=A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -165,10 +165,10 @@ class TestAlgebraRDF(unittest.TestCase):
         Operations passed as a parameter must have an internal operation that
         gets the same inputs as the operation that got the parameter operation.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=(A ** A) ** A ** A)
-        alg.g = g = Operator(type=A ** A)
+        A = Type.declare("A")
+        f = Operator(type=(A ** A) ** A ** A)
+        g = Operator(type=A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -188,11 +188,11 @@ class TestAlgebraRDF(unittest.TestCase):
         operation that synthesizes the value of variables.
         """
 
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=A ** A)
-        alg.g = g = Operator(type=A ** A, define=lambda x: f(f(x)))
-        alg.h = h = Operator(type=(A ** A) ** A ** A)
+        A = Type.declare()
+        f = Operator(type=A ** A)
+        g = Operator(type=A ** A, define=lambda x: f(f(x)))
+        h = Operator(type=(A ** A) ** A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -213,11 +213,11 @@ class TestAlgebraRDF(unittest.TestCase):
         variables.
         """
 
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=A ** A ** A)
-        alg.g = g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
-        alg.h = h = Operator(type=(A ** A ** A) ** A ** A ** A)
+        A = Type.declare()
+        f = Operator(type=A ** A ** A)
+        g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
+        h = Operator(type=(A ** A ** A) ** A ** A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -240,10 +240,10 @@ class TestAlgebraRDF(unittest.TestCase):
         has only an internal node `λ` that directly feeds `f`.
         """
 
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=(A ** A) ** A)
-        alg.id = id = Operator(type=A ** A, define=lambda x: x)
+        A = Type.declare()
+        f = Operator(type=(A ** A) ** A)
+        id = Operator(type=A ** A, define=lambda x: x)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -260,11 +260,11 @@ class TestAlgebraRDF(unittest.TestCase):
         conceptually the same as `f g`, but actually leads to the same graph.
         """
 
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator((A ** A) ** A)
-        alg.g = g = Operator(A ** A)
-        alg.h = h = Operator(A ** A, define=lambda x: g(x))
+        A = Type.declare()
+        f = Operator((A ** A) ** A)
+        g = Operator(A ** A)
+        h = Operator(A ** A, define=lambda x: g(x))
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         self.assertIsomorphic(
@@ -277,12 +277,12 @@ class TestAlgebraRDF(unittest.TestCase):
         It is possible to get a cyclic transformation graph when passing
         multiple operations as parameter.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=(A ** A) ** (A ** A) ** (A ** A) ** A ** A)
-        alg.g = g = Operator(type=A ** A)
-        alg.h = h = Operator(type=A ** A)
-        alg.e = e = Operator(type=A ** A)
+        A = Type.declare()
+        f = Operator(type=(A ** A) ** (A ** A) ** (A ** A) ** A ** A)
+        g = Operator(type=A ** A)
+        h = Operator(type=A ** A)
+        e = Operator(type=A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -308,11 +308,11 @@ class TestAlgebraRDF(unittest.TestCase):
         do that by feeding the outer internal operation to the inner one. See
         issues #37 and #41.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.outer = outer = Operator(type=(A ** A) ** A ** A)
-        alg.inner = inner = Operator(type=(A ** A) ** A ** (A ** A))
-        alg.f = f = Operator(type=A ** A)
+        A = Type.declare()
+        outer = Operator(type=(A ** A) ** A ** A)
+        inner = Operator(type=(A ** A) ** A ** (A ** A))
+        f = Operator(type=A ** A)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -334,11 +334,11 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         The body of an abstraction may be a function.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.f = f = Operator(type=(A ** A ** A) ** A ** A)
-        alg.g = g = Operator(type=A ** A ** A)
-        alg.h = h = Operator(type=A ** A ** A, define=lambda x: g(x))
+        A = Type.declare()
+        f = Operator(type=(A ** A ** A) ** A ** A)
+        g = Operator(type=A ** A ** A)
+        h = Operator(type=A ** A ** A, define=lambda x: g(x))
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         a = Source(A)
@@ -356,10 +356,10 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Test that type nodes are reused when transformed to RDF.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.F = F = Type.declare("F", params=1)
-        alg.G = G = Type.declare("G", params=2)
+        A = Type.declare("A")
+        F = Type.declare("F", params=1)
+        G = Type.declare("G", params=2)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
         g = Graph()
@@ -379,10 +379,11 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Test that bound type variables are properly reused.
         """
-        alg = Language()
-        alg.A = A = Type.declare("A")
-        alg.F = F = Type.declare("F", params=2)
+        A = Type.declare()
+        F = Type.declare(params=2)
+        alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
+
         g = Graph()
         x, y = TypeVariable(), TypeVariable()
         x.bind(A)

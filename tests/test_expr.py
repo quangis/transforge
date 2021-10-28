@@ -131,13 +131,12 @@ class TestAlgebra(unittest.TestCase):
 
     def test_same_labels_unify(self):
         # See issue #10
-        lang = Language()
-        A = Type.declare("A")
-        B = Type.declare("B")
+        A = Type.declare()
+        B = Type.declare()
         d1 = Operator(type=A)
         d2 = Operator(type=B)
         f = Operator(type=A ** B ** A)
-        lang.add_scope(locals())
+        lang = Language(locals())
 
         lang.parse("f (d1 x) (d2 y)")
         self.assertRaises(error.TATypeError, lang.parse, "f (d1 x) (d2 x)")

@@ -17,9 +17,11 @@ from transformation_algebra.expr import \
 
 
 class Language(object):
-    def __init__(self):
+    def __init__(self, scope: dict[str, Any] = {}):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
+        if scope:
+            self.add_scope(scope)
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
