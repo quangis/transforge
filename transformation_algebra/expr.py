@@ -27,9 +27,9 @@ class Operator(object):
 
     def __init__(
             self,
-            type: Union[Type, Callable[..., TypeInstance]],
-            define: Optional[Callable[..., Expr]] = None,
             doc: Optional[str] = None,
+            type: Union[Type, Callable[..., TypeInstance]] = _,
+            define: Optional[Callable[..., Expr]] = None,
             name: Optional[str] = None):
         self.name = name
         self.type = type if isinstance(type, Type) else TypeSchema(type)

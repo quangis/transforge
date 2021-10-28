@@ -13,8 +13,8 @@ class TestAlgebra(unittest.TestCase):
         Multiple arguments may be provided through partial or full application.
         """
         A = Type.declare('A')
-        x = Source(A)
-        f = Operator(A ** A ** A)
+        x = Source(type=A)
+        f = Operator(type=A ** A ** A)
         self.assertTrue(f(x, x).match(f(x)(x)))
 
     def test_primitive(self):
@@ -23,14 +23,14 @@ class TestAlgebra(unittest.TestCase):
         """
         Int = Type.declare('Int')
         one = Source(Int)
-        add = Operator(Int ** Int ** Int, name='add')
+        add = Operator(type=Int ** Int ** Int, name='add')
         add1 = Operator(
-            Int ** Int,
+            type=Int ** Int,
             define=lambda x: add(x, one),
             name='add1'
         )
         compose = Operator(
-            lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
             define=lambda f, g, x: f(g(x)),
             name='compose'
         )
@@ -44,8 +44,8 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operator(A ** A, name='f')
-        g = Operator(A ** A, name='g')
+        f = Operator(type=A ** A, name='f')
+        g = Operator(type=A ** A, name='g')
         self.assertTrue(f(x).match(f(x)))
         self.assertFalse(f(x).match(g(x)))
 
@@ -55,11 +55,11 @@ class TestAlgebra(unittest.TestCase):
         other non-primitive expressions are expanded properly.
         """
         A = Type.declare('A')
-        x = Source(A)
-        f = Operator(A ** A, name='f')
-        g = Operator(A ** A, name='g',
+        x = Source(type=A)
+        f = Operator(type=A ** A, name='f')
+        g = Operator(type=A ** A, name='g',
             define=lambda x: f(x))
-        h = Operator(A ** A, name='h',
+        h = Operator(type=A ** A, name='h',
             define=lambda x: g(x))
         self.assertTrue(f(x).match(f(x)))
         self.assertFalse(h(x).match(f(x)))
@@ -73,8 +73,8 @@ class TestAlgebra(unittest.TestCase):
         """
         A = Type.declare('A')
         x = Source(A)
-        f = Operator(lambda α: α ** α, name='f')
-        g = Operator(lambda α: α ** α, name='g', define=lambda x: f(x))
+        f = Operator(type=lambda α: α ** α, name='f')
+        g = Operator(type=lambda α: α ** α, name='g', define=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
 
     def test_double_binding(self):
@@ -86,17 +86,17 @@ class TestAlgebra(unittest.TestCase):
         Value = Type.declare('Val')
         Bool = Type.declare('Bool', supertype=Value)
         Map = Type.declare('Map', params=2)
-        data = Source(Map(Value, Bool))
-        eq = Operator(Value ** Value ** Bool)
+        data = Source(type=Map(Value, Bool))
+        eq = Operator(type=Value ** Value ** Bool)
         select = Operator(
-            lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
+            type=lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
             | τ @ [Map(α, _), Map(_, α)]
             | τ @ [Map(β, _), Map(_, β)]
         )
-        prod = Operator(lambda α, β, γ, τ:
+        prod = Operator(type=lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
         )
-        app = Operator(lambda α, β, γ, τ:
+        app = Operator(type=lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
             define=lambda f, x, y: select(eq, prod(f, x, y))
         )
@@ -106,39 +106,41 @@ class TestAlgebra(unittest.TestCase):
 
     def test_exact_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
-        f = Operator(A ** B)
+        f = Operator(type=A ** B)
         self.assertRaises(
             error.SubtypeMismatch,
             Operator.validate_type,
-            Operator(B ** B, define=lambda x: f(x))
+            Operator(type=B ** B, define=lambda x: f(x))
         )
-        Operator(A ** B, define=lambda x: f(x)).validate_type()
+        Operator(type=A ** B, define=lambda x: f(x)).validate_type()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
         g = Operator(lambda α: α ** B)
-        Operator(A ** B, define=lambda x: g(x)).validate_type()
-        Operator(B ** B, define=lambda x: g(x)).validate_type()
+        Operator(type=A ** B, define=lambda x: g(x)).validate_type()
+        Operator(type=B ** B, define=lambda x: g(x)).validate_type()
 
     def test_looser_declared_type_in_definition(self):
         A, B = Type.declare('A'), Type.declare('B')
-        f, g = Operator(A ** B), Operator(lambda α: α ** B)
-        Operator(lambda α: α ** B, define=lambda x: g(x)).validate_type()
+        f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
+        Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate_type()
         self.assertRaises(
             error.DeclaredTypeTooGeneral,
             Operator.validate_type,
-            Operator(lambda α: α ** B, define=lambda x: f(x)))
+            Operator(type=lambda α: α ** B, define=lambda x: f(x)))
 
     def test_same_labels_unify(self):
         # See issue #10
-        t = Language()
-        t.A = A = Type.declare("A")
-        t.B = B = Type.declare("B")
-        t.d1 = Operator(A)
-        t.d2 = Operator(B)
-        t.f = Operator(A ** B ** A)
-        t.parse("f (d1 x) (d2 y)")
-        self.assertRaises(error.TATypeError, t.parse, "f (d1 x) (d2 x)")
+        lang = Language()
+        A = Type.declare("A")
+        B = Type.declare("B")
+        d1 = Operator(type=A)
+        d2 = Operator(type=B)
+        f = Operator(type=A ** B ** A)
+        lang.add_scope(locals())
+
+        lang.parse("f (d1 x) (d2 y)")
+        self.assertRaises(error.TATypeError, lang.parse, "f (d1 x) (d2 x)")
 
 
 if __name__ == '__main__':
