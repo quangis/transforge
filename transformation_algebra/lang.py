@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from itertools import groupby, chain
-from typing import Optional, Union, Iterator
+from typing import Optional, Union, Iterator, Any
 
 from transformation_algebra import error
 from transformation_algebra.type import \
@@ -17,19 +17,19 @@ from transformation_algebra.expr import \
 
 
 class Language(object):
-    def __init__(self, **kwargs):
+    def __init__(self):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
 
-        # For convenience, the user may specify the operations and types on
-        # initialization. When fed `globals()`, irrelevant items are filtered
-        # out without complaint
-        filter_irrelevant_args = '__builtins__' in kwargs
-        for k, v in kwargs.items():
+    def add_scope(self, scope: dict[str, Any]) -> None:
+        """
+        For convenience, you may add types and operations in bulk via a
+        dictionary. This allows you to simply pass `globals()` or `locals()`.
+        Irrelevant items are filtered out without complaint.
+        """
+        for k, v in dict(scope).items():
             if isinstance(v, (Operator, TypeOperator)):
                 self.add(item=v, name=k)
-            elif not filter_irrelevant_args:
-                raise RuntimeError
 
     def add(self, item: Operator | TypeOperator, name: Optional[str] = None):
 

@@ -12,15 +12,19 @@ class TestAlgebra(unittest.TestCase):
         variables.
         """
         lang = Language()
-        lang.A = Type.declare()
-        lang.f = Operator(type=lambda x: x | x @ lang.A)
+        A = Type.declare()
+        f = Operator(type=lambda x: x | x @ A)
+        lang.add_scope(locals())
+
         self.assertEqual(str(lang.f), "f : x | x @ [A]")
 
     def test_parse_inline_typing(self):
         lang = Language()
-        lang.A = A = Type.declare()
-        lang.x = Operator(type=A)
-        lang.f = Operator(type=A ** A)
+        A = Type.declare()
+        x = Operator(type=A)
+        f = Operator(type=A ** A)
+        lang.add_scope(locals())
+
         lang.parse("f x : A")
 
 
