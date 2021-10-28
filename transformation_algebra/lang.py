@@ -1,6 +1,6 @@
 """
-This module allows you to define a transformation algebra as a collection of
-types and operations. It also handles parsing expressions of the algebra.
+This module allows you to define a transformation language as a collection of
+types and operators. It also handles parsing expressions of the algebra.
 """
 
 from __future__ import annotations

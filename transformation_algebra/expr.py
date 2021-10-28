@@ -1,8 +1,6 @@
 """
-A generic transformation algebra consists of *definitions* (of operations and
-of data constructors). Those definitions can be instantiated and combined into
-transformation algebra *expressions*, which describe applications of operations
-to data.
+A generic transformation expression consists of operators that are applied to
+source data or other operators. This module defines how they combine.
 """
 
 from __future__ import annotations
@@ -259,9 +257,7 @@ class Expr(ABC):
 
 
 class Operation(Expr):
-    """
-    An instance of an operator.
-    """
+    "An instance of an operator."
 
     def __init__(self, operator: Operator):
         self.operator = operator
@@ -269,9 +265,7 @@ class Operation(Expr):
 
 
 class Source(Expr):
-    """
-    A source data input.
-    """
+    "A source data input."
 
     def __init__(self, type: Type = _, label: Optional[str] = None):
         self.label: Optional[str] = label
@@ -279,10 +273,7 @@ class Source(Expr):
 
 
 class Application(Expr):
-    """
-    A complex expression, representing an application of the transformation in
-    its first argument to the expression in its second argument.
-    """
+    "A complex expression, applying one expression to another."
 
     def __init__(self, f: Expr, x: Expr):
         self.f: Expr = f
