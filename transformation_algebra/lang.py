@@ -11,7 +11,7 @@ from typing import Optional, Union, Iterator
 
 from transformation_algebra import error
 from transformation_algebra.type import \
-    TypeOperator, TypeInstance, Function
+    TypeOperator, TypeInstance, TypeVariable
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -97,8 +97,43 @@ class Language(object):
 
         sources: dict[str, Source] = dict()
         stack: list[Optional[Expr]] = [None]
+        stackT: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
+        type_mode: bool = False
 
-        for token in tokenize(string, "(,)"):
+        for token in tokenize(string, "(,):"):
+            if type_mode:
+                if token == "(":
+                    stackT.append([])
+                elif token in "),":
+                    unit = stackT.pop()
+                    assert isinstance(unit, TypeInstance)
+                    params = stackT.pop()
+                    assert isinstance(params, list)
+                    params.append(unit)
+                    stackT.append(params)
+                    if token == ")":
+                        params = stackT.pop()
+                        assert isinstance(params, list)
+                        op = stackT.pop()
+                        assert isinstance(op, TypeOperator)
+                        stackT.append(op(*params))
+                elif token == "_":
+                    stackT.append(TypeVariable())
+                else:
+                    try:
+                        op = self.types[token]
+                    except KeyError as e:
+                        raise error.Undefined(token) from e
+                    stackT.append(op() if op.arity == 0 else op)
+                if len(stackT) == 1 and isinstance(stackT[0], TypeInstance):
+                    type_mode = False
+                    t = stackT.pop()
+                    assert isinstance(t, TypeInstance)
+                    previous = stack[-1]
+                    assert isinstance(previous, Expr)
+                    previous.type.unify(t, subtype=True)
+                continue
+
             if token in "(,)":
                 if token in "),":
                     try:
@@ -110,6 +145,8 @@ class Language(object):
                         raise error.LBracketMismatch from e
                 if token in "(,":
                     stack.append(None)
+            elif token == ":":
+                type_mode = True
             else:
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):

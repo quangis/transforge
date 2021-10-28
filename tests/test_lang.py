@@ -16,6 +16,13 @@ class TestAlgebra(unittest.TestCase):
         lang.f = Operator(type=lambda x: x | x @ lang.A)
         self.assertEqual(str(lang.f), "f : x | x @ [A]")
 
+    def test_parse_inline_typing(self):
+        lang = Language()
+        lang.A = A = Type.declare()
+        lang.x = Operator(type=A)
+        lang.f = Operator(type=A ** A)
+        lang.parse("f x : A")
+
 
 if __name__ == '__main__':
     unittest.main()
