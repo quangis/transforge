@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import Type
+from transformation_algebra.type import TypeOperator
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
 
@@ -12,14 +12,14 @@ class TestAlgebra(unittest.TestCase):
         Test that schematic types are printed with the names of their schematic
         variables.
         """
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=lambda x: x | x @ A)
         lang = Language(scope=locals())
 
         self.assertEqual(str(lang.f), "f : x | x @ [A]")
 
     def test_parse_inline_typing(self):
-        A = Type.declare()
+        A = TypeOperator()
         x = Operator(type=A)
         f = Operator(type=A ** A)
         lang = Language(scope=locals())
@@ -27,8 +27,8 @@ class TestAlgebra(unittest.TestCase):
         lang.parse("f x : A")
 
     def test_parse_sources(self):
-        A = Type.declare()
-        B = Type.declare()
+        A = TypeOperator()
+        B = TypeOperator()
         x = Operator(type=A)
         f = Operator(type=lambda x: x ** x)
         lang = Language(scope=locals())

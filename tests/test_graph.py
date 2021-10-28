@@ -17,7 +17,7 @@ from rdflib.tools.rdf2dot import rdf2dot
 from typing import Iterator, Dict, Optional, Union
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, TypeVariable
+from transformation_algebra.type import Type, TypeOperator, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph, \
@@ -127,7 +127,7 @@ class TestAlgebraRDF(unittest.TestCase):
         Test the basic case of converting an expression consisting of an
         operation and a data source.
         """
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=A ** A)
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
@@ -145,7 +145,7 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Operations passed as a parameter must have an internal operation.
         """
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
         g = Operator(type=A ** A)
         alg = Language(locals())
@@ -165,7 +165,7 @@ class TestAlgebraRDF(unittest.TestCase):
         Operations passed as a parameter must have an internal operation that
         gets the same inputs as the operation that got the parameter operation.
         """
-        A = Type.declare("A")
+        A = TypeOperator("A")
         f = Operator(type=(A ** A) ** A ** A)
         g = Operator(type=A ** A)
         alg = Language(locals())
@@ -188,7 +188,7 @@ class TestAlgebraRDF(unittest.TestCase):
         operation that synthesizes the value of variables.
         """
 
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=A ** A)
         g = Operator(type=A ** A, define=lambda x: f(f(x)))
         h = Operator(type=(A ** A) ** A ** A)
@@ -213,7 +213,7 @@ class TestAlgebraRDF(unittest.TestCase):
         variables.
         """
 
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=A ** A ** A)
         g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
         h = Operator(type=(A ** A ** A) ** A ** A ** A)
@@ -240,7 +240,7 @@ class TestAlgebraRDF(unittest.TestCase):
         has only an internal node `λ` that directly feeds `f`.
         """
 
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
         id = Operator(type=A ** A, define=lambda x: x)
         alg = Language(locals())
@@ -260,7 +260,7 @@ class TestAlgebraRDF(unittest.TestCase):
         conceptually the same as `f g`, but actually leads to the same graph.
         """
 
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator((A ** A) ** A)
         g = Operator(A ** A)
         h = Operator(A ** A, define=lambda x: g(x))
@@ -277,7 +277,7 @@ class TestAlgebraRDF(unittest.TestCase):
         It is possible to get a cyclic transformation graph when passing
         multiple operations as parameter.
         """
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=(A ** A) ** (A ** A) ** (A ** A) ** A ** A)
         g = Operator(type=A ** A)
         h = Operator(type=A ** A)
@@ -308,7 +308,7 @@ class TestAlgebraRDF(unittest.TestCase):
         do that by feeding the outer internal operation to the inner one. See
         issues #37 and #41.
         """
-        A = Type.declare()
+        A = TypeOperator()
         outer = Operator(type=(A ** A) ** A ** A)
         inner = Operator(type=(A ** A) ** A ** (A ** A))
         f = Operator(type=A ** A)
@@ -334,7 +334,7 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         The body of an abstraction may be a function.
         """
-        A = Type.declare()
+        A = TypeOperator()
         f = Operator(type=(A ** A ** A) ** A ** A)
         g = Operator(type=A ** A ** A)
         h = Operator(type=A ** A ** A, define=lambda x: g(x))
@@ -356,9 +356,9 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Test that type nodes are reused when transformed to RDF.
         """
-        A = Type.declare("A")
-        F = Type.declare("F", params=1)
-        G = Type.declare("G", params=2)
+        A = TypeOperator("A")
+        F = TypeOperator("F", params=1)
+        G = TypeOperator("G", params=2)
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
@@ -379,8 +379,8 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         Test that bound type variables are properly reused.
         """
-        A = Type.declare()
-        F = Type.declare(params=2)
+        A = TypeOperator()
+        F = TypeOperator(params=2)
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 

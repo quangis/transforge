@@ -102,19 +102,6 @@ class Type(ABC):
     def instance(self) -> TypeInstance:
         return NotImplemented
 
-    @staticmethod
-    def declare(name: Optional[str] = None,
-            params: Union[int, Iterable[Variance]] = 0,
-            supertype: Optional[TypeOperator] = None) -> TypeOperator:
-        """
-        Convenience function for defining a type.
-        """
-        if isinstance(params, int):
-            variance = list(Variance.CO for _ in range(params))
-        else:
-            variance = list(params)
-        return TypeOperator(name=name, params=variance, supertype=supertype)
-
 
 class TypeSchema(Type):
     """
@@ -143,21 +130,21 @@ class TypeOperator(Type):
     the corresponding type operation (that is, a base type).
     """
 
-    def __init__(
-            self,
-            name: Optional[str],
-            params: list[Variance] = [],
+    def __init__(self,
+            name: Optional[str] = None,
+            params: int | list[Variance] = 0,
             supertype: Optional[TypeOperator] = None):
         self.name = name
         self.supertype: Optional[TypeOperator] = supertype
-        self.variance = params
-        self.arity = len(params)
+        self.variance = list(Variance.CO for _ in range(params)) \
+            if isinstance(params, int) else list(params)
+        self.arity = len(self.variance)
 
         if self.supertype and self.arity > 0:
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
-        return self.name or '<AnonymousType>'
+        return self.name or '<Anon>'
 
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))

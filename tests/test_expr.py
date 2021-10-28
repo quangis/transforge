@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra import error
-from transformation_algebra.type import Type, _
+from transformation_algebra.type import TypeOperator, _
 from transformation_algebra.expr import Operator, Source
 from transformation_algebra.lang import Language
 
@@ -12,7 +12,7 @@ class TestAlgebra(unittest.TestCase):
         """
         Multiple arguments may be provided through partial or full application.
         """
-        A = Type.declare('A')
+        A = TypeOperator('A')
         x = Source(type=A)
         f = Operator(type=A ** A ** A)
         self.assertTrue(f(x, x).match(f(x)(x)))
@@ -21,7 +21,7 @@ class TestAlgebra(unittest.TestCase):
         """
         Expressions can be converted to primitive form.
         """
-        Int = Type.declare('Int')
+        Int = TypeOperator('Int')
         one = Source(Int)
         add = Operator(type=Int ** Int ** Int, name='add')
         add1 = Operator(
@@ -42,7 +42,7 @@ class TestAlgebra(unittest.TestCase):
         """
         Expressions can be compared to one another.
         """
-        A = Type.declare('A')
+        A = TypeOperator('A')
         x = Source(A)
         f = Operator(type=A ** A, name='f')
         g = Operator(type=A ** A, name='g')
@@ -54,7 +54,7 @@ class TestAlgebra(unittest.TestCase):
         Test that non-primitive expressions defined in terms of
         other non-primitive expressions are expanded properly.
         """
-        A = Type.declare('A')
+        A = TypeOperator('A')
         x = Source(type=A)
         f = Operator(type=A ** A, name='f')
         g = Operator(type=A ** A, name='g',
@@ -71,7 +71,7 @@ class TestAlgebra(unittest.TestCase):
         """
         Make sure that primitives have the correct type.
         """
-        A = Type.declare('A')
+        A = TypeOperator('A')
         x = Source(A)
         f = Operator(type=lambda α: α ** α, name='f')
         g = Operator(type=lambda α: α ** α, name='g', define=lambda x: f(x))
@@ -83,9 +83,9 @@ class TestAlgebra(unittest.TestCase):
         bound once was violated, due to complex interactions of primitive
         Operators. This test makes sure that issue no longer exists.
         """
-        Value = Type.declare('Val')
-        Bool = Type.declare('Bool', supertype=Value)
-        Map = Type.declare('Map', params=2)
+        Value = TypeOperator('Val')
+        Bool = TypeOperator('Bool', supertype=Value)
+        Map = TypeOperator('Map', params=2)
         data = Source(type=Map(Value, Bool))
         eq = Operator(type=Value ** Value ** Bool)
         select = Operator(
@@ -105,7 +105,7 @@ class TestAlgebra(unittest.TestCase):
         ))
 
     def test_exact_declared_type_in_definition(self):
-        A, B = Type.declare('A'), Type.declare('B')
+        A, B = TypeOperator('A'), TypeOperator('B')
         f = Operator(type=A ** B)
         self.assertRaises(
             error.SubtypeMismatch,
@@ -115,13 +115,13 @@ class TestAlgebra(unittest.TestCase):
         Operator(type=A ** B, define=lambda x: f(x)).validate_type()
 
     def test_tighter_declared_type_in_definition(self):
-        A, B = Type.declare('A'), Type.declare('B')
+        A, B = TypeOperator('A'), TypeOperator('B')
         g = Operator(lambda α: α ** B)
         Operator(type=A ** B, define=lambda x: g(x)).validate_type()
         Operator(type=B ** B, define=lambda x: g(x)).validate_type()
 
     def test_looser_declared_type_in_definition(self):
-        A, B = Type.declare('A'), Type.declare('B')
+        A, B = TypeOperator('A'), TypeOperator('B')
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
         Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate_type()
         self.assertRaises(
@@ -131,8 +131,8 @@ class TestAlgebra(unittest.TestCase):
 
     def test_same_labels_unify(self):
         # See issue #10
-        A = Type.declare()
-        B = Type.declare()
+        A = TypeOperator()
+        B = TypeOperator()
         d1 = Operator(type=A)
         d2 = Operator(type=B)
         f = Operator(type=A ** B ** A)
