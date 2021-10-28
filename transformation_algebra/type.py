@@ -198,9 +198,10 @@ class TypeInstance(Type):
         if isinstance(self, TypeOperation):
             if self._operator == Function:
                 i, o = self.params
-                result = f"{i.text(labels)} {arrow} {o.text(labels)}"
                 if isinstance(i, TypeOperation) and i._operator == Function:
-                    result = f"({result})"
+                    result = f"({i.text(labels)}) {arrow} {o.text(labels)}"
+                else:
+                    result = f"{i.text(labels)} {arrow} {o.text(labels)}"
             else:
                 if self.params:
                     result = f"{self._operator}" \

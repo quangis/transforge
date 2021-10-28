@@ -112,27 +112,32 @@ class Expr(ABC):
         return self.tree()
 
     def __str__(self) -> str:
-        return self.text(with_type=True)
+        return self.text(with_type=True, with_parentheses=False)
 
     def text(self,
             labels: dict[Variable, str] = Labels("x", subscript=True),
-            with_type: bool = False):
+            with_type: bool = False,
+            with_parentheses: bool = True):
         if isinstance(self, Operation):
-            result = self.operator.name or '<anonymous_operation>'
+            with_parentheses = False
+            result = self.operator.name or '<anon>'
         elif isinstance(self, Source):
             with_type = True
             result = self.label or '-'
         elif isinstance(self, Application):
-            result = f"({self.f.text(labels)} {self.x.text(labels)})"
+            parens = not isinstance(self.f, Application)
+            result = f"{self.f.text(labels, with_parentheses=parens)} "\
+                f"{self.x.text(labels)}"
         elif isinstance(self, Abstraction):
             params = " ".join(p.text(labels) for p in self.params)
-            result = f"(λ{params}. {self.body.text(labels)})"
+            result = f"λ{params}. {self.body.text(labels)}"
         else:
             assert isinstance(self, Variable)
+            with_parentheses = False
             result = labels[self]
         if with_type:
             result = f"{result} : {self.type.text(with_constraints=True)}"
-        if isinstance(self, Source):
+        if with_parentheses:
             result = f"({result})"
         return result
 
