@@ -6,9 +6,10 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, TypeOperator, TypeInstance, TransformationTypeError
+    Function, TypeOperator, TypeInstance, TypingError
 from transformation_algebra.expr import \
-    Expr, Operation, Application, Abstraction, Source, Operator, Variable
+    Expr, Operation, Application, Abstraction, Source, Operator, Variable, \
+    ApplicationError
 from transformation_algebra.lang import Language
 
 from itertools import chain
@@ -220,9 +221,8 @@ class TransformationGraph(Graph):
                                 # RDF, which means some might be outdated
                                 # instead match(subtype=False)?
                                 source_expr.type.unify(expr.type, subtype=True)
-                            except TransformationTypeError:
-                                # e.while_unifying(source_expr, expr)
-                                raise
+                            except TypingError:
+                                raise ApplicationError(source_expr, expr)
                             return source_node
 
         else:

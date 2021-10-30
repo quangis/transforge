@@ -407,7 +407,7 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
                 if subtype and not a._operator.subtype(b._operator):
-                    raise SubtypeMismatch(a, b)
+                    raise SubtypeMismatch(a._operator, b._operator)
                 elif not subtype and a._operator != b._operator:
                     raise TypeMismatch(a, b)
             elif a._operator == b._operator:
@@ -550,9 +550,9 @@ class TypeVariable(TypeInstance):
             elif isinstance(t, TypeOperation):
                 if t.basic:
                     if self.lower and t._operator.subtype(self.lower, True):
-                        raise SubtypeMismatch(t, self)
+                        raise SubtypeMismatch(t._operator, self.lower)
                     if self.upper and self.upper.subtype(t._operator, True):
-                        raise SubtypeMismatch(self, t)
+                        raise SubtypeMismatch(self.upper, t._operator)
                 else:
                     variables = t.variables(indirect=False)
 
@@ -738,48 +738,51 @@ def with_parameters(
 
 # Errors #####################################################################
 
-class TransformationTypeError(Exception):
+class TypingError(Exception):
     "There is a typechecking issue."
 
 
-class TypeMismatch(TransformationTypeError):
-    "Raised when compound types mismatch."
+class TypeMismatch(TypingError):
+    "Raised when compound types cannot be unified."
 
-    def __init__(self, a: TypeInstance | TypeOperator,
-            b: TypeInstance | TypeOperator):
-        self.type1 = a
-        self.type2 = b
+    def __init__(self, left: Type, right: Type):
+        self.left = left
+        self.right = right
 
     def __str__(self) -> str:
-        return f"Could not unify type {self.type1} with {self.type2}."
+        return f"Could not unify type {self.left} with {self.right}."
 
 
 class SubtypeMismatch(TypeMismatch):
-    "Raised when base types are not subtypes."
+    "Raised when base types are not subtypes of eachother."
+
+    def __init__(self, left: TypeOperator, right: TypeOperator):
+        self.left = left
+        self.right = right
 
     def __str__(self) -> str:
-        return f"Could not satisfy subtype {self.type1} <= {self.type2}."
+        return f"Could not satisfy subtype {self.left} <= {self.right}."
 
 
 class FunctionApplicationError(TypeMismatch):
     "Raised when an argument is passed to a non-function type."
 
     def __str__(self) -> str:
-        return f"Could not apply non-function {self.type1} to {self.type2}."
+        return f"Could not apply non-function type {self.left} to {self.right}."
 
 
-class RecursiveType(TransformationTypeError):
+class RecursiveType(TypingError):
     "Raised for infinite types."
 
-    def __init__(self, a: TypeInstance, b: TypeInstance):
-        self.type1 = a
-        self.type2 = b
+    def __init__(self, inner: TypeInstance, outer: TypeInstance):
+        self.inner = inner
+        self.outer = outer
 
     def __str__(self) -> str:
-        return f"Encountered the recursive type {self.type1}~{self.type2}."
+        return f"Encountered the recursive type {self.inner}~{self.outer}."
 
 
-class ConstraintViolation(TransformationTypeError):
+class ConstraintViolation(TypingError):
     "Raised when there remains no way in which a constraint can be satisfied."
 
     def __init__(self, constraint: Constraint):
@@ -789,7 +792,7 @@ class ConstraintViolation(TransformationTypeError):
         return f"Violated typeclass constraint {self.constraint}."
 
 
-class ConstrainFreeVariable(TransformationTypeError):
+class ConstrainFreeVariable(TypingError):
     """
     Raised when a constraint refers to a variable that does not occur in its
     context.

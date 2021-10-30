@@ -13,8 +13,7 @@ from typing import Optional, Callable, Iterator
 
 from transformation_algebra.label import Labels
 from transformation_algebra.type import \
-    Type, TypeVariable, TypeSchema, TypeInstance, Function, _, \
-    TransformationTypeError
+    Type, TypeVariable, TypeSchema, TypeInstance, Function, _, TypingError
 
 
 class Operator(object):
@@ -86,7 +85,7 @@ class Operator(object):
                     raise DeclaredTypeTooGeneral(
                         self.type, self.instance().primitive().type)
 
-        except (DeclaredTypeTooGeneral, TransformationTypeError) as e:
+        except (DeclaredTypeTooGeneral, ApplicationError, TypingError) as e:
             raise DeclarationError(self) from e
 
 
@@ -162,7 +161,7 @@ class Expr(ABC):
     def apply(self, arg: Expr) -> Expr:
         try:
             return Application(self, arg).normalize(recursive=False)
-        except TransformationTypeError as e:
+        except TypingError as e:
             raise ApplicationError(self, arg) from e
 
     def normalize(self, recursive: bool = True) -> Expr:
@@ -327,6 +326,27 @@ class Variable(Expr):
 
 # Errors #####################################################################
 
+class DeclarationError(Exception):
+    def __init__(self, operator: Operator):
+        self.operator = operator
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must be caused by another error"
+        return f"While validating the declared operator '{self.operator}': " \
+            f"{self.__cause__}"
+
+
+class ApplicationError(Exception):
+    def __init__(self, operation: Expr, argument: Expr):
+        self.operation = operation
+        self.argument = argument
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must caused by another error"
+        return f"Could not apply {self.operation} to {self.argument}: " \
+            f"{self.__cause__}"
+
+
 class DeclaredTypeTooGeneral(Exception):
     """
     Raised when the declared type of a composite transformation is unifiable
@@ -341,24 +361,3 @@ class DeclaredTypeTooGeneral(Exception):
         return \
             f"Declared type {self.declared} is more general than " \
             f"inferred type {self.inferred}."
-
-
-class ApplicationError(Exception):
-    def __init__(self, op: Expr, arg: Expr):
-        self.operation = op
-        self.argument = arg
-
-    def __str__(self) -> str:
-        assert self.__cause__, "must caused by another error"
-        return f"Could not apply {self.operation} to {self.argument}: " \
-            f"{self.__cause__}"
-
-
-class DeclarationError(Exception):
-    def __init__(self, operator: Operator):
-        self.operator = operator
-
-    def __str__(self) -> str:
-        assert self.__cause__, "must be caused by another error"
-        return f"While validating the declared operator '{self.operator}': " \
-            f"{self.__cause__}"
