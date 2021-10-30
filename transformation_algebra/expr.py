@@ -9,7 +9,7 @@ from abc import ABC
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from typing import Optional, Callable, Union, Iterator
+from typing import Optional, Callable, Iterator
 
 from transformation_algebra.label import Labels
 from transformation_algebra.type import \
@@ -28,7 +28,7 @@ class Operator(object):
     def __init__(
             self,
             doc: Optional[str] = None,
-            type: Union[Type, Callable[..., TypeInstance]] = _,
+            type: Type | Callable[..., TypeInstance] = _,
             define: Optional[Callable[..., Expr]] = None,
             name: Optional[str] = None):
         self.name = name
