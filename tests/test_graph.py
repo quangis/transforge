@@ -14,9 +14,8 @@ from rdflib.term import Node
 from rdflib.compare import to_isomorphic, graph_diff
 from rdflib.tools.rdf2dot import rdf2dot
 
-from typing import Iterator, Dict, Optional, Union
+from typing import Optional, Union
 
-from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperator, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language

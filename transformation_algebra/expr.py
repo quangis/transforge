@@ -45,7 +45,7 @@ class Operator(object):
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.name or 'anonymous operation'} : {self.type}"
+        return f"{self.name or '<anon>'} : {self.type}"
 
     def __call__(self, *args: Operator | Expr) -> Expr:
         """
@@ -81,14 +81,13 @@ class Operator(object):
 
                 # All the variables in the declared type must still be
                 # variables --- otherwise we were too general
-                if not all(isinstance(v.follow(), TypeVariable) \
+                if not all(isinstance(v.follow(), TypeVariable)
                         for v in vars_decl):
                     raise DeclaredTypeTooGeneral(
                         self.type, self.instance().primitive().type)
 
-        except TransformationTypeError:
-            # e.definition = self
-            raise
+        except (DeclaredTypeTooGeneral, TransformationTypeError) as e:
+            raise DeclarationError(self) from e
 
 
 ###############################################################################
@@ -163,9 +162,8 @@ class Expr(ABC):
     def apply(self, arg: Expr) -> Expr:
         try:
             return Application(self, arg).normalize(recursive=False)
-        except TransformationTypeError:
-            # e.while_applying(self, arg)
-            raise
+        except TransformationTypeError as e:
+            raise ApplicationError(self, arg) from e
 
     def normalize(self, recursive: bool = True) -> Expr:
         """
@@ -329,11 +327,7 @@ class Variable(Expr):
 
 # Errors #####################################################################
 
-class DeclarationError(Exception):
-    pass
-
-
-class DeclaredTypeTooGeneral(DeclarationError):
+class DeclaredTypeTooGeneral(Exception):
     """
     Raised when the declared type of a composite transformation is unifiable
     with the type inferred from its derivation, but it is too general.
@@ -347,3 +341,24 @@ class DeclaredTypeTooGeneral(DeclarationError):
         return \
             f"Declared type {self.declared} is more general than " \
             f"inferred type {self.inferred}."
+
+
+class ApplicationError(Exception):
+    def __init__(self, op: Expr, arg: Expr):
+        self.operation = op
+        self.argument = arg
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must caused by another error"
+        return f"Could not apply {self.operation} to {self.argument}: " \
+            f"{self.__cause__}"
+
+
+class DeclarationError(Exception):
+    def __init__(self, operator: Operator):
+        self.operator = operator
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must be caused by another error"
+        return f"While validating the declared operator '{self.operator}': " \
+            f"{self.__cause__}"

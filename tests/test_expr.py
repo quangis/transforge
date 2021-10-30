@@ -1,13 +1,14 @@
 import unittest
+from .testcase import TestCase  # type: ignore
 
 from transformation_algebra.type import TypeOperator, _, \
     TypeMismatch, SubtypeMismatch
 from transformation_algebra.expr import Operator, Source, \
-    DeclaredTypeTooGeneral
+    DeclaredTypeTooGeneral, DeclarationError
 from transformation_algebra.lang import Language
 
 
-class TestAlgebra(unittest.TestCase):
+class TestAlgebra(TestCase):
 
     def test_currying(self):
         """
@@ -108,8 +109,8 @@ class TestAlgebra(unittest.TestCase):
     def test_exact_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         f = Operator(type=A ** B)
-        self.assertRaises(
-            SubtypeMismatch,
+        self.assertRaisesChain(
+            [DeclarationError, SubtypeMismatch],
             Operator.validate_type,
             Operator(type=B ** B, define=lambda x: f(x))
         )
@@ -125,8 +126,8 @@ class TestAlgebra(unittest.TestCase):
         A, B = TypeOperator('A'), TypeOperator('B')
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
         Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate_type()
-        self.assertRaises(
-            DeclaredTypeTooGeneral,
+        self.assertRaisesChain(
+            [DeclarationError, DeclaredTypeTooGeneral],
             Operator.validate_type,
             Operator(type=lambda α: α ** B, define=lambda x: f(x)))
 
