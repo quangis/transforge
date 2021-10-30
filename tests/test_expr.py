@@ -1,8 +1,9 @@
 import unittest
 
-from transformation_algebra import error
-from transformation_algebra.type import TypeOperator, _
-from transformation_algebra.expr import Operator, Source
+from transformation_algebra.type import TypeOperator, _, \
+    TypeMismatch, SubtypeMismatch
+from transformation_algebra.expr import Operator, Source, \
+    DeclaredTypeTooGeneral
 from transformation_algebra.lang import Language
 
 
@@ -108,7 +109,7 @@ class TestAlgebra(unittest.TestCase):
         A, B = TypeOperator('A'), TypeOperator('B')
         f = Operator(type=A ** B)
         self.assertRaises(
-            error.SubtypeMismatch,
+            SubtypeMismatch,
             Operator.validate_type,
             Operator(type=B ** B, define=lambda x: f(x))
         )
@@ -125,7 +126,7 @@ class TestAlgebra(unittest.TestCase):
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
         Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate_type()
         self.assertRaises(
-            error.DeclaredTypeTooGeneral,
+            DeclaredTypeTooGeneral,
             Operator.validate_type,
             Operator(type=lambda α: α ** B, define=lambda x: f(x)))
 
@@ -139,7 +140,7 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals())
 
         lang.parse("f (d1 x) (d2 y)")
-        self.assertRaises(error.TATypeError, lang.parse, "f (d1 x) (d2 x)")
+        self.assertRaises(TypeMismatch, lang.parse, "f (d1 x) (d2 x)")
 
 
 if __name__ == '__main__':

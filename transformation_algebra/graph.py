@@ -5,9 +5,8 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra import error
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, TypeOperator, TypeInstance
+    Function, TypeOperator, TypeInstance, TransformationTypeError
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source, Operator, Variable
 from transformation_algebra.lang import Language
@@ -222,8 +221,8 @@ class TransformationGraph(Graph):
                                 # RDF, which means some might be outdated
                                 # instead match(subtype=False)?
                                 source_expr.type.unify(expr.type, subtype=True)
-                            except error.TATypeError as e:
-                                e.while_unifying(source_expr, expr)
+                            except TransformationTypeError:
+                                # e.while_unifying(source_expr, expr)
                                 raise
                             return source_node
 

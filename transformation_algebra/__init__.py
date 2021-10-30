@@ -1,5 +1,5 @@
 from transformation_algebra.type import \
-    Type, TypeInstance, Constraint, with_parameters, _
+    Type, TypeOperator, TypeInstance, Constraint, with_parameters, _
 from transformation_algebra.expr import \
     Operator, Expr, Source
 from transformation_algebra.lang import \

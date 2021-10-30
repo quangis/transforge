@@ -11,10 +11,10 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Callable, Union, Iterator
 
-from transformation_algebra import error
 from transformation_algebra.label import Labels
 from transformation_algebra.type import \
-    Type, TypeVariable, TypeSchema, TypeInstance, Function, _
+    Type, TypeVariable, TypeSchema, TypeInstance, Function, _, \
+    TransformationTypeError
 
 
 class Operator(object):
@@ -83,11 +83,11 @@ class Operator(object):
                 # variables --- otherwise we were too general
                 if not all(isinstance(v.follow(), TypeVariable) \
                         for v in vars_decl):
-                    raise error.DeclaredTypeTooGeneral(
+                    raise DeclaredTypeTooGeneral(
                         self.type, self.instance().primitive().type)
 
-        except error.TAError as e:
-            e.definition = self
+        except TransformationTypeError:
+            # e.definition = self
             raise
 
 
@@ -97,7 +97,7 @@ class Expr(ABC):
     def __init__(self, type: TypeInstance):
         self.type = type
 
-    def __call__(self, *args: Expr | Operator | int | Type) -> Expr:
+    def __call__(self, *args: Expr | Operator) -> Expr:
         return reduce(Expr.apply, (Expr.shorthand(e) for e in args), self)
 
     @staticmethod
@@ -163,8 +163,8 @@ class Expr(ABC):
     def apply(self, arg: Expr) -> Expr:
         try:
             return Application(self, arg).normalize(recursive=False)
-        except error.TATypeError as e:
-            e.while_applying(self, arg)
+        except TransformationTypeError:
+            # e.while_applying(self, arg)
             raise
 
     def normalize(self, recursive: bool = True) -> Expr:
@@ -325,3 +325,25 @@ class Variable(Expr):
     def bind(self, expr: Expr) -> None:
         assert not self.bound, "cannot bind variable twice"
         self.bound = expr
+
+
+# Errors #####################################################################
+
+class DeclarationError(Exception):
+    pass
+
+
+class DeclaredTypeTooGeneral(DeclarationError):
+    """
+    Raised when the declared type of a composite transformation is unifiable
+    with the type inferred from its derivation, but it is too general.
+    """
+
+    def __init__(self, declared: Type, inferred: TypeInstance):
+        self.declared = declared
+        self.inferred = inferred
+
+    def __str__(self) -> str:
+        return \
+            f"Declared type {self.declared} is more general than " \
+            f"inferred type {self.inferred}."

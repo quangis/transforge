@@ -1,8 +1,9 @@
 import unittest
 
-from transformation_algebra import error
 from transformation_algebra.type import \
-    Type, TypeOperator, TypeSchema, TypeVariable, _, with_parameters
+    TypeOperator, TypeSchema, TypeVariable, _, with_parameters, \
+    FunctionApplicationError, SubtypeMismatch, \
+    ConstraintViolation, ConstrainFreeVariable
 
 
 class TestType(unittest.TestCase):
@@ -37,7 +38,7 @@ class TestType(unittest.TestCase):
 
     def test_apply_non_function(self):
         A = TypeOperator('A')
-        self.apply(A, A, error.FunctionApplicationError)
+        self.apply(A, A, FunctionApplicationError)
 
     def test_basic_match(self):
         A, B = TypeOperator('A'), TypeOperator('B')
@@ -47,7 +48,7 @@ class TestType(unittest.TestCase):
     def test_basic_mismatch(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         f = A ** B
-        self.apply(f, B, error.SubtypeMismatch)
+        self.apply(f, B, SubtypeMismatch)
 
     def test_basic_sub_match(self):
         A = TypeOperator('A')
@@ -59,7 +60,7 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
         f = B ** C
-        self.apply(f, A, error.SubtypeMismatch)
+        self.apply(f, A, SubtypeMismatch)
 
     def test_compound_match(self):
         F = TypeOperator('F', params=1)
@@ -71,7 +72,7 @@ class TestType(unittest.TestCase):
         F = TypeOperator('F', params=1)
         A, B = TypeOperator('A'), TypeOperator('B')
         f = F(A) ** B
-        self.apply(f, F(B), error.SubtypeMismatch)
+        self.apply(f, F(B), SubtypeMismatch)
 
     def test_compound_sub_match(self):
         A = TypeOperator('A')
@@ -85,7 +86,7 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
         f = F(B) ** C
-        self.apply(f, F(A), error.SubtypeMismatch)
+        self.apply(f, F(A), SubtypeMismatch)
 
     def test_variable(self):
         F = TypeOperator('F', params=1)
@@ -108,7 +109,7 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         B = TypeOperator('B', supertype=A)
         f = TypeSchema(lambda x: (x ** B) ** x)
-        self.apply(f, B ** A, error.SubtypeMismatch)
+        self.apply(f, B ** A, SubtypeMismatch)
 
     def test_functions_as_arguments1(self):
         A, B = TypeOperator('A'), TypeOperator('B')
@@ -130,7 +131,7 @@ class TestType(unittest.TestCase):
         f = TypeSchema(lambda α: α ** α ** Other)
         self.apply(f.apply(Sub), Basic, Other)
         self.apply(f.apply(Basic), Sub, Other)
-        self.apply(f.apply(Basic), Other, error.SubtypeMismatch)
+        self.apply(f.apply(Basic), Other, SubtypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
         Super = TypeOperator('Super')
@@ -139,7 +140,7 @@ class TestType(unittest.TestCase):
         Other = TypeOperator('Other')
         f = TypeSchema(lambda α: α ** α ** Other | α @ [Super, Basic])
         self.apply(f.apply(Basic), Sub, Other)
-        self.apply(f, Super, error.ConstraintViolation)
+        self.apply(f, Super, ConstraintViolation)
 
     def test_violation_of_constraints(self):
         F = TypeOperator('F', params=1)
@@ -148,7 +149,7 @@ class TestType(unittest.TestCase):
         C = TypeOperator('C')
         f = TypeSchema(lambda α: α ** α | α @ [A, F(A)])
         self.apply(f, F(B), F(B))
-        self.apply(f, C, error.ConstraintViolation)
+        self.apply(f, C, ConstraintViolation)
 
     def test_preservation_of_basic_subtypes_in_constraints(self):
         Super = TypeOperator('Super')
@@ -185,7 +186,7 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         B = TypeOperator('B', supertype=A)
         f = TypeSchema(lambda x: (x ** x) ** x)
-        self.apply(f, B ** A, error.SubtypeMismatch)
+        self.apply(f, B ** A, SubtypeMismatch)
 
     def test_constrain_wildcard(self):
         A = TypeOperator('A')
@@ -195,8 +196,8 @@ class TestType(unittest.TestCase):
     def test_constrain_free_variable(self):
         f = TypeSchema(lambda x, y, z: x ** x | y @ [x, z])
         g = TypeSchema(lambda x, y, z: x ** x | x @ [y, z])
-        self.assertRaises(error.ConstrainFreeVariable, TypeSchema.instance, f)
-        self.assertRaises(error.ConstrainFreeVariable, TypeSchema.instance, g)
+        self.assertRaises(ConstrainFreeVariable, TypeSchema.instance, f)
+        self.assertRaises(ConstrainFreeVariable, TypeSchema.instance, g)
 
     def test_global_subtype_resolution(self):
         A = TypeOperator('A')
@@ -210,7 +211,7 @@ class TestType(unittest.TestCase):
         F, G = TypeOperator('F', 1), TypeOperator('G', 2)
         f = TypeSchema(lambda α, β: α ** β | α @ [F(β), G(_, β)])
         self.apply(f, F(A), A)
-        self.apply(f, A, error.ConstraintViolation)
+        self.apply(f, A, ConstraintViolation)
 
     def test_subtyping_of_concrete_functions(self):
         Super = TypeOperator('Super')

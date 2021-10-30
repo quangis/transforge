@@ -11,7 +11,6 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Union, Callable
 
-from transformation_algebra import error
 from transformation_algebra.label import Labels
 
 
@@ -96,7 +95,7 @@ class Type(ABC):
             f.resolve()
             return f.params[1].resolve()
         else:
-            raise error.FunctionApplicationError(f, x)
+            raise FunctionApplicationError(f, x)
 
     @abstractmethod
     def instance(self) -> TypeInstance:
@@ -408,9 +407,9 @@ class TypeInstance(Type):
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
                 if subtype and not a._operator.subtype(b._operator):
-                    raise error.SubtypeMismatch(a, b)
+                    raise SubtypeMismatch(a, b)
                 elif not subtype and a._operator != b._operator:
-                    raise error.TypeMismatch(a, b)
+                    raise TypeMismatch(a, b)
             elif a._operator == b._operator:
                 for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
@@ -419,7 +418,7 @@ class TypeInstance(Type):
                         assert v == Variance.CONTRA
                         y.unify(x, subtype=subtype)
             else:
-                raise error.TypeMismatch(a, b)
+                raise TypeMismatch(a, b)
         else:
             if isinstance(a, TypeOperation) and isinstance(b, TypeVariable):
                 op, var, f = a, b, TypeVariable.above
@@ -429,7 +428,7 @@ class TypeInstance(Type):
                 op, var, f = b, a, TypeVariable.below
 
             if var in op:
-                raise error.RecursiveType(var, op)
+                raise RecursiveType(var, op)
             elif op.basic:
                 if subtype:
                     f(var, op._operator)
@@ -551,9 +550,9 @@ class TypeVariable(TypeInstance):
             elif isinstance(t, TypeOperation):
                 if t.basic:
                     if self.lower and t._operator.subtype(self.lower, True):
-                        raise error.SubtypeMismatch(t, self)
+                        raise SubtypeMismatch(t, self)
                     if self.upper and self.upper.subtype(t._operator, True):
-                        raise error.SubtypeMismatch(self, t)
+                        raise SubtypeMismatch(self, t)
                 else:
                     variables = t.variables(indirect=False)
 
@@ -575,14 +574,14 @@ class TypeVariable(TypeInstance):
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
         if upper.subtype(new, True):  # fail when lower bound higher than upper
-            raise error.SubtypeMismatch(new, upper)
+            raise SubtypeMismatch(new, upper)
         elif new.subtype(lower, True):  # ignore lower bound lower than current
             pass
         elif lower.subtype(new):  # tighten the lower bound
             a.lower = new
             a.check_constraints()
         else:  # fail on bound from other lineage (neither sub- nor supertype)
-            raise error.SubtypeMismatch(lower, new)
+            raise SubtypeMismatch(lower, new)
 
     def below(self, new: TypeOperator) -> None:
         """
@@ -594,14 +593,14 @@ class TypeVariable(TypeInstance):
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
         if new.subtype(lower, True):
-            raise error.SubtypeMismatch(lower, new)
+            raise SubtypeMismatch(lower, new)
         elif upper.subtype(new, True):
             pass
         elif new.subtype(upper):
             a.upper = new
             a.check_constraints()
         else:
-            raise error.SubtypeMismatch(new, upper)
+            raise SubtypeMismatch(new, upper)
 
     def check_constraints(self) -> None:
         self._constraints = set(
@@ -646,7 +645,7 @@ class Constraint(object):
     def set_context(self, context: TypeInstance) -> None:
         self.context = context
         if not self.all_variables_occur_in_context():
-            raise error.ConstrainFreeVariable(self)
+            raise ConstrainFreeVariable(self)
 
     def all_variables_occur_in_context(self) -> bool:
         """
@@ -697,7 +696,7 @@ class Constraint(object):
             in zip(self.alternatives, compatibility) if c is not False]
 
         if len(self.alternatives) == 0:
-            raise error.ConstraintViolation(self)
+            raise ConstraintViolation(self)
 
         # If there is only one possibility left, we can unify, but *only* with
         # the skeleton: the base types must remain variable, because we don't
@@ -735,3 +734,69 @@ def with_parameters(
                     param if param and i == j else _ for j in range(op.arity)
                 )))
     return options
+
+
+# Errors #####################################################################
+
+class TransformationTypeError(Exception):
+    "There is a typechecking issue."
+
+
+class TypeMismatch(TransformationTypeError):
+    "Raised when compound types mismatch."
+
+    def __init__(self, a: TypeInstance | TypeOperator,
+            b: TypeInstance | TypeOperator):
+        self.type1 = a
+        self.type2 = b
+
+    def __str__(self) -> str:
+        return f"Could not unify type {self.type1} with {self.type2}."
+
+
+class SubtypeMismatch(TypeMismatch):
+    "Raised when base types are not subtypes."
+
+    def __str__(self) -> str:
+        return f"Could not satisfy subtype {self.type1} <= {self.type2}."
+
+
+class FunctionApplicationError(TypeMismatch):
+    "Raised when an argument is passed to a non-function type."
+
+    def __str__(self) -> str:
+        return f"Could not apply non-function {self.type1} to {self.type2}."
+
+
+class RecursiveType(TransformationTypeError):
+    "Raised for infinite types."
+
+    def __init__(self, a: TypeInstance, b: TypeInstance):
+        self.type1 = a
+        self.type2 = b
+
+    def __str__(self) -> str:
+        return f"Encountered the recursive type {self.type1}~{self.type2}."
+
+
+class ConstraintViolation(TransformationTypeError):
+    "Raised when there remains no way in which a constraint can be satisfied."
+
+    def __init__(self, constraint: Constraint):
+        self.constraint = constraint
+
+    def __str__(self) -> str:
+        return f"Violated typeclass constraint {self.constraint}."
+
+
+class ConstrainFreeVariable(TransformationTypeError):
+    """
+    Raised when a constraint refers to a variable that does not occur in its
+    context.
+    """
+
+    def __init__(self, constraint: Constraint):
+        self.constraint = constraint
+
+    def __str__(self) -> str:
+        return f"A free variable occurs in constraint {self.constraint}"

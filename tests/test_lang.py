@@ -1,7 +1,6 @@
 import unittest
 
-from transformation_algebra import error
-from transformation_algebra.type import TypeOperator
+from transformation_algebra.type import TypeOperator, SubtypeMismatch
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
 
@@ -34,7 +33,7 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals())
 
         lang.parse("f 1 : A")
-        self.assertRaises(error.SubtypeMismatch, lang.parse, "1 : B; f 1 : A")
+        self.assertRaises(SubtypeMismatch, lang.parse, "1 : B; f 1 : A")
 
 
 if __name__ == '__main__':

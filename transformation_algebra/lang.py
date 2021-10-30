@@ -5,11 +5,9 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from enum import Enum, auto
-from itertools import groupby, chain
+from itertools import groupby
 from typing import Optional, Union, Iterator, Any
 
-from transformation_algebra import error
 from transformation_algebra.type import \
     TypeOperator, TypeInstance, TypeVariable
 from transformation_algebra.expr import \
@@ -125,7 +123,7 @@ class Language(object):
                     try:
                         op = self.types[token]
                     except KeyError as e:
-                        raise error.Undefined(token) from e
+                        raise UndefinedToken(token) from e
                     stackT.append(op() if op.arity == 0 else op)
                 if len(stackT) == 1 and isinstance(stackT[0], TypeInstance):
                     type_mode = False
@@ -144,7 +142,7 @@ class Language(object):
                             x = stack.pop()
                             stack.append(Application(x, y) if x else y)
                     except IndexError as e:
-                        raise error.LBracketMismatch from e
+                        raise BracketMismatch('(') from e
                 if token in "(,":
                     stack.append(None)
             elif token == ":":
@@ -153,6 +151,7 @@ class Language(object):
                 stack.clear()
                 stack.append(None)
             else:
+                current: Optional[Expr]
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
                     current = None
@@ -174,7 +173,7 @@ class Language(object):
                     try:
                         current = self.operators[token].instance()
                     except KeyError as e:
-                        raise error.Undefined(token) from e
+                        raise UndefinedToken(token) from e
                 if previous and current:
                     current = Application(previous, current)
                 stack.append(current)
@@ -182,11 +181,11 @@ class Language(object):
         if len(stack) == 1:
             result = stack[0]
             if not result:
-                raise error.Empty
+                raise EmptyParse
             else:
                 return result
         else:
-            raise error.RBracketMismatch
+            raise BracketMismatch(")")
 
 
 def tokenize(string: str, specials: str = "") -> Iterator[str]:
@@ -200,3 +199,27 @@ def tokenize(string: str, specials: str = "") -> Iterator[str]:
             yield "".join(tokens)
         elif group >= 0:
             yield from tokens
+
+
+# Errors #####################################################################
+
+class ParseError(Exception):
+    pass
+
+
+class BracketMismatch(ParseError):
+    def __str__(self) -> str:
+        return "Mismatched bracket."
+
+
+class EmptyParse(ParseError):
+    def __str__(self) -> str:
+        return "Empty parse."
+
+
+class UndefinedToken(ParseError):
+    def __init__(self, token: str):
+        self.token = token
+
+    def __str__(self) -> str:
+        return f"Operator or type operator '{self.token}' is undefined."
