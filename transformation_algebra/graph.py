@@ -11,13 +11,12 @@ from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source, Operator, Variable
 from transformation_algebra.lang import Language
 
-from itertools import count, chain
+from itertools import chain
 from rdflib import URIRef, Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS, ClosedNamespace
-from rdflib.plugins import sparql
 
-from typing import Dict, Union, Iterator, Optional, Tuple
+from typing import Optional
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
@@ -68,8 +67,8 @@ class TransformationGraph(Graph):
         self.include_steps = include_steps
         self.include_kinds = include_steps
 
-        self.type_nodes: Dict[TypeInstance, Node] = dict()
-        self.var_nodes: Dict[Variable, Node] = dict()
+        self.type_nodes: dict[TypeInstance, Node] = dict()
+        self.var_nodes: dict[Variable, Node] = dict()
 
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
@@ -150,7 +149,7 @@ class TransformationGraph(Graph):
             return node
 
     def add_expr(self, expr: Expr, root: Node, current: Optional[Node] = None,
-            sources: Dict[str, Union[Node, Tuple[Node, Expr]]] = {}) -> Node:
+            sources: dict[str, Node | tuple[Node, Expr]] = {}) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -325,7 +324,7 @@ class TransformationGraph(Graph):
         """
         # TODO cycles can occur
 
-        cache: Dict[Node, Node] = {}
+        cache: dict[Node, Node] = {}
 
         def to_expr_node(step_node: Node) -> Node:
             try:

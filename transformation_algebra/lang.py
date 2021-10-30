@@ -6,7 +6,7 @@ types and operators. It also handles parsing expressions of the algebra.
 from __future__ import annotations
 
 from itertools import groupby
-from typing import Optional, Union, Iterator, Any
+from typing import Optional, Iterator, Any
 
 from transformation_algebra.type import \
     TypeOperator, TypeInstance, TypeVariable
@@ -66,7 +66,7 @@ class Language(object):
         else:
             super().__setattr__(name, value)
 
-    def __contains__(self, key: Union[str, Operator, TypeOperator]) -> bool:
+    def __contains__(self, key: str | Operator | TypeOperator) -> bool:
         if isinstance(key, str):
             return key in self.operators or key in self.types
         elif isinstance(key, TypeOperator):

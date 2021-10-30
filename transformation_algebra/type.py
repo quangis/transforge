@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from inspect import signature
-from typing import Optional, Iterator, Iterable, Union, Callable
+from typing import Optional, Iterator, Iterable, Callable
 
 from transformation_algebra.label import Labels
 
@@ -464,7 +464,7 @@ class TypeInstance(Type):
         constraint.set_context(self)
         return self
 
-    def __matmul__(self, other: Union[Type, Iterable[Type]]) -> Constraint:
+    def __matmul__(self, other: Type | Iterable[Type]) -> Constraint:
         """
         Allows us to write typeclass constraints using @.
         """
