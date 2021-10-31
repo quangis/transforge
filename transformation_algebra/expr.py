@@ -36,10 +36,6 @@ class Operator(object):
         self.definition = define  # a transformation may be non-primitive
         self.is_function = self.type.instance().operator == Function
 
-        if isinstance(self.type, TypeInstance) and any(self.type.variables()):
-            raise ValueError(
-                "operator definitions musn't contain non-schematic variables")
-
     def __repr__(self) -> str:
         return str(self)
 
@@ -61,15 +57,33 @@ class Operator(object):
     def is_primitive(self) -> bool:
         return isinstance(self, Operator) and not self.definition
 
-    def validate_type(self) -> None:
+    def validate(self) -> None:
         """
-        This method raises an error if the operation is a composite operation,
-        but the declared type cannot be reconciled with the type inferred from
-        the definition.
+        If this method is called and completes without error, we obtain some
+        guarantees about the operator, namely:
+
+        -   The definition typechecks.
+        -   The declared type can be reconciled with the type inferred from the
+            definition, if any.
+        -   If the type of the operator contains type variables, they must be
+            either wildcards or schematic variables. If they are not, that
+            indicates that we are manipulating a "global" type variable, which
+            is probably not what we want!
+
+        This validation step is not performed during initialization, but
+        deferred instead to the point at which all operators in the primitive
+        expansion are defined. This avoids `NameError`s.
         """
-        # If the operation is composite, check that its declared type is no
-        # more general than the type we can infer from the definition
         try:
+
+            # Check that all variables are schematic or wildcard
+            t = self.type
+            if (isinstance(t, TypeSchema) and not t.only_schematic()) or \
+                    isinstance(t, TypeInstance) and any(t.variables()):
+                raise NonSchematicVariables(self.type)
+
+            # If the operation is composite, check that its declared type is no
+            # more general than the type we can infer from the definition
             if self.definition:
                 type_decl = self.type.instance()
                 vars_decl = list(type_decl.variables())
@@ -85,7 +99,8 @@ class Operator(object):
                     raise DeclaredTypeTooGeneral(
                         self.type, self.instance().primitive().type)
 
-        except (DeclaredTypeTooGeneral, ApplicationError, TypingError) as e:
+        except (NonSchematicVariables, DeclaredTypeTooGeneral,
+                ApplicationError, TypingError) as e:
             raise DeclarationError(self) from e
 
 
@@ -361,3 +376,11 @@ class DeclaredTypeTooGeneral(Exception):
         return \
             f"Declared type {self.declared} is more general than " \
             f"inferred type {self.inferred}."
+
+
+class NonSchematicVariables(Exception):
+    def __init__(self, type: Type):
+        self.type = type
+
+    def __str__(self) -> str:
+        return f"Type {self.type} contains a non-schematic variable."

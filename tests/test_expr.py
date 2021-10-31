@@ -111,24 +111,24 @@ class TestAlgebra(TestCase):
         f = Operator(type=A ** B)
         self.assertRaisesChain(
             [DeclarationError, SubtypeMismatch],
-            Operator.validate_type,
+            Operator.validate,
             Operator(type=B ** B, define=lambda x: f(x))
         )
-        Operator(type=A ** B, define=lambda x: f(x)).validate_type()
+        Operator(type=A ** B, define=lambda x: f(x)).validate()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         g = Operator(lambda α: α ** B)
-        Operator(type=A ** B, define=lambda x: g(x)).validate_type()
-        Operator(type=B ** B, define=lambda x: g(x)).validate_type()
+        Operator(type=A ** B, define=lambda x: g(x)).validate()
+        Operator(type=B ** B, define=lambda x: g(x)).validate()
 
     def test_looser_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
-        Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate_type()
+        Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate()
         self.assertRaisesChain(
             [DeclarationError, DeclaredTypeTooGeneral],
-            Operator.validate_type,
+            Operator.validate,
             Operator(type=lambda α: α ** B, define=lambda x: f(x)))
 
     def test_same_labels_unify(self):

@@ -84,7 +84,7 @@ class Language(object):
 
         for op in self.operators.values():
             # Check declared types of operations against their inferred type
-            op.validate_type()
+            op.validate()
 
             # Check that every type is known to the algebra
             for t in op.type.instance().operators():

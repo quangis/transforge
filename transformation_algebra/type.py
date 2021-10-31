@@ -122,6 +122,15 @@ class TypeSchema(Type):
     def instance(self) -> TypeInstance:
         return self.schema(*(TypeVariable() for _ in range(self.n)))
 
+    def only_schematic(self) -> bool:
+        """
+        Return `True` if all variables occuring in the schema are wildcards or
+        schematic variables.
+        """
+        variables = [TypeVariable() for _ in range(self.n)]
+        return all((v in variables or v.wildcard)
+            for v in self.schema(*variables).variables())
+
 
 class TypeOperator(Type):
     """
