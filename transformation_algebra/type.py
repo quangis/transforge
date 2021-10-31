@@ -152,7 +152,7 @@ class TypeOperator(Type):
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
-        return self.name or '<Anon>'
+        return self.name or object.__repr__(self)
 
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
@@ -759,7 +759,7 @@ class TypeMismatch(TypingError):
         self.right = right
 
     def __str__(self) -> str:
-        return f"Could not unify type {self.left} with {self.right}."
+        return f"Could not unify type `{self.left}` with `{self.right}`."
 
 
 class SubtypeMismatch(TypeMismatch):
@@ -770,14 +770,15 @@ class SubtypeMismatch(TypeMismatch):
         self.right = right
 
     def __str__(self) -> str:
-        return f"Could not satisfy subtype {self.left} <= {self.right}."
+        return f"Could not satisfy subtype `{self.left}` <= `{self.right}`."
 
 
 class FunctionApplicationError(TypeMismatch):
     "Raised when an argument is passed to a non-function type."
 
     def __str__(self) -> str:
-        return f"Could not apply non-function type {self.left} to {self.right}."
+        return f"Could not apply non-function type `{self.left}` to " \
+            f"`{self.right}`."
 
 
 class RecursiveType(TypingError):

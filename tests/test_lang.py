@@ -15,7 +15,7 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=lambda x: x | x @ A)
         lang = Language(scope=locals())
 
-        self.assertEqual(str(lang.f), "f : x | x @ [A]")
+        self.assertEqual(str(f.type), "x | x @ [A]")
 
     def test_parse_inline_typing(self):
         A = TypeOperator()

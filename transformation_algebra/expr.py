@@ -40,7 +40,7 @@ class Operator(object):
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.name or '<anon>'} : {self.type}"
+        return self.name or object.__repr__(self)
 
     def __call__(self, *args: Operator | Expr) -> Expr:
         """
@@ -133,7 +133,7 @@ class Expr(ABC):
             with_parentheses: bool = True):
         if isinstance(self, Operation):
             with_parentheses = False
-            result = self.operator.name or '<anon>'
+            result = str(self.operator)
         elif isinstance(self, Source):
             with_type = True
             result = self.label or '-'
@@ -358,7 +358,7 @@ class ApplicationError(Exception):
 
     def __str__(self) -> str:
         assert self.__cause__, "must caused by another error"
-        return f"Could not apply {self.operation} to {self.argument}: " \
+        return f"Could not apply `{self.operation}` to `{self.argument}`: " \
             f"{self.__cause__}"
 
 
