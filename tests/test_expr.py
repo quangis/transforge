@@ -118,7 +118,7 @@ class TestAlgebra(TestCase):
 
     def test_tighter_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
-        g = Operator(lambda α: α ** B)
+        g = Operator(name='g', type=lambda α: α ** B)
         Operator(type=A ** B, define=lambda x: g(x)).validate()
         Operator(type=B ** B, define=lambda x: g(x)).validate()
 

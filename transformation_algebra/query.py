@@ -226,7 +226,7 @@ class Unit(TransformationFlow):
     """
 
     def __init__(self, value: Type | Operator):
-        if isinstance(value, Operator) and not value.is_primitive():
+        if isinstance(value, Operator) and value.definition:
             raise ValueError("any operation in a flow query must be primitive")
         self.value = value
 

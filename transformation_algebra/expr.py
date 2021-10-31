@@ -54,9 +54,6 @@ class Operator(object):
         else:
             return Source(type=self.type)
 
-    def is_primitive(self) -> bool:
-        return isinstance(self, Operator) and not self.definition
-
     def validate(self) -> None:
         """
         If this method is called and completes without error, we obtain some
