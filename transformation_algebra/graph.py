@@ -221,8 +221,9 @@ class TransformationGraph(Graph):
                                 # RDF, which means some might be outdated
                                 # instead match(subtype=False)?
                                 source_expr.type.unify(expr.type, subtype=True)
-                            except TypingError:
-                                raise ApplicationError(source_expr, expr)
+                            except TypingError as e:
+                                raise ApplicationError(source_expr, expr
+                                    ) from e
                             return source_node
 
         else:
