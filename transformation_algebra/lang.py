@@ -155,10 +155,11 @@ class Language(object):
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
                     current = None
-                    previous.label = token
-                    if token in sources:
-                        sources[token].type.unify(previous.type)
-                    else:
+                    try:
+                        previous = sources[token]
+                    except KeyError:
+                        assert not previous.label
+                        previous.label = token
                         sources[token] = previous
                     stack.append(previous)
                     continue
