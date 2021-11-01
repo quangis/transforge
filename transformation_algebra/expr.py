@@ -36,6 +36,8 @@ class Operator(object):
         self.definition = define  # a transformation may be non-primitive
         self.is_function = self.type.instance().operator == Function
 
+        assert not self.description or isinstance(self.description, str)
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -281,7 +283,10 @@ class Operation(Expr):
 
     def __init__(self, operator: Operator):
         self.operator = operator
-        super().__init__(type=operator.type.instance())
+        if isinstance(operator.type, TypeSchema):
+            super().__init__(type=operator.type.instance(origin=self.operator))
+        else:
+            super().__init__(type=operator.type.instance())
 
 
 class Source(Expr):

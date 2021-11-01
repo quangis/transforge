@@ -119,8 +119,9 @@ class TypeSchema(Type):
             with_constraints=True,
             labels={v: k for k, v in zip(names, variables)})
 
-    def instance(self) -> TypeInstance:
-        return self.schema(*(TypeVariable() for _ in range(self.n)))
+    def instance(self, origin=None) -> TypeInstance:
+        return self.schema(*(TypeVariable(origin=origin)
+            for _ in range(self.n)))
 
     def only_schematic(self) -> bool:
         """
@@ -357,7 +358,7 @@ class TypeInstance(Type):
         """
         Return True if self is definitely the same as (or a subtype of) other,
         False if it is definitely not, and None if there is not enough
-        information.
+        information. Note that constraints are not taken into account!
         """
         a = self.follow()
         b = other.follow()
@@ -525,12 +526,13 @@ class TypeVariable(TypeInstance):
     A type variable. This is not a schematic variable — it is instantiated!
     """
 
-    def __init__(self, wildcard: bool = False):
+    def __init__(self, wildcard: bool = False, origin=None):
         self.wildcard = wildcard
         self.unification: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self._constraints: set[Constraint] = set()
+        self.origin = origin
 
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
