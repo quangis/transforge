@@ -260,9 +260,9 @@ class TestAlgebraRDF(unittest.TestCase):
         """
 
         A = TypeOperator()
-        f = Operator((A ** A) ** A)
-        g = Operator(A ** A)
-        h = Operator(A ** A, define=lambda x: g(x))
+        f = Operator(type=(A ** A) ** A)
+        g = Operator(type=A ** A)
+        h = Operator(type=A ** A, define=lambda x: g(x))
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
