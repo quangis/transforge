@@ -6,6 +6,14 @@ from transformation_algebra.type import \
     ConstraintViolation, ConstrainFreeVariable
 
 
+Ω = TypeOperator('Ω')
+A, B = TypeOperator('A', supertype=Ω), TypeOperator('B', supertype=Ω)
+A1, A2 = TypeOperator('A1', supertype=A), TypeOperator('A2', supertype=A)
+B1, B2 = TypeOperator('B1', supertype=B), TypeOperator('B2', supertype=B)
+F, G = TypeOperator('F', params=2), TypeOperator('G', params=2)
+Z = TypeOperator('Z', params=1)
+
+
 class TestType(unittest.TestCase):
 
     def apply(self, f, x, result=None):
@@ -24,9 +32,13 @@ class TestType(unittest.TestCase):
         else:
             f.apply(x)
 
-    def test_parameter_auxiliary(self):
-        F, G = TypeOperator(params=2), TypeOperator(params=2)
-        A = TypeOperator()
+    def test_with_parameters(self):
+        "Test the auxiliary function `with_parameters`."
+
+        self.assertEqual(
+            with_parameters(F),
+            [F(_, _)]
+        )
         self.assertEqual(
             with_parameters(F, param=A),
             [F(A, _), F(_, A)]
@@ -37,91 +49,46 @@ class TestType(unittest.TestCase):
         )
 
     def test_apply_non_function(self):
-        A = TypeOperator('A')
-        self.apply(A, A, FunctionApplicationError)
+        self.apply(A, A, result=FunctionApplicationError)
 
-    def test_basic_match(self):
-        A, B = TypeOperator('A'), TypeOperator('B')
-        f = A ** B
-        self.apply(f, A, B)
+    def test_basic(self):
+        self.apply(A ** B, A, result=B)
+        self.apply(A ** B, B, result=SubtypeMismatch)
 
-    def test_basic_mismatch(self):
-        A, B = TypeOperator('A'), TypeOperator('B')
-        f = A ** B
-        self.apply(f, B, SubtypeMismatch)
+    def test_basic_sub(self):
+        self.apply(A ** B, A1, result=B)
+        self.apply(A1 ** B, A, result=SubtypeMismatch)
 
-    def test_basic_sub_match(self):
-        A = TypeOperator('A')
-        B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
-        f = A ** C
-        self.apply(f, B, C)
+    def test_compound(self):
+        self.apply(Z(A) ** B, Z(A), result=B)
+        self.apply(Z(A) ** B, Z(B), result=SubtypeMismatch)
 
-    def test_basic_sub_mismatch(self):
-        A = TypeOperator('A')
-        B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
-        f = B ** C
-        self.apply(f, A, SubtypeMismatch)
-
-    def test_compound_match(self):
-        F = TypeOperator('F', params=1)
-        A, B = TypeOperator('A'), TypeOperator('B')
-        f = F(A) ** B
-        self.apply(f, F(A), B)
-
-    def test_compound_mismatch(self):
-        F = TypeOperator('F', params=1)
-        A, B = TypeOperator('A'), TypeOperator('B')
-        f = F(A) ** B
-        self.apply(f, F(B), SubtypeMismatch)
-
-    def test_compound_sub_match(self):
-        A = TypeOperator('A')
-        B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
-        F = TypeOperator('F', params=1)
-        f = F(A) ** C
-        self.apply(f, F(B), C)
-
-    def test_compound_sub_mismatch(self):
-        F = TypeOperator('F', params=1)
-        A = TypeOperator('A')
-        B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
-        f = F(B) ** C
-        self.apply(f, F(A), SubtypeMismatch)
+    def test_compound_sub(self):
+        self.apply(Z(A) ** B, Z(A1), result=B)
+        self.apply(Z(A1) ** B, Z(A), result=SubtypeMismatch)
 
     def test_variable(self):
-        F = TypeOperator('F', params=1)
-        A = TypeOperator('A')
-        wrap = TypeSchema(lambda α: α ** F(α))
-        self.apply(wrap, A, F(A))
+        wrap = TypeSchema(lambda α: α ** Z(α))
+        self.apply(wrap, A, result=Z(A))
 
     def test_compose(self):
-        A, B = TypeOperator('A'), TypeOperator('B')
         compose = TypeSchema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
-        self.apply(compose.apply(A ** B), B ** A, B ** B)
+        self.apply(compose.apply(A ** B), B ** A, result=B ** B)
+        self.apply(compose.apply(A ** B), B ** A1, result=B ** B)
 
-    def test_compose_subtype(self):
-        A, B = TypeOperator('A'), TypeOperator('B')
-        Asub = TypeOperator('Asub', supertype=A)
-        compose = TypeSchema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
-        self.apply(compose.apply(A ** B), B ** Asub, B ** B)
-
-    def test_variable_subtype_mismatch(self):
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
-        f = TypeSchema(lambda x: (x ** B) ** x)
-        self.apply(f, B ** A, SubtypeMismatch)
+    def test_variable_sub(self):
+        f = TypeSchema(lambda x: (x ** A1) ** x)
+        # self.apply(f, A ** A1, result=A)
+        self.apply(f, A1 ** A, result=SubtypeMismatch)
 
     def test_functions_as_arguments1(self):
-        A, B = TypeOperator('A'), TypeOperator('B')
         swap = TypeSchema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
         f = TypeSchema(lambda x: A ** x ** x)
         self.apply(swap.apply(f).apply(B), A, B)
 
     def test_functions_as_arguments2(self):
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
         id = TypeSchema(lambda x: x ** x)
-        self.apply(id.apply(A ** A), B, A)
+        self.apply(id.apply(A ** A), A1, result=A)
 
     def test_order_of_subtype_application(self):
         # This test is inspired by Traytel et al (2011).
