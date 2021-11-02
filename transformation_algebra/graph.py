@@ -69,7 +69,7 @@ class TransformationGraph(Graph):
         self.include_kinds = include_steps
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
-        self.var_nodes: dict[Variable, Node] = dict()
+        self.expr_nodes: dict[Expr, Node] = dict()
 
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
@@ -150,7 +150,7 @@ class TransformationGraph(Graph):
             return node
 
     def add_expr(self, expr: Expr, root: Node, current: Optional[Node] = None,
-            sources: dict[str, Node | tuple[Node, Expr]] = {}) -> Node:
+            sources: dict[str, Node | Expr] = {}) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -162,9 +162,8 @@ class TransformationGraph(Graph):
         """
         assert isinstance(expr.type, TypeInstance)
 
-        if isinstance(expr, Variable):
-            assert expr in self.var_nodes
-            return self.var_nodes[expr]
+        if expr in self.expr_nodes:
+            return self.expr_nodes[expr]
 
         current = current or BNode()
 
@@ -213,18 +212,16 @@ class TransformationGraph(Graph):
                         if isinstance(source, Node):
                             self.add((current, TA.source, source))
                         else:
-                            source_node, source_expr = source
-                            assert isinstance(source_node, Node) and \
-                                isinstance(source_expr, Expr)
+                            assert isinstance(source, Expr)
                             try:
                                 # TODO unification happens as we translate to
                                 # RDF, which means some might be outdated
                                 # instead match(subtype=False)?
-                                source_expr.type.unify(expr.type, subtype=True)
+                                source.type.unify(expr.type, subtype=True)
                             except TypingError as e:
-                                raise ApplicationError(source_expr, expr
+                                raise ApplicationError(source, expr
                                     ) from e
-                            return source_node
+                            return self.expr_nodes[source]
 
         else:
             assert isinstance(expr, Application)
@@ -275,7 +272,7 @@ class TransformationGraph(Graph):
 
                 if isinstance(expr.x, Abstraction):
                     for p in expr.x.params:
-                        self.var_nodes[p] = internal
+                        self.expr_nodes[p] = internal
 
                     x = self.add_expr(expr.x.body, root, BNode(), sources)
                 else:
@@ -306,10 +303,11 @@ class TransformationGraph(Graph):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
 
+        self.expr_nodes[expr] = current  # TODO: slow
         return current
 
-    def add_workflow(self, root: Node, sources: set[Node],
-            steps: dict[Node, tuple[Expr, list[Node]]]) -> Node:
+    def add_workflow(self, root: Node,
+            steps: dict[Expr, list[Node | Expr]]) -> Node:
         """
         Convert a workflow to a full transformation graph by converting its
         individual steps to representations of expressions in RDF and combining
@@ -317,39 +315,28 @@ class TransformationGraph(Graph):
 
         A workflow consists of:
 
-        -   A collection of RDF nodes representing data sources.
         -   A collection of algebra expressions for each step (e.g. application
             of a tool), paired with the inputs to those expressions. Every
-            input must be either a source node or a node representing another
-            step from the same collection.
+            input must be either a source node or an expression.
         """
         # TODO cycles can occur
 
-        cache: dict[Node, Node] = {}
+        # One of the tool expressions must be 'last': it represents the tool
+        # finally producing the output and so isn't an input to another.
+        all_inputs = set(i for s in steps.values() for i in s)
+        final_expressions = [e for e in steps.keys() if e not in all_inputs]
+        assert len(final_expressions) == 1, "must have exactly one final step"
+        top_level_expression = final_expressions[0]
 
-        def to_expr_node(step_node: Node) -> Node:
-            try:
-                return cache[step_node]
-            except KeyError:
-                expr, inputs = steps[step_node]
-                assert all(x in steps or x in sources for x in inputs), \
-                    "unknown input data source"
-                cache[step_node] = self.add_expr(expr, root, sources={
-                    f"x{i}": (to_expr_node(x), steps[x][0])
-                    if x in steps else x
-                    for i, x in enumerate(inputs, start=1)
-                })
-                return cache[step_node]
+        def to_expr_node(expr: Expr) -> Node:
+            for source in steps[expr]:
+                if isinstance(source, Expr):
+                    to_expr_node(source)
+            return self.add_expr(expr, root, sources={
+                f"x{i}": source
+                for i, source in enumerate(steps[expr], start=1)
+            })
 
-        # One of the tool expressions must be 'last', in that it represents the
-        # tool finally producing the output and so isn't an input to another.
-        all_inputs = set(input_node
-            for step in steps.values() for input_node in step[1])
-        final_tool_node = [step_node for step_node in steps.keys()
-            if step_node not in all_inputs]
-        assert len(final_tool_node) == 1, \
-            "workflow must have exactly one final step"
-
-        final_expr_node = to_expr_node(final_tool_node[0])
-        self.add((root, TA.result, final_expr_node))
-        return final_expr_node
+        node = to_expr_node(top_level_expression)
+        self.add((root, TA.result, node))
+        return node
