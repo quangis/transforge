@@ -303,7 +303,6 @@ class TransformationGraph(Graph):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
 
-        self.expr_nodes[expr] = current  # TODO: slow
         return current
 
     def add_workflow(self, root: Node,
@@ -329,13 +328,18 @@ class TransformationGraph(Graph):
         top_level_expression = final_expressions[0]
 
         def to_expr_node(expr: Expr) -> Node:
-            for source in steps[expr]:
-                if isinstance(source, Expr):
-                    to_expr_node(source)
-            return self.add_expr(expr, root, sources={
-                f"x{i}": source
-                for i, source in enumerate(steps[expr], start=1)
-            })
+            try:
+                return self.expr_nodes[expr]
+            except KeyError:
+                for source in steps[expr]:
+                    if isinstance(source, Expr):
+                        to_expr_node(source)
+
+                self.expr_nodes[expr] = n = self.add_expr(expr, root, sources={
+                    f"x{i}": source
+                    for i, source in enumerate(steps[expr], start=1)
+                })
+                return n
 
         node = to_expr_node(top_level_expression)
         self.add((root, TA.result, node))
