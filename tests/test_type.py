@@ -1,8 +1,8 @@
 import unittest
 
 from transformation_algebra.type import \
-    TypeOperator, TypeSchema, TypeVariable, _, with_parameters, \
-    FunctionApplicationError, SubtypeMismatch, \
+    Type, TypeOperator, TypeSchema, TypeVariable, _, with_parameters, \
+    FunctionApplicationError, TypeMismatch, \
     ConstraintViolation, ConstrainFreeVariable
 
 
@@ -11,26 +11,31 @@ A, B = TypeOperator('A', supertype=Ω), TypeOperator('B', supertype=Ω)
 A1, A2 = TypeOperator('A1', supertype=A), TypeOperator('A2', supertype=A)
 B1, B2 = TypeOperator('B1', supertype=B), TypeOperator('B2', supertype=B)
 F, G = TypeOperator('F', params=2), TypeOperator('G', params=2)
-Z = TypeOperator('Z', params=1)
+Z, W = TypeOperator('Z', params=1), TypeOperator('W', params=1)
 
 
 class TestType(unittest.TestCase):
 
-    def apply(self, f, x, result=None):
+    def apply(self, f: Type, *xs: Type, result=None):
         """
-        Test the application of an argument to a function.
+        Test the application of an argument type to a function type.
         """
-        f = f.instance()
-        x = x.instance()
+
+        def do_apply():
+            res = f.instance()
+            for x in xs:
+                res = res.apply(x.instance())
+            return res
 
         if isinstance(result, type) and issubclass(result, Exception):
-            self.assertRaises(result, lambda x: f.apply(x), x)
+            self.assertRaises(result, do_apply)
         elif result:
-            actual = f.apply(x)
-            expected = result.instance()
-            self.assertEqual(actual, expected)
+            assert isinstance(result, Type)
+            self.assertEqual(
+                do_apply(),
+                result.instance())
         else:
-            f.apply(x)
+            do_apply()
 
     def test_with_parameters(self):
         "Test the auxiliary function `with_parameters`."
@@ -53,19 +58,19 @@ class TestType(unittest.TestCase):
 
     def test_basic(self):
         self.apply(A ** B, A, result=B)
-        self.apply(A ** B, B, result=SubtypeMismatch)
+        self.apply(A ** B, B, result=TypeMismatch)
 
     def test_basic_sub(self):
         self.apply(A ** B, A1, result=B)
-        self.apply(A1 ** B, A, result=SubtypeMismatch)
+        self.apply(A1 ** B, A, result=TypeMismatch)
 
     def test_compound(self):
         self.apply(Z(A) ** B, Z(A), result=B)
-        self.apply(Z(A) ** B, Z(B), result=SubtypeMismatch)
+        self.apply(Z(A) ** B, Z(B), result=TypeMismatch)
 
     def test_compound_sub(self):
         self.apply(Z(A) ** B, Z(A1), result=B)
-        self.apply(Z(A1) ** B, Z(A), result=SubtypeMismatch)
+        self.apply(Z(A1) ** B, Z(A), result=TypeMismatch)
 
     def test_variable(self):
         wrap = TypeSchema(lambda α: α ** Z(α))
@@ -73,92 +78,83 @@ class TestType(unittest.TestCase):
 
     def test_compose(self):
         compose = TypeSchema(lambda x, y, z: (y ** z) ** (x ** y) ** (x ** z))
-        self.apply(compose.apply(A ** B), B ** A, result=B ** B)
-        self.apply(compose.apply(A ** B), B ** A1, result=B ** B)
+        self.apply(compose, A ** B, B ** A, result=B ** B)
+        self.apply(compose, A ** B, B ** A1, result=B ** B)
+        self.apply(compose, A ** B, B ** B1, result=TypeMismatch)
+        self.apply(compose, A1 ** B, B ** A, result=TypeMismatch)
 
     def test_variable_sub(self):
         f = TypeSchema(lambda x: (x ** A1) ** x)
         # self.apply(f, A ** A1, result=A)
-        self.apply(f, A1 ** A, result=SubtypeMismatch)
+        self.apply(f, A1 ** A, result=TypeMismatch)
 
     def test_functions_as_arguments1(self):
         swap = TypeSchema(lambda α, β, γ: (α ** β ** γ) ** (β ** α ** γ))
         f = TypeSchema(lambda x: A ** x ** x)
-        self.apply(swap.apply(f).apply(B), A, B)
+        self.apply(swap, f, B, A, result=B)
 
     def test_functions_as_arguments2(self):
-        id = TypeSchema(lambda x: x ** x)
-        self.apply(id.apply(A ** A), A1, result=A)
+        identity = TypeSchema(lambda x: x ** x)
+        self.apply(identity, A ** A, A1, result=A)
 
     def test_order_of_subtype_application(self):
-        # This test is inspired by Traytel et al (2011).
-        Basic = TypeOperator('Basic')
-        Sub = TypeOperator('Sub', supertype=Basic)
-        Other = TypeOperator('Other')
-        f = TypeSchema(lambda α: α ** α ** Other)
-        self.apply(f.apply(Sub), Basic, Other)
-        self.apply(f.apply(Basic), Sub, Other)
-        self.apply(f.apply(Basic), Other, SubtypeMismatch)
+        """
+        The order in which subtypes are applied does not matter. Test inspired
+        by the discussion in Traytel et al (2011).
+        """
+        f = TypeSchema(lambda α: α ** α ** B)
+        self.apply(f, A1, A, result=B)
+        self.apply(f, A, A1, result=B)
+        self.apply(f, A, B, result=TypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
         Super = TypeOperator('Super')
         Basic = TypeOperator('Basic', supertype=Super)
         Sub = TypeOperator('Sub', supertype=Basic)
         Other = TypeOperator('Other')
+
         f = TypeSchema(lambda α: α ** α ** Other | α @ [Super, Basic])
-        self.apply(f.apply(Basic), Sub, Other)
-        self.apply(f, Super, ConstraintViolation)
+        self.apply(f, Basic, Sub, result=Other)
 
-    def test_violation_of_constraints(self):
-        F = TypeOperator('F', params=1)
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
-        C = TypeOperator('C')
-        f = TypeSchema(lambda α: α ** α | α @ [A, F(A)])
-        self.apply(f, F(B), F(B))
-        self.apply(f, C, ConstraintViolation)
+        # TODO this seems wrong.
+        # self.apply(f, Super, result=ConstraintViolation)
 
-    def test_preservation_of_basic_subtypes_in_constraints(self):
-        Super = TypeOperator('Super')
-        Basic = TypeOperator('Basic', supertype=Super)
-        f = TypeSchema(lambda x: x ** x | x @ [Super])
-        self.apply(f, Basic, Basic)
+    # def test_unify_base_types_in_constraints(self):
+    #     f = TypeSchema(lambda α: α ** α | α @ [A, A1])
+    #     self.apply(f, A)
+
+    def test_preservation_of_subtypes_in_constraints(self):
+        f = TypeSchema(lambda α: α ** α | α @ [A, Z(A)])
+        self.apply(f, A1, result=A1)
+        self.apply(f, Z(A1), result=Z(A1))
+        self.apply(f, B, result=ConstraintViolation)
 
     def test_unification_of_compound_types_in_constraints(self):
-        F, G = TypeOperator('F', params=1), TypeOperator('G', params=1)
-        A = TypeOperator('A')
-        f = TypeSchema(lambda xs, x: xs ** x | xs @ [G(x), F(x)])
-        self.apply(f, F(A), A)
+        f = TypeSchema(lambda xs, x: xs ** x | xs @ [W(x), Z(x)])
+        self.apply(f, W(A), result=A)
 
     def test_non_unification_of_base_types(self):
         # We can't unify with base types from constraints, as they might be
         # subtypes. So in this case, we know that x is an F, but we don't know
         # that its parameters is exactly A: that might be too general a bound.
-        F, A = TypeOperator('F', params=1), TypeOperator('A')
-        f = TypeSchema(lambda x: x ** x | x @ F(A))
+        f = TypeSchema(lambda x: x ** x | x @ Z(A))
         result = f.apply(TypeVariable())
-        self.assertEqual(result.operator, F)
+        self.assertEqual(result.operator, Z)
         self.assertTrue(isinstance(result.params[0], TypeVariable))
 
-    def test_multiple_bounds1(self):
-        # This works because B ** B is acceptable for A ** B.
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
+    def test_multiple_bounds(self):
         f = TypeSchema(lambda x: (x ** x) ** x)
-        self.apply(f, A ** B, B)
 
-    def test_multiple_bounds2(self):
-        # This doesn't work because the upper bound B cannot be reconciled
+        # This works because A1 ** A1 is acceptable for A ** A1.
+        self.apply(f, A ** A1, result=A1)
+
+        # This doesn't work because the upper bound A1 cannot be reconciled
         # with the lower bound A.
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
-        f = TypeSchema(lambda x: (x ** x) ** x)
-        self.apply(f, B ** A, SubtypeMismatch)
+        self.apply(f, A1 ** A, result=TypeMismatch)
 
     def test_constrain_wildcard(self):
-        A = TypeOperator('A')
         f = TypeSchema(lambda x: x ** x | x @ [_])
-        self.apply(f, A, A)
+        self.apply(f, A, result=A)
 
     def test_constrain_free_variable(self):
         f = TypeSchema(lambda x, y, z: x ** x | y @ [x, z])
@@ -167,27 +163,20 @@ class TestType(unittest.TestCase):
         self.assertRaises(ConstrainFreeVariable, TypeSchema.instance, g)
 
     def test_global_subtype_resolution(self):
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
         f = TypeSchema(lambda x: x ** (x ** x) ** x)
-        self.apply(f.apply(B), A ** B, B)
-        self.apply(f.apply(A), A ** B, A)
+        self.apply(f, A1, A ** A1, result=A1)
+        self.apply(f, A, A ** A1, result=A)
 
     def test_interdependent_types(self):
-        A = TypeOperator('A')
-        F, G = TypeOperator('F', 1), TypeOperator('G', 2)
-        f = TypeSchema(lambda α, β: α ** β | α @ [F(β), G(_, β)])
-        self.apply(f, F(A), A)
-        self.apply(f, A, ConstraintViolation)
+        f = TypeSchema(lambda α, β: α ** β | α @ [Z(β), F(_, β)])
+        self.apply(f, Z(A), result=A)
+        self.apply(f, A, result=ConstraintViolation)
 
     def test_subtyping_of_concrete_functions(self):
-        Super = TypeOperator('Super')
-        Basic = TypeOperator('Basic', supertype=Super)
-        Sub = TypeOperator('Sub', supertype=Basic)
-        self.assertTrue(Basic ** Basic <= Sub ** Basic)
-        self.assertTrue(Basic ** Basic <= Basic ** Super)
-        self.assertFalse(Basic ** Basic <= Super ** Basic)
-        self.assertFalse(Basic ** Basic <= Basic ** Sub)
+        self.assertTrue(A ** A <= A1 ** A)
+        self.assertTrue(A ** A <= A ** Ω)
+        self.assertFalse(A ** A <= Ω ** A)
+        self.assertFalse(A ** A <= A ** A1)
 
     def test_subtyping_of_variables(self):
         x = TypeVariable()
@@ -196,37 +185,28 @@ class TestType(unittest.TestCase):
 
     def test_subtyping_of_variable_functions(self):
         x = TypeVariable()
-        Super = TypeOperator('Super')
-        Basic = TypeOperator('Basic', supertype=Super)
-        Sub = TypeOperator('Sub', supertype=Basic)
-        self.assertEqual(x ** Basic <= Sub ** Basic, None)
-        self.assertEqual(Basic ** x <= Basic ** Super, None)
-        self.assertEqual(Basic ** Basic <= x ** Basic, None)
-        self.assertEqual(Basic ** Basic <= Basic ** x, None)
+        self.assertEqual(x ** A <= A1 ** A, None)
+        self.assertEqual(A ** x <= A ** Ω, None)
+        self.assertEqual(A ** A <= x ** A, None)
+        self.assertEqual(A ** A <= A ** x, None)
 
     def test_subtyping_of_wildcard_functions(self):
-        Super = TypeOperator('Super')
-        Basic = TypeOperator('Basic', supertype=Super)
-        Sub = TypeOperator('Sub', supertype=Basic)
-        self.assertTrue(_ ** Basic <= Sub ** Basic)
-        self.assertTrue(Basic ** _ <= Basic ** Super)
-        self.assertTrue(Basic ** Basic <= _ ** Basic)
-        self.assertTrue(Basic ** Basic <= Basic ** _)
-        self.assertFalse(_ ** Super <= Sub ** Basic)
-        self.assertFalse(Sub ** _ <= Basic ** Super)
+        self.assertTrue(_ ** A <= A1 ** A)
+        self.assertTrue(A ** _ <= A ** Ω)
+        self.assertTrue(A ** A <= _ ** A)
+        self.assertTrue(A ** A <= A ** _)
+        self.assertFalse(_ ** Ω <= A1 ** A)
+        self.assertFalse(A1 ** _ <= A ** Ω)
 
     def test_constrained_to_base_type(self):
         # See issue #2, which caused an infinite loop
-        A = TypeOperator('A')
         f = TypeSchema(lambda x: x ** x | x @ A)
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
     def test_constrained_to_compound_type(self):
         # See issue #2
-        A = TypeOperator('A')
-        F = TypeOperator('F', params=1)
-        f = TypeSchema(lambda x: x ** x | x @ F(A))
+        f = TypeSchema(lambda x: x ** x | x @ Z(A))
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
@@ -241,19 +221,13 @@ class TestType(unittest.TestCase):
 
     def test_timely_constraint_check(self):
         # See issue #13
-        A, B, F = TypeOperator('A'), TypeOperator('B'), TypeOperator('F', 2)
         f = TypeSchema(lambda r, x: r ** x | r @ [F(A, x), F(B, x)])
-        actual = f.apply(F(A, B))
-        expected = B
-        self.assertEqual(actual.instance(), expected.instance())
+        self.apply(f, F(A, B), result=B)
 
     def test_unification_of_constraint_options(self):
         # See issue #11
-        A = TypeOperator('A')
-        F = TypeOperator('F', params=2)
-        actual = TypeSchema(lambda x: x | F(A, A) @ [F(A, x), F(A, x)])
-        expected = A
-        self.assertEqual(actual.instance(), expected.instance())
+        non_function = TypeSchema(lambda x: x | F(A, A) @ [F(A, x), F(A, x)])
+        self.apply(non_function, result=A)
 
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
@@ -278,7 +252,6 @@ class TestType(unittest.TestCase):
 
     def test_constraint_check_on_intertwined_variables1(self):
         # See issue #18
-        F = TypeOperator('F', params=2)
         f = TypeSchema(lambda x, y, z: (x ** y) ** z | z @ F(x, y))
         g = TypeSchema(lambda x, y: x ** y)
         x, y = f.apply(g).params
@@ -287,7 +260,6 @@ class TestType(unittest.TestCase):
 
     def test_constraint_check_on_intertwined_variables2(self):
         # See issue #18
-        F = TypeOperator('F', params=2)
         f = TypeSchema(lambda x, y: F(x, y) ** y)
         g = TypeSchema(lambda a, b: F(a, b) | F(a, b) @ F(a, b))
         y = f.apply(g)
@@ -306,10 +278,9 @@ class TestType(unittest.TestCase):
 
     def test_curried_function_signature_same_as_uncurried(self):
         # See issue #53
-        A, B, C = TypeOperator("A"), TypeOperator("B"), TypeOperator("B")
         self.assertEqual(
-            A ** B ** C,
-            (A, B) ** C
+            A1 ** A2 ** A,
+            (A1, A2) ** A
         )
 
 
