@@ -232,15 +232,20 @@ class TestType(unittest.TestCase):
         self.assertEqual(len(c.alternatives), 1)
 
     def test_constraints_extraneous_alternatives(self):
-        # Subtypes should be considered extraneous in constraint alternatives.
-        # See issue #58
+        # Subtypes should be considered extraneous in constraint alternatives,
+        # see issue #58
         x = TypeVariable()
         c = x @ [A1, A]
         self.assertEqual(c.alternatives, [A()])
 
+        # ... regardless of order, see issue #57
+        x = TypeVariable()
+        c = x @ [A, A1]
+        self.assertEqual(c.alternatives, [A()])
+
     def test_unification_of_constraint_option_subtypes(self):
         # See issue #16
-        f = TypeSchema(lambda x, y: F(x, y) | F(y, A) @ [F(A1, x), F(A, x)])
+        f = TypeSchema(lambda x, y: F(x, y) | F(y, A) @ [F(A, x), F(A1, x)])
         self.assertEqual(
             f.instance().params[0],
             A()

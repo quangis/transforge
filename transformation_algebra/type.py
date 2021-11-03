@@ -677,9 +677,9 @@ class Constraint(object):
         for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
-                if minimized[i].match(obj, subtype=True) is True:
-                    if obj.match(minimized[i], subtype=True) is not True:
-                        minimized[i] = obj
+                if minimized[i].match(obj, subtype=True):
+                    minimized[i] = obj.follow()
+                if obj.match(minimized[i], subtype=True):
                     add = False
             if add:
                 minimized.append(obj.follow())
