@@ -108,20 +108,13 @@ class TestType(unittest.TestCase):
         self.apply(f, A, B, result=TypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
-        Super = TypeOperator('Super')
-        Basic = TypeOperator('Basic', supertype=Super)
-        Sub = TypeOperator('Sub', supertype=Basic)
-        Other = TypeOperator('Other')
+        f = TypeSchema(lambda α: α ** α ** B | α @ A)
+        self.apply(f, A1, A, result=B)
+        self.apply(f, A, A1, result=B)
 
-        f = TypeSchema(lambda α: α ** α ** Other | α @ [Super, Basic])
-        self.apply(f, Basic, Sub, result=Other)
+        # TODO shouldn't this work?
+        # self.apply(f, B, result=ConstraintViolation)
 
-        # TODO this seems wrong.
-        # self.apply(f, Super, result=ConstraintViolation)
-
-    # def test_unify_base_types_in_constraints(self):
-    #     f = TypeSchema(lambda α: α ** α | α @ [A, A1])
-    #     self.apply(f, A)
 
     def test_preservation_of_subtypes_in_constraints(self):
         f = TypeSchema(lambda α: α ** α | α @ [A, Z(A)])
@@ -231,8 +224,6 @@ class TestType(unittest.TestCase):
 
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
-        A = TypeOperator('A')
-        F = TypeOperator('F', params=2)
         self.assertEqual(F(A, _) <= F(_, A), True)
         x = TypeVariable()
         c = x @ [F(A, _), F(_, A)]
@@ -240,15 +231,20 @@ class TestType(unittest.TestCase):
         c = x @ [F(_, _), F(_, _)]
         self.assertEqual(len(c.alternatives), 1)
 
+    def test_constraints_extraneous_alternatives(self):
+        # Subtypes should be considered extraneous in constraint alternatives.
+        # See issue #58
+        x = TypeVariable()
+        c = x @ [A1, A]
+        self.assertEqual(c.alternatives, [A()])
+
     def test_unification_of_constraint_option_subtypes(self):
         # See issue #16
-        A = TypeOperator('A')
-        B = TypeOperator('B', supertype=A)
-        F = TypeOperator('F', params=2)
-        f = TypeSchema(lambda x, y: F(x, y) | F(y, A) @ [F(A, x), F(B, x)])
-        actual = f.instance().params[0]
-        expected = A.instance()
-        self.assertEqual(actual, expected)
+        f = TypeSchema(lambda x, y: F(x, y) | F(y, A) @ [F(A1, x), F(A, x)])
+        self.assertEqual(
+            f.instance().params[0],
+            A()
+        )
 
     def test_constraint_check_on_intertwined_variables1(self):
         # See issue #18

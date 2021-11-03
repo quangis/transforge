@@ -670,15 +670,15 @@ class Constraint(object):
     def minimize(self) -> None:
         """
         Ensure that constraints don't contain extraneous alternatives:
-        alternatives that are equal to, or more general versions of, other
+        alternatives that are equal to, or more specific versions of, other
         alternatives.
         """
         minimized: list[TypeInstance] = []
         for obj in self.alternatives:
             add = True
             for i in range(len(minimized)):
-                if obj.match(minimized[i], subtype=True) is True:
-                    if minimized[i].match(obj, subtype=True) is not True:
+                if minimized[i].match(obj, subtype=True) is True:
+                    if obj.match(minimized[i], subtype=True) is not True:
                         minimized[i] = obj
                     add = False
             if add:
