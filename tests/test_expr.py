@@ -92,8 +92,8 @@ class TestAlgebra(TestCase):
         eq = Operator(type=Value ** Value ** Bool)
         select = Operator(
             type=lambda α, β, τ: (α ** β ** Bool) ** τ ** τ
-            | τ @ [Map(α, _), Map(_, α)]
-            | τ @ [Map(β, _), Map(_, β)]
+            | τ << [Map(α, _), Map(_, α)]
+            | τ << [Map(β, _), Map(_, β)]
         )
         prod = Operator(type=lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),

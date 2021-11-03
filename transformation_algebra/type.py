@@ -478,9 +478,9 @@ class TypeInstance(Type):
         constraint.set_context(self)
         return self
 
-    def __matmul__(self, other: Type | Iterable[Type]) -> Constraint:
+    def __lshift__(self, other: Type | Iterable[Type]) -> Constraint:
         """
-        Allows us to write typeclass constraints using @.
+        Allows us to write typeclass constraints using `<<`.
         """
         if isinstance(other, Type):
             return Constraint(self, other.instance())
@@ -648,7 +648,7 @@ class Constraint(object):
     def text(self, labels: dict[TypeVariable, str]) -> str:
         return (
             f"{self.reference.text(labels)}"
-            f" @ [{', '.join(a.text(labels) for a in self.alternatives)}]"
+            f" << [{', '.join(a.text(labels) for a in self.alternatives)}]"
         )
 
     def variables(self, indirect: bool = True) -> set[TypeVariable]:
