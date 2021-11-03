@@ -92,7 +92,8 @@ class Type(ABC):
 
         if isinstance(f, TypeOperation) and f._operator == Function:
             x.unify(f.params[0], subtype=True)
-            f.resolve()
+            f.params[0].resolve(prefer_lower=False)
+            # f.resolve()
             return f.params[1].resolve()
         else:
             raise FunctionApplicationError(f, x)

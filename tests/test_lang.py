@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra.type import TypeOperator, SubtypeMismatch
-from transformation_algebra.expr import Operator
+from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 
 
@@ -12,10 +12,10 @@ class TestAlgebra(unittest.TestCase):
         variables.
         """
         A = TypeOperator()
-        f = Operator(type=lambda x: x | x @ A)
+        f = Operator(type=lambda x: x | x << A)
         lang = Language(scope=locals())
 
-        self.assertEqual(str(f.type), "x | x @ [A]")
+        self.assertEqual(str(f.type), "x | x << [A]")
 
     def test_parse_inline_typing(self):
         A = TypeOperator()
@@ -34,6 +34,14 @@ class TestAlgebra(unittest.TestCase):
 
         lang.parse("f 1 : A")
         self.assertRaises(SubtypeMismatch, lang.parse, "1 : B; f 1 : A")
+
+    def test_parse_anonymous_source(self):
+        A = TypeOperator()
+        lang = Language(scope=locals())
+        self.assertEqual(
+            lang.parse("~A"),
+            ~A
+        )
 
 
 if __name__ == '__main__':

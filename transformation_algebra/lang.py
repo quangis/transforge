@@ -100,7 +100,7 @@ class Language(object):
         stackT: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
         type_mode: bool = False
 
-        for token in tokenize(string, "(,):;"):
+        for token in tokenize(string, "(,):;~"):
             if type_mode:
                 if token == "(":
                     stackT.append([])
@@ -132,6 +132,7 @@ class Language(object):
                     previous = stack[-1]
                     assert isinstance(previous, Expr)
                     previous.type.unify(t, subtype=True)
+                    previous.type.resolve(prefer_lower=False)
                 continue
 
             if token in "(,)":
@@ -150,6 +151,12 @@ class Language(object):
             elif token == ";":
                 stack.clear()
                 stack.append(None)
+            elif token == "~":
+                previous = stack.pop()
+                if previous:
+                    stack.append(previous)
+                stack.append(Source())
+                type_mode = True
             else:
                 current: Optional[Expr]
                 previous = stack.pop()
