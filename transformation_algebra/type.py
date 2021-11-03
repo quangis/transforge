@@ -385,12 +385,16 @@ class TypeInstance(Type):
                 return False
             if b.upper and b.upper.subtype(a._operator, strict=True):
                 return False
+            if b.lower and (b.lower.subtype(a._operator) is False):
+                return False
             if accept_wildcard and b.wildcard:
                 return True
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
             if (a.upper or a.lower) and not b.basic:
                 return False
             if a.lower and b._operator.subtype(a.lower, strict=True):
+                return False
+            if a.upper and (a.upper.subtype(b._operator) is False):
                 return False
             if accept_wildcard and a.wildcard:
                 return True
@@ -399,7 +403,7 @@ class TypeInstance(Type):
                 return True
             if accept_wildcard and (a.wildcard or b.wildcard):
                 return True
-            if a.lower and b.upper and a.lower.subtype(b.upper, strict=True):
+            if a.lower and b.upper and b.upper.subtype(a.lower, strict=True):
                 return False
         return None
 
