@@ -89,7 +89,7 @@ class Operator(object):
                 type_infer = self.instance().primitive(unify=False).type
 
                 type_decl.unify(type_infer, subtype=True)
-                type_decl = type_decl.resolve()
+                type_decl = type_decl.fix()
 
                 # All the variables in the declared type must still be
                 # variables --- otherwise we were too general
@@ -233,7 +233,7 @@ class Expr(ABC):
                 # that of the primitive expression, but not more general.
                 if unify:
                     expr.type.unify(expr_primitive.type, subtype=True)
-                    expr_primitive.type = expr_primitive.type.resolve()
+                    expr_primitive.type = expr_primitive.type.fix()
                 expr = expr_primitive.primitive(normalize=False)
 
         elif isinstance(expr, Application):

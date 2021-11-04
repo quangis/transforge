@@ -38,9 +38,8 @@ class TestAlgebra(unittest.TestCase):
     def test_parse_anonymous_source(self):
         A = TypeOperator()
         lang = Language(scope=locals())
-        self.assertEqual(
-            lang.parse("~A"),
-            ~A
+        self.assertTrue(
+            lang.parse("~A").match(~A)
         )
 
 

@@ -132,7 +132,7 @@ class Language(object):
                     previous = stack[-1]
                     assert isinstance(previous, Expr)
                     previous.type.unify(t, subtype=True)
-                    previous.type.resolve(prefer_lower=False)
+                    previous.type.fix(prefer_lower=False)
                 continue
 
             if token in "(,)":

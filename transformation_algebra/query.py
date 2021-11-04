@@ -125,11 +125,12 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     f"(^ta:feeds{modifier}) "
                     f"?{current}.")
 
-            if flow.type:
-                yield from self.sparql_type(current, flow.type, name_generator)
-            else:
+            if flow.operation:
                 assert flow.operation
                 yield f"?{current} ta:via <{self.namespace[flow.operation]}>."
+            else:
+                assert flow.type
+                yield from self.sparql_type(current, flow.type, name_generator)
 
         elif isinstance(flow, Parallel):
             for sub in flow.items:

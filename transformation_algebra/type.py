@@ -92,9 +92,9 @@ class Type(ABC):
 
         if isinstance(f, TypeOperation) and f._operator == Function:
             x.unify(f.params[0], subtype=True)
-            f.params[0].resolve(prefer_lower=False)
-            # f.resolve()
-            return f.params[1].resolve()
+            f.params[0].fix(prefer_lower=False)
+            # f.fix()
+            return f.params[1].fix()
         else:
             raise FunctionApplicationError(f, x)
 
@@ -237,16 +237,16 @@ class TypeInstance(Type):
         else:
             return result
 
-    def resolve(self, prefer_lower: bool = True) -> TypeInstance:
+    def fix(self, prefer_lower: bool = True) -> TypeInstance:
         """
         Obtain a version of this type with all eligible variables with subtype
-        constraints resolved to their most specific type.
+        constraints fixed to their most specific type.
         """
         a = self.follow()
 
         if isinstance(a, TypeOperation):
             for v, p in zip(a._operator.variance, a.params):
-                p.resolve(prefer_lower ^ (v == Variance.CONTRA))
+                p.fix(prefer_lower ^ (v == Variance.CONTRA))
         elif isinstance(a, TypeVariable):
             if prefer_lower and a.lower:
                 a.bind(a.lower())
@@ -716,7 +716,7 @@ class Constraint(object):
 
         # If there is only one possibility left, we can unify, but *only* with
         # the skeleton: the base types must remain variable, because we don't
-        # want to resolve against an overly loose subtype bound.
+        # want to fix to an overly loose subtype bound.
         elif len(self.alternatives) == 1 and not self.skeleton:
             self.skeleton = self.alternatives[0].skeleton()
             self.reference.unify(self.skeleton)
