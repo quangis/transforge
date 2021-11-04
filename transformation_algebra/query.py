@@ -63,9 +63,9 @@ NestedNotation = Union[Element, Nested[Element]]
 
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, *items: NestedNotation,
+    def __init__(self, items: NestedNotation,
             namespace: LanguageNamespace):
-        self.flow = Serial(*items)
+        self.flow = TransformationFlow.shorthand(items)
         self.namespace = namespace
 
     def sparql_type(self, name: str, type: Type,

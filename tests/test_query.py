@@ -32,7 +32,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((wf, TA.result, e))
         graph.add((wf, RDFS.comment, TEST.comment))
 
-        query = TransformationQuery(C, g, B, f, A, namespace=ALG)
+        query = TransformationQuery((C, g, B, f, A), namespace=ALG)
         result = list(graph.query(query.sparql()))
 
         with open('graph.dot', 'w') as handle:
