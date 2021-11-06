@@ -143,10 +143,11 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                         self.variable[current] = self.variable[after]
                     mod = None
 
-                yield self.n3(
-                    self.variable[after],
-                    (~TA.feeds) * mod if mod else ~TA.feeds,
-                    self.variable[current])
+                if self.variable[current] != self.variable[after]:
+                    yield self.n3(
+                        self.variable[after],
+                        (~TA.feeds) * mod if mod else ~TA.feeds,
+                        self.variable[current])
             else:
                 yield self.n3(
                     rdflib.Variable("workflow"),
