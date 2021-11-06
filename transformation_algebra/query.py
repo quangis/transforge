@@ -7,8 +7,10 @@ specified order.
 
 from __future__ import annotations
 
+import rdflib
 from abc import ABC
 from itertools import count, chain
+from collections import defaultdict
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
@@ -68,8 +70,11 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         self.flow = TransformationFlow.shorthand(items)
         self.namespace = namespace
 
-    def sparql_type(self, name: str, type: Type,
-            name_generator: Iterator[str],
+        self.generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
+        self.variable: dict[Unit, rdflib.Variable] = \
+            defaultdict(lambda: next(self.generator))
+
+    def sparql_type(self, variable: rdflib.Variable, type: Type,
             index: Optional[int] = None) -> Iterator[str]:
         """
         Produce SPARQL constraints for the given (non-function) type.
@@ -86,34 +91,29 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
 
             pred = "rdf:type" if index is None else f"rdf:_{index}"
             if t.params:
-                bnode = next(name_generator)
-                yield f"?{name} {pred} ?{bnode}."
-                yield f"?{bnode} rdfs:subClassOf <{self.namespace[t._operator]}>."
+                bnode = next(self.generator)
+                yield f"?{variable} {pred} ?{bnode}."
+                yield f"?{bnode} rdfs:subClassOf "\
+                    f"<{self.namespace[t._operator]}>."
                 for i, param in enumerate(t.params, start=1):
-                    yield from self.sparql_type(bnode, param, name_generator,
-                        index=i)
+                    yield from self.sparql_type(bnode, param, index=i)
             else:
-                yield f"?{name} {pred}/(rdfs:subClassOf*) <{self.namespace[t._operator]}>."
+                yield f"?{variable} {pred}/(rdfs:subClassOf*) "\
+                    f"<{self.namespace[t._operator]}>."
 
     def trace(self, flow: TransformationFlow,
-            previous: Optional[tuple[str, TransformationFlow]] = None,
-            name_generator: Optional[Iterator[str]] = None,
-            current: str = "",
-            ) -> Iterator[str]:
+            previous: Optional[Unit] = None) -> Iterator[str]:
         """
         Trace the paths between each node in a chain to produce SPARQL
         constraints.
         """
         # See rdflib.paths: (~TA.feeds * OneOrMore).n3(g.namespace_manager)
 
-        name_generator = name_generator or iter(f"n{i}" for i in count(start=1))
-        current = current or next(name_generator)
-
         if isinstance(flow, Unit):
             if previous:
-                assert isinstance(previous[1], Unit)
                 if flow.skip:
-                    if previous[1].type and flow.operation:
+                    if isinstance(previous.value, Type) and \
+                            isinstance(flow.value, Operator):
                         modifier = '*'
                     else:
                         modifier = '+'
@@ -121,30 +121,29 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     modifier = ''
 
                 yield (
-                    f"?{previous[0]} "
+                    f"?{self.variable[previous]} "
                     f"(^ta:feeds{modifier}) "
-                    f"?{current}.")
+                    f"?{self.variable[flow]}.")
 
-            if flow.operation:
-                assert flow.operation
-                yield f"?{current} ta:via <{self.namespace[flow.operation]}>."
+            if isinstance(flow.value, Operator):
+                yield f"?{self.variable[flow]} ta:via "\
+                    f"<{self.namespace[flow.value]}>."
             else:
-                assert flow.type
-                yield from self.sparql_type(current, flow.type, name_generator)
+                assert isinstance(flow.value, Type)
+                yield from self.sparql_type(self.variable[flow], flow.value)
 
         elif isinstance(flow, Parallel):
-            for sub in flow.items:
-                yield from self.trace(sub, previous, name_generator)
+            for item in flow.items:
+                yield from self.trace(item, previous)
 
         else:
             assert isinstance(flow, Serial)
 
-            # TODO remove this assumption when possible
-            assert all(isinstance(x, Unit) for x in flow.items[:-1])
-
-            for name, sub in zip(chain([current], name_generator), flow.items):
-                yield from self.trace(sub, previous, name_generator, name)
-                previous = name, sub
+            for item in flow.items[:-1]:
+                assert isinstance(item, Unit)  # TODO remove when possible
+                yield from self.trace(item, previous)
+                previous = item
+            yield from self.trace(flow.items[-1], previous)
 
     def sparql(self) -> str:
         """
@@ -160,7 +159,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             "?workflow rdfs:comment ?description.",
             "?workflow ta:result ?n0.",
         ]
-        query.extend(self.trace(self.flow, current="n0"))
+        query.extend(self.trace(self.flow))
         query.append("} GROUP BY ?workflow ?description")
         return "\n".join(query)
 
@@ -236,14 +235,6 @@ class Unit(TransformationFlow):
         self.skip = False
 
         super().__init__()
-
-    @property
-    def type(self) -> Optional[Type]:
-        return self.value if isinstance(self.value, Type) else None
-
-    @property
-    def operation(self) -> Optional[Operator]:
-        return self.value if isinstance(self.value, Operator) else None
 
     def set_skip(self) -> None:
         self.skip = True
