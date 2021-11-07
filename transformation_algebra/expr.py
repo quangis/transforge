@@ -134,8 +134,13 @@ class Expr(ABC):
             with_parentheses = False
             result = str(self.operator)
         elif isinstance(self, Source):
-            with_type = True
-            result = self.label or '-'
+            if self.label:
+                with_type = True
+                result = self.label
+            else:
+                with_type = False
+                with_parentheses = False
+                result = f"~{self.type.text()}"
         elif isinstance(self, Application):
             parens = not isinstance(self.f, Application)
             result = f"{self.f.text(labels, with_parentheses=parens)} "\
