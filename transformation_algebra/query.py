@@ -298,13 +298,16 @@ class Serial(TransformationFlow):
 
 class Parallel(TransformationFlow):
     """
-    Indicate which transformation paths must occur conjunctively.
+    Indicate which transformation paths must occur conjunctively. That is,
+    every path must occur somewhere --- possibly on distinct branches, possibly
+    on the same branch.
     """
     pass
 
 
 class Choice(TransformationFlow):
     """
-    Indicate which transformation paths can occur disjunctively.
+    Indicate which transformation paths can occur disjunctively. That is, at
+    least one path must occur somewhere.
     """
     pass

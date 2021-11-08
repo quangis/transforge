@@ -20,6 +20,7 @@ D = TypeOperator()
 f = Operator(type=A ** B)
 g = Operator(type=B ** C)
 h = Operator(type=C ** D)
+f2 = Operator(type=B ** C ** D)
 alg = Language(locals())
 
 
@@ -56,7 +57,7 @@ class TestAlgebra(unittest.TestCase):
             set(r.workflow for r in graph.query(query1.sparql()))
         )
 
-    def test_basic(self):
+    def test_serial(self):
         graph = make_graph(wf1=g(f(~A)))
 
         self.assertQuery(graph, (C, g, B, f, A),
@@ -70,7 +71,7 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(graph, (B, g, C, f, A),
             results=None)
 
-    def test_skip(self):
+    def test_serial_skip(self):
         graph = make_graph(wf1=h(g(f(~A))))
 
         self.assertQuery(graph, (D, ..., A),
@@ -85,6 +86,20 @@ class TestAlgebra(unittest.TestCase):
             results=None)
         self.assertQuery(graph, (D, ..., B, ..., f, ..., A),
             results={TEST.wf1})
+
+    def test_parallel(self):
+        graph = make_graph(wf1=f2(~B, ~C), wf2=f2(f(~A), g(~B)))
+
+        self.assertQuery(graph, (D, f2, [B, C]),
+            results={TEST.wf1, TEST.wf2})
+        self.assertQuery(graph, (D, f2, [(..., B), (..., C)]),
+            results={TEST.wf1, TEST.wf2})
+        self.assertQuery(graph, (D, f2, [B, C, f, g]),
+            results={TEST.wf2})
+        self.assertQuery(graph, (D, f2, [(B, f), (C, g)]),
+            results={TEST.wf2})
+        self.assertQuery(graph, (D, f2, [(..., A), (..., B)]),
+            results={TEST.wf2})
 
 
 if __name__ == '__main__':
