@@ -1,47 +1,72 @@
-import unittest
+from __future__ import annotations
 
-from rdflib.namespace import Namespace, RDFS, RDF
+import unittest
+from rdflib.term import Node
+from rdflib.namespace import Namespace, RDF
+from typing import Union
 
 from transformation_algebra.type import TypeOperator
-from transformation_algebra.expr import Operator
+from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph, LanguageNamespace, TA
-from transformation_algebra.query import TransformationQuery
+from transformation_algebra.graph import TransformationGraph, \
+    LanguageNamespace, TA
+from transformation_algebra.query import TransformationQuery, NestedNotation
 
-from rdflib.tools.rdf2dot import rdf2dot
+TEST = Namespace("https://example.com/#")
 
-TEST = Namespace("TEST#")
+A = TypeOperator()
+B = TypeOperator()
+C = TypeOperator()
+f = Operator(type=A ** B)
+g = Operator(type=B ** C)
+alg = Language(locals())
+ALG = LanguageNamespace("ALG#", alg)
+
+
+def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
+        ) -> TransformationGraph:
+    """
+    Convenience method for constructing a graph containing workflows.
+    """
+    graph = TransformationGraph(alg, ALG)
+    for name, content in workflows.items():
+        wf = TEST[name]
+        if isinstance(content, Expr):
+            e = graph.add_expr(content, wf)
+            graph.add((wf, RDF.type, TA.Transformation))
+            graph.add((wf, TA.result, e))
+        else:
+            graph.add_workflow(wf, content)
+    return graph
 
 
 class TestAlgebra(unittest.TestCase):
 
+    def assertQuery(self, graph: TransformationGraph,
+            query: TransformationQuery | NestedNotation,
+            results: set[Node] | None) -> None:
+
+        if isinstance(query, TransformationQuery):
+            query1 = query
+        else:
+            query1 = TransformationQuery(query, ALG)
+
+        self.assertEqual(
+            results or set(),
+            set(r.workflow for r in graph.query(query1.sparql()))
+        )
+
     def test_basic(self):
-        A = TypeOperator()
-        B = TypeOperator()
-        C = TypeOperator()
-        f = Operator(type=A ** B)
-        g = Operator(type=B ** C)
-        alg = Language(locals())
-        ALG = LanguageNamespace("ALG#", alg)
+        graph = make_graph(wf1=g(f(~A)))
 
-        wf = TEST.workflow
-        graph = TransformationGraph(alg, ALG)
-        e = graph.add_expr(g(f(~A)), wf)
-
-        graph.add((wf, RDF.type, TA.Transformation))
-        graph.add((wf, TA.result, e))
-        graph.add((wf, RDFS.comment, TEST.comment))
-
-        query = TransformationQuery((C, g, B, f, A), namespace=ALG)
-        result = list(graph.query(query.sparql()))
-
-        with open('graph.dot', 'w') as handle:
-            rdf2dot(graph, handle)
-
-        with open('graph.rq', 'w') as handle:
-            handle.write(query.sparql())
-
-        self.assertEqual(len(result), 1)
+        self.assertQuery(graph, (C, g, B, f, A),
+            results={TEST.wf1})
+        self.assertQuery(graph, (C, ..., g, ..., B, ..., f, ..., A),
+            results={TEST.wf1})
+        self.assertQuery(graph, (C, f, B, g, A),
+            results=None)
+        self.assertQuery(graph, (B, g, C, f, A),
+            results=None)
 
 
 if __name__ == '__main__':
