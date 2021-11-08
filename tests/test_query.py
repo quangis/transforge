@@ -21,7 +21,6 @@ f = Operator(type=A ** B)
 g = Operator(type=B ** C)
 h = Operator(type=C ** D)
 alg = Language(locals())
-ALG = LanguageNamespace("ALG#", alg)
 
 
 def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
@@ -29,7 +28,7 @@ def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
     """
     Convenience method for constructing a graph containing workflows.
     """
-    graph = TransformationGraph(alg, ALG)
+    graph = TransformationGraph(alg, TEST)
     for name, content in workflows.items():
         wf = TEST[name]
         if isinstance(content, Expr):
@@ -50,7 +49,7 @@ class TestAlgebra(unittest.TestCase):
         if isinstance(query, TransformationQuery):
             query1 = query
         else:
-            query1 = TransformationQuery(query, ALG)
+            query1 = TransformationQuery(query, TEST)
 
         self.assertEqual(
             results or set(),

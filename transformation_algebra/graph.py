@@ -51,8 +51,7 @@ class TransformationGraph(Graph):
     as an RDF graph.
     """
 
-    def __init__(self, algebra: Language,
-            namespace: LanguageNamespace,
+    def __init__(self, algebra: Language, namespace: Namespace,
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
@@ -127,7 +126,7 @@ class TransformationGraph(Graph):
                 if t.params:
                     node = BNode()
                     self.add((node, RDFS.subClassOf,
-                        self.namespace[t._operator]))
+                        self.namespace[t._operator.name]))
 
                     for i, param in enumerate(t.params, start=1):
                         self.add((node, RDF[f"_{i}"], self.add_type(param)))
@@ -135,7 +134,7 @@ class TransformationGraph(Graph):
                     if self.include_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
                 else:
-                    node = self.namespace[t._operator]
+                    node = self.namespace[t._operator.name]
             else:
                 assert isinstance(t, TypeVariable)
                 node = BNode()
@@ -191,7 +190,7 @@ class TransformationGraph(Graph):
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.via, self.namespace[expr.operator]))
+                self.add((current, TA.via, self.namespace[expr.operator.name]))
             else:
                 assert isinstance(expr, Source)
 

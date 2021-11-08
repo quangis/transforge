@@ -11,14 +11,14 @@ import rdflib
 from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
-from rdflib.namespace import NamespaceManager, RDFS, RDF
+from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
 from abc import ABC
-from itertools import count, chain
+from itertools import count
 from collections import defaultdict
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
-from transformation_algebra.graph import LanguageNamespace, TA
+from transformation_algebra.graph import TA
 from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
     overload, Optional, TypeVar
 
@@ -69,8 +69,7 @@ NestedNotation = Union[Element, Nested[Element]]
 
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, items: NestedNotation,
-            namespace: LanguageNamespace):
+    def __init__(self, items: NestedNotation, namespace: Namespace):
         self.flow = TransformationFlow.shorthand(items)
         self.namespace = namespace
         self.prefix = "n"
@@ -115,14 +114,14 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                 bnode = next(self.generator)
                 yield self.n3(variable, pred, bnode)
                 yield self.n3(bnode, RDFS.subClassOf,
-                        self.namespace[t._operator])
+                        self.namespace[t._operator.name])
                 for i, param in enumerate(t.params, start=1):
                     yield from self.sparql_type(bnode, param, index=i)
             else:
                 yield self.n3(
                     variable,
                     pred / (RDFS.subClassOf * ZeroOrMore),
-                    self.namespace[t._operator])
+                    self.namespace[t._operator.name])
 
     def trace(self, current: TransformationFlow,
             after: Optional[Unit] = None) -> Iterator[str]:
@@ -159,7 +158,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                 yield self.n3(
                     self.variable[current],
                     TA.via,
-                    self.namespace[current.value])
+                    self.namespace[current.value.name])
             else:
                 assert isinstance(current.value, Type)
                 yield from self.sparql_type(
