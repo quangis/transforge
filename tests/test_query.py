@@ -21,6 +21,8 @@ D = TypeOperator()
 f = Operator(type=A ** B)
 g = Operator(type=B ** C)
 h = Operator(type=C ** D)
+m = Operator(type=B ** C)
+n = Operator(type=A ** B)
 f2 = Operator(type=B ** C ** D)
 alg = Language(locals())
 
@@ -105,15 +107,26 @@ class TestAlgebra(unittest.TestCase):
             results=None)
 
     def test_choice(self):
-        graph = make_graph(wf1=f2(f(~A), g(~B)))
+        graph = make_graph(
+            wf1=f2(f(~A), g(~B)),
+            wf2=f2(~B, g(f(~A)))
+        )
 
         self.assertQuery(graph, (D, f2, Choice(A, D)),
             results=None)
         self.assertQuery(graph, (D, f2, Choice(A, B)),
-            results={TEST.wf1})
+            results={TEST.wf1, TEST.wf2})
         self.assertQuery(graph, (D, f2, Choice(B, C)),
-            results={TEST.wf1})
+            results={TEST.wf1, TEST.wf2})
         self.assertQuery(graph, (D, f2, Choice((B, f), (C, f))),
+            results={TEST.wf1})
+
+        # Choice between operations in non-last place
+        self.assertQuery(graph, (D, f2, Choice(g, m), B),
+            results={TEST.wf1, TEST.wf2})
+
+        # Choice between sequences in non-last place
+        self.assertQuery(graph, (D, f2, Choice((g, f), (m, n)), A),
             results={TEST.wf1})
 
 
