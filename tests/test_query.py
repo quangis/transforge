@@ -9,7 +9,8 @@ from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, \
     LanguageNamespace, TA
-from transformation_algebra.query import TransformationQuery, NestedNotation
+from transformation_algebra.query import TransformationQuery, \
+    NestedNotation, Choice
 
 TEST = Namespace("https://example.com/#")
 
@@ -100,6 +101,20 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf2})
         self.assertQuery(graph, (D, f2, [(..., A), (..., B)]),
             results={TEST.wf2})
+        self.assertQuery(graph, (D, f2, [A, B]),
+            results=None)
+
+    def test_choice(self):
+        graph = make_graph(wf1=f2(f(~A), g(~B)))
+
+        self.assertQuery(graph, (D, f2, Choice(A, D)),
+            results=None)
+        self.assertQuery(graph, (D, f2, Choice(A, B)),
+            results={TEST.wf1})
+        self.assertQuery(graph, (D, f2, Choice(B, C)),
+            results={TEST.wf1})
+        self.assertQuery(graph, (D, f2, Choice((B, f), (C, f))),
+            results={TEST.wf1})
 
 
 if __name__ == '__main__':

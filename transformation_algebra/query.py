@@ -169,6 +169,12 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             for item in current.items:
                 yield from self.trace(item, after)
 
+        elif isinstance(current, Choice):
+            yield " UNION ".join(
+                "{" + "\n".join(self.trace(item, after)) + "}"
+                for item in current.items
+            )
+
         else:
             assert isinstance(current, Serial)
 
