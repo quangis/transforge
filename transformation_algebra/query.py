@@ -191,7 +191,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             f"PREFIX {self.prefix}: <{self.namespace}>",
             "SELECT ?workflow ?description WHERE {",
             "?workflow rdf:type ta:Transformation.",
-            "?workflow rdfs:comment ?description.",
+            "OPTIONAL {?workflow rdfs:comment ?description}",
         ]
         query.extend(self.trace(self.flow))
         query.append("} GROUP BY ?workflow ?description")
