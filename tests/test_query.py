@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 from rdflib.term import Node
 from rdflib.namespace import Namespace, RDF
-from typing import Union
 
 from transformation_algebra.type import TypeOperator
 from transformation_algebra.expr import Operator, Expr
@@ -17,8 +16,10 @@ TEST = Namespace("https://example.com/#")
 A = TypeOperator()
 B = TypeOperator()
 C = TypeOperator()
+D = TypeOperator()
 f = Operator(type=A ** B)
 g = Operator(type=B ** C)
+h = Operator(type=C ** D)
 alg = Language(locals())
 ALG = LanguageNamespace("ALG#", alg)
 
@@ -61,12 +62,30 @@ class TestAlgebra(unittest.TestCase):
 
         self.assertQuery(graph, (C, g, B, f, A),
             results={TEST.wf1})
-        self.assertQuery(graph, (C, ..., g, ..., B, ..., f, ..., A),
+        self.assertQuery(graph, (C, B, A),
+            results={TEST.wf1})
+        self.assertQuery(graph, (g, f),
             results={TEST.wf1})
         self.assertQuery(graph, (C, f, B, g, A),
             results=None)
         self.assertQuery(graph, (B, g, C, f, A),
             results=None)
+
+    def test_skip(self):
+        graph = make_graph(wf1=h(g(f(~A))))
+
+        self.assertQuery(graph, (D, ..., A),
+            results={TEST.wf1})
+        self.assertQuery(graph, (h, ..., f),
+            results={TEST.wf1})
+        self.assertQuery(graph, (h, g, f),
+            results={TEST.wf1})
+        self.assertQuery(graph, (D, ..., g, ..., A),
+            results={TEST.wf1})
+        self.assertQuery(graph, (D, g, A),
+            results=None)
+        self.assertQuery(graph, (D, ..., B, ..., f, ..., A),
+            results={TEST.wf1})
 
 
 if __name__ == '__main__':
