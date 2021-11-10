@@ -129,6 +129,8 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         Produce SPARQL constraints by tracing the paths between each unit.
         """
         if isinstance(current, Unit):
+
+            # Deal with connection to this unit
             if after:
                 if current.skip:
                     if isinstance(after, UnitType) and \
@@ -140,7 +142,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     if isinstance(after, UnitType) and \
                             isinstance(current, UnitOperator):
                         self.variable[current] = self.variable[after]
-                    mod = None
+                    mod = ''
 
                 if self.variable[current] != self.variable[after]:
                     yield self.n3(
@@ -154,6 +156,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     self.variable[current]
                 )
 
+            # Deal with unit itself
             if isinstance(current, UnitOperator):
                 yield self.n3(
                     self.variable[current],
@@ -179,7 +182,11 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             assert isinstance(current, Serial)
 
             for item in current.items[:-1]:
-                assert isinstance(item, Unit)  # TODO remove when possible
+                if not isinstance(item, Unit):
+                    raise RuntimeError(
+                        "Outside of the last place of a serial flow, "
+                        "only unit types and operators may occur. "
+                        "This may change in the future.")  # TODO
                 yield from self.trace(item, after)
                 after = item
             yield from self.trace(current.items[-1], after)
