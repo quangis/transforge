@@ -12,7 +12,7 @@ from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
-from abc import ABC
+from abc import ABC, abstractmethod
 from itertools import count
 from collections import defaultdict
 from transformation_algebra.type import Type, TypeOperation, \
@@ -65,11 +65,11 @@ class Nested(Protocol[_T_co]):
 
 
 Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
-NestedNotation = Union[Element, Nested[Element]]
+NestedFlow = Union[Element, Nested[Element]]
 
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, items: NestedNotation, namespace: Namespace):
+    def __init__(self, items: NestedFlow, namespace: Namespace):
         self.flow = TransformationFlow.shorthand(items)
         self.namespace = namespace
         self.prefix = "n"
@@ -131,14 +131,14 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         if isinstance(current, Unit):
             if after:
                 if current.skip:
-                    if isinstance(after.value, Type) and \
-                            isinstance(current.value, Operator):
+                    if isinstance(after, UnitType) and \
+                            isinstance(current, UnitOperator):
                         mod = ZeroOrMore
                     else:
                         mod = OneOrMore
                 else:
-                    if isinstance(after.value, Type) and \
-                            isinstance(current.value, Operator):
+                    if isinstance(after, UnitType) and \
+                            isinstance(current, UnitOperator):
                         self.variable[current] = self.variable[after]
                     mod = None
 
@@ -154,16 +154,16 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     self.variable[current]
                 )
 
-            if isinstance(current.value, Operator):
+            if isinstance(current, UnitOperator):
                 yield self.n3(
                     self.variable[current],
                     TA.via,
-                    self.namespace[current.value.name])
+                    self.namespace[current.operator.name])
             else:
-                assert isinstance(current.value, Type)
+                assert isinstance(current, UnitType)
                 yield from self.sparql_type(
                     self.variable[current],
-                    current.value)
+                    current.type)
 
         elif isinstance(current, Parallel):
             for item in current.items:
@@ -230,24 +230,21 @@ class TransformationFlow(ABC):
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    def __init__(self, *items: Element | Nested[Element], skip: bool = False):
-        self.items: list[TransformationFlow] = [
-            TransformationFlow.shorthand(x) for x in items]
-
+    @abstractmethod
     def set_skip(self) -> None:
-        for x in self.items:
-            x.set_skip()
+        raise NotImplementedError
 
     @staticmethod
-    def shorthand(value: Element | Nested[Element]) \
-            -> TransformationFlow:
+    def shorthand(value: NestedFlow) -> TransformationFlow:
         """
         Translate shorthand data structures (ellipsis for skips, tuples for
         serials, lists for parallels) to real flows.
         """
         assert value != ..., "ellipses may only occur in serials"
-        if isinstance(value, (Type, Operator)):
-            return Unit(value)
+        if isinstance(value, Operator):
+            return UnitOperator(value)
+        elif isinstance(value, Type):
+            return UnitType(value)
         elif isinstance(value, tuple):
             return Serial(*value)
         elif isinstance(value, list):
@@ -264,19 +261,28 @@ class Unit(TransformationFlow):
     A unit represents a single data instance in the flow.
     """
 
-    def __init__(self, value: Type | Operator):
-        if isinstance(value, Operator) and value.definition:
-            raise ValueError("any operation in a flow query must be primitive")
-        self.value = value
-
+    def __init__(self):
         # Does a skip occur after this unit? (i.e. is `...` specified *before*
         # this unit in the reversed sequence)
         self.skip = False
 
-        super().__init__()
-
     def set_skip(self) -> None:
         self.skip = True
+
+
+class UnitType(Unit):
+    def __init__(self, type: Type):
+        self.type = type
+        super().__init__()
+
+
+class UnitOperator(Unit):
+    def __init__(self, operator: Operator):
+        if operator.definition:
+            raise ValueError("any operation in a flow query must be primitive")
+
+        self.operator = operator
+        super().__init__()
 
 
 class Serial(TransformationFlow):
@@ -284,9 +290,8 @@ class Serial(TransformationFlow):
     Indicate the order in which transformation elements must occur.
     """
 
-    def __init__(self, *items: Element | Nested[Element]):
-        super().__init__()
-
+    def __init__(self, *items: NestedFlow):
+        self.items = []
         skip: bool = False
         for current in items:
             if current == ...:
@@ -308,7 +313,13 @@ class Parallel(TransformationFlow):
     every path must occur somewhere --- possibly on distinct branches, possibly
     on the same branch.
     """
-    pass
+
+    def __init__(self, *items: NestedFlow):
+        self.items = [TransformationFlow.shorthand(x) for x in items]
+
+    def set_skip(self) -> None:
+        for x in self.items:
+            x.set_skip()
 
 
 class Choice(TransformationFlow):
@@ -316,4 +327,11 @@ class Choice(TransformationFlow):
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
     """
-    pass
+
+    def __init__(self, *items: NestedFlow):
+        self.items = [TransformationFlow.shorthand(x) for x in items]
+
+    def set_skip(self) -> None:
+        for x in self.items:
+            x.set_skip()
+

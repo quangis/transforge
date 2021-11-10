@@ -10,7 +10,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, \
     LanguageNamespace, TA
 from transformation_algebra.query import TransformationQuery, \
-    NestedNotation, Choice
+    NestedFlow, Choice
 
 TEST = Namespace("https://example.com/#")
 
@@ -47,7 +47,7 @@ def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
 class TestAlgebra(unittest.TestCase):
 
     def assertQuery(self, graph: TransformationGraph,
-            query: TransformationQuery | NestedNotation,
+            query: TransformationQuery | NestedFlow,
             results: set[Node] | None) -> None:
 
         if isinstance(query, TransformationQuery):
