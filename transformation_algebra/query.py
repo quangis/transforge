@@ -13,7 +13,7 @@ from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
 from abc import ABC, abstractmethod
-from itertools import count
+from itertools import count, product
 from collections import defaultdict
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
@@ -68,6 +68,13 @@ Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
 NestedFlow = Union[Element, Nested[Element]]
 
 
+class QueryStatements(object):
+    def __init__(self):
+        self.entrances: list[tuple[bool, rdflib.Variable]] = []
+        self.statements: list[str] = []
+        self.exits: list[tuple[rdflib.Variable, bool]] = []
+
+
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
     def __init__(self, items: NestedFlow, namespace: Namespace):
         self.flow = TransformationFlow.shorthand(items)
@@ -81,6 +88,8 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         self.generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
         self.variable: dict[Unit, rdflib.Variable] = \
             defaultdict(self.generator.__next__)
+
+        self.units: dict[rdflib.Variable, Unit] = {}
 
     def n3(self, *items: Path | Node) -> str:
         result = []
@@ -123,79 +132,89 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     pred / (RDFS.subClassOf * ZeroOrMore),
                     self.namespace[t._operator.name])
 
-    def trace(self, current: TransformationFlow,
-            after: Optional[Unit] = None) -> Iterator[str]:
+    def trace(self, current: TransformationFlow) -> QueryStatements:
         """
-        Produce SPARQL constraints by tracing the paths between each unit.
+        As a side effect, produce SPARQL constraints by tracing the paths
+        between each unit. Return the variables assigned to the units.
         """
+
+        result = QueryStatements()
+
         if isinstance(current, Unit):
-
-            # Deal with connection to this unit
-            if after:
-                if current.skip:
-                    if isinstance(after, UnitType) and \
-                            isinstance(current, UnitOperator):
-                        mod = ZeroOrMore
-                    else:
-                        mod = OneOrMore
-                else:
-                    if isinstance(after, UnitType) and \
-                            isinstance(current, UnitOperator):
-                        self.variable[current] = self.variable[after]
-                    mod = ''
-
-                if self.variable[current] != self.variable[after]:
-                    yield self.n3(
-                        self.variable[after],
-                        (~TA.feeds) * mod if mod else ~TA.feeds,
-                        self.variable[current])
-            else:
-                yield self.n3(
-                    rdflib.Variable("workflow"),
-                    TA.result,
-                    self.variable[current]
-                )
+            incoming = next(self.generator)
+            outgoing = incoming
 
             # Deal with unit itself
-            if isinstance(current, UnitOperator):
-                yield self.n3(
-                    self.variable[current],
+            if current.type:
+                result.statements.extend(
+                    self.sparql_type(incoming, current.type))
+
+            if current.operator:
+                if current.type and not current.direct:
+                    outgoing = next(self.generator)
+                    result.statements.append(
+                        self.n3(incoming, ~TA.feeds * ZeroOrMore, outgoing))
+
+                result.statements.append(self.n3(
+                    outgoing,
                     TA.via,
-                    self.namespace[current.operator.name])
-            else:
-                assert isinstance(current, UnitType)
-                yield from self.sparql_type(
-                    self.variable[current],
-                    current.type)
+                    self.namespace[current.operator.name]))
+
+            result.entrances.append((False, incoming))
+            result.exits.append((outgoing, False))
 
         elif isinstance(current, Parallel):
             for item in current.items:
-                yield from self.trace(item, after)
+                t = self.trace(item)
+                result.entrances.extend(t.entrances)
+                result.statements.extend(t.statements)
+                result.exits.extend(t.exits)
 
         elif isinstance(current, Choice):
-            yield " UNION ".join(
-                "{" + "\n".join(self.trace(item, after)) + "}"
+            # result.entrances.append(?)
+            result.statements.append(" UNION ".join(
+                "{" + "\n".join(self.trace(item).statements) + "}"
                 for item in current.items
-            )
+            ))
+            # result.exits.append(?)
 
         else:
             assert isinstance(current, Serial)
 
-            for item in current.items[:-1]:
-                if not isinstance(item, Unit):
-                    raise RuntimeError(
-                        "Outside of the last place of a serial flow, "
-                        "only unit types and operators may occur. "
-                        "This may change in the future.")  # TODO
-                yield from self.trace(item, after)
-                after = item
-            yield from self.trace(current.items[-1], after)
+            items = [self.trace(item) for item in current.items]
+
+            for i in range(len(items)):
+                result.statements.extend(items[i].statements)
+
+                try:
+                    lefts = items[i].exits
+                    rights = items[i + 1].entrances
+                except IndexError:
+                    pass
+                else:
+                    for (l, lskip), (rskip, r) in product(lefts, rights):
+                        skip = lskip or rskip or current.skips[i + 1]
+                        result.statements.append(self.n3(
+                            l,
+                            ~TA.feeds * OneOrMore if skip else ~TA.feeds,
+                            r
+                        ))
+
+            skip_entrance = current.skips[0]
+            result.entrances = [(skip or skip_entrance, var)
+                for skip, var in items[0].entrances]
+            skip_exit = current.skips[-1]
+            result.exits = [(var, skip or skip_exit)
+                for skip, var in items[-1].entrances]
+
+        return result
 
     def sparql(self) -> str:
         """
         Convert this Flow to a SPARQL query.
         """
 
+        subquery = self.trace(self.flow)
         query = [
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -205,7 +224,14 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             "?workflow rdf:type ta:Transformation.",
             "OPTIONAL {?workflow rdfs:comment ?description}",
         ]
-        query.extend(self.trace(self.flow))
+        query.extend((
+            self.n3(
+                rdflib.Variable("workflow"),
+                TA.result / (~TA.feeds * ZeroOrMore) if skip else TA.result,
+                var)
+            for skip, var in subquery.entrances
+        ))
+        query.extend(subquery.statements)
         query.append("} GROUP BY ?workflow ?description")
         return "\n".join(query)
 
@@ -237,10 +263,6 @@ class TransformationFlow(ABC):
     # workflows, the approach chosen here makes for a straightforward
     # translation.
 
-    @abstractmethod
-    def set_skip(self) -> None:
-        raise NotImplementedError
-
     @staticmethod
     def shorthand(value: NestedFlow) -> TransformationFlow:
         """
@@ -249,9 +271,9 @@ class TransformationFlow(ABC):
         """
         assert value != ..., "ellipses may only occur in serials"
         if isinstance(value, Operator):
-            return UnitOperator(value)
+            return Unit(operator=value)
         elif isinstance(value, Type):
-            return UnitType(value)
+            return Unit(type=value)
         elif isinstance(value, tuple):
             return Serial(*value)
         elif isinstance(value, list):
@@ -268,28 +290,17 @@ class Unit(TransformationFlow):
     A unit represents a single data instance in the flow.
     """
 
-    def __init__(self):
-        # Does a skip occur after this unit? (i.e. is `...` specified *before*
-        # this unit in the reversed sequence)
-        self.skip = False
+    def __init__(self,
+            operator: Optional[Operator] = None,
+            direct: bool = False,
+            type: Optional[Type] = None):
 
-    def set_skip(self) -> None:
-        self.skip = True
-
-
-class UnitType(Unit):
-    def __init__(self, type: Type):
-        self.type = type
-        super().__init__()
-
-
-class UnitOperator(Unit):
-    def __init__(self, operator: Operator):
-        if operator.definition:
+        if operator and operator.definition:
             raise ValueError("any operation in a flow query must be primitive")
 
         self.operator = operator
-        super().__init__()
+        self.direct = direct
+        self.type = type
 
 
 class Serial(TransformationFlow):
@@ -298,20 +309,35 @@ class Serial(TransformationFlow):
     """
 
     def __init__(self, *items: NestedFlow):
-        self.items = []
+        assert items
+
+        self.items: list[TransformationFlow] = []
+        self.skips: list[bool] = []
+
         skip: bool = False
+        previous: Type | Operator | None = None
         for current in items:
             if current == ...:
                 skip = True
-            else:
-                item = TransformationFlow.shorthand(current)
-                if skip:
-                    item.set_skip()
-                self.items.append(item)
-                skip = False
+                continue
 
-    def set_skip(self) -> None:
-        self.items[0].set_skip()
+            if isinstance(previous, Type) and isinstance(current, Operator):
+                result = self.items[-1]
+                assert isinstance(result, Unit)
+                assert not current.definition
+                result.operator = current
+                result.direct = not skip
+            else:
+                self.skips.append(skip)
+                self.items.append(TransformationFlow.shorthand(current))
+
+            if isinstance(current, (Operator, Type)):
+                previous = current
+            skip = False
+
+        self.skips.append(skip)
+
+        assert len(self.items) == len(self.skips) - 1
 
 
 class Parallel(TransformationFlow):
@@ -322,11 +348,8 @@ class Parallel(TransformationFlow):
     """
 
     def __init__(self, *items: NestedFlow):
+        assert items
         self.items = [TransformationFlow.shorthand(x) for x in items]
-
-    def set_skip(self) -> None:
-        for x in self.items:
-            x.set_skip()
 
 
 class Choice(TransformationFlow):
@@ -336,9 +359,5 @@ class Choice(TransformationFlow):
     """
 
     def __init__(self, *items: NestedFlow):
+        assert items
         self.items = [TransformationFlow.shorthand(x) for x in items]
-
-    def set_skip(self) -> None:
-        for x in self.items:
-            x.set_skip()
-
