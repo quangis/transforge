@@ -86,10 +86,6 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         self.nsm.bind(self.prefix, self.namespace)
 
         self.generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
-        self.variable: dict[Unit, rdflib.Variable] = \
-            defaultdict(self.generator.__next__)
-
-        self.units: dict[rdflib.Variable, Unit] = {}
 
     def n3(self, *items: Path | Node) -> str:
         result = []
@@ -152,8 +148,10 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             if current.operator:
                 if current.type and not current.direct:
                     outgoing = next(self.generator)
-                    result.statements.append(
-                        self.n3(incoming, ~TA.feeds * ZeroOrMore, outgoing))
+                    result.statements.append(self.n3(
+                        incoming,
+                        ~TA.feeds * ZeroOrMore,
+                        outgoing))
 
                 result.statements.append(self.n3(
                     outgoing,
@@ -163,14 +161,14 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             result.entrances.append((False, incoming))
             result.exits.append((outgoing, False))
 
-        elif isinstance(current, Parallel):
+        elif isinstance(current, AllOf):
             for item in current.items:
                 t = self.trace(item)
                 result.entrances.extend(t.entrances)
                 result.statements.extend(t.statements)
                 result.exits.extend(t.exits)
 
-        elif isinstance(current, Choice):
+        elif isinstance(current, AnyOf):
             # result.entrances.append(?)
             result.statements.append(" UNION ".join(
                 "{" + "\n".join(self.trace(item).statements) + "}"
@@ -255,7 +253,7 @@ class TransformationFlow(ABC):
     convenient tree-like notation, but it may trip you up.
 
     Furthermore, for succinct notation, nested tuples are interpreted as
-    `Serial` and lists as `Parallel` transformation flows. The ellipsis
+    `Serial` and lists as `All` transformation flows. The ellipsis
     indicates we may skip any number of steps.
     """
     # The same can also be described in terms of semantic linear time logic
@@ -277,7 +275,7 @@ class TransformationFlow(ABC):
         elif isinstance(value, tuple):
             return Serial(*value)
         elif isinstance(value, list):
-            return Parallel(*value)
+            return AllOf(*value)
         elif isinstance(value, TransformationFlow):
             return value
         else:
@@ -340,11 +338,11 @@ class Serial(TransformationFlow):
         assert len(self.items) == len(self.skips) - 1
 
 
-class Parallel(TransformationFlow):
+class AllOf(TransformationFlow):
     """
     Indicate which transformation paths must occur conjunctively. That is,
-    every path must occur somewhere --- possibly on distinct branches, possibly
-    on the same branch.
+    every path must occur somewhere --- possibly on distinct, parallel
+    branches, possibly on the same branch.
     """
 
     def __init__(self, *items: NestedFlow):
@@ -352,7 +350,7 @@ class Parallel(TransformationFlow):
         self.items = [TransformationFlow.shorthand(x) for x in items]
 
 
-class Choice(TransformationFlow):
+class AnyOf(TransformationFlow):
     """
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
