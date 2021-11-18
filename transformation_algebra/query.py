@@ -12,15 +12,13 @@ from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
-from abc import ABC, abstractmethod
+from abc import ABC
 from itertools import count, product
-from collections import defaultdict
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TA
-from typing import TYPE_CHECKING, Protocol, Iterator, Any, Union, \
-    overload, Optional, TypeVar
+from typing import TYPE_CHECKING, Iterator, Union, Optional
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
@@ -29,43 +27,8 @@ if TYPE_CHECKING:
 else:
     ellipsis = type(Ellipsis)
 
-# For convenience, we allow nested sequences in `Flow.serial()`. The following
-# temporary solution to the recursive type thus introduced has been lifted from
-# github.com/python/mypy/issues/731
-_T_co = TypeVar("_T_co")
-
-
-class Nested(Protocol[_T_co]):
-    def __len__(self) -> int:
-        ...
-
-    @overload
-    def __getitem__(self, __index: int) -> _T_co | Nested[_T_co]:
-        ...
-
-    @overload
-    def __getitem__(self, __index: slice) -> Nested[_T_co]:
-        ...
-
-    def __contains__(self, __x: object) -> bool:
-        ...
-
-    def __iter__(self) -> Iterator[_T_co | Nested[_T_co]]:
-        ...
-
-    def __reversed__(self) -> Iterator[_T_co | Nested[_T_co]]:
-        ...
-
-    def count(self, __value: Any) -> int:
-        ...
-
-    def index(self, __value: Any, __start: int = ...,
-            __stop: int = ...) -> int:
-        ...
-
-
 Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
-NestedFlow = Union[Element, Nested[Element]]
+NestedFlow = Union[Element, list[Element]]
 
 
 class QueryStatements(object):
