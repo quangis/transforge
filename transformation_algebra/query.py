@@ -299,24 +299,24 @@ class Sequence(TransformationFlow):
         assert len(self.items) == len(self.skips) - 1
 
 
-class AllOf(TransformationFlow):
+class Branch(TransformationFlow):
+    def __init__(self, *items: NestedFlow):
+        assert items
+        self.items = [TransformationFlow.shorthand(x) for x in items]
+
+
+class AllOf(Branch):
     """
     Indicate which transformation paths must occur conjunctively. That is,
     every path must occur somewhere --- possibly on distinct, parallel
     branches, possibly on the same branch.
     """
-
-    def __init__(self, *items: NestedFlow):
-        assert items
-        self.items = [TransformationFlow.shorthand(x) for x in items]
+    pass
 
 
-class AnyOf(TransformationFlow):
+class AnyOf(Branch):
     """
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
     """
-
-    def __init__(self, *items: NestedFlow):
-        assert items
-        self.items = [TransformationFlow.shorthand(x) for x in items]
+    pass
