@@ -177,7 +177,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             # result.exits.append(?)
 
         else:
-            assert isinstance(current, Serial)
+            assert isinstance(current, Sequence)
 
             items = [self.trace(item) for item in current.items]
 
@@ -247,14 +247,14 @@ class TransformationFlow(ABC):
     flow holds that there must be datatypes `A` and `B` that are fed to an
     operation f that eventually results in a datatype `C`:
 
-    Serial(C, ..., f, [A, B])
+    [C, ..., f, AllOf(A, B)]
 
     Note that the flow is 'reversed' (from output to input). This allows for a
     convenient tree-like notation, but it may trip you up.
 
-    Furthermore, for succinct notation, nested tuples are interpreted as
-    `Serial` and lists as `All` transformation flows. The ellipsis
-    indicates we may skip any number of steps.
+    Furthermore, for succinct notation, lists are interpreted as `Sequence`
+    transformation flows and the ellipsis indicates we may skip any number of
+    steps.
     """
     # The same can also be described in terms of semantic linear time logic
     # formulae (SLTL), but since we will be using SPARQL to search through
@@ -264,18 +264,16 @@ class TransformationFlow(ABC):
     @staticmethod
     def shorthand(value: NestedFlow) -> TransformationFlow:
         """
-        Translate shorthand data structures (ellipsis for skips, tuples for
-        serials, lists for parallels) to real flows.
+        Translate shorthand data structures (ellipsis for skips, lists for
+        sequences) to real flows.
         """
-        assert value != ..., "ellipses may only occur in serials"
+        assert value != ..., "ellipses may only occur in sequences"
         if isinstance(value, Operator):
             return Unit(operator=value)
         elif isinstance(value, Type):
             return Unit(type=value)
-        elif isinstance(value, tuple):
-            return Serial(*value)
         elif isinstance(value, list):
-            return AllOf(*value)
+            return Sequence(*value)
         elif isinstance(value, TransformationFlow):
             return value
         else:
@@ -301,7 +299,7 @@ class Unit(TransformationFlow):
         self.type = type
 
 
-class Serial(TransformationFlow):
+class Sequence(TransformationFlow):
     """
     Indicate the order in which transformation elements must occur.
     """

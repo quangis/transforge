@@ -10,7 +10,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, \
     LanguageNamespace, TA
 from transformation_algebra.query import TransformationQuery, \
-    NestedFlow, AnyOf
+    NestedFlow, AnyOf, AllOf
 
 TEST = Namespace("https://example.com/#")
 
@@ -63,47 +63,47 @@ class TestAlgebra(unittest.TestCase):
     def test_serial(self):
         graph = make_graph(wf1=g(f(~A)))
 
-        self.assertQuery(graph, (C, g, B, f, A),
+        self.assertQuery(graph, [C, g, B, f, A],
             results={TEST.wf1})
-        self.assertQuery(graph, (C, B, A),
+        self.assertQuery(graph, [C, B, A],
             results={TEST.wf1})
-        self.assertQuery(graph, (g, f),
+        self.assertQuery(graph, [g, f],
             results={TEST.wf1})
-        self.assertQuery(graph, (C, f, B, g, A),
+        self.assertQuery(graph, [C, f, B, g, A],
             results=None)
-        self.assertQuery(graph, (B, g, C, f, A),
+        self.assertQuery(graph, [B, g, C, f, A],
             results=None)
 
     def test_serial_skip(self):
         graph = make_graph(wf1=h(g(f(~A))))
 
-        self.assertQuery(graph, (D, ..., A),
+        self.assertQuery(graph, [D, ..., A],
             results={TEST.wf1})
-        self.assertQuery(graph, (h, ..., f),
+        self.assertQuery(graph, [h, ..., f],
             results={TEST.wf1})
-        self.assertQuery(graph, (h, g, f),
+        self.assertQuery(graph, [h, g, f],
             results={TEST.wf1})
-        self.assertQuery(graph, (D, ..., g, ..., A),
+        self.assertQuery(graph, [D, ..., g, ..., A],
             results={TEST.wf1})
-        self.assertQuery(graph, (D, g, A),
+        self.assertQuery(graph, [D, g, A],
             results=None)
-        self.assertQuery(graph, (D, ..., B, ..., f, ..., A),
+        self.assertQuery(graph, [D, ..., B, ..., f, ..., A],
             results={TEST.wf1})
 
     def test_parallel(self):
         graph = make_graph(wf1=f2(~B, ~C), wf2=f2(f(~A), g(~B)))
 
-        self.assertQuery(graph, (D, f2, [B, C]),
+        self.assertQuery(graph, [D, f2, AllOf(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, (D, f2, [(..., B), (..., C)]),
+        self.assertQuery(graph, [D, f2, AllOf([..., B], [..., C])],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, (D, f2, [B, C, f, g]),
+        self.assertQuery(graph, [D, f2, AllOf(B, C, f, g)],
             results={TEST.wf2})
-        self.assertQuery(graph, (D, f2, [(B, f), (C, g)]),
+        self.assertQuery(graph, [D, f2, AllOf([B, f], [C, g])],
             results={TEST.wf2})
-        self.assertQuery(graph, (D, f2, [(..., A), (..., B)]),
+        self.assertQuery(graph, [D, f2, AllOf([..., A], [..., B])],
             results={TEST.wf2})
-        self.assertQuery(graph, (D, f2, [A, B]),
+        self.assertQuery(graph, [D, f2, AllOf(A, B)],
             results=None)
 
     def test_choice(self):
@@ -112,21 +112,21 @@ class TestAlgebra(unittest.TestCase):
             wf2=f2(~B, g(f(~A)))
         )
 
-        self.assertQuery(graph, (D, f2, AnyOf(A, D)),
+        self.assertQuery(graph, [D, f2, AnyOf(A, D)],
             results=None)
-        self.assertQuery(graph, (D, f2, AnyOf(A, B)),
+        self.assertQuery(graph, [D, f2, AnyOf(A, B)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, (D, f2, AnyOf(B, C)),
+        self.assertQuery(graph, [D, f2, AnyOf(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, (D, f2, AnyOf((B, f), (C, f))),
+        self.assertQuery(graph, [D, f2, AnyOf([B, f], [C, f])],
             results={TEST.wf1})
 
         # Choice between operations in non-last place
-        self.assertQuery(graph, (D, f2, AnyOf(g, m), B),
+        self.assertQuery(graph, [D, f2, AnyOf(g, m), B],
             results={TEST.wf1, TEST.wf2})
 
         # Choice between sequences in non-last place
-        self.assertQuery(graph, (D, f2, AnyOf((g, f), (m, n)), A),
+        self.assertQuery(graph, [D, f2, AnyOf([g, f], [m, n]), A],
             results={TEST.wf1})
 
 
