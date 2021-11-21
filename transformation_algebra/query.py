@@ -13,7 +13,7 @@ from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
 from abc import ABC
-from itertools import count, product
+from itertools import count, product, chain
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
@@ -30,40 +30,92 @@ else:
 Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
 NestedFlow = Union[Element, list[Element]]
 
-
-class QueryStatements(object):
-    def __init__(self):
-        self.entrances: list[tuple[bool, rdflib.Variable]] = []
-        self.statements: list[str] = []
-        self.exits: list[tuple[rdflib.Variable, bool]] = []
+Triple = tuple[Node, Union[Path, Node], Node]
 
 
-class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, items: NestedFlow, namespace: Namespace):
-        self.flow = TransformationFlow.shorthand(items)
-        self.namespace = namespace
-        self.prefix = "n"
-        self.nsm = NamespaceManager(Graph())
+generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
 
-        self.nsm.bind("ta", TA)
-        self.nsm.bind(self.prefix, self.namespace)
 
-        self.generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
+def n3(*items: Path | Node) -> str:
+    result = []
+    for item in items:
+        try:
+            result.append(item.n3())
+        except TypeError:
+            result.append(str(item))
 
-    def n3(self, *items: Path | Node) -> str:
-        result = []
-        for item in items:
-            try:
-                result.append(item.n3(self.nsm))
-            except TypeError:
-                result.append(item.n3())
+    return " ".join(result) + "."
 
-        return " ".join(result) + "."
-        # assert all(isinstance(item, (Path, Node)) for item in items)
-        # return " ".join(item.n3(self.nsm) for item in items) + "."
 
-    def sparql_type(self, variable: rdflib.Variable, type: Type,
-            index: Optional[int] = None) -> Iterator[str]:
+class Query(object):
+
+    def strings(self) -> Iterator[str]:
+        if isinstance(self, QueryUNIT):
+            yield from (n3(*s) for s in chain(*(self.prologue, self.statements,
+                self.epilogue)))
+        elif isinstance(self, (QuerySEQ, QueryANY, QueryALL)):
+            yield from chain(*(item.strings() for item in self.items))
+
+    def entrances(self) -> Iterator[tuple[bool, QueryUNIT]]:
+        if isinstance(self, QueryUNIT):
+            yield (False, self)
+        elif isinstance(self, QuerySEQ):
+            yield from ((skip or self.flow.skips[0], unit)
+                for skip, unit in self.items[0].entrances())
+        elif isinstance(self, (QueryANY, QueryALL)):
+            yield from chain(*(item.entrances() for item in self.items))
+
+    def exits(self) -> Iterator[tuple[QueryUNIT, bool]]:
+        if isinstance(self, QueryUNIT):
+            yield (self, False)
+        elif isinstance(self, QuerySEQ):
+            yield from ((unit, skip or self.flow.skips[-1])
+                for unit, skip in self.items[-1].exits())
+        elif isinstance(self, (QueryANY, QueryALL)):
+            yield from chain(*(item.exits() for item in self.items))
+
+    @staticmethod
+    def create(flow: TransformationFlow, ns: Namespace) -> Query:
+        if isinstance(flow, Unit):
+            return QueryUNIT(flow, ns)
+        elif isinstance(flow, Sequence):
+            return QuerySEQ(flow, ns)
+        elif isinstance(flow, ANY):
+            return QueryANY(flow, ns)
+        else:
+            assert isinstance(flow, ALL)
+            return QueryALL(flow, ns)
+
+
+class QueryUNIT(Query):
+    def __init__(self, unit: Unit, ns: Namespace):
+        self.unit = unit
+        self.namespace = ns
+        self.incoming = next(generator)
+        self.outgoing = self.incoming
+
+        self.prologue: list[Triple] = []
+        self.statements: list[Triple] = []
+        self.epilogue: list[Triple] = []
+
+        if unit.type:
+            self.type(self.incoming, unit.type)
+
+        if unit.operator:
+            if unit.type and not unit.direct:
+                self.outgoing = next(generator)
+                self.add(self.incoming, ~TA.feeds * ZeroOrMore, self.outgoing)
+
+            self.add(self.outgoing, TA.via, self.namespace[unit.operator.name])
+
+    def add(self, *other: Node | Path, at_start: bool = False) -> None:
+        if at_start:
+            self.statements.insert(0, other)  # type: ignore
+        else:
+            self.statements.append(other)  # type: ignore
+
+    def type(self, variable: rdflib.Variable, type: Type,
+            index: Optional[int] = None) -> None:
         """
         Produce SPARQL constraints for the given (non-function) type.
         """
@@ -79,103 +131,89 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
 
             pred = RDF.type if index is None else RDF[f"_{index}"]
             if t.params:
-                bnode = next(self.generator)
-                yield self.n3(variable, pred, bnode)
-                yield self.n3(bnode, RDFS.subClassOf,
-                        self.namespace[t._operator.name])
+                bnode = next(generator)
+                self.add(variable, pred, bnode)
+                self.add(bnode, RDFS.subClassOf, self.namespace[t._operator.name])
                 for i, param in enumerate(t.params, start=1):
-                    yield from self.sparql_type(bnode, param, index=i)
+                    self.type(bnode, param, index=i)
             else:
-                yield self.n3(
+                self.add(
                     variable,
-                    pred / (RDFS.subClassOf * ZeroOrMore),
+                    pred / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
                     self.namespace[t._operator.name])
 
-    def trace(self, current: TransformationFlow) -> QueryStatements:
-        """
-        As a side effect, produce SPARQL constraints by tracing the paths
-        between each unit. Return the variables assigned to the units.
-        """
-
-        result = QueryStatements()
-
-        if isinstance(current, Unit):
-            incoming = next(self.generator)
-            outgoing = incoming
-
-            # Deal with unit itself
-            if current.type:
-                result.statements.extend(
-                    self.sparql_type(incoming, current.type))
-
-            if current.operator:
-                if current.type and not current.direct:
-                    outgoing = next(self.generator)
-                    result.statements.append(self.n3(
-                        incoming,
-                        ~TA.feeds * ZeroOrMore,
-                        outgoing))
-
-                result.statements.append(self.n3(
-                    outgoing,
-                    TA.via,
-                    self.namespace[current.operator.name]))
-
-            result.entrances.append((False, incoming))
-            result.exits.append((outgoing, False))
-
-        elif isinstance(current, AllOf):
-            for item in current.items:
-                t = self.trace(item)
-                result.entrances.extend(t.entrances)
-                result.statements.extend(t.statements)
-                result.exits.extend(t.exits)
-
-        elif isinstance(current, AnyOf):
-            # result.entrances.append(?)
-            result.statements.append(" UNION ".join(
-                "{" + "\n".join(self.trace(item).statements) + "}"
-                for item in current.items
+    def connect_left(self, *units: tuple[QueryUNIT, bool], skip=False):
+        for unit, skipL in units:
+            self.prologue.append((
+                unit.outgoing,
+                ~TA.feeds * OneOrMore if skipL or skip else ~TA.feeds,
+                self.incoming
             ))
-            # result.exits.append(?)
 
-        else:
-            assert isinstance(current, Sequence)
+    def connect_right(self, *units: tuple[bool, QueryUNIT], skip=False):
+        for skipR, unit in units:
+            self.epilogue.append((
+                self.outgoing,
+                ~TA.feeds * OneOrMore if skip or skipR else ~TA.feeds,
+                unit.incoming
+            ))
 
-            items = [self.trace(item) for item in current.items]
+    def connect_unit(self, unit: QueryUNIT, skip=False):
+        unit.prologue.append((
+            self.outgoing,
+            ~TA.feeds * OneOrMore if skip else ~TA.feeds,
+            unit.incoming))
 
-            for i in range(len(items)):
-                result.statements.extend(items[i].statements)
 
-                try:
-                    lefts = items[i].exits
-                    rights = items[i + 1].entrances
-                except IndexError:
-                    pass
-                else:
-                    for (l, lskip), (rskip, r) in product(lefts, rights):
-                        skip = lskip or rskip or current.skips[i + 1]
-                        result.statements.append(self.n3(
-                            l,
-                            ~TA.feeds * OneOrMore if skip else ~TA.feeds,
-                            r
-                        ))
+class QuerySEQ(Query):
+    def __init__(self, flow: Sequence, ns: Namespace):
+        self.flow = flow
+        self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
 
-            skip_entrance = current.skips[0]
-            result.entrances = [(skip or skip_entrance, var)
-                for skip, var in items[0].entrances]
-            skip_exit = current.skips[-1]
-            result.exits = [(var, skip or skip_exit)
-                for skip, var in items[-1].entrances]
+        # Add connections
+        for i in range(len(self.items)):
+            try:
+                lefts = self.items[i].exits()
+                rights = self.items[i + 1].entrances()
+            except IndexError:
+                pass
+            else:
+                for left, lskip in lefts:
+                    for rskip, right in rights:
+                        left.connect_unit(right,
+                            skip=lskip or rskip or flow.skips[i + 1])
 
-        return result
+
+class QueryANY(Query):
+    def __init__(self, flow: ANY, ns: Namespace):
+        self.flow = flow
+        self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
+
+
+class QueryALL(Query):
+    def __init__(self, flow: ALL, ns: Namespace):
+        self.flow = flow
+        self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
+
+
+class TransformationQuery(object):  # TODO subclass rdflib.Query?
+    def __init__(self, items: NestedFlow, namespace: Namespace):
+        self.flow = TransformationFlow.shorthand(items)
+        self.namespace = namespace
+        self.prefix = "n"
+        self.nsm = NamespaceManager(Graph())
+
+        self.nsm.bind("ta", TA)
+        self.nsm.bind(self.prefix, self.namespace)
+
+        self.generator = iter(rdflib.Variable(f"n{i}") for i in count(start=1))
 
     def sparql(self) -> str:
         """
         Convert this Flow to a SPARQL query.
         """
 
-        subquery = self.trace(self.flow)
+        subquery = Query.create(self.flow, self.namespace)
         query = [
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -186,13 +224,13 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             "OPTIONAL {?workflow rdfs:comment ?description}",
         ]
         query.extend((
-            self.n3(
+            n3(
                 rdflib.Variable("workflow"),
                 TA.result / (~TA.feeds * ZeroOrMore) if skip else TA.result,
-                var)
-            for skip, var in subquery.entrances
+                unit.incoming)
+            for skip, unit in subquery.entrances()
         ))
-        query.extend(subquery.statements)
+        query.extend(subquery.strings())
         query.append("} GROUP BY ?workflow ?description")
         return "\n".join(query)
 
@@ -210,7 +248,7 @@ class TransformationFlow(ABC):
     flow holds that there must be datatypes `A` and `B` that are fed to an
     operation f that eventually results in a datatype `C`:
 
-    [C, ..., f, AllOf(A, B)]
+    [C, ..., f, ALL(A, B)]
 
     Note that the flow is 'reversed' (from output to input). This allows for a
     convenient tree-like notation, but it may trip you up.
@@ -305,7 +343,7 @@ class Branch(TransformationFlow):
         self.items = [TransformationFlow.shorthand(x) for x in items]
 
 
-class AllOf(Branch):
+class ALL(Branch):
     """
     Indicate which transformation paths must occur conjunctively. That is,
     every path must occur somewhere --- possibly on distinct, parallel
@@ -314,7 +352,7 @@ class AllOf(Branch):
     pass
 
 
-class AnyOf(Branch):
+class ANY(Branch):
     """
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
