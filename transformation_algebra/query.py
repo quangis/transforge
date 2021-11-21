@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 else:
     ellipsis = type(Ellipsis)
 
-Element = Union[Type, Operator, ellipsis, 'TransformationFlow']
+Element = Union[Type, Operator, ellipsis, 'Flow']
 NestedFlow = Union[Element, list[Element]]
 
 Triple = tuple[Node, Union[Path, Node], Node]
@@ -75,7 +75,7 @@ class Query(object):
             yield from chain(*(item.exits() for item in self.items))
 
     @staticmethod
-    def create(flow: TransformationFlow, ns: Namespace) -> Query:
+    def create(flow: Flow, ns: Namespace) -> Query:
         if isinstance(flow, Unit):
             return QueryUNIT(flow, ns)
         elif isinstance(flow, Sequence):
@@ -198,7 +198,7 @@ class QueryAND(Query):
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
     def __init__(self, items: NestedFlow, namespace: Namespace):
-        self.flow = TransformationFlow.shorthand(items)
+        self.flow = Flow.shorthand(items)
         self.namespace = namespace
         self.prefix = "n"
         self.nsm = NamespaceManager(Graph())
@@ -241,7 +241,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         # )
 
 
-class TransformationFlow(ABC):
+class Flow(ABC):
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
@@ -263,7 +263,7 @@ class TransformationFlow(ABC):
     # translation.
 
     @staticmethod
-    def shorthand(value: NestedFlow) -> TransformationFlow:
+    def shorthand(value: NestedFlow) -> Flow:
         """
         Translate shorthand data structures (ellipsis for skips, lists for
         sequences) to real flows.
@@ -275,14 +275,14 @@ class TransformationFlow(ABC):
             return Unit(type=value)
         elif isinstance(value, list):
             return Sequence(*value)
-        elif isinstance(value, TransformationFlow):
+        elif isinstance(value, Flow):
             return value
         else:
             raise ValueError(
-                f"{value} cannot be interpreted as a TransformationFlow")
+                f"{value} cannot be interpreted as a Flow")
 
 
-class Unit(TransformationFlow):
+class Unit(Flow):
     """
     A unit represents a single data instance in the flow.
     """
@@ -300,7 +300,7 @@ class Unit(TransformationFlow):
         self.type = type
 
 
-class Sequence(TransformationFlow):
+class Sequence(Flow):
     """
     Indicate the order in which transformation elements must occur.
     """
@@ -308,7 +308,7 @@ class Sequence(TransformationFlow):
     def __init__(self, *items: NestedFlow):
         assert items
 
-        self.items: list[TransformationFlow] = []
+        self.items: list[Flow] = []
         self.skips: list[bool] = []
 
         skip: bool = False
@@ -326,7 +326,7 @@ class Sequence(TransformationFlow):
                 result.direct = not skip
             else:
                 self.skips.append(skip)
-                self.items.append(TransformationFlow.shorthand(current))
+                self.items.append(Flow.shorthand(current))
 
             if isinstance(current, (Operator, Type)):
                 previous = current
@@ -337,10 +337,10 @@ class Sequence(TransformationFlow):
         assert len(self.items) == len(self.skips) - 1
 
 
-class Branch(TransformationFlow):
+class Branch(Flow):
     def __init__(self, *items: NestedFlow):
         assert items
-        self.items = [TransformationFlow.shorthand(x) for x in items]
+        self.items = [Flow.shorthand(x) for x in items]
 
 
 class AND(Branch):
