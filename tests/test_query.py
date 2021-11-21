@@ -10,7 +10,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, \
     LanguageNamespace, TA
 from transformation_algebra.query import TransformationQuery, \
-    NestedFlow, ANY, ALL
+    NestedFlow, OR, AND
 
 TEST = Namespace("https://example.com/#")
 
@@ -93,17 +93,17 @@ class TestAlgebra(unittest.TestCase):
     def test_parallel(self):
         graph = make_graph(wf1=f2(~B, ~C), wf2=f2(f(~A), g(~B)))
 
-        self.assertQuery(graph, [D, f2, ALL(B, C)],
+        self.assertQuery(graph, [D, f2, AND(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, ALL([..., B], [..., C])],
+        self.assertQuery(graph, [D, f2, AND([..., B], [..., C])],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, ALL(B, C, f, g)],
+        self.assertQuery(graph, [D, f2, AND(B, C, f, g)],
             results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, ALL([B, f], [C, g])],
+        self.assertQuery(graph, [D, f2, AND([B, f], [C, g])],
             results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, ALL([..., A], [..., B])],
+        self.assertQuery(graph, [D, f2, AND([..., A], [..., B])],
             results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, ALL(A, B)],
+        self.assertQuery(graph, [D, f2, AND(A, B)],
             results=None)
 
     def test_choice(self):
@@ -112,21 +112,21 @@ class TestAlgebra(unittest.TestCase):
             wf2=f2(~B, g(f(~A)))
         )
 
-        self.assertQuery(graph, [D, f2, ANY(A, D)],
+        self.assertQuery(graph, [D, f2, OR(A, D)],
             results=None)
-        self.assertQuery(graph, [D, f2, ANY(A, B)],
+        self.assertQuery(graph, [D, f2, OR(A, B)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, ANY(B, C)],
+        self.assertQuery(graph, [D, f2, OR(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, ANY([B, f], [C, f])],
+        self.assertQuery(graph, [D, f2, OR([B, f], [C, f])],
             results={TEST.wf1})
 
         # Choice between operations in non-last place
-        self.assertQuery(graph, [D, f2, ANY(g, m), B],
+        self.assertQuery(graph, [D, f2, OR(g, m), B],
             results={TEST.wf1, TEST.wf2})
 
         # Choice between sequences in non-last place
-        self.assertQuery(graph, [D, f2, ANY([g, f], [m, n]), A],
+        self.assertQuery(graph, [D, f2, OR([g, f], [m, n]), A],
             results={TEST.wf1})
 
 

@@ -53,7 +53,7 @@ class Query(object):
         if isinstance(self, QueryUNIT):
             yield from (n3(*s) for s in chain(*(self.prologue, self.statements,
                 self.epilogue)))
-        elif isinstance(self, (QuerySEQ, QueryANY, QueryALL)):
+        elif isinstance(self, (QuerySEQ, QueryOR, QueryAND)):
             yield from chain(*(item.strings() for item in self.items))
 
     def entrances(self) -> Iterator[tuple[bool, QueryUNIT]]:
@@ -62,7 +62,7 @@ class Query(object):
         elif isinstance(self, QuerySEQ):
             yield from ((skip or self.flow.skips[0], unit)
                 for skip, unit in self.items[0].entrances())
-        elif isinstance(self, (QueryANY, QueryALL)):
+        elif isinstance(self, (QueryOR, QueryAND)):
             yield from chain(*(item.entrances() for item in self.items))
 
     def exits(self) -> Iterator[tuple[QueryUNIT, bool]]:
@@ -71,7 +71,7 @@ class Query(object):
         elif isinstance(self, QuerySEQ):
             yield from ((unit, skip or self.flow.skips[-1])
                 for unit, skip in self.items[-1].exits())
-        elif isinstance(self, (QueryANY, QueryALL)):
+        elif isinstance(self, (QueryOR, QueryAND)):
             yield from chain(*(item.exits() for item in self.items))
 
     @staticmethod
@@ -80,11 +80,11 @@ class Query(object):
             return QueryUNIT(flow, ns)
         elif isinstance(flow, Sequence):
             return QuerySEQ(flow, ns)
-        elif isinstance(flow, ANY):
-            return QueryANY(flow, ns)
+        elif isinstance(flow, OR):
+            return QueryOR(flow, ns)
         else:
-            assert isinstance(flow, ALL)
-            return QueryALL(flow, ns)
+            assert isinstance(flow, AND)
+            return QueryAND(flow, ns)
 
 
 class QueryUNIT(Query):
@@ -184,14 +184,14 @@ class QuerySEQ(Query):
                             skip=lskip or rskip or flow.skips[i + 1])
 
 
-class QueryANY(Query):
-    def __init__(self, flow: ANY, ns: Namespace):
+class QueryOR(Query):
+    def __init__(self, flow: OR, ns: Namespace):
         self.flow = flow
         self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
 
 
-class QueryALL(Query):
-    def __init__(self, flow: ALL, ns: Namespace):
+class QueryAND(Query):
+    def __init__(self, flow: AND, ns: Namespace):
         self.flow = flow
         self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
 
@@ -248,7 +248,7 @@ class TransformationFlow(ABC):
     flow holds that there must be datatypes `A` and `B` that are fed to an
     operation f that eventually results in a datatype `C`:
 
-    [C, ..., f, ALL(A, B)]
+    [C, ..., f, AND(A, B)]
 
     Note that the flow is 'reversed' (from output to input). This allows for a
     convenient tree-like notation, but it may trip you up.
@@ -343,7 +343,7 @@ class Branch(TransformationFlow):
         self.items = [TransformationFlow.shorthand(x) for x in items]
 
 
-class ALL(Branch):
+class AND(Branch):
     """
     Indicate which transformation paths must occur conjunctively. That is,
     every path must occur somewhere --- possibly on distinct, parallel
@@ -352,7 +352,7 @@ class ALL(Branch):
     pass
 
 
-class ANY(Branch):
+class OR(Branch):
     """
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
