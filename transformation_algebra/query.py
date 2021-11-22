@@ -60,7 +60,7 @@ class Query(object):
         if isinstance(self, QueryUNIT):
             yield (False, self)
         elif isinstance(self, QuerySEQ):
-            yield from ((skip or self.flow.skips[0], unit)
+            yield from ((skip or self.skips[0], unit)
                 for skip, unit in self.items[0].entrances())
         elif isinstance(self, (QueryOR, QueryAND)):
             yield from chain(*(item.entrances() for item in self.items))
@@ -69,15 +69,21 @@ class Query(object):
         if isinstance(self, QueryUNIT):
             yield (self, False)
         elif isinstance(self, QuerySEQ):
-            yield from ((unit, skip or self.flow.skips[-1])
+            yield from ((unit, skip or self.skips[-1])
                 for unit, skip in self.items[-1].exits())
         elif isinstance(self, (QueryOR, QueryAND)):
             yield from chain(*(item.exits() for item in self.items))
 
     @staticmethod
-    def create(flow: Flow, ns: Namespace) -> Query:
-        if isinstance(flow, Unit):
-            return QueryUNIT(flow, ns)
+    def create(flow: Flow | Type | Operator, ns: Namespace) -> Query:
+        if isinstance(flow, Type):
+            q = QueryUNIT(ns)
+            q.typed = flow
+            return q
+        elif isinstance(flow, Operator):
+            q = QueryUNIT(ns)
+            q.operator = flow
+            return q
         elif isinstance(flow, Sequence):
             return QuerySEQ(flow, ns)
         elif isinstance(flow, OR):
@@ -88,8 +94,10 @@ class Query(object):
 
 
 class QueryUNIT(Query):
-    def __init__(self, unit: Unit, ns: Namespace):
-        self.unit = unit
+    def __init__(self, ns: Namespace):
+        self.operator: Operator | None = None
+        self.direct: bool = False
+        self.typed: Type | None = None
         self.namespace = ns
         self.incoming = next(generator)
         self.outgoing = self.incoming
@@ -98,15 +106,16 @@ class QueryUNIT(Query):
         self.statements: list[Triple] = []
         self.epilogue: list[Triple] = []
 
-        if unit.type:
-            self.type(self.incoming, unit.type)
+    def init(self):
+        if self.typed:
+            self.type(self.incoming, self.typed)
 
-        if unit.operator:
-            if unit.type and not unit.direct:
+        if self.operator:
+            if self.type and not self.direct:
                 self.outgoing = next(generator)
                 self.add(self.incoming, ~TA.feeds * ZeroOrMore, self.outgoing)
 
-            self.add(self.outgoing, TA.via, self.namespace[unit.operator.name])
+            self.add(self.outgoing, TA.via, self.namespace[self.operator.name])
 
     def add(self, *other: Node | Path, at_start: bool = False) -> None:
         if at_start:
@@ -168,10 +177,29 @@ class QueryUNIT(Query):
 class QuerySEQ(Query):
     def __init__(self, flow: Sequence, ns: Namespace):
         self.flow = flow
-        self.items: list[Query] = [Query.create(o, ns) for o in flow.items]
+        self.items: list[Query] = []
+        self.skips: list[bool] = []
+
+        previous: Type | Operator | None = None
+        for lskip, current, rskip in flow:
+            if isinstance(current, Operator) and isinstance(previous, Type):
+                result = self.items[-1]
+                assert isinstance(result, QueryUNIT) and not result.operator
+                assert not current.definition
+                result.operator = current
+                result.direct = not lskip
+            else:
+                self.items.append(Query.create(current, ns))
+                self.skips.append(lskip)
+            if isinstance(current, (Operator, Type)):
+                previous = current
+        self.skips.append(flow.skips[-1])
 
         # Add connections
         for i in range(len(self.items)):
+            item = self.items[i]
+            if isinstance(item, QueryUNIT):
+                item.init()
             try:
                 lefts = self.items[i].exits()
                 rights = self.items[i + 1].entrances()
@@ -181,7 +209,7 @@ class QuerySEQ(Query):
                 for left, lskip in lefts:
                     for rskip, right in rights:
                         left.connect_unit(right,
-                            skip=lskip or rskip or flow.skips[i + 1])
+                            skip=lskip or rskip or self.skips[i + 1])
 
 
 class QueryOR(Query):
@@ -263,16 +291,14 @@ class Flow(ABC):
     # translation.
 
     @staticmethod
-    def shorthand(value: NestedFlow) -> Flow:
+    def shorthand(value: NestedFlow) -> Flow | Type | Operator:
         """
         Translate shorthand data structures (ellipsis for skips, lists for
         sequences) to real flows.
         """
         assert value != ..., "ellipses may only occur in sequences"
-        if isinstance(value, Operator):
-            return Unit(operator=value)
-        elif isinstance(value, Type):
-            return Unit(type=value)
+        if isinstance(value, (Type, Operator)):
+            return value
         elif isinstance(value, list):
             return Sequence(*value)
         elif isinstance(value, Flow):
@@ -280,24 +306,6 @@ class Flow(ABC):
         else:
             raise ValueError(
                 f"{value} cannot be interpreted as a Flow")
-
-
-class Unit(Flow):
-    """
-    A unit represents a single data instance in the flow.
-    """
-
-    def __init__(self,
-            operator: Optional[Operator] = None,
-            direct: bool = False,
-            type: Optional[Type] = None):
-
-        if operator and operator.definition:
-            raise ValueError("any operation in a flow query must be primitive")
-
-        self.operator = operator
-        self.direct = direct
-        self.type = type
 
 
 class Sequence(Flow):
@@ -308,33 +316,23 @@ class Sequence(Flow):
     def __init__(self, *items: NestedFlow):
         assert items
 
-        self.items: list[Flow] = []
+        self.items: list[Type | Operator | Flow] = []
         self.skips: list[bool] = []
 
         skip: bool = False
-        previous: Type | Operator | None = None
         for current in items:
             if current == ...:
                 skip = True
-                continue
-
-            if isinstance(previous, Type) and isinstance(current, Operator):
-                result = self.items[-1]
-                assert isinstance(result, Unit)
-                assert not current.definition
-                result.operator = current
-                result.direct = not skip
             else:
-                self.skips.append(skip)
                 self.items.append(Flow.shorthand(current))
-
-            if isinstance(current, (Operator, Type)):
-                previous = current
-            skip = False
-
+                self.skips.append(skip)
+                skip = False
         self.skips.append(skip)
 
         assert len(self.items) == len(self.skips) - 1
+
+    def __iter__(self) -> Iterator[tuple[bool, Type | Operator | Flow, bool]]:
+        return iter(zip(self.skips, self.items, self.skips[1:]))
 
 
 class Branch(Flow):
