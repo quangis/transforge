@@ -12,20 +12,15 @@ from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
-from abc import ABC
-from itertools import count, product, chain
+from itertools import count, chain
+from typing import Iterator, Union, Optional
+
+from transformation_algebra.flow import Flow, Sequence, AND, OR, ellipsis
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TA
-from typing import TYPE_CHECKING, Iterator, Union, Optional, TypeVar, Generic
 
-# We use '...' to indicate that steps may be skipped. This workaround allows us
-# to refer to the ellipsis' type. See github.com/python/typing/issues/684
-if TYPE_CHECKING:
-    from builtins import ellipsis
-else:
-    ellipsis = type(Ellipsis)
 
 Element = Union[Type, Operator, ellipsis, 'Flow']
 NestedFlow = Union[Element, list[Element]]
@@ -225,7 +220,23 @@ class QueryAND(Query):
 
 
 class TransformationQuery(object):  # TODO subclass rdflib.Query?
-    def __init__(self, items: NestedFlow, namespace: Namespace):
+    """
+    A flow captures some relevant aspects of a conceptual process, in terms of
+    the sequence of elements that must occur in it. For example, the following
+    flow holds that there must be datatypes `A` and `B` that are fed to an
+    operation f that eventually results in a datatype `C`:
+
+    [C, ..., f, AND(A, B)]
+
+    Note that the flow is 'reversed' (from output to input). This allows for a
+    convenient tree-like notation, but it may trip you up.
+
+    Furthermore, for succinct notation, lists are interpreted as `Sequence`
+    transformation flows and the ellipsis indicates we may skip any number of
+    steps.
+    """
+
+    def __init__(self, items: Flow[Type | Operator], namespace: Namespace):
         self.flow = Flow.shorthand(items)
         self.namespace = namespace
         self.prefix = "n"
@@ -268,87 +279,3 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         #         initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS}
         # )
 
-
-T = TypeVar('T')
-
-
-class Flow(Generic[T]):
-    """
-    A flow captures some relevant aspects of a conceptual process, in terms of
-    the sequence of elements that must occur in it. For example, the following
-    flow holds that there must be datatypes `A` and `B` that are fed to an
-    operation f that eventually results in a datatype `C`:
-
-    [C, ..., f, AND(A, B)]
-
-    Note that the flow is 'reversed' (from output to input). This allows for a
-    convenient tree-like notation, but it may trip you up.
-
-    Furthermore, for succinct notation, lists are interpreted as `Sequence`
-    transformation flows and the ellipsis indicates we may skip any number of
-    steps.
-    """
-    # The same can also be described in terms of semantic linear time logic
-    # formulae (SLTL), but since we will be using SPARQL to search through
-    # workflows, the approach chosen here makes for a straightforward
-    # translation.
-
-    @staticmethod
-    def shorthand(value: T | Flow[T] | list[T | Flow[T]]) -> T | Flow[T]:
-        """
-        Translate shorthand data structures (ellipsis for skips, lists for
-        sequences) to real flows.
-        """
-        assert value != ..., "ellipses may only occur in sequences"
-        return Sequence(*value) if isinstance(value, list) else value
-
-
-class Sequence(Flow[T]):
-    """
-    Indicate the order in which transformation elements must occur.
-    """
-
-    def __init__(self, *items: ellipsis | T | Flow[T]):
-        assert items
-
-        self.items: list[T | Flow[T]] = []
-        self.skips: list[bool] = []
-
-        skip: bool = False
-        for current in items:
-            if current == ...:
-                skip = True
-            else:
-                assert not isinstance(current, ellipsis)
-                self.items.append(Flow.shorthand(current))
-                self.skips.append(skip)
-                skip = False
-        self.skips.append(skip)
-
-        assert len(self.items) == len(self.skips) - 1
-
-    def __iter__(self) -> Iterator[tuple[bool, T | Flow[T], bool]]:
-        return iter(zip(self.skips, self.items, self.skips[1:]))
-
-
-class Branch(Flow[T]):
-    def __init__(self, *items: T | Flow[T]):
-        assert items
-        self.items = [Flow.shorthand(x) for x in items]
-
-
-class AND(Branch[T]):
-    """
-    Indicate which transformation paths must occur conjunctively. That is,
-    every path must occur somewhere --- possibly on distinct, parallel
-    branches, possibly on the same branch.
-    """
-    pass
-
-
-class OR(Branch[T]):
-    """
-    Indicate which transformation paths can occur disjunctively. That is, at
-    least one path must occur somewhere.
-    """
-    pass
