@@ -15,15 +15,12 @@ from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
 from itertools import count, chain
 from typing import Iterator, Union, Optional
 
-from transformation_algebra.flow import Flow, Sequence, AND, OR, ellipsis
+from transformation_algebra.flow import Flow, Sequence, AND, OR, FlowShorthand
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TA
 
-
-Element = Union[Type, Operator, ellipsis, 'Flow']
-NestedFlow = Union[Element, list[Element]]
 
 Triple = tuple[Node, Union[Path, Node], Node]
 
@@ -236,7 +233,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
     steps.
     """
 
-    def __init__(self, items: Flow[Type | Operator], namespace: Namespace):
+    def __init__(self, items: FlowShorthand[Type | Operator], namespace: Namespace):
         self.flow = Flow.shorthand(items)
         self.namespace = namespace
         self.prefix = "n"

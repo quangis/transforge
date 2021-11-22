@@ -4,7 +4,7 @@ Defines the generic `Flow` class.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, TypeVar, Generic
+from typing import TYPE_CHECKING, Iterator, TypeVar, Generic, Union
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
@@ -33,7 +33,7 @@ class Flow(Generic[T]):
     """
 
     @staticmethod
-    def shorthand(value: T | Flow[T] | list[T | Flow[T]]) -> T | Flow[T]:
+    def shorthand(value: FlowShorthand[T]) -> T | Flow[T]:
         """
         Translate shorthand data structures (ellipsis for skips, lists for
         sequences) to real flows.
@@ -43,7 +43,7 @@ class Flow(Generic[T]):
 
 
 class Sequence(Flow[T]):
-    def __init__(self, *items: ellipsis | T | Flow[T]):
+    def __init__(self, *items: FlowShorthand[T]):
         assert items
 
         self.items: list[T | Flow[T]] = []
@@ -87,3 +87,9 @@ class OR(FlowBranch[T]):
     must occur somewhere.
     """
     pass
+
+
+"""
+A shorthand for specifying `Flow`s.
+"""
+FlowShorthand = Union[T, Flow[T], list[Union[T, ellipsis, Flow[T]]]]
