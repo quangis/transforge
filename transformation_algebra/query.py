@@ -18,7 +18,7 @@ from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TA
-from typing import TYPE_CHECKING, Iterator, Union, Optional
+from typing import TYPE_CHECKING, Iterator, Union, Optional, TypeVar, Generic
 
 # We use '...' to indicate that steps may be skipped. This workaround allows us
 # to refer to the ellipsis' type. See github.com/python/typing/issues/684
@@ -269,7 +269,10 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         # )
 
 
-class Flow(ABC):
+T = TypeVar('T')
+
+
+class Flow(Generic[T]):
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
@@ -291,32 +294,24 @@ class Flow(ABC):
     # translation.
 
     @staticmethod
-    def shorthand(value: NestedFlow) -> Flow | Type | Operator:
+    def shorthand(value: T | Flow[T] | list[T | Flow[T]]) -> T | Flow[T]:
         """
         Translate shorthand data structures (ellipsis for skips, lists for
         sequences) to real flows.
         """
         assert value != ..., "ellipses may only occur in sequences"
-        if isinstance(value, (Type, Operator)):
-            return value
-        elif isinstance(value, list):
-            return Sequence(*value)
-        elif isinstance(value, Flow):
-            return value
-        else:
-            raise ValueError(
-                f"{value} cannot be interpreted as a Flow")
+        return Sequence(*value) if isinstance(value, list) else value
 
 
-class Sequence(Flow):
+class Sequence(Flow[T]):
     """
     Indicate the order in which transformation elements must occur.
     """
 
-    def __init__(self, *items: NestedFlow):
+    def __init__(self, *items: ellipsis | T | Flow[T]):
         assert items
 
-        self.items: list[Type | Operator | Flow] = []
+        self.items: list[T | Flow[T]] = []
         self.skips: list[bool] = []
 
         skip: bool = False
@@ -324,6 +319,7 @@ class Sequence(Flow):
             if current == ...:
                 skip = True
             else:
+                assert not isinstance(current, ellipsis)
                 self.items.append(Flow.shorthand(current))
                 self.skips.append(skip)
                 skip = False
@@ -331,17 +327,17 @@ class Sequence(Flow):
 
         assert len(self.items) == len(self.skips) - 1
 
-    def __iter__(self) -> Iterator[tuple[bool, Type | Operator | Flow, bool]]:
+    def __iter__(self) -> Iterator[tuple[bool, T | Flow[T], bool]]:
         return iter(zip(self.skips, self.items, self.skips[1:]))
 
 
-class Branch(Flow):
-    def __init__(self, *items: NestedFlow):
+class Branch(Flow[T]):
+    def __init__(self, *items: T | Flow[T]):
         assert items
         self.items = [Flow.shorthand(x) for x in items]
 
 
-class AND(Branch):
+class AND(Branch[T]):
     """
     Indicate which transformation paths must occur conjunctively. That is,
     every path must occur somewhere --- possibly on distinct, parallel
@@ -350,7 +346,7 @@ class AND(Branch):
     pass
 
 
-class OR(Branch):
+class OR(Branch[T]):
     """
     Indicate which transformation paths can occur disjunctively. That is, at
     least one path must occur somewhere.
