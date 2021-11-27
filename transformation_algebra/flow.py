@@ -33,20 +33,23 @@ class Flow(Generic[T]):
     """
 
     @staticmethod
-    def shorthand(value: FlowShorthand[T]) -> T | Flow[T]:
+    def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
         """
         Translate shorthand data structures (ellipsis for skips, lists for
         sequences) to real flows.
         """
-        assert value != ..., "ellipses may only occur in sequences"
-        return Sequence(*value) if isinstance(value, list) else value
+        if isinstance(value, list):
+            return SEQ(*value)
+        else:
+            assert value != ..., "ellipses may only occur in sequences"
+            return value
 
 
-class Sequence(Flow[T]):
+class SEQ(Flow[T]):
     def __init__(self, *items: FlowShorthand[T]):
         assert items
 
-        self.items: list[T | Flow[T]] = []
+        self.items: list[Flow1[T]] = []
         self.skips: list[bool] = []
 
         skip: bool = False
@@ -62,13 +65,15 @@ class Sequence(Flow[T]):
 
         assert len(self.items) == len(self.skips) - 1
 
-    def __iter__(self) -> Iterator[tuple[bool, T | Flow[T], bool]]:
+    def __iter__(self) -> Iterator[Flow1[T]]:
+        return iter(self.items)
+
+    def with_skips(self) -> Iterator[tuple[bool, Flow1[T], bool]]:
         return iter(zip(self.skips, self.items, self.skips[1:]))
 
 
 class FlowBranch(Flow[T]):
-    def __init__(self, *items: T | Flow[T]):
-        assert items
+    def __init__(self, *items: Flow1[T]):
         self.items = [Flow.shorthand(x) for x in items]
 
 
@@ -93,3 +98,4 @@ class OR(FlowBranch[T]):
 A shorthand for specifying `Flow`s.
 """
 FlowShorthand = Union[T, Flow[T], list[Union[T, ellipsis, Flow[T]]]]
+Flow1 = Union[T, Flow[T]]
