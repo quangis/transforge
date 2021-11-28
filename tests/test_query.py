@@ -124,6 +124,39 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(graph, [D, f2, OR(g, m), B],
             results={TEST.wf1, TEST.wf2})
 
+    def test_multiple_usage_of_units(self):
+        # The same unit may be used multiple times, so simply assigning a
+        # variable to a unit will lead to problems: one unit may have multiple
+        # variables, and multiple variables may refer to the same unit. Adding
+        # skips as a property of units poses a problem for the same reason: if
+        # a unit is used once in a series WITH a skip, all subsequent uses of
+        # that unit would also have that skip.
+
+        a2b1 = Operator(type=A ** B)
+        a2b2 = Operator(type=A ** B)
+        a2b = OR(a2b1, a2b2)
+        b2c = Operator(type=B ** C)
+        cc2d = Operator(type=C ** C ** D)
+
+        graph = make_graph(
+            wf1=cc2d(b2c(a2b1(~A)), b2c(a2b2(~A))),
+        )
+
+        self.assertQuery(graph,
+            [D, AND(
+                [C, ..., a2b],
+                [C, a2b]
+            )],
+            results={}
+        )
+        self.assertQuery(graph,
+            [D, AND(
+                [..., B, a2b],
+                [..., B, a2b]
+            )],
+            results={TEST.wf1}
+        )
+
     @unittest.skip("unsupported flows")
     def test_unsupported(self):
 
