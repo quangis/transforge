@@ -8,10 +8,9 @@ specified order.
 from __future__ import annotations
 
 import rdflib
-from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
-from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
+from rdflib.namespace import Namespace, RDFS, RDF
 from itertools import count
 from typing import Iterator, Union, Optional
 
@@ -24,13 +23,8 @@ from transformation_algebra.graph import TA
 Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
 Triple = tuple[Node, Union[Path, Node], Node]
 
-# self.prefix = "n"
-# self.nsm = NamespaceManager(Graph())
-# self.nsm.bind("ta", TA)
-# self.nsm.bind(self.prefix, self.namespace)
 
-
-class TransformationQuery(object):  # TODO subclass rdflib.Query?
+class Query(object):  # TODO subclass rdflib.Query?
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
     the sequence of elements that must occur in it. For example, the following
@@ -61,8 +55,8 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
             flow1: Flow1[Type | Operator] = Flow.shorthand(flow)
             self.connect(next(self.generator), None, False, flow1)
 
-    def spawn(self) -> TransformationQuery:
-        return TransformationQuery(self.namespace, None, self.generator)
+    def spawn(self) -> Query:
+        return Query(self.namespace, None, self.generator)
 
     def sparql(self) -> str:
         """
@@ -138,7 +132,7 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
     def __str__(self) -> str:
         return "\n".join(self.statements)
 
-    def union(self, *queries: TransformationQuery) -> None:
+    def union(self, *queries: Query) -> None:
         self.statements.append("{")
         self.statements.append("\n} UNION {\n".join(str(q) for q in queries))
         self.statements.append("}")

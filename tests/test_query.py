@@ -8,9 +8,8 @@ from transformation_algebra.flow import FlowShorthand
 from transformation_algebra.type import TypeOperator, Type
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph, \
-    LanguageNamespace, TA
-from transformation_algebra.query import TransformationQuery, OR, AND
+from transformation_algebra.graph import TransformationGraph, TA
+from transformation_algebra.query import Query, OR, AND
 
 TEST = Namespace("https://example.com/#")
 
@@ -47,13 +46,13 @@ def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
 class TestAlgebra(unittest.TestCase):
 
     def assertQuery(self, graph: TransformationGraph,
-            query: TransformationQuery | FlowShorthand[Type | Operator],
+            query: Query | FlowShorthand[Type | Operator],
             results: set[Node] | None) -> None:
 
-        if isinstance(query, TransformationQuery):
+        if isinstance(query, Query):
             query1 = query
         else:
-            query1 = TransformationQuery(TEST, query)
+            query1 = Query(TEST, query)
 
         self.assertEqual(
             results or set(),
