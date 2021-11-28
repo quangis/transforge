@@ -95,6 +95,9 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.statements.append(" ".join(result) + ".")
 
     def set_operator(self, variable: rdflib.Variable, op: Operator) -> None:
+        if op.definition:
+            import warnings
+            warnings.warn(f"query used a non-primitive operation {op.name}")
         self.triple(variable, TA.via, self.namespace[op.name])
 
     def set_type(self, variable: rdflib.Variable, type: Type,
