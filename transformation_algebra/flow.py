@@ -73,7 +73,7 @@ class SEQ(Flow[T]):
 
 
 class FlowBranch(Flow[T]):
-    def __init__(self, *items: Flow1[T]):
+    def __init__(self, *items: FlowShorthand[T]):
         self.items = [Flow.shorthand(x) for x in items]
 
 

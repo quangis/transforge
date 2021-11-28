@@ -12,7 +12,7 @@ from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
 from rdflib.namespace import Namespace, NamespaceManager, RDFS, RDF
-from itertools import count, chain
+from itertools import count
 from typing import Iterator, Union, Optional
 
 from transformation_algebra.flow import Flow, Flow1, SEQ, AND, OR, FlowShorthand
@@ -58,8 +58,8 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
         self.statements: list[str] = []
 
         if flow:
-            self.connect(next(self.generator), None, False,
-                Flow.shorthand(flow))
+            flow1: Flow1[Type | Operator] = Flow.shorthand(flow)
+            self.connect(next(self.generator), None, False, flow1)
 
     def spawn(self) -> TransformationQuery:
         return TransformationQuery(self.namespace, None, self.generator)
@@ -135,6 +135,14 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                     pred / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
                     self.namespace[t._operator.name])
 
+    def __str__(self) -> str:
+        return "\n".join(self.statements)
+
+    def union(self, *queries: TransformationQuery) -> None:
+        self.statements.append("{")
+        self.statements.append("\n} UNION {\n".join(str(q) for q in queries))
+        self.statements.append("}")
+
     def connect(self,
             lvar: rdflib.Variable,
             lunit: Type | Operator | OR[Operator] | None,
@@ -182,15 +190,13 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
                 self.set_operator(var, item)
             else:
                 assert isinstance(item, OR)
-                res = []
+                subs = []
                 for i in item.items:
                     assert isinstance(i, Operator)
                     subquery = self.spawn()
                     subquery.set_operator(var, i)
-                    res.append('\n'.join(subquery.statements))
-                self.statements.append("{")
-                self.statements.append("} UNION {".join(res))
-                self.statements.append("}")
+                    subs.append(subquery)
+                self.union(*subs)
             return var
 
         elif isinstance(item, AND):
@@ -202,21 +208,22 @@ class TransformationQuery(object):  # TODO subclass rdflib.Query?
 
         elif isinstance(item, OR):
 
-            res = []
+            subs = []
             for i in item.items:
                 subquery = self.spawn()
-                self.connect(lvar, lunit, lskip, i)
-                res.append('\n'.join(subquery.statements))
-            self.statements.append("{")
-            self.statements.append("} UNION {".join(res))
-            self.statements.append("}")
+                subquery.connect(lvar, lunit, lskip, i)
+                subs.append(subquery)
+            self.union(*subs)
 
         else:
             assert isinstance(item, SEQ)
 
             for i in range(len(item.items) - 1):
                 current = item.items[i]
-                assert isinstance(current, (Type, Operator))
+                assert isinstance(current, (Type, Operator)) or (
+                    isinstance(current, OR) and
+                    all(isinstance(i, Operator) for i in current.items)
+                )
                 var = self.connect(lvar, lunit, lskip or item.skips[i], current)
                 lvar = var
                 lunit = current
