@@ -21,7 +21,7 @@ from transformation_algebra.type import Type, TypeOperation, \
 from transformation_algebra.expr import Operator
 from transformation_algebra.graph import TA
 
-
+Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
 Triple = tuple[Node, Union[Path, Node], Node]
 
 # self.prefix = "n"
