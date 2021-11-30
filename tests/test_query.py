@@ -124,14 +124,23 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(graph, [D, f2, OR(g, m), B],
             results={TEST.wf1, TEST.wf2})
 
-    def test_direct_output(self):
-        # Test that a query for direct output really only captures direct
-        # output
+    def test_sequenced_skips(self):
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
         lang = Language(locals())
 
-        graph = make_graph(e=b2c(a2b(~A)))
+        graph = make_graph(e=b2c(a2b(~A)), e2=~A)
+
+        # Test that a query for direct output really only captures that
         self.assertQuery(graph, [C, a2b], results=set())
+
+        # Test that a query for indirect output captures both direct and
+        # indirect output
+        self.assertQuery(graph, [C, ..., a2b], results={TEST.e})
+        self.assertQuery(graph, [C, ..., b2c], results={TEST.e})
+
+        # Test that a query that skips the result type may still capture it
+        self.assertQuery(graph, [..., C], results={TEST.e})
+        self.assertQuery(graph, [..., A], results={TEST.e, TEST.e2})
 
     def test_multiple_usage_of_units(self):
         # The same unit may be used multiple times, so simply assigning a
