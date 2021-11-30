@@ -124,6 +124,15 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(graph, [D, f2, OR(g, m), B],
             results={TEST.wf1, TEST.wf2})
 
+    def test_direct_output(self):
+        # Test that a query for direct output really only captures direct
+        # output
+        a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
+        lang = Language(locals())
+
+        graph = make_graph(e=b2c(a2b(~A)))
+        self.assertQuery(graph, [C, a2b], results=set())
+
     def test_multiple_usage_of_units(self):
         # The same unit may be used multiple times, so simply assigning a
         # variable to a unit will lead to problems: one unit may have multiple
@@ -136,21 +145,23 @@ class TestAlgebra(unittest.TestCase):
         a2b2 = Operator(type=A ** B)
         a2b = OR(a2b1, a2b2)
         b2c = Operator(type=B ** C)
-        cc2d = Operator(type=C ** C ** D)
+        b2d = Operator(type=B ** D)
+        cd2a = Operator(type=C ** D ** A)
+        lang = Language(locals())
 
         graph = make_graph(
-            wf1=cc2d(b2c(a2b1(~A)), b2c(a2b2(~A))),
+            wf1=cd2a(b2c(a2b1(~A)), b2d(a2b2(~A))),
         )
 
         self.assertQuery(graph,
-            [D, AND(
+            [A, AND(
                 [C, ..., a2b],
                 [C, a2b]
             )],
             results={}
         )
         self.assertQuery(graph,
-            [D, AND(
+            [A, AND(
                 [..., B, a2b],
                 [..., B, a2b]
             )],
