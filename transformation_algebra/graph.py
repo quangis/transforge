@@ -74,41 +74,55 @@ class TransformationGraph(Graph):
         # self.bind("test", self.namespace)
 
     @staticmethod
-    def vocabulary(algebra: Language, namespace:
-            LanguageNamespace) -> Graph:
+    def vocabulary(algebra: Language, namespace: Namespace) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.
         """
         vocab = TransformationGraph(algebra, namespace)
+        vocab.include_labels = False  # TODO
 
         # Add type operators to the vocabulary
         for t in algebra.types.values():
             if t.arity > 0:
-                current_uri = namespace[t]
-                vocab.add((current_uri, RDF.type, TA.Type))
-                vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
-                vocab.add((current_uri, RDFS.label, Literal(str(t))))
+                current_uri = namespace[t.name]
+
+                if vocab.include_kinds:
+                    vocab.add((current_uri, RDF.type, TA.Type))
+                    vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
+
+                if vocab.include_labels:
+                    vocab.add((current_uri, RDFS.label, Literal(str(t))))
             else:
                 previous_uri = None
                 current: Optional[TypeOperator] = t
                 while current:
-                    current_uri = namespace[current]
-                    vocab.add((current_uri, RDFS.label, Literal(str(t))))
-                    vocab.add((current_uri, RDF.type, TA.Type))
+                    current_uri = namespace[current.name]
+
+                    if vocab.include_labels:
+                        vocab.add((current_uri, RDFS.label, Literal(str(t))))
+
+                    if vocab.include_kinds:
+                        vocab.add((current_uri, RDF.type, TA.Type))
+
                     if previous_uri:
                         vocab.add((previous_uri, RDFS.subClassOf, current_uri))
+
                     previous_uri = current_uri
                     current = current.supertype
 
         # Add operations to the vocabulary
         for d in algebra.operators.values():
             node = namespace[d]
-            type_node = TA.Operation
-            vocab.add((node, RDF.type, type_node))
-            vocab.add((node, RDFS.label, Literal(str(d.name))))
-            if d.description:
-                vocab.add((node, RDFS.comment, Literal(d.description)))
+
+            if vocab.include_kinds:
+                type_node = TA.Operation
+                vocab.add((node, RDF.type, type_node))
+
+            if vocab.include_labels:
+                vocab.add((node, RDFS.label, Literal(str(d.name))))
+                if d.description:
+                    vocab.add((node, RDFS.comment, Literal(d.description)))
 
         return vocab
 

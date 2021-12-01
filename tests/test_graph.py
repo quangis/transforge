@@ -395,3 +395,22 @@ class TestAlgebraRDF(unittest.TestCase):
             graph_auto(alg, ALG, F(x, y)),
             g
         )
+
+    def test_vocabulary(self):
+        # Test that subtype relations are encoded in the vocabulary
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        C = TypeOperator(supertype=A)
+        D = TypeOperator(supertype=C)
+        lang = Language(locals())
+        LANG = LanguageNamespace('LANG#', lang)
+
+        graph = Graph()
+        graph.add((LANG.B, RDFS.subClassOf, LANG.A))
+        graph.add((LANG.C, RDFS.subClassOf, LANG.A))
+        graph.add((LANG.D, RDFS.subClassOf, LANG.C))
+
+        self.assertIsomorphic(
+            TransformationGraph.vocabulary(lang, LANG),
+            graph
+        )

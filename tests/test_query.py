@@ -26,12 +26,14 @@ f2 = Operator(type=B ** C ** D)
 alg = Language(locals())
 
 
-def make_graph(**workflows: Expr | dict[Expr, list[Expr | Node]]
+def make_graph(lang: Language,
+        **workflows: Expr | dict[Expr, list[Expr | Node]]
         ) -> TransformationGraph:
     """
     Convenience method for constructing a graph containing workflows.
     """
-    graph = TransformationGraph(alg, TEST)
+    graph = TransformationGraph(lang, TEST)
+    graph += TransformationGraph.vocabulary(lang, TEST)
     for name, content in workflows.items():
         wf = TEST[name]
         if isinstance(content, Expr):
@@ -60,7 +62,7 @@ class TestAlgebra(unittest.TestCase):
         )
 
     def test_serial(self):
-        graph = make_graph(wf1=g(f(~A)))
+        graph = make_graph(alg, wf1=g(f(~A)))
 
         self.assertQuery(graph, [C, g, B, f, A],
             results={TEST.wf1})
@@ -74,7 +76,7 @@ class TestAlgebra(unittest.TestCase):
             results=None)
 
     def test_serial_skip(self):
-        graph = make_graph(wf1=h(g(f(~A))))
+        graph = make_graph(alg, wf1=h(g(f(~A))))
 
         self.assertQuery(graph, [D, ..., A],
             results={TEST.wf1})
@@ -90,7 +92,7 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1})
 
     def test_parallel(self):
-        graph = make_graph(wf1=f2(~B, ~C), wf2=f2(f(~A), g(~B)))
+        graph = make_graph(alg, wf1=f2(~B, ~C), wf2=f2(f(~A), g(~B)))
 
         self.assertQuery(graph, [D, f2, AND(B, C)],
             results={TEST.wf1, TEST.wf2})
@@ -106,7 +108,7 @@ class TestAlgebra(unittest.TestCase):
             results=None)
 
     def test_choice(self):
-        graph = make_graph(
+        graph = make_graph(alg,
             wf1=f2(f(~A), g(~B)),
             wf2=f2(~B, g(f(~A)))
         )
@@ -128,13 +130,12 @@ class TestAlgebra(unittest.TestCase):
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
         lang = Language(locals())
 
-        graph = make_graph(e=b2c(a2b(~A)), e2=~A)
+        graph = make_graph(alg, e=b2c(a2b(~A)), e2=~A)
 
         # Test that a query for direct output really only captures that
         self.assertQuery(graph, [C, a2b], results=set())
 
-        # Test that a query for indirect output captures both direct and
-        # indirect output
+        # Test that a query for indirect output also captures direct output
         self.assertQuery(graph, [C, ..., a2b], results={TEST.e})
         self.assertQuery(graph, [C, ..., b2c], results={TEST.e})
 
@@ -158,7 +159,7 @@ class TestAlgebra(unittest.TestCase):
         cd2a = Operator(type=C ** D ** A)
         lang = Language(locals())
 
-        graph = make_graph(
+        graph = make_graph(alg,
             wf1=cd2a(b2c(a2b1(~A)), b2d(a2b2(~A))),
         )
 
@@ -177,10 +178,25 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1}
         )
 
+    def test_capture_subtypes(self):
+        # Test that using a supertype in a query would still return a workflow
+        # that uses a subtype
+        X = TypeOperator()
+        Y = TypeOperator(supertype=X)
+        F = TypeOperator(params=1)
+        lang = Language(locals())
+
+        graph = make_graph(lang, x=~X, y=~Y, fx=~F(X), fy=~F(Y))
+
+        self.assertQuery(graph, [X], results={TEST.x, TEST.y})
+        self.assertQuery(graph, [Y], results={TEST.y})
+        self.assertQuery(graph, [F(X)], results={TEST.fx, TEST.fy})
+        self.assertQuery(graph, [F(Y)], results={TEST.fy})
+
     @unittest.skip("unsupported flows")
     def test_unsupported(self):
 
-        graph = make_graph(
+        graph = make_graph(alg,
             wf1=f2(f(~A), g(~B)),
             wf2=f2(~B, g(f(~A)))
         )
