@@ -178,7 +178,29 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1}
         )
 
-    def test_capture_subtypes(self):
+    def test_distribution_of_skips(self):
+        # See issue #61:
+        # Test that [A, ..., AND(f, g)] is not interpreted the same as [A,
+        # AND([..., f], [..., g])]: the first says that, before A, there should
+        # be a particular node that takes the outputs of both f and g as input;
+        # the second simply says that f and g occur sometime before A.
+
+        a2a = Operator(type=A ** A)
+        a2b = Operator(type=A ** B)
+        ab2c = Operator(type=A ** B ** C)
+        c2d = Operator(type=C ** D)
+        lang = Language(locals())
+
+        graph = make_graph(lang,
+                direct=c2d(ab2c(a2a(~A), a2b(~A))),
+                indirect=c2d(ab2c(~A, a2b(a2a(~A)))))
+
+        self.assertQuery(graph, [D, ..., AND(a2a, a2b)],
+            results={TEST.direct})
+        self.assertQuery(graph, [D, AND([..., a2a], [..., a2b])],
+            results={TEST.direct, TEST.indirect})
+
+    def test_that_supertypes_are_captured(self):
         # Test that using a supertype in a query would still return a workflow
         # that uses a subtype
         X = TypeOperator()
