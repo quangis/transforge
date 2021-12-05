@@ -6,12 +6,15 @@ types and operators. It also handles parsing expressions of the algebra.
 from __future__ import annotations
 
 from itertools import groupby
-from typing import Optional, Iterator, Any
+from typing import Optional, Iterator, Any, TYPE_CHECKING
 
 from transformation_algebra.type import \
     TypeOperator, TypeInstance, TypeVariable
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
+
+if TYPE_CHECKING:
+    from rdflib import Namespace
 
 
 class Language(object):
@@ -20,6 +23,7 @@ class Language(object):
         self.types: dict[str, TypeOperator] = dict()
         if scope:
             self.add_scope(scope)
+        self.namespace: Namespace | None = None
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
