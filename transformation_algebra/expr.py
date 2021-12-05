@@ -30,7 +30,7 @@ class Operator(object):
             type: Type | Callable[..., TypeInstance] = _,
             define: Optional[Callable[..., Expr]] = None,
             name: Optional[str] = None):
-        self.name = name
+        self._name = name
         self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.description = doc
         self.definition = define  # a transformation may be non-primitive
@@ -42,7 +42,20 @@ class Operator(object):
         return str(self)
 
     def __str__(self) -> str:
-        return self.name or object.__repr__(self)
+        return self._name or object.__repr__(self)
+
+    @property
+    def name(self) -> str:
+        if self._name is None:
+            raise RuntimeError("Unnamed operator.")
+        return self._name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        if value is None or (self._name is not None and value != self._name):
+            raise RuntimeError(
+                f"Cannot name operator {value}; already named {self._name}.")
+        self._name = value
 
     def __call__(self, *args: Operator | Expr) -> Expr:
         """

@@ -137,7 +137,6 @@ class TransformationGraph(Graph):
             return self.type_nodes[t]
         except KeyError:
             if isinstance(t, TypeOperation):
-                assert t._operator.name, "type must have a name at this point"
                 if t.params:
                     node = BNode()
                     self.add((node, RDFS.subClassOf,
@@ -195,8 +194,6 @@ class TransformationGraph(Graph):
                 self.add((current, RDF.type, self.add_type(datatype)))
 
             if isinstance(expr, Operation):
-                assert expr.operator.name, \
-                    "operator must have a name at this point"
                 assert not expr.operator.definition, \
                     f"{expr.operator} should be a primitive"
 

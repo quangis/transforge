@@ -95,7 +95,6 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.statements.append(" ".join(result) + ".")
 
     def set_operator(self, variable: rdflib.Variable, op: Operator) -> None:
-        assert op.name, "operator must have a name at this point"
         if op.definition:
             import warnings
             warnings.warn(f"query used a non-primitive operation {op.name}")
@@ -115,7 +114,6 @@ class Query(object):  # TODO subclass rdflib.Query?
             assert t.wildcard
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
-            assert t._operator.name, "type must have a name at this point"
 
             pred = RDF.type if index is None else RDF[f"_{index}"]
             if t.params:

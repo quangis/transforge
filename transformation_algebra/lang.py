@@ -35,13 +35,7 @@ class Language(object):
 
         # The item must already have a name or be named here
         if name:
-            name = name.rstrip("_")
-            if not item.name:
-                item.name = name
-            elif item.name != name:
-                raise ValueError("has conflicting names")
-        elif not item.name:
-            raise ValueError("must have a name")
+            name = item.name = name.rstrip("_")
         else:
             name = item.name
 

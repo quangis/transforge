@@ -144,7 +144,7 @@ class TypeOperator(Type):
             name: Optional[str] = None,
             params: int | list[Variance] = 0,
             supertype: Optional[TypeOperator] = None):
-        self.name = name
+        self._name = name
         self.supertype: Optional[TypeOperator] = supertype
         self.variance = list(Variance.CO for _ in range(params)) \
             if isinstance(params, int) else list(params)
@@ -154,7 +154,7 @@ class TypeOperator(Type):
             raise ValueError("only nullary types can have direct supertypes")
 
     def __str__(self) -> str:
-        return self.name or object.__repr__(self)
+        return self._name or object.__repr__(self)
 
     def __call__(self, *params: Type) -> TypeOperation:
         return TypeOperation(self, *(p.instance() for p in params))
@@ -169,6 +169,19 @@ class TypeOperator(Type):
 
     def instance(self) -> TypeInstance:
         return TypeOperation(self)
+
+    @property
+    def name(self) -> str:
+        if self._name is None:
+            raise RuntimeError("Unnamed operator.")
+        return self._name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        if value is None or (self._name is not None and value != self._name):
+            raise RuntimeError(
+                f"Cannot name operator {value}; already named {self._name}.")
+        self._name = value
 
 
 class TypeInstance(Type):
