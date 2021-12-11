@@ -51,9 +51,10 @@ class Query(object):  # TODO subclass rdflib.Query?
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
         self.statements: list[str] = []
 
+        self.flow: Flow1[Type | Operator] | None = None
         if flow:
-            flow1: Flow1[Type | Operator] = Flow.shorthand(flow)
-            self.connect(next(self.generator), "start", False, flow1)
+            self.flow = Flow.shorthand(flow)
+            self.connect(next(self.generator), "start", False, self.flow)
 
     def spawn(self) -> Query:
         return Query(self.namespace, None, self.generator)
