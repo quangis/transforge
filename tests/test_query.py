@@ -64,31 +64,31 @@ class TestAlgebra(unittest.TestCase):
     def test_serial(self):
         graph = make_graph(alg, wf1=g(f(~A)))
 
-        self.assertQuery(graph, [C, g, B, f, A],
+        self.assertQuery(graph, [[C, g, B, f, A]],
             results={TEST.wf1})
-        self.assertQuery(graph, [C, B, A],
+        self.assertQuery(graph, [[C, B, A]],
             results={TEST.wf1})
-        self.assertQuery(graph, [g, f],
+        self.assertQuery(graph, [[g, f]],
             results={TEST.wf1})
-        self.assertQuery(graph, [C, f, B, g, A],
+        self.assertQuery(graph, [[C, f, B, g, A]],
             results=None)
-        self.assertQuery(graph, [B, g, C, f, A],
+        self.assertQuery(graph, [[B, g, C, f, A]],
             results=None)
 
     def test_serial_skip(self):
         graph = make_graph(alg, wf1=h(g(f(~A))))
 
-        self.assertQuery(graph, [D, ..., A],
+        self.assertQuery(graph, [D, A],
             results={TEST.wf1})
-        self.assertQuery(graph, [h, ..., f],
+        self.assertQuery(graph, [h, f],
             results={TEST.wf1})
-        self.assertQuery(graph, [h, g, f],
-            results={TEST.wf1})
-        self.assertQuery(graph, [D, ..., g, ..., A],
+        self.assertQuery(graph, [[h, g, f]],
             results={TEST.wf1})
         self.assertQuery(graph, [D, g, A],
+            results={TEST.wf1})
+        self.assertQuery(graph, [[D, g, A]],
             results=None)
-        self.assertQuery(graph, [D, ..., B, ..., f, ..., A],
+        self.assertQuery(graph, [D, B, f, A],
             results={TEST.wf1})
 
     def test_parallel(self):
@@ -96,52 +96,61 @@ class TestAlgebra(unittest.TestCase):
 
         self.assertQuery(graph, [D, f2, AND(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, AND([..., B], [..., C])],
-            results={TEST.wf1, TEST.wf2})
         self.assertQuery(graph, [D, f2, AND(B, C, f, g)],
             results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, AND([B, f], [C, g])],
-            results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, AND([..., A], [..., B])],
+        self.assertQuery(graph, [D, f2, AND([[B, f]], [[C, g]])],
             results={TEST.wf2})
         self.assertQuery(graph, [D, f2, AND(A, B)],
+            results={TEST.wf2})
+        self.assertQuery(graph, [[D, f2, AND(A, B)]],
             results=None)
 
     def test_choice(self):
-        graph = make_graph(alg,
-            wf1=f2(f(~A), g(~B)),
-            wf2=f2(~B, g(f(~A)))
+
+        A, B, C, D = (TypeOperator() for _ in range(4))
+        a2b = Operator(type=A ** B)
+        b2c = Operator(type=B ** C)
+        b2c2 = Operator(type=B ** C)
+        bc2d = Operator(type=B ** C ** D)
+        lang = Language(locals())
+
+        graph = make_graph(lang,
+            wf1=bc2d(a2b(~A), b2c(~B)),
+            wf2=bc2d(~B, b2c(a2b(~A)))
         )
 
-        self.assertQuery(graph, [D, f2, OR(A, D)],
+        self.assertQuery(graph, [[D, bc2d, OR(A, D)]],
             results=None)
-        self.assertQuery(graph, [D, f2, OR(A, B)],
+        self.assertQuery(graph, [D, bc2d, OR(A, B)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, OR(B, C)],
+        self.assertQuery(graph, [D, bc2d, OR(B, C)],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(graph, [D, f2, OR([B, f], [C, f])],
+
+        self.assertQuery(graph, [[D, bc2d, OR([[B, a2b]], [[C, a2b]])]],
             results={TEST.wf1})
 
         # Choice between operations in non-last place
-        self.assertQuery(graph, [D, f2, OR(g, m), B],
+        self.assertQuery(graph, [[D, bc2d, OR(b2c, b2c2), B]],
             results={TEST.wf1, TEST.wf2})
 
     def test_sequenced_skips(self):
+
+        A, B, C = (TypeOperator() for _ in range(3))
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
         lang = Language(locals())
 
         graph = make_graph(alg, e=b2c(a2b(~A)), e2=~A)
 
         # Test that a query for direct output really only captures that
-        self.assertQuery(graph, [C, a2b], results=set())
+        self.assertQuery(graph, [[C, a2b]], results=set())
 
         # Test that a query for indirect output also captures direct output
-        self.assertQuery(graph, [C, ..., a2b], results={TEST.e})
-        self.assertQuery(graph, [C, ..., b2c], results={TEST.e})
+        self.assertQuery(graph, [C, a2b], results={TEST.e})
+        self.assertQuery(graph, [C, b2c], results={TEST.e})
 
         # Test that a query that skips the result type may still capture it
-        self.assertQuery(graph, [..., C], results={TEST.e})
-        self.assertQuery(graph, [..., A], results={TEST.e, TEST.e2})
+        # self.assertQuery(graph, [..., C], results={TEST.e})
+        # self.assertQuery(graph, [..., A], results={TEST.e, TEST.e2})
 
     def test_multiple_usage_of_units(self):
         # The same unit may be used multiple times, so simply assigning a
@@ -151,6 +160,7 @@ class TestAlgebra(unittest.TestCase):
         # a unit is used once in a series WITH a skip, all subsequent uses of
         # that unit would also have that skip.
 
+        A, B, C, D = (TypeOperator() for _ in range(4))
         a2b1 = Operator(type=A ** B)
         a2b2 = Operator(type=A ** B)
         a2b = OR(a2b1, a2b2)
@@ -164,20 +174,22 @@ class TestAlgebra(unittest.TestCase):
         )
 
         self.assertQuery(graph,
-            [A, AND(
-                [C, ..., a2b],
-                [C, a2b]
-            )],
+            [[A, AND(
+                [C, a2b],
+                [[C, a2b]]
+            )]],
             results={}
         )
         self.assertQuery(graph,
             [A, AND(
-                [..., B, a2b],
-                [..., B, a2b]
+                [D, a2b],
+                [C, a2b]
             )],
             results={TEST.wf1}
         )
 
+    @unittest.skip("Obsoleted since it is no longer possible to skip at "
+            "the beginning of a flow.")
     def test_distribution_of_skips(self):
         # See issue #61:
         # Test that [A, ..., AND(f, g)] is not interpreted the same as [A,
@@ -185,6 +197,7 @@ class TestAlgebra(unittest.TestCase):
         # be a particular node that takes the outputs of both f and g as input;
         # the second simply says that f and g occur sometime before A.
 
+        A, B, C, D = (TypeOperator() for _ in range(4))
         a2a = Operator(type=A ** A)
         a2b = Operator(type=A ** B)
         ab2c = Operator(type=A ** B ** C)
@@ -210,10 +223,10 @@ class TestAlgebra(unittest.TestCase):
 
         graph = make_graph(lang, x=~X, y=~Y, fx=~F(X), fy=~F(Y))
 
-        self.assertQuery(graph, [X], results={TEST.x, TEST.y})
-        self.assertQuery(graph, [Y], results={TEST.y})
-        self.assertQuery(graph, [F(X)], results={TEST.fx, TEST.fy})
-        self.assertQuery(graph, [F(Y)], results={TEST.fy})
+        self.assertQuery(graph, X, results={TEST.x, TEST.y})
+        self.assertQuery(graph, Y, results={TEST.y})
+        self.assertQuery(graph, F(X), results={TEST.fx, TEST.fy})
+        self.assertQuery(graph, F(Y), results={TEST.fy})
 
     @unittest.skip("unsupported flows")
     def test_unsupported(self):

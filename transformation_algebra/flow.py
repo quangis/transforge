@@ -4,14 +4,7 @@ Defines the generic `Flow` class.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, TypeVar, Generic, Union
-
-# We use '...' to indicate that steps may be skipped. This workaround allows us
-# to refer to the ellipsis' type. See github.com/python/typing/issues/684
-if TYPE_CHECKING:
-    from builtins import ellipsis
-else:
-    ellipsis = type(Ellipsis)
+from typing import Iterator, TypeVar, Generic, Union
 
 T = TypeVar('T')
 
@@ -23,61 +16,53 @@ class Flow(Generic[T]):
     and it is 'reversed' (that is, specified from end to beginning). This
     allows for a convenient tree-like notation, but it may trip you up.
 
-    For succinct notation, lists are interpreted as sequential flows and the
-    ellipsis indicates we may skip any number of steps.
+    A shorthand notation allows lists to be interpreted as `SERIES`.
 
     For example, the following flow of type `Flow[int]` describes a flow ending
-    in 99, where 3 results from steps 1 and 2.
+    in 9, in which step 3 results directly from steps 1 and 2.
 
-    [99, ..., 3, AND(1, 2)]
+    SERIES(9, LINKED(3, AND(1, 2)))
     """
 
-    @staticmethod
-    def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
-        """
-        Translate shorthand data structures (ellipsis for skips, lists for
-        sequences) to real flows.
-        """
-        if isinstance(value, list):
-            return SEQ(*value)
-        else:
-            assert value != ..., "ellipses may only occur in sequences"
-            return value
-
-
-class SEQ(Flow[T]):
     def __init__(self, *items: FlowShorthand[T]):
-        assert items
-
-        self.items: list[Flow1[T]] = []
-        self.skips: list[bool] = []
-
-        skip: bool = False
-        for current in items:
-            if current == ...:
-                skip = True
-            else:
-                assert not isinstance(current, ellipsis)
-                self.items.append(Flow.shorthand(current))
-                self.skips.append(skip)
-                skip = False
-        self.skips.append(skip)
-
-        assert len(self.items) == len(self.skips) - 1
+        if len(items) < 2:
+            raise RuntimeError("Expected at least two items.")
+        self.items: list[Flow1[T]] = [Flow.shorthand(x) for x in items]
 
     def __iter__(self) -> Iterator[Flow1[T]]:
         return iter(self.items)
 
-    def with_skips(self) -> Iterator[tuple[bool, Flow1[T], bool]]:
-        return iter(zip(self.skips, self.items, self.skips[1:]))
+    @staticmethod
+    def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
+        """
+        Translate shorthand data structures (lists for series) to real flows.
+        """
+        if isinstance(value, list):
+            if len(value) == 1 and isinstance(value[0], list):
+                return LINKED(*value[0])
+            else:
+                return SERIES(*value)
+        else:
+            return value
 
 
-class FlowBranch(Flow[T]):
-    def __init__(self, *items: FlowShorthand[T]):
-        self.items = [Flow.shorthand(x) for x in items]
+class LINKED(Flow[T]):
+    """
+    A series linked in a chain, where each node must *immediately* follow the
+    one after.
+    """
+    pass
 
 
-class AND(FlowBranch[T]):
+class SERIES(Flow[T]):
+    """
+    A sequence where each node must follow the one after, but not necessarily
+    immediately.
+    """
+    pass
+
+
+class AND(Flow[T]):
     """
     Indicate which paths must occur conjunctively. That is, every path must
     occur somewhere --- possibly on distinct, parallel branches, possibly on
@@ -86,7 +71,7 @@ class AND(FlowBranch[T]):
     pass
 
 
-class OR(FlowBranch[T]):
+class OR(Flow[T]):
     """
     Indicate which paths can occur disjunctively. That is, at least one path
     must occur somewhere.
@@ -97,5 +82,5 @@ class OR(FlowBranch[T]):
 """
 A shorthand for specifying `Flow`s.
 """
-FlowShorthand = Union[T, Flow[T], list[Union[T, ellipsis, Flow[T]]]]
 Flow1 = Union[T, Flow[T]]
+FlowShorthand = Union[Flow1[T], list[Flow1[T]]]

@@ -14,7 +14,7 @@ from rdflib.namespace import Namespace, RDFS, RDF
 from itertools import count
 from typing import Iterator, Union, Optional, Literal
 
-from transformation_algebra.flow import Flow, Flow1, SEQ, AND, OR, FlowShorthand
+from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, FlowShorthand
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
@@ -189,7 +189,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             else:
                 assert isinstance(item, OR)
                 subs = []
-                for i in item.items:
+                for i in item:
                     assert isinstance(i, Operator)
                     subquery = self.spawn()
                     subquery.set_operator(var, i)
@@ -199,7 +199,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         elif isinstance(item, AND):
 
-            for i in item.items:
+            for i in item:
                 subquery = self.spawn()
                 subquery.connect(lvar, lunit, lskip, i)
                 self.statements.extend(subquery.statements)
@@ -207,44 +207,43 @@ class Query(object):  # TODO subclass rdflib.Query?
         elif isinstance(item, OR):
 
             subs = []
-            for i in item.items:
+            for i in item:
                 subquery = self.spawn()
                 subquery.connect(lvar, lunit, lskip, i)
                 subs.append(subquery)
             self.union(*subs)
 
         else:
-            assert isinstance(item, SEQ)
+            assert isinstance(item, (SERIES, LINKED))
 
-            n = len(item.items)
+            skip_between = isinstance(item, SERIES)
 
-            for i in range(n - 1):
-                current = item.items[i]
+            for current in item.items[:-1]:
                 assert isinstance(current, (Type, Operator)) or (
                     isinstance(current, OR) and
                     all(isinstance(i, Operator) for i in current.items)
                 )
-                var = self.connect(lvar, lunit, lskip or item.skips[i], current)
+                var = self.connect(lvar, lunit, lskip, current)
                 lvar = var
                 lunit = current
-                lskip = False
+                lskip = skip_between
 
-            lskip = item.skips[-2] if n >= 1 else False
+            lskip = skip_between
             current = item.items[-1]
 
-            # If there is a skip before an item that is not a unit (can only be
-            # the last item at the moment), then then we must make an
-            # intermediary node that subsequent sequences can attach to. See
-            # issue #61. This is only necessary if subsequent sequences don't
-            # all start with a skip.
-            if lskip and isinstance(current, AND) and not all(
-                    isinstance(item, SEQ) and item.skips[0]
-                    for item in current.items):
-                var = next(self.generator)
-                self.triple(lvar, ~TA.feeds * ZeroOrMore, var)
-                lunit = None
-                lskip = False
-                lvar = var
+            # # If there is a skip before an item that is not a unit (can only be
+            # # the last item at the moment), then then we must make an
+            # # intermediary node that subsequent sequences can attach to. See
+            # # issue #61. This is only necessary if subsequent sequences don't
+            # # all start with a skip.
+            # if lskip and isinstance(current, AND) and not all(
+            #         isinstance(item, SEQ) and item.skips[0]
+            #         for item in current.items):
+            #     var = next(self.generator)
+            #     self.triple(lvar, ~TA.feeds * ZeroOrMore, var)
+            #     lunit = None
+            #     lskip = False
+            #     lvar = var
 
             return self.connect(lvar, lunit, lskip, current)
 
