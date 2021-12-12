@@ -64,15 +64,15 @@ class TestAlgebra(unittest.TestCase):
     def test_serial(self):
         graph = make_graph(alg, wf1=g(f(~A)))
 
-        self.assertQuery(graph, [[C, g, B, f, A]],
+        self.assertQuery(graph, (C, g, B, f, A),
             results={TEST.wf1})
-        self.assertQuery(graph, [[C, B, A]],
+        self.assertQuery(graph, (C, B, A),
             results={TEST.wf1})
-        self.assertQuery(graph, [[g, f]],
+        self.assertQuery(graph, (g, f),
             results={TEST.wf1})
-        self.assertQuery(graph, [[C, f, B, g, A]],
+        self.assertQuery(graph, (C, f, B, g, A),
             results=None)
-        self.assertQuery(graph, [[B, g, C, f, A]],
+        self.assertQuery(graph, (B, g, C, f, A),
             results=None)
 
     def test_serial_skip(self):
@@ -82,11 +82,11 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1})
         self.assertQuery(graph, [h, f],
             results={TEST.wf1})
-        self.assertQuery(graph, [[h, g, f]],
+        self.assertQuery(graph, (h, g, f),
             results={TEST.wf1})
         self.assertQuery(graph, [D, g, A],
             results={TEST.wf1})
-        self.assertQuery(graph, [[D, g, A]],
+        self.assertQuery(graph, (D, g, A),
             results=None)
         self.assertQuery(graph, [D, B, f, A],
             results={TEST.wf1})
@@ -98,11 +98,11 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1, TEST.wf2})
         self.assertQuery(graph, [D, f2, AND(B, C, f, g)],
             results={TEST.wf2})
-        self.assertQuery(graph, [D, f2, AND([[B, f]], [[C, g]])],
+        self.assertQuery(graph, [D, f2, AND((B, f), (C, g))],
             results={TEST.wf2})
         self.assertQuery(graph, [D, f2, AND(A, B)],
             results={TEST.wf2})
-        self.assertQuery(graph, [[D, f2, AND(A, B)]],
+        self.assertQuery(graph, (D, f2, AND(A, B)),
             results=None)
 
     def test_choice(self):
@@ -119,18 +119,18 @@ class TestAlgebra(unittest.TestCase):
             wf2=bc2d(~B, b2c(a2b(~A)))
         )
 
-        self.assertQuery(graph, [[D, bc2d, OR(A, D)]],
+        self.assertQuery(graph, (D, bc2d, OR(A, D)),
             results=None)
         self.assertQuery(graph, [D, bc2d, OR(A, B)],
             results={TEST.wf1, TEST.wf2})
         self.assertQuery(graph, [D, bc2d, OR(B, C)],
             results={TEST.wf1, TEST.wf2})
 
-        self.assertQuery(graph, [[D, bc2d, OR([[B, a2b]], [[C, a2b]])]],
+        self.assertQuery(graph, (D, bc2d, OR((B, a2b), (C, a2b))),
             results={TEST.wf1})
 
         # Choice between operations in non-last place
-        self.assertQuery(graph, [[D, bc2d, OR(b2c, b2c2), B]],
+        self.assertQuery(graph, (D, bc2d, OR(b2c, b2c2), B),
             results={TEST.wf1, TEST.wf2})
 
     def test_sequenced_skips(self):
@@ -142,7 +142,7 @@ class TestAlgebra(unittest.TestCase):
         graph = make_graph(alg, e=b2c(a2b(~A)), e2=~A)
 
         # Test that a query for direct output really only captures that
-        self.assertQuery(graph, [[C, a2b]], results=set())
+        self.assertQuery(graph, (C, a2b), results=set())
 
         # Test that a query for indirect output also captures direct output
         self.assertQuery(graph, [C, a2b], results={TEST.e})
@@ -174,10 +174,10 @@ class TestAlgebra(unittest.TestCase):
         )
 
         self.assertQuery(graph,
-            [[A, AND(
+            (A, AND(
                 [C, a2b],
-                [[C, a2b]]
-            )]],
+                (C, a2b)
+            )),
             results={}
         )
         self.assertQuery(graph,

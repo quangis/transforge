@@ -12,16 +12,18 @@ T = TypeVar('T')
 class Flow(Generic[T]):
     """
     A flow is used to capture a sequence of steps, possibly skipping over any
-    number of them. The sequence may branch into disjunctions or conjunctions
-    and it is 'reversed' (that is, specified from end to beginning). This
+    number of them and branching into disjunctions or conjunctions.
+
+    The sequence is 'reversed' (that is, specified from end to beginning). This
     allows for a convenient tree-like notation, but it may trip you up.
 
-    A shorthand notation allows lists to be interpreted as `SERIES`.
+    A shorthand notation allows lists to be interpreted as `SERIES` and tuples
+    as `LINKED` series.
 
     For example, the following flow of type `Flow[int]` describes a flow ending
-    in 9, in which step 3 results directly from steps 1 and 2.
+    in 9, in which step 3 directly combines the outputs from steps 1 and 2.
 
-    SERIES(9, LINKED(3, AND(1, 2)))
+        [9, (3, AND(1, 2))]
     """
 
     def __init__(self, *items: FlowShorthand[T]):
@@ -35,13 +37,13 @@ class Flow(Generic[T]):
     @staticmethod
     def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
         """
-        Translate shorthand data structures (lists for series) to real flows.
+        Translate shorthand data structures (list for `SERIES`, tuples for
+        `LINKED`) to real flows.
         """
         if isinstance(value, list):
-            if len(value) == 1 and isinstance(value[0], list):
-                return LINKED(*value[0])
-            else:
-                return SERIES(*value)
+            return SERIES(*value)
+        elif isinstance(value, tuple):
+            return LINKED(*value)
         else:
             return value
 
@@ -83,4 +85,4 @@ class OR(Flow[T]):
 A shorthand for specifying `Flow`s.
 """
 Flow1 = Union[T, Flow[T]]
-FlowShorthand = Union[Flow1[T], list[Flow1[T]]]
+FlowShorthand = Union[Flow1[T], list[Flow1[T]], tuple[Flow1[T]]]
