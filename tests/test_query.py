@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from rdflib.term import Node
+from rdflib.term import Node, URIRef
 from rdflib.namespace import Namespace, RDF
 
 from transformation_algebra.flow import FlowShorthand
@@ -15,21 +15,20 @@ TEST = Namespace("https://example.com/#")
 
 
 def make_graph(lang: Language,
-        **workflows: Expr | dict[Expr, list[Expr | Node]]
+        workflows: dict[URIRef, Expr | dict[Expr, list[Expr | Node]]]
         ) -> TransformationGraph:
     """
     Convenience method for constructing a graph containing workflows.
     """
     graph = TransformationGraph(lang, TEST)
     graph += TransformationGraph.vocabulary(lang, TEST)
-    for name, content in workflows.items():
-        wf = TEST[name]
+    for wfnode, content in workflows.items():
         if isinstance(content, Expr):
-            e = graph.add_expr(content, wf)
-            graph.add((wf, RDF.type, TA.Transformation))
-            graph.add((wf, TA.result, e))
+            e = graph.add_expr(content, wfnode)
+            graph.add((wfnode, RDF.type, TA.Transformation))
+            graph.add((wfnode, TA.result, e))
         else:
-            graph.add_workflow(wf, content)
+            graph.add_workflow(wfnode, content)
     return graph
 
 
@@ -56,7 +55,7 @@ class TestAlgebra(unittest.TestCase):
         b2c = Operator(type=B ** C)
         alg = Language(locals())
 
-        graph = make_graph(alg, wf1=b2c(a2b(~A)))
+        graph = make_graph(alg, {TEST.wf1: b2c(a2b(~A))})
 
         self.assertQuery(graph, (C, b2c, B, a2b, A),
             results={TEST.wf1})
@@ -76,7 +75,7 @@ class TestAlgebra(unittest.TestCase):
         c2d = Operator(type=C ** D)
         alg = Language(locals())
 
-        graph = make_graph(alg, wf1=c2d(b2c(a2b(~A))))
+        graph = make_graph(alg, {TEST.wf1: c2d(b2c(a2b(~A)))})
 
         self.assertQuery(graph, [D, A],
             results={TEST.wf1})
@@ -99,7 +98,10 @@ class TestAlgebra(unittest.TestCase):
         bc2d = Operator(type=B ** C ** D)
         alg = Language(locals())
 
-        graph = make_graph(alg, wf1=bc2d(~B, ~C), wf2=bc2d(a2b(~A), b2c(~B)))
+        graph = make_graph(alg, {
+            TEST.wf1: bc2d(~B, ~C),
+            TEST.wf2: bc2d(a2b(~A), b2c(~B))
+        })
 
         self.assertQuery(graph, [D, bc2d, AND(B, C)],
             results={TEST.wf1, TEST.wf2})
@@ -121,10 +123,10 @@ class TestAlgebra(unittest.TestCase):
         bc2d = Operator(type=B ** C ** D)
         lang = Language(locals())
 
-        graph = make_graph(lang,
-            wf1=bc2d(a2b(~A), b2c(~B)),
-            wf2=bc2d(~B, b2c(a2b(~A)))
-        )
+        graph = make_graph(lang, {
+            TEST.wf1: bc2d(a2b(~A), b2c(~B)),
+            TEST.wf2: bc2d(~B, b2c(a2b(~A)))
+        })
 
         self.assertQuery(graph, (D, bc2d, OR(A, D)),
             results=None)
@@ -146,7 +148,10 @@ class TestAlgebra(unittest.TestCase):
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
         lang = Language(locals())
 
-        graph = make_graph(lang, e=b2c(a2b(~A)), e2=~A)
+        graph = make_graph(lang, {
+            TEST.e: b2c(a2b(~A)),
+            TEST.e2: ~A
+        })
 
         # Test that a query for direct output really only captures that
         self.assertQuery(graph, (C, a2b), results=set())
@@ -176,9 +181,9 @@ class TestAlgebra(unittest.TestCase):
         cd2a = Operator(type=C ** D ** A)
         lang = Language(locals())
 
-        graph = make_graph(lang,
-            wf1=cd2a(b2c(a2b1(~A)), b2d(a2b2(~A))),
-        )
+        graph = make_graph(lang, {
+            TEST.wf1: cd2a(b2c(a2b1(~A)), b2d(a2b2(~A)))
+        })
 
         self.assertQuery(graph,
             (A, AND(
@@ -203,7 +208,12 @@ class TestAlgebra(unittest.TestCase):
         F = TypeOperator(params=1)
         lang = Language(locals())
 
-        graph = make_graph(lang, x=~X, y=~Y, fx=~F(X), fy=~F(Y))
+        graph = make_graph(lang, {
+            TEST.x: ~X,
+            TEST.y: ~Y,
+            TEST.fx: ~F(X),
+            TEST.fy: ~F(Y)
+        })
 
         self.assertQuery(graph, X, results={TEST.x, TEST.y})
         self.assertQuery(graph, Y, results={TEST.y})
