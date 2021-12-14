@@ -1,8 +1,9 @@
+@prefix: <http://github.com/quangis/transformation-algebra#>.
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 
 :Transformation
-    a rdfs:Class,
+    a rdfs:Class;
     rdfs:comment "The class of composite conceptual transformations of a transformation algebra.".
 
 :step
@@ -32,7 +33,7 @@
 
 :InternalData
     a rdfs:Class;
-    rdfs:subClassOf :Data
+    rdfs:subClassOf :Data;
     rdfs:comment "Data produced by some internal process for which the structure is unknown. For example, when an operation *g* is passed as a parameter to some other operation *f*, the data produced by *g* within *f* may be preprocessed by unknown internals.".
 
 :origin
