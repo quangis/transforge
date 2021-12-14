@@ -32,19 +32,19 @@ class Step(object):
     """
 
     def __init__(self,
-            op: URIRef | None = None,
-            input: str | list[str] = [],
+            via: URIRef | None = None,
             type: URIRef | None = None,
+            input: str | list[str] = [],
             internal: str | None = None,
             result: bool = False,
             source: Node | None = None):
-        self.inputs = [input] if isinstance(input, str) else input
+        self.via = via
         self.type = type
-        self.transformer = op
+        self.inputs = [input] if isinstance(input, str) else input
         self.internal = internal
         self.result = result
         self.source = source
-        assert not (internal and op) and not (op and not input)
+        assert not (internal and via) and not (via and not input)
 
 
 def graph_auto(alg: Language, namespace: Namespace,
@@ -74,9 +74,9 @@ def graph_manual(include_steps: bool = False, include_kinds: bool = False,
     g.add((root, RDF.type, TA.Transformation))
 
     for i, step in steps.items():
-        if step.transformer:
+        if step.via:
             kind = TA.TransformedData
-            g.add((nodes[i], TA.via, step.transformer))
+            g.add((nodes[i], TA.via, step.via))
         elif step.internal:
             kind = TA.InternalData
             g.add((nodes[step.internal], TA.internal, nodes[i]))
