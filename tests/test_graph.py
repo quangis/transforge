@@ -7,6 +7,7 @@ tests, it's recommended to draw out the graphs with a pen.
 # - source labels
 # - types
 
+from __future__ import annotations
 import unittest
 
 from rdflib import Namespace, Graph, BNode, Literal, RDF, RDFS, URIRef
@@ -31,14 +32,18 @@ class Step(object):
     """
 
     def __init__(self,
-            op: Optional[URIRef] = None,
-            input: Union[str, list[str]] = [],
-            type: Optional[Type] = None,
-            internal: Optional[str] = None):
+            op: URIRef | None = None,
+            input: str | list[str] = [],
+            type: URIRef | None = None,
+            internal: str | None = None,
+            result: bool = False,
+            source: Node | None = None):
         self.inputs = [input] if isinstance(input, str) else input
         self.type = type
         self.transformer = op
         self.internal = internal
+        self.result = result
+        self.source = source
         assert not (internal and op) and not (op and not input)
 
 
@@ -77,6 +82,15 @@ def graph_manual(include_steps: bool = False, include_kinds: bool = False,
             g.add((nodes[step.internal], TA.internal, nodes[i]))
         else:
             kind = TA.SourceData
+
+        if step.source:
+            g.add((nodes[i], TA.source, step.source))
+
+        if step.result:
+            g.add((root, TA.result, nodes[i]))
+
+        if step.type:
+            g.add((nodes[i], RDF.type, step.type))
 
         if include_steps:
             g.add((root, TA.step, nodes[i]))
@@ -414,3 +428,36 @@ class TestAlgebraRDF(unittest.TestCase):
             TransformationGraph.vocabulary(lang, LANG),
             graph
         )
+
+    def test_timely_unification_of_workflow(self):
+        # Tools that have a variable type, but are incorporated in a workflow
+        # such that their type gets fixed, should be unified in time for the
+        # type to be reflected in the graph representation. See issue #31.
+
+        A, B = TypeOperator(), TypeOperator()
+        f1 = Operator(type=lambda x: x ** B)
+        f2 = Operator(type=lambda x: x ** x)
+        ℒ = Language(locals())
+        LANG = Namespace('https://example.com/#')
+
+        actual = TransformationGraph(ℒ, LANG,
+            include_labels=False, include_types=True, include_kinds=False)
+
+        root = BNode()
+        source = BNode()
+        app1 = f1(Source(label="x1"))
+        app2 = f2(Source(label="x1"))
+        actual.add_workflow(root, {
+            app1: [source],  # Results in a B
+            app2: [app1]  # Results in a B
+        })
+
+        expected = graph_manual(
+            source=Step(type=LANG.A, source=source),
+            app1=Step(LANG.f1, input="source", type=LANG.B),
+            app2=Step(LANG.f2, input="app1", type=LANG.B, result=True)
+        )
+
+        actual.serialize("actual.ttl", format="ttl")
+        expected.serialize("expected.ttl", format="ttl")
+        self.assertIsomorphic(actual, expected)
