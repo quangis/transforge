@@ -1,7 +1,13 @@
 #!/bin/bash
-# Convenience script to quickly visualize ttl files. You may also be interested
-# in <https://gephi.org/>.
-#   Dependencies on Debian: sudo apt-get install xdot raptor2-utils
+# Convenience script to quickly visualize ttl files. Install dependencies:
+#   sudo apt-get install xdot raptor2-utils # on Debian-based systems
+#
+# You may also be interested in <https://gephi.org/>. Note that you can also
+# use RDFLib's `rdf2dot` to generate a `.dot` file in Python:
+# >>> from rdflib.tools.rdf2dot import rdf2dot
+# >>> with open("output.dot", 'w') as f:
+# >>>     rdf2dot(graph, f)
+
 set -euo pipefail
 
 if [ ! -z "${1:-}" ]; then
