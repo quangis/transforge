@@ -22,9 +22,16 @@ class Language(object):
             namespace: Namespace | None = None):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
-        self.namespace = namespace
+        self._namespace = namespace
         if scope:
             self.add_scope(scope)
+
+    @property
+    def namespace(self) -> Namespace:
+        if self._namespace is None:
+            raise RuntimeError("No associated namespace.")
+        else:
+            return self._namespace
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """

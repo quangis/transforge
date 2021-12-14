@@ -10,7 +10,7 @@ tests, it's recommended to draw out the graphs with a pen.
 from __future__ import annotations
 import unittest
 
-from rdflib import Namespace, Graph, BNode, RDF, RDFS, URIRef
+from rdflib import Graph, BNode, RDF, RDFS, URIRef
 from rdflib.term import Node
 from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
@@ -44,12 +44,11 @@ class Step(object):
         assert not (internal and via) and not (via and not input)
 
 
-def graph_auto(alg: Language, namespace: Namespace,
-        value: Expr | Type) -> Graph:
+def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
-    g = TransformationGraph(alg, namespace,
+    g = TransformationGraph(alg,
         include_labels=False, include_types=False, include_kinds=False)
     if isinstance(value, Expr):
         root = BNode()
@@ -143,7 +142,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(a)),
+            graph_auto(alg, f(a)),
             graph_manual(
                 a=Step(),
                 f=Step(TEST.f, input="a")
@@ -160,7 +159,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(g)),
+            graph_auto(alg, f(g)),
             graph_manual(
                 λ=Step(internal="f"),
                 f=Step(TEST.f, input="g"),
@@ -180,7 +179,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(g, a)),
+            graph_auto(alg, f(g, a)),
             graph_manual(
                 a=Step(),
                 λ=Step(internal="f", input="a"),
@@ -203,7 +202,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, h(g, a).primitive()),
+            graph_auto(alg, h(g, a).primitive()),
             graph_manual(
                 h=Step(TEST.h, input=["f2", "a"]),
                 f2=Step(TEST.f, input="f1"),
@@ -228,7 +227,7 @@ class TestAlgebraRDF(unittest.TestCase):
         a = Source(type=A)
         b = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, h(g, a, b).primitive()),
+            graph_auto(alg, h(g, a, b).primitive()),
             graph_manual(
                 h=Step(TEST.h, input=["f2", "a", "b"]),
                 f2=Step(TEST.f, input=["λ", "f1"]),
@@ -251,7 +250,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(id).primitive()),
+            graph_auto(alg, f(id).primitive()),
             graph_manual(
                 f=Step(TEST.f, input="λ"),
                 λ=Step(internal="f"),
@@ -271,8 +270,8 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(h).primitive()),
-            graph_auto(alg, TEST, f(g))
+            graph_auto(alg, f(h).primitive()),
+            graph_auto(alg, f(g))
         )
 
     def test_cycle(self):
@@ -289,7 +288,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(g, h, e, a)),
+            graph_auto(alg, f(g, h, e, a)),
             graph_manual(
                 a=Step(),
                 f=Step(TEST.f, input=["a", "g", "h", "e"]),
@@ -319,7 +318,7 @@ class TestAlgebraRDF(unittest.TestCase):
         a = Source(type=A)
         b = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, outer(inner(f, a), b)),
+            graph_auto(alg, outer(inner(f, a), b)),
             graph_manual(
                 a=Step(),
                 b=Step(),
@@ -343,7 +342,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, TEST, f(h, a).primitive()),
+            graph_auto(alg, f(h, a).primitive()),
             graph_manual(
                 a=Step(),
                 g=Step(TEST.g, input="λ"),
@@ -370,7 +369,7 @@ class TestAlgebraRDF(unittest.TestCase):
         g.add((n2, RDF._1, n1))
         g.add((n2, RDF._2, n1))
         self.assertIsomorphic(
-            graph_auto(alg, TEST, G(F(A), F(A))),
+            graph_auto(alg, G(F(A), F(A))),
             g
         )
 
@@ -391,7 +390,7 @@ class TestAlgebraRDF(unittest.TestCase):
         g.add((n1, RDF._1, TEST.A))
         g.add((n1, RDF._2, TEST.A))
         self.assertIsomorphic(
-            graph_auto(alg, TEST, F(x, y)),
+            graph_auto(alg, F(x, y)),
             g
         )
 
@@ -409,7 +408,7 @@ class TestAlgebraRDF(unittest.TestCase):
         graph.add((TEST.D, RDFS.subClassOf, TEST.C))
 
         self.assertIsomorphic(
-            TransformationGraph.vocabulary(lang, TEST),
+            TransformationGraph.vocabulary(lang),
             graph
         )
 
@@ -424,7 +423,7 @@ class TestAlgebraRDF(unittest.TestCase):
         f2 = Operator(type=lambda x: x ** x)
         ℒ = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(ℒ, TEST,
+        actual = TransformationGraph(ℒ,
             include_labels=False, include_types=True, include_kinds=False)
 
         root = BNode()

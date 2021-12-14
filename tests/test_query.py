@@ -18,8 +18,8 @@ def make_graph(lang: Language,
     """
     Convenience method for constructing a graph containing workflows.
     """
-    graph = TransformationGraph(lang, TEST)
-    graph += TransformationGraph.vocabulary(lang, TEST)
+    graph = TransformationGraph(lang)
+    graph += TransformationGraph.vocabulary(lang)
     for wfnode, content in workflows.items():
         if isinstance(content, Expr):
             e = graph.add_expr(content, wfnode)
@@ -51,7 +51,7 @@ class TestAlgebra(unittest.TestCase):
         A, B, C, D = (TypeOperator() for _ in range(4))
         a2b = Operator(type=A ** B)
         b2c = Operator(type=B ** C)
-        alg = Language(locals())
+        alg = Language(locals(), namespace=TEST)
 
         graph = make_graph(alg, {TEST.wf1: b2c(a2b(~A))})
 
@@ -204,7 +204,7 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=1)
-        lang = Language(locals())
+        lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
             TEST.x: ~X,

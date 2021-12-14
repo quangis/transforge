@@ -52,7 +52,7 @@ class TransformationGraph(Graph):
     as an RDF graph.
     """
 
-    def __init__(self, algebra: Language, namespace: Namespace,
+    def __init__(self, algebra: Language,
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
@@ -62,7 +62,7 @@ class TransformationGraph(Graph):
         super().__init__(*nargs, **kwargs)
 
         self.algebra = algebra
-        self.namespace = namespace
+        self.namespace = algebra.namespace
         self.include_types = include_types
         self.include_labels = include_labels
         self.include_steps = include_steps
@@ -75,12 +75,13 @@ class TransformationGraph(Graph):
         # self.bind("test", self.namespace)
 
     @staticmethod
-    def vocabulary(algebra: Language, namespace: Namespace) -> Graph:
+    def vocabulary(algebra: Language) -> Graph:
         """
         Produce an RDF vocabulary for describing expressions in terms of the
         types and operations defined for this transformation algebra.
         """
-        vocab = TransformationGraph(algebra, namespace)
+        namespace = algebra.namespace
+        vocab = TransformationGraph(algebra)
         vocab.include_labels = False  # TODO
 
         # Add type operators to the vocabulary
