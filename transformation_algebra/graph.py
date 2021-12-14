@@ -20,6 +20,7 @@ from rdflib.namespace import RDF, RDFS, ClosedNamespace
 from typing import Optional
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
+TEST = Namespace("https://example.com/#")
 
 
 class LanguageNamespace(ClosedNamespace):

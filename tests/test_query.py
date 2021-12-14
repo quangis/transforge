@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import unittest
 from rdflib.term import Node, URIRef
-from rdflib.namespace import Namespace, RDF
+from rdflib.namespace import RDF
 
 from transformation_algebra.flow import FlowShorthand
 from transformation_algebra.type import TypeOperator, Type
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph, TA
+from transformation_algebra.graph import TransformationGraph, TA, TEST
 from transformation_algebra.query import Query, OR, AND
-
-TEST = Namespace("https://example.com/#")
 
 
 def make_graph(lang: Language,
@@ -73,7 +71,7 @@ class TestAlgebra(unittest.TestCase):
         a2b = Operator(type=A ** B)
         b2c = Operator(type=B ** C)
         c2d = Operator(type=C ** D)
-        alg = Language(locals())
+        alg = Language(locals(), namespace=TEST)
 
         graph = make_graph(alg, {TEST.wf1: c2d(b2c(a2b(~A)))})
 
@@ -96,7 +94,7 @@ class TestAlgebra(unittest.TestCase):
         b2c = Operator(type=B ** C)
         c2d = Operator(type=C ** D)
         bc2d = Operator(type=B ** C ** D)
-        alg = Language(locals())
+        alg = Language(locals(), namespace=TEST)
 
         graph = make_graph(alg, {
             TEST.wf1: bc2d(~B, ~C),
@@ -121,7 +119,7 @@ class TestAlgebra(unittest.TestCase):
         b2c = Operator(type=B ** C)
         b2c2 = Operator(type=B ** C)
         bc2d = Operator(type=B ** C ** D)
-        lang = Language(locals())
+        lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
             TEST.wf1: bc2d(a2b(~A), b2c(~B)),
@@ -146,7 +144,7 @@ class TestAlgebra(unittest.TestCase):
 
         A, B, C = (TypeOperator() for _ in range(3))
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
-        lang = Language(locals())
+        lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
             TEST.e: b2c(a2b(~A)),
@@ -179,7 +177,7 @@ class TestAlgebra(unittest.TestCase):
         b2c = Operator(type=B ** C)
         b2d = Operator(type=B ** D)
         cd2a = Operator(type=C ** D ** A)
-        lang = Language(locals())
+        lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
             TEST.wf1: cd2a(b2c(a2b1(~A)), b2d(a2b2(~A)))

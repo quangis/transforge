@@ -10,18 +10,15 @@ tests, it's recommended to draw out the graphs with a pen.
 from __future__ import annotations
 import unittest
 
-from rdflib import Namespace, Graph, BNode, Literal, RDF, RDFS, URIRef
+from rdflib import Namespace, Graph, BNode, RDF, RDFS, URIRef
 from rdflib.term import Node
-from rdflib.compare import to_isomorphic, graph_diff
+from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
-
-from typing import Optional, Union
 
 from transformation_algebra.type import Type, TypeOperator, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TA, TransformationGraph, \
-    LanguageNamespace
+from transformation_algebra.graph import TA, TEST, TransformationGraph
 
 
 class Step(object):
@@ -48,7 +45,7 @@ class Step(object):
 
 
 def graph_auto(alg: Language, namespace: Namespace,
-        value: Union[Expr, Type]) -> Graph:
+        value: Expr | Type) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
@@ -142,15 +139,14 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = TypeOperator()
         f = Operator(type=A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(a)),
+            graph_auto(alg, TEST, f(a)),
             graph_manual(
                 a=Step(),
-                f=Step(ALG.f, input="a")
+                f=Step(TEST.f, input="a")
             )
         )
 
@@ -161,15 +157,14 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
         g = Operator(type=A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(g)),
+            graph_auto(alg, TEST, f(g)),
             graph_manual(
                 λ=Step(internal="f"),
-                f=Step(ALG.f, input="g"),
-                g=Step(ALG.g, input="λ")
+                f=Step(TEST.f, input="g"),
+                g=Step(TEST.g, input="λ")
             )
         )
 
@@ -181,17 +176,16 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator("A")
         f = Operator(type=(A ** A) ** A ** A)
         g = Operator(type=A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(g, a)),
+            graph_auto(alg, TEST, f(g, a)),
             graph_manual(
                 a=Step(),
                 λ=Step(internal="f", input="a"),
-                f=Step(ALG.f, input=["g", "a"]),
-                g=Step(ALG.g, input="λ"),
+                f=Step(TEST.f, input=["g", "a"]),
+                g=Step(TEST.g, input="λ"),
             )
         )
 
@@ -205,16 +199,15 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operator(type=A ** A)
         g = Operator(type=A ** A, define=lambda x: f(f(x)))
         h = Operator(type=(A ** A) ** A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, h(g, a).primitive()),
+            graph_auto(alg, TEST, h(g, a).primitive()),
             graph_manual(
-                h=Step(ALG.h, input=["f2", "a"]),
-                f2=Step(ALG.f, input="f1"),
-                f1=Step(ALG.f, input="λ"),
+                h=Step(TEST.h, input=["f2", "a"]),
+                f2=Step(TEST.f, input="f1"),
+                f1=Step(TEST.f, input="λ"),
                 λ=Step(internal="h", input="a"),
                 a=Step(),
             )
@@ -230,17 +223,16 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operator(type=A ** A ** A)
         g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
         h = Operator(type=(A ** A ** A) ** A ** A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         b = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, h(g, a, b).primitive()),
+            graph_auto(alg, TEST, h(g, a, b).primitive()),
             graph_manual(
-                h=Step(ALG.h, input=["f2", "a", "b"]),
-                f2=Step(ALG.f, input=["λ", "f1"]),
-                f1=Step(ALG.f, input="λ"),
+                h=Step(TEST.h, input=["f2", "a", "b"]),
+                f2=Step(TEST.f, input=["λ", "f1"]),
+                f1=Step(TEST.f, input="λ"),
                 λ=Step(internal="h", input=["a", "b"]),
                 a=Step(),
                 b=Step(),
@@ -256,13 +248,12 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
         id = Operator(type=A ** A, define=lambda x: x)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(id).primitive()),
+            graph_auto(alg, TEST, f(id).primitive()),
             graph_manual(
-                f=Step(ALG.f, input="λ"),
+                f=Step(TEST.f, input="λ"),
                 λ=Step(internal="f"),
             )
         )
@@ -277,12 +268,11 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operator(type=(A ** A) ** A)
         g = Operator(type=A ** A)
         h = Operator(type=A ** A, define=lambda x: g(x))
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(h).primitive()),
-            graph_auto(alg, ALG, f(g))
+            graph_auto(alg, TEST, f(h).primitive()),
+            graph_auto(alg, TEST, f(g))
         )
 
     def test_cycle(self):
@@ -295,21 +285,20 @@ class TestAlgebraRDF(unittest.TestCase):
         g = Operator(type=A ** A)
         h = Operator(type=A ** A)
         e = Operator(type=A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(g, h, e, a)),
+            graph_auto(alg, TEST, f(g, h, e, a)),
             graph_manual(
                 a=Step(),
-                f=Step(ALG.f, input=["a", "g", "h", "e"]),
+                f=Step(TEST.f, input=["a", "g", "h", "e"]),
                 gλ=Step(internal="f", input=["a", "h", "e"]),
                 hλ=Step(internal="f", input=["a", "g", "e"]),
                 eλ=Step(internal="f", input=["a", "g", "h"]),
-                g=Step(ALG.g, input="gλ"),
-                h=Step(ALG.h, input="hλ"),
-                e=Step(ALG.e, input="eλ"),
+                g=Step(TEST.g, input="gλ"),
+                h=Step(TEST.h, input="hλ"),
+                e=Step(TEST.e, input="eλ"),
             )
         )
 
@@ -325,19 +314,18 @@ class TestAlgebraRDF(unittest.TestCase):
         outer = Operator(type=(A ** A) ** A ** A)
         inner = Operator(type=(A ** A) ** A ** (A ** A))
         f = Operator(type=A ** A)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         b = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, outer(inner(f, a), b)),
+            graph_auto(alg, TEST, outer(inner(f, a), b)),
             graph_manual(
                 a=Step(),
                 b=Step(),
-                outer=Step(ALG.outer, input=["inner", "b"]),
-                inner=Step(ALG.inner, input=["f", "a", "outerλ"]),
-                f=Step(ALG.f, input="innerλ"),
+                outer=Step(TEST.outer, input=["inner", "b"]),
+                inner=Step(TEST.inner, input=["f", "a", "outerλ"]),
+                f=Step(TEST.f, input="innerλ"),
                 innerλ=Step(internal="inner", input=["a", "outerλ"]),
                 outerλ=Step(internal="outer", input="b"),
             )
@@ -351,16 +339,15 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operator(type=(A ** A ** A) ** A ** A)
         g = Operator(type=A ** A ** A)
         h = Operator(type=A ** A ** A, define=lambda x: g(x))
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
         self.assertIsomorphic(
-            graph_auto(alg, ALG, f(h, a).primitive()),
+            graph_auto(alg, TEST, f(h, a).primitive()),
             graph_manual(
                 a=Step(),
-                g=Step(ALG.g, input="λ"),
-                f=Step(ALG.f, input=["g", "a"]),
+                g=Step(TEST.g, input="λ"),
+                f=Step(TEST.f, input=["g", "a"]),
                 λ=Step(internal="f", input="a"),
             )
         )
@@ -372,19 +359,18 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator("A")
         F = TypeOperator("F", params=1)
         G = TypeOperator("G", params=2)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         g = Graph()
         n1 = BNode()
         n2 = BNode()
-        g.add((n1, RDFS.subClassOf, ALG.F))
-        g.add((n1, RDF._1, ALG.A))
-        g.add((n2, RDFS.subClassOf, ALG.G))
+        g.add((n1, RDFS.subClassOf, TEST.F))
+        g.add((n1, RDF._1, TEST.A))
+        g.add((n2, RDFS.subClassOf, TEST.G))
         g.add((n2, RDF._1, n1))
         g.add((n2, RDF._2, n1))
         self.assertIsomorphic(
-            graph_auto(alg, ALG, G(F(A), F(A))),
+            graph_auto(alg, TEST, G(F(A), F(A))),
             g
         )
 
@@ -394,19 +380,18 @@ class TestAlgebraRDF(unittest.TestCase):
         """
         A = TypeOperator()
         F = TypeOperator(params=2)
-        alg = Language(locals())
-        ALG = LanguageNamespace('ALG#', alg)
+        alg = Language(locals(), namespace=TEST)
 
         g = Graph()
         x, y = TypeVariable(), TypeVariable()
         x.bind(A)
         y.bind(A)
         n1 = BNode()
-        g.add((n1, RDFS.subClassOf, ALG.F))
-        g.add((n1, RDF._1, ALG.A))
-        g.add((n1, RDF._2, ALG.A))
+        g.add((n1, RDFS.subClassOf, TEST.F))
+        g.add((n1, RDF._1, TEST.A))
+        g.add((n1, RDF._2, TEST.A))
         self.assertIsomorphic(
-            graph_auto(alg, ALG, F(x, y)),
+            graph_auto(alg, TEST, F(x, y)),
             g
         )
 
@@ -416,16 +401,15 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         C = TypeOperator(supertype=A)
         D = TypeOperator(supertype=C)
-        lang = Language(locals())
-        LANG = LanguageNamespace('LANG#', lang)
+        lang = Language(locals(), namespace=TEST)
 
         graph = Graph()
-        graph.add((LANG.B, RDFS.subClassOf, LANG.A))
-        graph.add((LANG.C, RDFS.subClassOf, LANG.A))
-        graph.add((LANG.D, RDFS.subClassOf, LANG.C))
+        graph.add((TEST.B, RDFS.subClassOf, TEST.A))
+        graph.add((TEST.C, RDFS.subClassOf, TEST.A))
+        graph.add((TEST.D, RDFS.subClassOf, TEST.C))
 
         self.assertIsomorphic(
-            TransformationGraph.vocabulary(lang, LANG),
+            TransformationGraph.vocabulary(lang, TEST),
             graph
         )
 
@@ -438,10 +422,9 @@ class TestAlgebraRDF(unittest.TestCase):
         A, B = TypeOperator(), TypeOperator()
         f1 = Operator(type=lambda x: x ** B)
         f2 = Operator(type=lambda x: x ** x)
-        ℒ = Language(locals())
-        LANG = Namespace('https://example.com/#')
+        ℒ = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(ℒ, LANG,
+        actual = TransformationGraph(ℒ, TEST,
             include_labels=False, include_types=True, include_kinds=False)
 
         root = BNode()
@@ -454,9 +437,9 @@ class TestAlgebraRDF(unittest.TestCase):
         })
 
         expected = graph_manual(
-            source=Step(type=LANG.A, source=source),
-            app1=Step(LANG.f1, input="source", type=LANG.B),
-            app2=Step(LANG.f2, input="app1", type=LANG.B, result=True)
+            source=Step(type=TEST.A, source=source),
+            app1=Step(TEST.f1, input="source", type=TEST.B),
+            app2=Step(TEST.f2, input="app1", type=TEST.B, result=True)
         )
 
         # actual.serialize("actual.ttl", format="ttl")

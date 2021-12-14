@@ -18,12 +18,13 @@ if TYPE_CHECKING:
 
 
 class Language(object):
-    def __init__(self, scope: dict[str, Any] = {}):
+    def __init__(self, scope: dict[str, Any] = {},
+            namespace: Namespace | None = None):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
+        self.namespace = namespace
         if scope:
             self.add_scope(scope)
-        self.namespace: Namespace | None = None
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
