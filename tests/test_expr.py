@@ -24,7 +24,7 @@ class TestAlgebra(TestCase):
         Expressions can be converted to primitive form.
         """
         Int = TypeOperator('Int')
-        one = Source(Int)
+        one = Source(type=Int)
         add = Operator(type=Int ** Int ** Int, name='add')
         add1 = Operator(
             type=Int ** Int,
@@ -45,7 +45,7 @@ class TestAlgebra(TestCase):
         Expressions can be compared to one another.
         """
         A = TypeOperator('A')
-        x = Source(A)
+        x = Source(type=A)
         f = Operator(type=A ** A, name='f')
         g = Operator(type=A ** A, name='g')
         self.assertTrue(f(x).match(f(x)))
@@ -74,7 +74,7 @@ class TestAlgebra(TestCase):
         Make sure that primitives have the correct type.
         """
         A = TypeOperator('A')
-        x = Source(A)
+        x = Source(type=A)
         f = Operator(type=lambda α: α ** α, name='f')
         g = Operator(type=lambda α: α ** α, name='g', define=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))

@@ -310,7 +310,7 @@ class Operation(Expr):
 class Source(Expr):
     "A source data input."
 
-    def __init__(self, type: Type = _, label: Optional[str] = None):
+    def __init__(self, label: Optional[str] = None, type: Type = _):
         self.label: Optional[str] = label
         super().__init__(type=type.instance())
 

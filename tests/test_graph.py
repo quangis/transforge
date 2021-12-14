@@ -145,7 +145,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
+        a = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(a)),
             graph_manual(
@@ -184,7 +184,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
+        a = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g, a)),
             graph_manual(
@@ -208,7 +208,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
+        a = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, h(g, a).primitive()),
             graph_manual(
@@ -233,8 +233,8 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
-        b = Source(A)
+        a = Source(type=A)
+        b = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, h(g, a, b).primitive()),
             graph_manual(
@@ -298,7 +298,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
+        a = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(g, h, e, a)),
             graph_manual(
@@ -328,8 +328,8 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
-        b = Source(A)
+        a = Source(type=A)
+        b = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, outer(inner(f, a), b)),
             graph_manual(
@@ -354,7 +354,7 @@ class TestAlgebraRDF(unittest.TestCase):
         alg = Language(locals())
         ALG = LanguageNamespace('ALG#', alg)
 
-        a = Source(A)
+        a = Source(type=A)
         self.assertIsomorphic(
             graph_auto(alg, ALG, f(h, a).primitive()),
             graph_manual(
@@ -429,6 +429,7 @@ class TestAlgebraRDF(unittest.TestCase):
             graph
         )
 
+    @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):
         # Tools that have a variable type, but are incorporated in a workflow
         # such that their type gets fixed, should be unified in time for the
@@ -445,8 +446,8 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         source = BNode()
-        app1 = f1(Source(label="x1"))
-        app2 = f2(Source(label="x1"))
+        app1 = f1(Source("x1"))
+        app2 = f2(Source("x1"))
         actual.add_workflow(root, {
             app1: [source],  # Results in a B
             app2: [app1]  # Results in a B
@@ -458,6 +459,6 @@ class TestAlgebraRDF(unittest.TestCase):
             app2=Step(LANG.f2, input="app1", type=LANG.B, result=True)
         )
 
-        actual.serialize("actual.ttl", format="ttl")
-        expected.serialize("expected.ttl", format="ttl")
+        # actual.serialize("actual.ttl", format="ttl")
+        # expected.serialize("expected.ttl", format="ttl")
         self.assertIsomorphic(actual, expected)
