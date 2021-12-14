@@ -242,9 +242,9 @@ class TypeInstance(Type):
             result_aux = [result]
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v.text(labels)} >= {v.lower}")
+                    result_aux.append(f"{v.text(labels)} ≥ {v.lower}")
                 if v.upper:
-                    result_aux.append(f"{v.text(labels)} <= {v.upper}")
+                    result_aux.append(f"{v.text(labels)} ≤ {v.upper}")
             result_aux.extend(c.text(labels) for c in self.constraints())
             return ' | '.join(result_aux)
         else:
