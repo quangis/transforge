@@ -53,9 +53,9 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, language: Language,
-            with_types: bool = True,
+            with_types: bool = False,
             with_steps: bool = False,
-            with_labels: bool = True,
+            with_labels: bool = False,
             with_kinds: bool = False,
             *nargs, **kwargs):
 
