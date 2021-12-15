@@ -53,19 +53,19 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, language: Language,
-            include_types: bool = True,
-            include_steps: bool = False,
-            include_labels: bool = True,
-            include_kinds: bool = False,
+            with_types: bool = True,
+            with_steps: bool = False,
+            with_labels: bool = True,
+            with_kinds: bool = False,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
 
         self.language = language
-        self.include_types = include_types
-        self.include_labels = include_labels
-        self.include_steps = include_steps
-        self.include_kinds = include_steps
+        self.with_types = with_types
+        self.with_labels = with_labels
+        self.with_steps = with_steps
+        self.with_kinds = with_steps
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -85,11 +85,11 @@ class TransformationGraph(Graph):
             if t.arity > 0:
                 current_uri = ns[t.name]
 
-                if self.include_kinds:
+                if self.with_kinds:
                     self.add((current_uri, RDF.type, TA.Type))
                     self.add((current_uri, RDFS.subClassOf, RDF.Seq))
 
-                if self.include_labels:
+                if self.with_labels:
                     self.add((current_uri, RDFS.label, Literal(str(t))))
             else:
                 previous_uri = None
@@ -97,10 +97,10 @@ class TransformationGraph(Graph):
                 while current:
                     current_uri = ns[current.name]
 
-                    if self.include_labels:
+                    if self.with_labels:
                         self.add((current_uri, RDFS.label, Literal(str(t))))
 
-                    if self.include_kinds:
+                    if self.with_kinds:
                         self.add((current_uri, RDF.type, TA.Type))
 
                     if previous_uri:
@@ -113,10 +113,10 @@ class TransformationGraph(Graph):
         for op in self.language.operators.values():
             node = ns[op.name]
 
-            if self.include_kinds:
+            if self.with_kinds:
                 self.add((node, RDF.type, TA.Operation))
 
-            if self.include_labels:
+            if self.with_labels:
                 self.add((node, RDFS.label, Literal(str(op.name))))
                 if op.description:
                     self.add((node, RDFS.comment, Literal(op.description)))
@@ -140,7 +140,7 @@ class TransformationGraph(Graph):
                     for i, param in enumerate(t.params, start=1):
                         self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
-                    if self.include_labels:
+                    if self.with_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
                 else:
                     node = self.language.namespace[t._operator.name]
@@ -148,10 +148,10 @@ class TransformationGraph(Graph):
                 assert isinstance(t, TypeVariable)
                 node = BNode()
 
-                if self.include_labels:
+                if self.with_labels:
                     self.add((node, RDFS.label, Literal(str(t))))
 
-                if self.include_kinds:
+                if self.with_kinds:
                     self.add((node, RDF.type, TA.TypeVariable))
 
             self.type_nodes[t] = node
@@ -175,28 +175,28 @@ class TransformationGraph(Graph):
 
         current = current or BNode()
 
-        # always label transformation; ignore self.include_kinds because this
+        # always label transformation; ignore self.with_kinds because this
         # information is actually used by our queries
         self.add((root, RDF.type, TA.Transformation))
 
-        if self.include_steps:
+        if self.with_steps:
             self.add((root, TA.step, current))
 
         if isinstance(expr, (Operation, Source)):
             datatype = expr.type.output()
 
-            if self.include_types:
+            if self.with_types:
                 self.add((current, RDF.type, self.add_type(datatype)))
 
             if isinstance(expr, Operation):
                 assert not expr.operator.definition, \
                     f"{expr.operator} should be a primitive"
 
-                if self.include_labels:
+                if self.with_labels:
                     self.add((current, RDFS.label,
                         Literal(f"{datatype} via {expr.operator.name}")))
 
-                if self.include_kinds:
+                if self.with_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
                 self.add((current, TA.via,
@@ -204,11 +204,11 @@ class TransformationGraph(Graph):
             else:
                 assert isinstance(expr, Source)
 
-                if self.include_labels:
+                if self.with_labels:
                     self.add((current, RDFS.label,
                         Literal(f"source {datatype}")))
 
-                if self.include_kinds:
+                if self.with_kinds:
                     self.add((current, RDF.type, TA.SourceData))
 
                 if expr.label:
@@ -269,13 +269,13 @@ class TransformationGraph(Graph):
                 current_internal = internal
                 self.add((f, TA.internal, internal))
 
-                if self.include_kinds:
+                if self.with_kinds:
                     self.add((internal, RDF.type, TA.InternalData))
 
-                if self.include_steps:
+                if self.with_steps:
                     self.add((root, TA.step, internal))
 
-                if self.include_labels:
+                if self.with_labels:
                     self.add((internal, RDFS.label, Literal("internal")))
 
                 if isinstance(expr.x, Abstraction):

@@ -49,7 +49,7 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     Transform an expression to a transformation graph.
     """
     g = TransformationGraph(alg,
-        include_labels=False, include_types=False, include_kinds=False)
+        with_labels=False, with_types=False, with_kinds=False)
     if isinstance(value, Expr):
         root = BNode()
         g.add_expr(value, root)
@@ -59,7 +59,7 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     return g
 
 
-def graph_manual(include_steps: bool = False, include_kinds: bool = False,
+def graph_manual(with_steps: bool = False, with_kinds: bool = False,
         **steps: Step) -> Graph:
     """
     Manually construct a transformation graph.
@@ -88,10 +88,10 @@ def graph_manual(include_steps: bool = False, include_kinds: bool = False,
         if step.type:
             g.add((nodes[i], RDF.type, step.type))
 
-        if include_steps:
+        if with_steps:
             g.add((root, TA.step, nodes[i]))
 
-        if include_kinds:
+        if with_kinds:
             g.add((nodes[i], RDF.type, kind))
 
         for j in step.inputs:
@@ -403,7 +403,7 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         actual = TransformationGraph(lang,
-            include_labels=False)
+            with_labels=False)
         actual.add_vocabulary()
 
         expected = Graph()
@@ -425,7 +425,7 @@ class TestAlgebraRDF(unittest.TestCase):
         ℒ = Language(locals(), namespace=TEST)
 
         actual = TransformationGraph(ℒ,
-            include_labels=False, include_types=True, include_kinds=False)
+            with_labels=False, with_types=True, with_kinds=False)
 
         root = BNode()
         source = BNode()
