@@ -52,7 +52,7 @@ class TransformationGraph(Graph):
     as an RDF graph.
     """
 
-    def __init__(self, algebra: Language,
+    def __init__(self, language: Language,
             include_types: bool = True,
             include_steps: bool = False,
             include_labels: bool = True,
@@ -61,8 +61,7 @@ class TransformationGraph(Graph):
 
         super().__init__(*nargs, **kwargs)
 
-        self.algebra = algebra
-        self.namespace = algebra.namespace
+        self.language = language
         self.include_types = include_types
         self.include_labels = include_labels
         self.include_steps = include_steps
@@ -74,59 +73,53 @@ class TransformationGraph(Graph):
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
 
-    @staticmethod
-    def vocabulary(algebra: Language) -> Graph:
+    def add_vocabulary(self) -> None:
         """
-        Produce an RDF vocabulary for describing expressions in terms of the
-        types and operations defined for this transformation algebra.
+        Add the RDF vocabulary for describing expressions in terms of the types
+        and operations defined for this transformation algebra.
         """
-        namespace = algebra.namespace
-        vocab = TransformationGraph(algebra)
-        vocab.include_labels = False  # TODO
+        ns = self.language.namespace
 
         # Add type operators to the vocabulary
-        for t in algebra.types.values():
+        for t in self.language.types.values():
             if t.arity > 0:
-                current_uri = namespace[t.name]
+                current_uri = ns[t.name]
 
-                if vocab.include_kinds:
-                    vocab.add((current_uri, RDF.type, TA.Type))
-                    vocab.add((current_uri, RDFS.subClassOf, RDF.Seq))
+                if self.include_kinds:
+                    self.add((current_uri, RDF.type, TA.Type))
+                    self.add((current_uri, RDFS.subClassOf, RDF.Seq))
 
-                if vocab.include_labels:
-                    vocab.add((current_uri, RDFS.label, Literal(str(t))))
+                if self.include_labels:
+                    self.add((current_uri, RDFS.label, Literal(str(t))))
             else:
                 previous_uri = None
                 current: Optional[TypeOperator] = t
                 while current:
-                    current_uri = namespace[current.name]
+                    current_uri = ns[current.name]
 
-                    if vocab.include_labels:
-                        vocab.add((current_uri, RDFS.label, Literal(str(t))))
+                    if self.include_labels:
+                        self.add((current_uri, RDFS.label, Literal(str(t))))
 
-                    if vocab.include_kinds:
-                        vocab.add((current_uri, RDF.type, TA.Type))
+                    if self.include_kinds:
+                        self.add((current_uri, RDF.type, TA.Type))
 
                     if previous_uri:
-                        vocab.add((previous_uri, RDFS.subClassOf, current_uri))
+                        self.add((previous_uri, RDFS.subClassOf, current_uri))
 
                     previous_uri = current_uri
                     current = current.supertype
 
         # Add operations to the vocabulary
-        for d in algebra.operators.values():
-            node = namespace[d]
+        for op in self.language.operators.values():
+            node = ns[op.name]
 
-            if vocab.include_kinds:
-                type_node = TA.Operation
-                vocab.add((node, RDF.type, type_node))
+            if self.include_kinds:
+                self.add((node, RDF.type, TA.Operation))
 
-            if vocab.include_labels:
-                vocab.add((node, RDFS.label, Literal(str(d.name))))
-                if d.description:
-                    vocab.add((node, RDFS.comment, Literal(d.description)))
-
-        return vocab
+            if self.include_labels:
+                self.add((node, RDFS.label, Literal(str(op.name))))
+                if op.description:
+                    self.add((node, RDFS.comment, Literal(op.description)))
 
     def add_type(self, type: Type) -> Node:
         """
@@ -142,7 +135,7 @@ class TransformationGraph(Graph):
                 if t.params:
                     node = BNode()
                     self.add((node, RDFS.subClassOf,
-                        self.namespace[t._operator.name]))
+                        self.language.namespace[t._operator.name]))
 
                     for i, param in enumerate(t.params, start=1):
                         self.add((node, RDF[f"_{i}"], self.add_type(param)))
@@ -150,7 +143,7 @@ class TransformationGraph(Graph):
                     if self.include_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
                 else:
-                    node = self.namespace[t._operator.name]
+                    node = self.language.namespace[t._operator.name]
             else:
                 assert isinstance(t, TypeVariable)
                 node = BNode()
@@ -206,7 +199,8 @@ class TransformationGraph(Graph):
                 if self.include_kinds:
                     self.add((current, RDF.type, TA.TransformedData))
 
-                self.add((current, TA.via, self.namespace[expr.operator.name]))
+                self.add((current, TA.via,
+                    self.language.namespace[expr.operator.name]))
             else:
                 assert isinstance(expr, Source)
 

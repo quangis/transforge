@@ -402,15 +402,16 @@ class TestAlgebraRDF(unittest.TestCase):
         D = TypeOperator(supertype=C)
         lang = Language(locals(), namespace=TEST)
 
-        graph = Graph()
-        graph.add((TEST.B, RDFS.subClassOf, TEST.A))
-        graph.add((TEST.C, RDFS.subClassOf, TEST.A))
-        graph.add((TEST.D, RDFS.subClassOf, TEST.C))
+        actual = TransformationGraph(lang,
+            include_labels=False)
+        actual.add_vocabulary()
 
-        self.assertIsomorphic(
-            TransformationGraph.vocabulary(lang),
-            graph
-        )
+        expected = Graph()
+        expected.add((TEST.B, RDFS.subClassOf, TEST.A))
+        expected.add((TEST.C, RDFS.subClassOf, TEST.A))
+        expected.add((TEST.D, RDFS.subClassOf, TEST.C))
+
+        self.assertIsomorphic(expected, actual)
 
     @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):

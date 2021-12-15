@@ -19,7 +19,7 @@ def make_graph(lang: Language,
     Convenience method for constructing a graph containing workflows.
     """
     graph = TransformationGraph(lang)
-    graph += TransformationGraph.vocabulary(lang)
+    graph.add_vocabulary()
     for wfnode, content in workflows.items():
         if isinstance(content, Expr):
             e = graph.add_expr(content, wfnode)
