@@ -18,7 +18,8 @@ from rdflib.tools.rdf2dot import rdf2dot
 from transformation_algebra.type import Type, TypeOperator, TypeVariable
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TA, TEST, TransformationGraph
+from transformation_algebra.graph import TA, TEST, TransformationGraph, \
+    SourceError
 
 
 class Step(object):
@@ -422,8 +423,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         source = TEST["~source"]
-        actual = TransformationGraph(ℒ,
-            with_types=True)
+        actual = TransformationGraph(ℒ, with_types=True)
         actual.add_workflow(root, {
             f(Source("x1", A)): [source]
         })
@@ -434,6 +434,52 @@ class TestAlgebraRDF(unittest.TestCase):
         )
 
         self.assertIsomorphic(actual, expected)
+
+    def test_order_of_subtype_application(self):
+        # A repeat of the test in `test_type.py` to make sure that the order of
+        # subtype application does not matter, but now on the expression level.
+        A, B = TypeOperator(), TypeOperator()
+        A1 = TypeOperator(supertype=A)
+        f = Operator(type=lambda α: α ** α ** B)
+        ℒ = Language(locals(), namespace=TEST)
+
+        root = BNode()
+
+        # 1
+        sourceA = ~A
+        sourceA1 = ~A1
+        app = f(Source("x1"), Source("x2"))
+
+        actual1 = TransformationGraph(ℒ, with_types=True)
+        actual1.add_workflow(root, {
+            sourceA: [],
+            sourceA1: [],
+            app: [sourceA, sourceA1]
+        })
+
+        # 2
+        sourceA = ~A
+        sourceA1 = ~A1
+        app = f(Source("x1"), Source("x2"))
+
+        actual2 = TransformationGraph(ℒ, with_types=True)
+        actual2.add_workflow(root, {
+            sourceA: [],
+            sourceA1: [],
+            app: [sourceA1, sourceA]
+        })
+
+        # Mismatch
+        sourceA = ~A
+        sourceB = ~B
+        app = f(Source("x1"), Source("x2"))
+
+        actual3 = TransformationGraph(ℒ, with_types=True)
+        self.assertRaises(SourceError, actual3.add_workflow, root, {
+            sourceA: [],
+            sourceB: [],
+            app: [sourceA, sourceB]
+        })
 
     @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):
