@@ -163,7 +163,7 @@ class TransformationGraph(Graph):
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
         expression are appropriately attached, either as data sources or as
-        input expressions.
+        previously added input expressions.
 
         This is a lossy conversion, because the order of arguments and the
         exact structure of functions-as-arguments is not preserved.
@@ -179,57 +179,63 @@ class TransformationGraph(Graph):
         # information is actually used by our queries
         self.add((root, RDF.type, TA.Transformation))
 
-        if self.with_steps:
-            self.add((root, TA.step, current))
+        if isinstance(expr, Source):
 
-        if isinstance(expr, (Operation, Source)):
+            if expr.label:
+                try:
+                    source = sources[expr.label]
+                except KeyError as e:
+                    msg = f"no input node named '{expr.label}'"
+                    raise RuntimeError(msg) from e
+            else:
+                source = None
+
+            if isinstance(source, Node) or source is None:
+                if source:
+                    self.add((current, TA.source, source))
+
+                if self.with_types:
+                    self.add((current, RDF.type, self.add_type(expr.type)))
+
+                if self.with_labels:
+                    self.add((current, RDFS.label,
+                        Literal(f"source {expr.type.output()}")))
+
+                if self.with_kinds:
+                    self.add((current, RDF.type, TA.SourceData))
+
+            else:
+                assert isinstance(source, Expr)
+                try:
+                    # TODO unification happens as we translate to
+                    # RDF, which means some might be outdated
+                    # instead match(subtype=False)?
+                    source.type.unify(expr.type, subtype=True)
+                except TypingError as e:
+                    raise SourceError(expr, source) from e
+
+                assert source in self.expr_nodes, \
+                    "should already have been calculated in add_workflow"
+                current = self.expr_nodes[source]
+
+        elif isinstance(expr, Operation):
+            assert not expr.operator.definition, \
+                f"{expr.operator} should be a primitive"
+
             datatype = expr.type.output()
 
             if self.with_types:
                 self.add((current, RDF.type, self.add_type(datatype)))
 
-            if isinstance(expr, Operation):
-                assert not expr.operator.definition, \
-                    f"{expr.operator} should be a primitive"
+            if self.with_labels:
+                self.add((current, RDFS.label,
+                    Literal(f"{datatype} via {expr.operator.name}")))
 
-                if self.with_labels:
-                    self.add((current, RDFS.label,
-                        Literal(f"{datatype} via {expr.operator.name}")))
+            if self.with_kinds:
+                self.add((current, RDF.type, TA.TransformedData))
 
-                if self.with_kinds:
-                    self.add((current, RDF.type, TA.TransformedData))
-
-                self.add((current, TA.via,
-                    self.language.namespace[expr.operator.name]))
-            else:
-                assert isinstance(expr, Source)
-
-                if self.with_labels:
-                    self.add((current, RDFS.label,
-                        Literal(f"source {datatype}")))
-
-                if self.with_kinds:
-                    self.add((current, RDF.type, TA.SourceData))
-
-                if expr.label:
-                    try:
-                        source = sources[expr.label]
-                    except KeyError as e:
-                        msg = f"no input node named '{expr.label}'"
-                        raise RuntimeError(msg) from e
-                    else:
-                        if isinstance(source, Node):
-                            self.add((current, TA.source, source))
-                        else:
-                            assert isinstance(source, Expr)
-                            try:
-                                # TODO unification happens as we translate to
-                                # RDF, which means some might be outdated
-                                # instead match(subtype=False)?
-                                source.type.unify(expr.type, subtype=True)
-                            except TypingError as e:
-                                raise SourceError(expr, source) from e
-                            return self.expr_nodes[source]
+            self.add((current, TA.via,
+                self.language.namespace[expr.operator.name]))
 
         else:
             assert isinstance(expr, Application)
@@ -311,6 +317,9 @@ class TransformationGraph(Graph):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
 
+        if self.with_steps:
+            self.add((root, TA.step, current))
+
         return current
 
     def add_workflow(self, root: Node,
@@ -320,11 +329,9 @@ class TransformationGraph(Graph):
         individual steps to representations of expressions in RDF and combining
         them. Return the final 'output' node of the expression.
 
-        A workflow consists of:
-
-        -   A collection of algebra expressions for each step (e.g. application
-            of a tool), paired with the inputs to those expressions. Every
-            input must be either a source node or an expression.
+        A workflow consists of a collection of algebra expressions for each
+        step (e.g. application of a tool), paired with the inputs to those
+        expressions. Every input must be either a source node or an expression.
         """
         # TODO cycles can occur
 
@@ -343,15 +350,17 @@ class TransformationGraph(Graph):
                     if isinstance(source, Expr):
                         to_expr_node(source)
 
-                self.expr_nodes[expr] = n = self.add_expr(expr, root, sources={
-                    f"x{i}": source
-                    for i, source in enumerate(steps[expr], start=1)
-                })
-                return n
+                self.expr_nodes[expr] = node = self.add_expr(
+                    expr, root, sources={
+                        f"x{i}": source
+                        for i, source in enumerate(steps[expr], start=1)
+                    }
+                )
+                return node
 
-        node = to_expr_node(top_level_expression)
-        self.add((root, TA.result, node))
-        return node
+        result_node = to_expr_node(top_level_expression)
+        self.add((root, TA.result, result_node))
+        return result_node
 
 
 # Errors #####################################################################

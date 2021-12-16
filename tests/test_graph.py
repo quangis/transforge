@@ -413,6 +413,29 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(expected, actual)
 
+    def test_sources_typed(self):
+        # Test that sources are properly typed. See issue #66.
+        A, B = TypeOperator(), TypeOperator()
+        f = Operator(type=A ** B)
+        ℒ = Language(locals(), namespace=TEST)
+
+        root = BNode()
+        source = TEST["~source"]
+        actual = TransformationGraph(ℒ,
+            with_types=True)
+        actual.add_workflow(root, {
+            f(Source("x1", A)): [source]
+        })
+
+        expected = graph_manual(
+            x=Step(type=TEST.A, source=source),
+            f=Step(via=TEST.f, input="x", type=TEST.B, result=True),
+        )
+
+        actual.serialize("actual.ttl", format="ttl")
+        expected.serialize("expected.ttl", format="ttl")
+        self.assertIsomorphic(actual, expected)
+
     @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):
         # Tools that have a variable type, but are incorporated in a workflow
