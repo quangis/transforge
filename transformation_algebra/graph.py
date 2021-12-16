@@ -175,10 +175,6 @@ class TransformationGraph(Graph):
 
         current = current or BNode()
 
-        # always label transformation; ignore self.with_kinds because this
-        # information is actually used by our queries
-        self.add((root, RDF.type, TA.Transformation))
-
         if isinstance(expr, Source):
 
             if expr.label:
@@ -360,6 +356,10 @@ class TransformationGraph(Graph):
 
         result_node = to_expr_node(top_level_expression)
         self.add((root, TA.result, result_node))
+
+        if self.with_kinds:
+            self.add((root, RDF.type, TA.Transformation))
+
         return result_node
 
 

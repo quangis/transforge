@@ -70,7 +70,6 @@ class Query(object):  # TODO subclass rdflib.Query?
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             # f"PREFIX {self.prefix}: <{self.namespace}>",
             "SELECT ?workflow ?description WHERE {",
-            "?workflow rdf:type ta:Transformation.",
             "OPTIONAL {?workflow rdfs:comment ?description}",
         ]
         query.extend(self.statements)

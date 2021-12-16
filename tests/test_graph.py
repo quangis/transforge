@@ -67,7 +67,8 @@ def graph_manual(with_steps: bool = False, with_kinds: bool = False,
     root = BNode()
     g = Graph()
     nodes = {i: BNode() for i in steps}
-    g.add((root, RDF.type, TA.Transformation))
+    if with_kinds:
+        g.add((root, RDF.type, TA.Transformation))
 
     for i, step in steps.items():
         if step.via:
@@ -432,8 +433,6 @@ class TestAlgebraRDF(unittest.TestCase):
             f=Step(via=TEST.f, input="x", type=TEST.B, result=True),
         )
 
-        actual.serialize("actual.ttl", format="ttl")
-        expected.serialize("expected.ttl", format="ttl")
         self.assertIsomorphic(actual, expected)
 
     @unittest.skip("deferred until #66 is fixed")
