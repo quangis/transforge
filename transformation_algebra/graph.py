@@ -187,6 +187,7 @@ class TransformationGraph(Graph):
                 source = None
 
             if isinstance(source, Node) or source is None:
+                expr.type = expr.type.fix(prefer_lower=False)
                 if source:
                     self.add((current, TA.source, source))
 

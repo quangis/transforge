@@ -425,7 +425,7 @@ class TestAlgebraRDF(unittest.TestCase):
         source = TEST["~source"]
         actual = TransformationGraph(ℒ, with_types=True)
         actual.add_workflow(root, {
-            f(Source("x1", A)): [source]
+            f(Source("x1")): [source]
         })
 
         expected = graph_manual(
@@ -480,6 +480,26 @@ class TestAlgebraRDF(unittest.TestCase):
             sourceB: [],
             app: [sourceA, sourceB]
         })
+
+    def test_reuse_sources(self):
+        # Test that the same source can be reused
+        A, B = TypeOperator(), TypeOperator()
+        A1 = TypeOperator(supertype=A)
+        f = Operator(type=A1 ** A ** B)
+        ℒ = Language(locals(), namespace=TEST)
+
+        root = BNode()
+
+        source = Source()
+        app = f(Source("x1"), Source("x2"))
+
+        actual = TransformationGraph(ℒ, with_types=True)
+        actual.add_workflow(root, {
+            source: [],
+            app: [source, source]
+        })
+
+        actual.serialize("actual.ttl", format="ttl")
 
     @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):
