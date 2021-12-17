@@ -65,7 +65,7 @@ class TransformationGraph(Graph):
         self.with_types = with_types
         self.with_labels = with_labels
         self.with_steps = with_steps
-        self.with_kinds = with_steps
+        self.with_kinds = with_kinds
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
