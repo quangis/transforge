@@ -16,10 +16,9 @@ from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
 from transformation_algebra.type import Type, TypeOperator, TypeVariable
-from transformation_algebra.expr import Expr, Operator, Source
+from transformation_algebra.expr import Expr, Operator, Source, SourceError
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TA, TEST, TransformationGraph, \
-    SourceError
+from transformation_algebra.graph import TA, TEST, TransformationGraph
 
 
 class Step(object):
@@ -498,8 +497,6 @@ class TestAlgebraRDF(unittest.TestCase):
             source: [],
             app: [source, source]
         })
-
-        actual.serialize("actual.ttl", format="ttl")
 
     @unittest.skip("deferred until #66 is fixed")
     def test_timely_unification_of_workflow(self):

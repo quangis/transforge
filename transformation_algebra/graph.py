@@ -186,8 +186,10 @@ class TransformationGraph(Graph):
             else:
                 source = None
 
+            # A source that is not attached to another expression
             if isinstance(source, Node) or source is None:
                 expr.type = expr.type.fix(prefer_lower=False)
+
                 if source:
                     self.add((current, TA.source, source))
 
@@ -201,18 +203,16 @@ class TransformationGraph(Graph):
                 if self.with_kinds:
                     self.add((current, RDF.type, TA.SourceData))
 
+            # A source that got attached to another expression
             else:
                 assert isinstance(source, Expr)
-                try:
-                    # TODO unification happens as we translate to
-                    # RDF, which means some might be outdated
-                    # instead match(subtype=False)?
-                    source.type.unify(expr.type, subtype=True)
-                except TypingError as e:
-                    raise SourceError(expr, source) from e
-
+                assert expr.type.match(source.type, subtype=True) \
+                    is not False, \
+                    f"when attaching {source} to a source of type " \
+                    f"{expr.type}, the types must match; unify beforehand"
                 assert source in self.expr_nodes, \
-                    "should already have been calculated in add_workflow"
+                    "the node corresponding to a source should have been " \
+                    "precalculated in add_workflow"
                 current = self.expr_nodes[source]
 
         elif isinstance(expr, Operation):
@@ -332,6 +332,10 @@ class TransformationGraph(Graph):
         """
         # TODO cycles can occur
 
+        # First, make sure the points where sources get attached are typed
+        for expr, inputs in steps.items():
+            expr.attach([i if isinstance(i, Expr) else None for i in inputs])
+
         # One of the tool expressions must be 'last': it represents the tool
         # finally producing the output and so isn't an input to another.
         all_inputs = set(i for s in steps.values() for i in s)
@@ -343,17 +347,19 @@ class TransformationGraph(Graph):
             try:
                 return self.expr_nodes[expr]
             except KeyError:
-                for source in steps[expr]:
-                    if isinstance(source, Expr):
-                        to_expr_node(source)
+                pass
 
-                self.expr_nodes[expr] = node = self.add_expr(
-                    expr, root, sources={
-                        f"x{i}": source
-                        for i, source in enumerate(steps[expr], start=1)
-                    }
-                )
-                return node
+            for source in steps[expr]:
+                if isinstance(source, Expr):
+                    to_expr_node(source)
+
+            self.expr_nodes[expr] = node = self.add_expr(
+                expr, root, sources={
+                    f"x{i}": source
+                    for i, source in enumerate(steps[expr], start=1)
+                }
+            )
+            return node
 
         result_node = to_expr_node(top_level_expression)
         self.add((root, TA.result, result_node))
@@ -363,18 +369,3 @@ class TransformationGraph(Graph):
 
         return result_node
 
-
-# Errors #####################################################################
-
-class SourceError(Exception):
-    "Raised when a source"
-
-    def __init__(self, source: Expr, attachment: Expr):
-        self.source = source
-        self.attachment = attachment
-
-    def __str__(self) -> str:
-        assert self.__cause__, "must caused by another error"
-        return f"Could not attach {self.attachment} to a source of type " \
-            f"{self.source.type}: " \
-            f"{self.__cause__}"

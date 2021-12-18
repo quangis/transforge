@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import reduce
-from itertools import chain
+from itertools import chain, product
 from inspect import signature
-from typing import Optional, Callable, Iterator
+from typing import Optional, Callable, Iterator, Any
 
 from transformation_algebra.label import Labels
 from transformation_algebra.type import \
@@ -281,6 +281,30 @@ class Expr(ABC):
                 a.body.match(b.body)
         return a == b
 
+    def attach(self, inputs: list[Expr | None]) -> None:
+        """
+        Unify the types of labelled sources with the types of the input source
+        expressions with which they are to be substituted.
+        """
+        # TODO add switch to actually substitute
+        source_anchors = set(s for s in self.leaves()
+            if isinstance(s, Source) and s.label)
+
+        # TODO should be an actual test when constructing
+        assert all(x is y or x.label != y.label for x, y in
+            product(source_anchors, source_anchors)), \
+            "No two distinct sources can have the same label"
+
+        for source_anchor in source_anchors:
+            assert source_anchor.label
+            label = int(source_anchor.label[1:]) - 1  # TODO should be int
+            source = inputs[label]
+            if isinstance(source, Expr):
+                try:
+                    source_anchor.type.unify(source.type, subtype=True)
+                except TypingError as e:
+                    raise SourceError(source_anchor, source) from e
+
     def leaves(self) -> Iterator[Expr]:
         """
         Obtain all base expressions and variables in an expression.
@@ -381,7 +405,7 @@ class ApplicationError(Exception):
         self.argument = argument
 
     def __str__(self) -> str:
-        assert self.__cause__, "must caused by another error"
+        assert self.__cause__, "must be caused by another error"
         return f"Could not apply `{self.operation}` to `{self.argument}`: " \
             f"{self.__cause__}"
 
@@ -408,3 +432,17 @@ class NonSchematicVariables(Exception):
 
     def __str__(self) -> str:
         return f"Type {self.type} contains a non-schematic variable."
+
+
+class SourceError(Exception):
+    "Raised when a source is attached to a non-matching input."
+
+    def __init__(self, source: Expr, attachment: Expr):
+        self.source = source
+        self.attachment = attachment
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must be caused by another error"
+        return f"Could not attach {self.attachment} to a source of type " \
+            f"{self.source.type}: " \
+            f"{self.__cause__}"
