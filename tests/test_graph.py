@@ -481,7 +481,7 @@ class TestAlgebraRDF(unittest.TestCase):
         })
 
     def test_reuse_sources(self):
-        # Test that the same source can be reused
+        # Test that the same source can be reused.
         A, B = TypeOperator(), TypeOperator()
         A1 = TypeOperator(supertype=A)
         f = Operator(type=A1 ** A ** B)
@@ -498,35 +498,29 @@ class TestAlgebraRDF(unittest.TestCase):
             app: [source, source]
         })
 
-    @unittest.skip("deferred until #66 is fixed")
-    def test_timely_unification_of_workflow(self):
-        # Tools that have a variable type, but are incorporated in a workflow
-        # such that their type gets fixed, should be unified in time for the
-        # type to be reflected in the graph representation. See issue #31.
+    def test_unify_type_when_attaching_source(self):
+        # Expressions that have a variable type, but are incorporated in a
+        # workflow such that their type gets fixed, should be unified; and this
+        # should happen in time for the type to be reflected in the graph
+        # representation. See issue #31.
 
-        A, B = TypeOperator(), TypeOperator()
-        f1 = Operator(type=lambda x: x ** B)
-        f2 = Operator(type=lambda x: x ** x)
+        A = TypeOperator()
+        f = Operator(type=lambda x: x ** x)
         ℒ = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(ℒ,
-            with_labels=False, with_types=True, with_kinds=False)
+        actual = TransformationGraph(ℒ, with_types=True)
 
         root = BNode()
-        source = BNode()
-        app1 = f1(Source("x1"))
-        app2 = f2(Source("x1"))
+        src = ~A
+        app = f(Source("x1"))
         actual.add_workflow(root, {
-            app1: [source],  # Results in a B
-            app2: [app1]  # Results in a B
+            src: [],
+            app: [src]
         })
 
         expected = graph_manual(
-            source=Step(type=TEST.A, source=source),
-            app1=Step(TEST.f1, input="source", type=TEST.B),
-            app2=Step(TEST.f2, input="app1", type=TEST.B, result=True)
+            source=Step(type=TEST.A),
+            app=Step(TEST.f, input="source", type=TEST.A, result=True),
         )
 
-        # actual.serialize("actual.ttl", format="ttl")
-        # expected.serialize("expected.ttl", format="ttl")
         self.assertIsomorphic(actual, expected)

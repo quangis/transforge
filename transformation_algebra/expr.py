@@ -286,24 +286,52 @@ class Expr(ABC):
         Unify the types of labelled sources with the types of the input source
         expressions with which they are to be substituted.
         """
-        # TODO add switch to actually substitute
-        source_anchors = set(s for s in self.leaves()
-            if isinstance(s, Source) and s.label)
 
         # TODO should be an actual test when constructing
+        source_anchors = set(s for s in self.leaves()
+            if isinstance(s, Source) and s.label)
         assert all(x is y or x.label != y.label for x, y in
             product(source_anchors, source_anchors)), \
             "No two distinct sources can have the same label"
 
-        for source_anchor in source_anchors:
-            assert source_anchor.label
-            label = int(source_anchor.label[1:]) - 1  # TODO should be int
-            source = inputs[label]
-            if isinstance(source, Expr):
+        # When we substitute a labelled source with another expression, we are
+        # doing something similar to supplying arguments to a function.
+        # Consider that, in normal application, when you apply a function `f :
+        # t ** t` to an argument with a concrete type, say `x : A`, then you
+        # can deduce that `t >= A`. After all, any supertype of `A` in `f`'s
+        # signature might still be possible, but a subtype would be too
+        # restrictive. (This does *not* mean that giving a sub-`A` value to `f`
+        # is illegal!) So, when we have an expression `f(1 : t, 2 : t) : t` and
+        # we substitute an expression of type `A` for source `1`, we must use
+        # similar logic: the lower bound on source `1` becomes `A`, so `t >=
+        # A`. This is not immediately intuitive in that the type of the
+        # expression then substituted into source `2` might very well be a
+        # *sub*type of `A` --- it's just the type variable `t` for which the
+        # condition `t >= A` holds.
+        # We must then fix the type of the enclosing applications to deduce
+        # that the most specific type of `f(1, 2)` is indeed `A`, not just
+        # `t >= A`.
+
+        a = self.normalize(recursive=False)
+        if isinstance(a, Source):
+            if a.label:
+                label = int(a.label[1:]) - 1  # TODO should be int
+                source = inputs[label]
+            else:
+                source = None
+            if source:
                 try:
-                    source_anchor.type.unify(source.type, subtype=True)
+                    source.type.unify(a.type, subtype=True)
                 except TypingError as e:
-                    raise SourceError(source_anchor, source) from e
+                    raise SourceError(a, source) from e
+        elif isinstance(a, Abstraction):
+            a.body.attach(inputs)
+        elif isinstance(a, Application):
+            a.f.attach(inputs)
+            a.x.attach(inputs)
+            a.type.fix()
+        else:
+            assert isinstance(a, (Operation, Variable))
 
     def leaves(self) -> Iterator[Expr]:
         """

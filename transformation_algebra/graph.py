@@ -177,6 +177,9 @@ class TransformationGraph(Graph):
 
         if isinstance(expr, Source):
 
+            # Retrieve the expression with which to substitute a labelled
+            # source, or the origin node to which it gets attached.
+            source: Expr | Node | None
             if expr.label:
                 try:
                     source = sources[expr.label]
@@ -186,7 +189,9 @@ class TransformationGraph(Graph):
             else:
                 source = None
 
-            # A source that is not attached to another expression
+            # An unlabelled source, or a labelled source that gets attached to
+            # an origin node, is 'at the end of the road' and gets put into the
+            # graph as source data.
             if isinstance(source, Node) or source is None:
                 expr.type = expr.type.fix(prefer_lower=False)
 
@@ -203,13 +208,10 @@ class TransformationGraph(Graph):
                 if self.with_kinds:
                     self.add((current, RDF.type, TA.SourceData))
 
-            # A source that got attached to another expression
+            # When an expression is instead substituted, we assume that the
+            # corresponding nodes are already calculated with correct types.
             else:
                 assert isinstance(source, Expr)
-                assert expr.type.match(source.type, subtype=True) \
-                    is not False, \
-                    f"when attaching {source} to a source of type " \
-                    f"{expr.type}, the types must match; unify beforehand"
                 assert source in self.expr_nodes, \
                     "the node corresponding to a source should have been " \
                     "precalculated in add_workflow"
@@ -368,4 +370,3 @@ class TransformationGraph(Graph):
             self.add((root, RDF.type, TA.Transformation))
 
         return result_node
-
