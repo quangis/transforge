@@ -48,8 +48,7 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
-    g = TransformationGraph(alg,
-        with_labels=False, with_types=False, with_kinds=False)
+    g = TransformationGraph(alg).minimal()
     if isinstance(value, Expr):
         root = BNode()
         g.add_expr(value, root)
@@ -403,8 +402,7 @@ class TestAlgebraRDF(unittest.TestCase):
         D = TypeOperator(supertype=C)
         lang = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(lang,
-            with_labels=False)
+        actual = TransformationGraph(lang).minimal()
         actual.add_vocabulary()
 
         expected = Graph()
@@ -422,7 +420,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         source = TEST["~source"]
-        actual = TransformationGraph(ℒ, with_types=True)
+        actual = TransformationGraph(ℒ).minimal(with_types=True)
         actual.add_workflow(root, {
             f(Source("x1")): [source]
         })
@@ -449,7 +447,7 @@ class TestAlgebraRDF(unittest.TestCase):
         sourceA1 = ~A1
         app = f(Source("x1"), Source("x2"))
 
-        actual1 = TransformationGraph(ℒ, with_types=True)
+        actual1 = TransformationGraph(ℒ).minimal(with_types=True)
         actual1.add_workflow(root, {
             sourceA: [],
             sourceA1: [],
@@ -461,7 +459,7 @@ class TestAlgebraRDF(unittest.TestCase):
         sourceA1 = ~A1
         app = f(Source("x1"), Source("x2"))
 
-        actual2 = TransformationGraph(ℒ, with_types=True)
+        actual2 = TransformationGraph(ℒ).minimal(with_types=True)
         actual2.add_workflow(root, {
             sourceA: [],
             sourceA1: [],
@@ -473,7 +471,7 @@ class TestAlgebraRDF(unittest.TestCase):
         sourceB = ~B
         app = f(Source("x1"), Source("x2"))
 
-        actual3 = TransformationGraph(ℒ, with_types=True)
+        actual3 = TransformationGraph(ℒ).minimal(with_types=True)
         self.assertRaises(SourceError, actual3.add_workflow, root, {
             sourceA: [],
             sourceB: [],
@@ -492,7 +490,7 @@ class TestAlgebraRDF(unittest.TestCase):
         source = Source()
         app = f(Source("x1"), Source("x2"))
 
-        actual = TransformationGraph(ℒ, with_types=True)
+        actual = TransformationGraph(ℒ).minimal(with_types=True)
         actual.add_workflow(root, {
             source: [],
             app: [source, source]
@@ -508,7 +506,7 @@ class TestAlgebraRDF(unittest.TestCase):
         f = Operator(type=lambda x: x ** x)
         ℒ = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(ℒ, with_types=True)
+        actual = TransformationGraph(ℒ).minimal(with_types=True)
 
         root = BNode()
         src = ~A

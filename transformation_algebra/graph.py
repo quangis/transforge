@@ -53,10 +53,10 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, language: Language,
-            with_types: bool = False,
-            with_steps: bool = False,
-            with_labels: bool = False,
-            with_kinds: bool = False,
+            with_types: bool = True,
+            with_steps: bool = True,
+            with_labels: bool = True,
+            with_kinds: bool = True,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
@@ -72,6 +72,17 @@ class TransformationGraph(Graph):
 
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
+
+    def minimal(self,
+            with_types: bool = False,
+            with_steps: bool = False,
+            with_labels: bool = False,
+            with_kinds: bool = False) -> TransformationGraph:
+        self.with_types = with_types
+        self.with_labels = with_labels
+        self.with_steps = with_steps
+        self.with_kinds = with_kinds
+        return self
 
     def add_vocabulary(self) -> None:
         """
