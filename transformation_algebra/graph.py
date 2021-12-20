@@ -77,7 +77,7 @@ class TransformationGraph(Graph):
         self.expr_nodes: dict[Expr, Node] = dict()
 
         self.bind("ta", TA)
-        # self.bind("test", self.namespace)
+        self.bind("lang", self.language.namespace)
 
     def add_vocabulary(self) -> None:
         """
