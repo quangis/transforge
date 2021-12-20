@@ -53,6 +53,7 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, language: Language,
+            with_operators: bool = True,
             with_types: bool = True,
             with_steps: bool = True,
             with_labels: bool = True,
@@ -62,6 +63,7 @@ class TransformationGraph(Graph):
         super().__init__(*nargs, **kwargs)
 
         self.language = language
+        self.with_operators = with_operators
         self.with_types = with_types
         self.with_labels = with_labels
         self.with_steps = with_steps
@@ -74,10 +76,12 @@ class TransformationGraph(Graph):
         # self.bind("test", self.namespace)
 
     def minimal(self,
+            with_operators: bool = False,
             with_types: bool = False,
             with_steps: bool = False,
             with_labels: bool = False,
             with_kinds: bool = False) -> TransformationGraph:
+        self.with_operators = with_operators
         self.with_types = with_types
         self.with_labels = with_labels
         self.with_steps = with_steps
@@ -234,6 +238,10 @@ class TransformationGraph(Graph):
 
             datatype = expr.type.output()
 
+            if self.with_operators:
+                self.add((current, TA.via,
+                    self.language.namespace[expr.operator.name]))
+
             if self.with_types:
                 self.add((current, RDF.type, self.add_type(datatype)))
 
@@ -243,9 +251,6 @@ class TransformationGraph(Graph):
 
             if self.with_kinds:
                 self.add((current, RDF.type, TA.TransformedData))
-
-            self.add((current, TA.via,
-                self.language.namespace[expr.operator.name]))
 
         else:
             assert isinstance(expr, Application)
