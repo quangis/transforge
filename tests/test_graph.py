@@ -33,14 +33,14 @@ class Step(object):
             type: URIRef | None = None,
             input: str | list[str] = [],
             internal: str | None = None,
-            result: bool = False,
-            source: Node | None = None):
+            is_output: bool = False,
+            origin: Node | None = None):
         self.via = via
         self.type = type
         self.inputs = [input] if isinstance(input, str) else input
         self.internal = internal
-        self.result = result
-        self.source = source
+        self.is_output = is_output
+        self.origin = origin
         assert not (internal and via) and not (via and not input)
 
 
@@ -58,15 +58,14 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     return g
 
 
-def graph_manual(with_steps: bool = False, with_kinds: bool = False,
-        **steps: Step) -> Graph:
+def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
     """
     Manually construct a transformation graph.
     """
     root = BNode()
     g = Graph()
     nodes = {i: BNode() for i in steps}
-    if with_kinds:
+    if with_classes:
         g.add((root, RDF.type, TA.Transformation))
 
     for i, step in steps.items():
@@ -79,19 +78,16 @@ def graph_manual(with_steps: bool = False, with_kinds: bool = False,
         else:
             kind = TA.SourceData
 
-        if step.source:
-            g.add((nodes[i], TA.source, step.source))
+        if step.origin:
+            g.add((nodes[i], TA.origin, step.origin))
 
-        if step.result:
-            g.add((root, TA.result, nodes[i]))
+        if step.is_output:
+            g.add((root, TA.output, nodes[i]))
 
         if step.type:
             g.add((nodes[i], RDF.type, step.type))
 
-        if with_steps:
-            g.add((root, TA.step, nodes[i]))
-
-        if with_kinds:
+        if with_classes:
             g.add((nodes[i], RDF.type, kind))
 
         for j in step.inputs:
@@ -427,8 +423,8 @@ class TestAlgebraRDF(unittest.TestCase):
         })
 
         expected = graph_manual(
-            x=Step(type=TEST.A, source=source),
-            f=Step(via=TEST.f, input="x", type=TEST.B, result=True),
+            x=Step(type=TEST.A, origin=source),
+            f=Step(via=TEST.f, input="x", type=TEST.B),
         )
 
         self.assertIsomorphic(actual, expected)
@@ -524,7 +520,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         expected = graph_manual(
             source=Step(type=TEST.A),
-            app=Step(TEST.f, input="source", type=TEST.A, result=True),
+            app=Step(TEST.f, input="source", type=TEST.A),
         )
 
         self.assertIsomorphic(actual, expected)

@@ -159,8 +159,8 @@ class Query(object):  # TODO subclass rdflib.Query?
                 var = lvar
                 self.triple(
                     rdflib.Variable("workflow"),
-                    TA.result / (~TA.feeds * ZeroOrMore)
-                    if lskip else TA.result,
+                    TA.output / (~TA.feeds * ZeroOrMore)
+                    if lskip else TA.output,
                     var)
             elif is_operator and isinstance(lunit, Type):
                 if lskip:

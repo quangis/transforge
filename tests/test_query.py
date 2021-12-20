@@ -19,13 +19,13 @@ def make_graph(lang: Language,
     Convenience method for constructing a graph containing workflows.
     """
     graph = TransformationGraph(lang,
-        minimal=True, with_types=True, with_operators=True)
+        minimal=True, with_types=True, with_operators=True, with_output=True)
     graph.add_vocabulary()
     for wfnode, content in workflows.items():
         if isinstance(content, Expr):
             e = graph.add_expr(content, wfnode)
             graph.add((wfnode, RDF.type, TA.Transformation))
-            graph.add((wfnode, TA.result, e))
+            graph.add((wfnode, TA.output, e))
         else:
             graph.add_workflow(wfnode, content)
     return graph

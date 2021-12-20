@@ -6,13 +6,20 @@
     a rdfs:Class;
     rdfs:comment "The class of composite conceptual transformations of a transformation algebra.".
 
-:step
+:member
     a rdf:Property;
-    rdfs:comment "Constituent steps of a transformation in terms of the data that is conceptualized along the way.";
+    rdfs:subPropertyOf rdfs:member;
+    rdfs:comment "Constituent elements of a transformation in terms of its types and operations.";
     rdfs:domain :Transformation;
-    rdfs:range :Data.
+    rdfs:range :Element.
 
-:result
+:input
+    a rdf:Property;
+    rdfs:comment "Identifies the source data.";
+    rdfs:domain :Transformation;
+    rdfs:range :SourceData.
+
+:output
     a rdf:Property;
     rdfs:comment "Identifies the target data: the final output data of a transformation as a whole.";
     rdfs:domain :Transformation;
@@ -60,16 +67,21 @@
     rdfs:range :InternalData.
 
 
+:Element
+    a rdfs:Class;
+    rdfs:comment "Class comprising both operations and types.".
+
 :Operation
     a rdfs:Class;
+    rdfs:subClassOf :Element;
     rdfs:comment "The class of atomary conceptual transformations.".
-
 
 :Type
     a rdfs:Class;
+    rdfs:subClassOf :Element;
     rdfs:comment "The class of all transformation types.".
 
 :Function
     a rdfs:Class;
-    rdfs:subClassOf :TypeOperator;
+    rdfs:subClassOf :Type;
     rdfs:comment "The class of function types.".

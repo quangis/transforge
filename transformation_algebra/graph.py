@@ -56,9 +56,11 @@ class TransformationGraph(Graph):
             minimal: bool = False,
             with_operators: bool | None = None,
             with_types: bool | None = None,
-            with_steps: bool | None = None,
+            with_output: bool | None = None,
+            with_inputs: bool | None = None,
+            with_membership: bool | None = None,
             with_labels: bool | None = None,
-            with_kinds: bool | None = None,
+            with_classes: bool | None = None,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
@@ -70,8 +72,10 @@ class TransformationGraph(Graph):
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
         self.with_labels = default(with_labels)
-        self.with_steps = default(with_steps)
-        self.with_kinds = default(with_kinds)
+        self.with_output = default(with_output)
+        self.with_inputs = default(with_inputs)
+        self.with_membership = default(with_membership)
+        self.with_classes = default(with_classes)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -91,7 +95,7 @@ class TransformationGraph(Graph):
             if t.arity > 0:
                 current_uri = ns[t.name]
 
-                if self.with_kinds:
+                if self.with_classes:
                     self.add((current_uri, RDF.type, TA.Type))
                     self.add((current_uri, RDFS.subClassOf, RDF.Seq))
 
@@ -106,7 +110,7 @@ class TransformationGraph(Graph):
                     if self.with_labels:
                         self.add((current_uri, RDFS.label, Literal(str(t))))
 
-                    if self.with_kinds:
+                    if self.with_classes:
                         self.add((current_uri, RDF.type, TA.Type))
 
                     if previous_uri:
@@ -119,7 +123,7 @@ class TransformationGraph(Graph):
         for op in self.language.operators.values():
             node = ns[op.name]
 
-            if self.with_kinds:
+            if self.with_classes:
                 self.add((node, RDF.type, TA.Operation))
 
             if self.with_labels:
@@ -157,7 +161,7 @@ class TransformationGraph(Graph):
                 if self.with_labels:
                     self.add((node, RDFS.label, Literal(str(t))))
 
-                if self.with_kinds:
+                if self.with_classes:
                     self.add((node, RDF.type, TA.TypeVariable))
 
             self.type_nodes[t] = node
@@ -202,16 +206,23 @@ class TransformationGraph(Graph):
                 expr.type = expr.type.fix(prefer_lower=False)
 
                 if source:
-                    self.add((current, TA.source, source))
+                    self.add((current, TA.origin, source))
+
+                if self.with_inputs:
+                    self.add((root, TA.input, current))
 
                 if self.with_types:
-                    self.add((current, RDF.type, self.add_type(expr.type)))
+                    type_node = self.add_type(expr.type)
+                    self.add((current, RDF.type, type_node))
+
+                    if self.with_membership:
+                        self.add((current, TA.member, type_node))
 
                 if self.with_labels:
                     self.add((current, RDFS.label,
-                        Literal(f"source {expr.type.output()}")))
+                        Literal(f"{expr.type} (source)")))
 
-                if self.with_kinds:
+                if self.with_classes:
                     self.add((current, RDF.type, TA.SourceData))
 
             # When an expression is instead substituted, we assume that the
@@ -230,17 +241,24 @@ class TransformationGraph(Graph):
             datatype = expr.type.output()
 
             if self.with_operators:
-                self.add((current, TA.via,
-                    self.language.namespace[expr.operator.name]))
+                op_node = self.language.namespace[expr.operator.name]
+                self.add((current, TA.via, op_node))
+
+                if self.with_membership:
+                    self.add((root, TA.member, op_node))
 
             if self.with_types:
-                self.add((current, RDF.type, self.add_type(datatype)))
+                type_node = self.add_type(datatype)
+                self.add((current, RDF.type, type_node))
+
+                if self.with_membership:
+                    self.add((root, TA.member, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
-                    Literal(f"{datatype} via {expr.operator.name}")))
+                    Literal(f"{datatype} (via {expr.operator.name})")))
 
-            if self.with_kinds:
+            if self.with_classes:
                 self.add((current, RDF.type, TA.TransformedData))
 
         else:
@@ -281,11 +299,8 @@ class TransformationGraph(Graph):
                 current_internal = internal
                 self.add((f, TA.internal, internal))
 
-                if self.with_kinds:
+                if self.with_classes:
                     self.add((internal, RDF.type, TA.InternalData))
-
-                if self.with_steps:
-                    self.add((root, TA.step, internal))
 
                 if self.with_labels:
                     self.add((internal, RDFS.label, Literal("internal")))
@@ -322,9 +337,6 @@ class TransformationGraph(Graph):
                 for data_input in self.subjects(TA.feeds, f):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
-
-        if self.with_steps:
-            self.add((root, TA.step, current))
 
         return current
 
@@ -367,9 +379,11 @@ class TransformationGraph(Graph):
             return node
 
         result_node = to_expr_node(top_level_expression)
-        self.add((root, TA.result, result_node))
 
-        if self.with_kinds:
+        if self.with_output:
+            self.add((root, TA.output, result_node))
+
+        if self.with_classes:
             self.add((root, RDF.type, TA.Transformation))
 
         return result_node
