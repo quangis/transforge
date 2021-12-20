@@ -53,40 +53,31 @@ class TransformationGraph(Graph):
     """
 
     def __init__(self, language: Language,
-            with_operators: bool = True,
-            with_types: bool = True,
-            with_steps: bool = True,
-            with_labels: bool = True,
-            with_kinds: bool = True,
+            minimal: bool = False,
+            with_operators: bool | None = None,
+            with_types: bool | None = None,
+            with_steps: bool | None = None,
+            with_labels: bool | None = None,
+            with_kinds: bool | None = None,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
 
+        def default(switch: bool | None) -> bool:
+            return (not minimal) if switch is None else switch
+
         self.language = language
-        self.with_operators = with_operators
-        self.with_types = with_types
-        self.with_labels = with_labels
-        self.with_steps = with_steps
-        self.with_kinds = with_kinds
+        self.with_operators = default(with_operators)
+        self.with_types = default(with_types)
+        self.with_labels = default(with_labels)
+        self.with_steps = default(with_steps)
+        self.with_kinds = default(with_kinds)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
         self.bind("ta", TA)
         # self.bind("test", self.namespace)
-
-    def minimal(self,
-            with_operators: bool = False,
-            with_types: bool = False,
-            with_steps: bool = False,
-            with_labels: bool = False,
-            with_kinds: bool = False) -> TransformationGraph:
-        self.with_operators = with_operators
-        self.with_types = with_types
-        self.with_labels = with_labels
-        self.with_steps = with_steps
-        self.with_kinds = with_kinds
-        return self
 
     def add_vocabulary(self) -> None:
         """
