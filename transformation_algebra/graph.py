@@ -164,7 +164,7 @@ class TransformationGraph(Graph):
             return node
 
     def add_expr(self, expr: Expr, root: Node, current: Optional[Node] = None,
-            sources: dict[str, Node | Expr] = {}) -> Node:
+            sources: list[Node | Expr] = []) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -188,9 +188,9 @@ class TransformationGraph(Graph):
             source: Expr | Node | None
             if expr.label:
                 try:
-                    source = sources[expr.label]
+                    source = sources[expr.label - 1]
                 except KeyError as e:
-                    msg = f"no input node named '{expr.label}'"
+                    msg = f"no input node {expr.label}"
                     raise RuntimeError(msg) from e
             else:
                 source = None
@@ -362,12 +362,8 @@ class TransformationGraph(Graph):
                 if isinstance(source, Expr):
                     to_expr_node(source)
 
-            self.expr_nodes[expr] = node = self.add_expr(
-                expr, root, sources={
-                    f"x{i}": source
-                    for i, source in enumerate(steps[expr], start=1)
-                }
-            )
+            self.expr_nodes[expr] = node = self.add_expr(expr,
+                root, sources=steps[expr])
             return node
 
         result_node = to_expr_node(top_level_expression)

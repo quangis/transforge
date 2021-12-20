@@ -423,7 +423,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual.add_workflow(root, {
-            f(Source("x1")): [source]
+            f(Source(1)): [source]
         })
 
         expected = graph_manual(
@@ -446,7 +446,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # 1
         sourceA = ~A
         sourceA1 = ~A1
-        app = f(Source("x1"), Source("x2"))
+        app = f(Source(1), Source(2))
 
         actual1 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
@@ -459,7 +459,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # 2
         sourceA = ~A
         sourceA1 = ~A1
-        app = f(Source("x1"), Source("x2"))
+        app = f(Source(1), Source(2))
 
         actual2 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
@@ -472,7 +472,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # Mismatch
         sourceA = ~A
         sourceB = ~B
-        app = f(Source("x1"), Source("x2"))
+        app = f(Source(1), Source(2))
 
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
@@ -492,7 +492,7 @@ class TestAlgebraRDF(unittest.TestCase):
         root = BNode()
 
         source = Source()
-        app = f(Source("x1"), Source("x2"))
+        app = f(Source(1), Source(2))
 
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
@@ -516,7 +516,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         src = ~A
-        app = f(Source("x1"))
+        app = f(Source(1))
         actual.add_workflow(root, {
             src: [],
             app: [src]

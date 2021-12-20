@@ -135,13 +135,11 @@ class TestAlgebra(TestCase):
         # See issue #10
         A = TypeOperator()
         B = TypeOperator()
-        d1 = Operator(type=A)
-        d2 = Operator(type=B)
         f = Operator(type=A ** B ** A)
         lang = Language(locals())
 
-        lang.parse("f (d1 x) (d2 y)")
-        self.assertRaises(TypeMismatch, lang.parse, "f (d1 x) (d2 x)")
+        lang.parse("f (1 : A) (2 : B)")
+        self.assertRaises(TypeMismatch, lang.parse, "f (1 : A) (1 : B)")
 
 
 if __name__ == '__main__':

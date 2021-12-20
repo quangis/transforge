@@ -9,7 +9,7 @@ from abc import ABC
 from functools import reduce
 from itertools import chain, product
 from inspect import signature
-from typing import Optional, Callable, Iterator, Any
+from typing import Optional, Callable, Iterator
 
 from transformation_algebra.label import Labels
 from transformation_algebra.type import \
@@ -149,7 +149,7 @@ class Expr(ABC):
         elif isinstance(self, Source):
             if self.label:
                 with_type = True
-                result = self.label
+                result = str(self.label)
             else:
                 with_type = False
                 with_parentheses = False
@@ -289,7 +289,7 @@ class Expr(ABC):
 
         # TODO should be an actual test when constructing
         source_anchors = set(s for s in self.leaves()
-            if isinstance(s, Source) and s.label)
+            if isinstance(s, Source) and s.label is not None)
         assert all(x is y or x.label != y.label for x, y in
             product(source_anchors, source_anchors)), \
             "No two distinct sources can have the same label"
@@ -314,11 +314,7 @@ class Expr(ABC):
 
         a = self.normalize(recursive=False)
         if isinstance(a, Source):
-            if a.label:
-                label = int(a.label[1:]) - 1  # TODO should be int
-                source = inputs[label]
-            else:
-                source = None
+            source = inputs[a.label - 1] if a.label else None
             if source:
                 try:
                     source.type.unify(a.type, subtype=True)
@@ -362,8 +358,8 @@ class Operation(Expr):
 class Source(Expr):
     "A source data input."
 
-    def __init__(self, label: Optional[str] = None, type: Type = _):
-        self.label: Optional[str] = label
+    def __init__(self, label: int | None = None, type: Type = _):
+        self.label: int | None = label
         super().__init__(type=type.instance())
 
 

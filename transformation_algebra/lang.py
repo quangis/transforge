@@ -101,7 +101,7 @@ class Language(object):
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
-        sources: dict[str, Source] = dict()
+        sources: dict[int, Source] = dict()
         stack: list[Optional[Expr]] = [None]
         stackT: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
         type_mode: bool = False
@@ -168,21 +168,28 @@ class Language(object):
                 previous = stack.pop()
                 if previous and isinstance(previous, Source):
                     current = None
+
+                    # TODO Deprecated: labelling a source by suffixing it with
+                    # "xn". Will be removed in next version.
+                    assert token[0] == 'x'
+                    n = int(token[1:])
+
                     try:
-                        previous = sources[token]
+                        previous = sources[int(token)]
                     except KeyError:
                         assert not previous.label
-                        previous.label = token
-                        sources[token] = previous
+                        previous.label = n
+                        sources[n] = previous
                     stack.append(previous)
                     continue
                 if token == "-":
                     current = Source()
                 elif token.isnumeric():
+                    n = int(token)
                     try:
-                        current = sources[token]
+                        current = sources[n]
                     except KeyError:
-                        current = sources[token] = Source(label=token)
+                        current = sources[n] = Source(label=n)
                 else:
                     try:
                         current = self.operators[token].instance()
