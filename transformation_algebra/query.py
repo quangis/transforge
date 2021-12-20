@@ -13,6 +13,7 @@ from rdflib.term import Node
 from rdflib.namespace import Namespace, RDFS, RDF
 from itertools import count
 from typing import Iterator, Union, Optional, Literal
+from enum import Enum, auto
 
 from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, FlowShorthand
 from transformation_algebra.type import Type, TypeOperation, \
@@ -24,6 +25,17 @@ Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
 Triple = tuple[Node, Union[Path, Node], Node]
 
 
+class Aspect(Enum):
+    """
+    Queryable aspects of a workflow.
+    """
+    TYPES = auto()
+    OPERATORS = auto()
+    INPUTS = auto()
+    OUTPUT = auto()
+    ORDER = auto()
+
+
 class Query(object):  # TODO subclass rdflib.Query?
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
@@ -31,7 +43,7 @@ class Query(object):  # TODO subclass rdflib.Query?
     flow holds that there must be datatypes `A` and `B` that are fed to an
     operation f that eventually results in a datatype `C`:
 
-    [C, ..., f, AND(A, B)]
+    [C, f, AND(A, B)]
 
     Note that the flow is 'reversed' (from output to input). This allows for a
     convenient tree-like notation, but it may trip you up.
@@ -44,8 +56,10 @@ class Query(object):  # TODO subclass rdflib.Query?
     def __init__(self,
             ns: Namespace,
             flow: FlowShorthand[Type | Operator] | None = None,
+            aspects: set[Aspect] = set(Aspect),
             generator: Iterator[rdflib.Variable] | None = None):
 
+        self.aspects = aspects
         self.namespace = ns
         self.generator = generator or \
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
@@ -57,7 +71,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             self.connect(next(self.generator), "start", False, self.flow)
 
     def spawn(self) -> Query:
-        return Query(self.namespace, None, self.generator)
+        return Query(self.namespace, None, self.aspects, self.generator)
 
     def sparql(self) -> str:
         """
