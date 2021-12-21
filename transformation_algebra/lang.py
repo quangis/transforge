@@ -175,7 +175,7 @@ class Language(object):
                     n = int(token[1:])
 
                     try:
-                        previous = sources[int(token)]
+                        previous = sources[n]
                     except KeyError:
                         assert not previous.label
                         previous.label = n
