@@ -46,12 +46,11 @@ class Query(object):  # TODO subclass rdflib.Query?
             ns: Namespace,
             flow: FlowShorthand[Type | Operator] | None = None,
             generator: Iterator[rdflib.Variable] | None = None,
+            by_output: bool = True,
             by_types: bool = True,
             by_operators: bool = True,
-            by_output: bool = True,
             by_order: bool = True):
 
-        self.root = rdflib.Variable("workflow")
         self.namespace = ns
         self.generator = generator or \
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
@@ -64,17 +63,22 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.by_operators = by_operators
         self.by_order = by_order
 
+        self.root = rdflib.Variable("workflow")
+        self.output = rdflib.Variable("output")
+
+
         self.flow: Flow1[Type | Operator] | None = None
         if flow:
             self.flow = Flow.shorthand(flow)
 
         if self.flow:
 
+            self.triple(self.root, TA.output, self.output)
+
             if self.by_output:
                 for item in Flow.leaves(self.flow, targets=True):
                     if isinstance(item, Type):
-                        self.set_type(self.root,
-                            predicate=TA.output / RDF.type, type=item)
+                        self.set_type(self.output, item)
 
             for item in Flow.leaves(self.flow):
                 if self.by_operators and isinstance(item, Operator):
@@ -84,7 +88,7 @@ class Query(object):  # TODO subclass rdflib.Query?
                     self.set_type(self.root, item, TA.member)
 
             if self.by_order:
-                self.connect(next(self.generator), "start", False, self.flow)
+                self.connect(self.output, "start", False, self.flow)
 
     def spawn(self) -> Query:
         return Query(self.namespace, None, self.generator)
@@ -132,7 +136,7 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.triple(variable, predicate, self.namespace[op.name])
 
     def set_type(self, variable: rdflib.Variable, type: Type,
-            predicate: URIRef | Path = RDF.type) -> None:
+            predicate: Node | Path = RDF.type) -> None:
         """
         Produce SPARQL constraints for the given (non-function) type.
         """
@@ -185,21 +189,10 @@ class Query(object):  # TODO subclass rdflib.Query?
         if is_operator or isinstance(item, Type):
 
             # Connect this node to left node
-            if lunit == "start":
-                var = lvar
-                self.triple(
-                    rdflib.Variable("workflow"),
-                    TA.output / (~TA.feeds * ZeroOrMore)
-                    if lskip else TA.output,
-                    var)
-            elif is_operator and isinstance(lunit, Type):
+            if lunit == "start" or (is_operator and isinstance(lunit, Type)):
                 if lskip:
                     var = next(self.generator)
-                    self.triple(
-                        lvar,
-                        ~TA.feeds * ZeroOrMore,
-                        var
-                    )
+                    self.triple(lvar, ~TA.feeds * ZeroOrMore, var)
                 else:
                     var = lvar
             else:
