@@ -18,8 +18,7 @@ def make_graph(lang: Language,
     """
     Convenience method for constructing a graph containing workflows.
     """
-    graph = TransformationGraph(lang,
-        minimal=True, with_types=True, with_operators=True, with_output=True)
+    graph = TransformationGraph(lang)
     graph.add_vocabulary()
     for wfnode, content in workflows.items():
         if isinstance(content, Expr):
@@ -213,6 +212,9 @@ class TestAlgebra(unittest.TestCase):
             TEST.fx: ~F(X),
             TEST.fy: ~F(Y)
         })
+
+        # graph.serialize("test.ttl", format="ttl")
+        # print(Query(lang.namespace, X).sparql())
 
         self.assertQuery(graph, X, results={TEST.x, TEST.y})
         self.assertQuery(graph, Y, results={TEST.y})

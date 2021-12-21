@@ -35,6 +35,21 @@ class Flow(Generic[T]):
         return iter(self.items)
 
     @staticmethod
+    def leaves(self: Flow1[T],
+            targets: bool = False, sources: bool = False) -> Iterator[T]:
+        """
+        Find the leaves
+        """
+        assert not (targets and sources)
+        if isinstance(self, Flow):
+            yield from (Flow.leaves(item, targets, sources)
+                for item in self.items[
+                    -1 if sources else None:
+                    1 if targets else None])
+        else:
+            yield self
+
+    @staticmethod
     def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
         """
         Translate shorthand data structures (list for `SERIES`, tuples for

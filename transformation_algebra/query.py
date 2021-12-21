@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import rdflib
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
-from rdflib.term import Node
+from rdflib.term import Node, URIRef
 from rdflib.namespace import Namespace, RDFS, RDF
 from itertools import count
 from typing import Iterator, Union, Optional, Literal
@@ -23,17 +23,6 @@ from transformation_algebra.graph import TA
 
 Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
 Triple = tuple[Node, Union[Path, Node], Node]
-
-
-class Aspect(Enum):
-    """
-    Queryable aspects of a workflow.
-    """
-    TYPES = auto()
-    OPERATORS = auto()
-    INPUTS = auto()
-    OUTPUT = auto()
-    ORDER = auto()
 
 
 class Query(object):  # TODO subclass rdflib.Query?
@@ -56,22 +45,49 @@ class Query(object):  # TODO subclass rdflib.Query?
     def __init__(self,
             ns: Namespace,
             flow: FlowShorthand[Type | Operator] | None = None,
-            aspects: set[Aspect] = set(Aspect),
-            generator: Iterator[rdflib.Variable] | None = None):
+            generator: Iterator[rdflib.Variable] | None = None,
+            by_types: bool = True,
+            by_operators: bool = True,
+            by_output: bool = True,
+            by_order: bool = True):
 
-        self.aspects = aspects
+        self.root = rdflib.Variable("workflow")
         self.namespace = ns
         self.generator = generator or \
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
         self.statements: list[str] = []
+        self.cache: dict[Type, rdflib.Variable] = dict()
+
+        # Filter by...
+        self.by_output = by_output
+        self.by_types = by_types
+        self.by_operators = by_operators
+        self.by_order = by_order
 
         self.flow: Flow1[Type | Operator] | None = None
         if flow:
             self.flow = Flow.shorthand(flow)
-            self.connect(next(self.generator), "start", False, self.flow)
+
+        if self.flow:
+
+            if self.by_output:
+                for item in Flow.leaves(self.flow, targets=True):
+                    if isinstance(item, Type):
+                        self.set_type(self.root,
+                            predicate=TA.output / RDF.type, type=item)
+
+            for item in Flow.leaves(self.flow):
+                if self.by_operators and isinstance(item, Operator):
+                    self.set_operator(self.root, item, TA.member)
+
+                if self.by_types and isinstance(item, Type):
+                    self.set_type(self.root, item, TA.member)
+
+            if self.by_order:
+                self.connect(next(self.generator), "start", False, self.flow)
 
     def spawn(self) -> Query:
-        return Query(self.namespace, None, self.aspects, self.generator)
+        return Query(self.namespace, None, self.generator)
 
     def sparql(self) -> str:
         """
@@ -108,14 +124,15 @@ class Query(object):  # TODO subclass rdflib.Query?
                 result.append(str(item))
         self.statements.append(" ".join(result) + ".")
 
-    def set_operator(self, variable: rdflib.Variable, op: Operator) -> None:
+    def set_operator(self, variable: rdflib.Variable, op: Operator,
+            predicate: Node | Path = TA.via) -> None:
         if op.definition:
             import warnings
             warnings.warn(f"query used a non-primitive operation {op.name}")
-        self.triple(variable, TA.via, self.namespace[op.name])
+        self.triple(variable, predicate, self.namespace[op.name])
 
     def set_type(self, variable: rdflib.Variable, type: Type,
-            index: Optional[int] = None) -> None:
+            predicate: URIRef | Path = RDF.type) -> None:
         """
         Produce SPARQL constraints for the given (non-function) type.
         """
@@ -128,23 +145,22 @@ class Query(object):  # TODO subclass rdflib.Query?
             assert t.wildcard
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
-
-            pred = RDF.type if index is None else RDF[f"_{index}"]
-            if t.params:
-                bnode = next(self.generator)
-                self.triple(variable,
-                    pred,
-                    bnode)
-                self.triple(bnode,
-                    RDFS.subClassOf,
+            if t.params and t not in self.cache:
+                self.cache[t] = bnode = next(self.generator)
+                self.triple(variable, predicate, bnode)
+                self.triple(bnode, RDFS.subClassOf,
                     self.namespace[t._operator.name])
                 for i, param in enumerate(t.params, start=1):
-                    self.set_type(bnode, param, index=i)
+                    self.set_type(bnode, param, predicate=RDF[f"_{i}"])
             else:
+                if not t.params:
+                    node = self.namespace[t._operator.name]
+                else:
+                    node = self.cache[t]
                 self.triple(
                     variable,
-                    pred / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
-                    self.namespace[t._operator.name])
+                    predicate / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
+                    node)
 
     def __str__(self) -> str:
         return "\n".join(self.statements)

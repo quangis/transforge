@@ -216,7 +216,7 @@ class TransformationGraph(Graph):
                     self.add((current, RDF.type, type_node))
 
                     if self.with_membership:
-                        self.add((current, TA.member, type_node))
+                        self.add((root, TA.member, type_node))
 
                 if self.with_labels:
                     self.add((current, RDFS.label,
