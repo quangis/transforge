@@ -66,6 +66,7 @@ class TransformationGraph(Graph):
         super().__init__(*nargs, **kwargs)
 
         def default(switch: bool | None) -> bool:
+            assert isinstance(minimal, bool)
             return (not minimal) if switch is None else switch
 
         self.language = language
