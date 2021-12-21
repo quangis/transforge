@@ -42,10 +42,9 @@ class Flow(Generic[T]):
         """
         assert not (targets and sources)
         if isinstance(self, Flow):
-            yield from (Flow.leaves(item, targets, sources)
-                for item in self.items[
-                    -1 if sources else None:
-                    1 if targets else None])
+            for item in self.items[-1 if sources else None:
+                    1 if targets else None]:
+                yield from Flow.leaves(item, targets, sources)
         else:
             yield self
 
