@@ -46,9 +46,9 @@ class Query(object):  # TODO subclass rdflib.Query?
             ns: Namespace,
             flow: FlowShorthand[Type | Operator] | None = None,
             generator: Iterator[rdflib.Variable] | None = None,
-            by_output: bool = True,
-            by_types: bool = True,
-            by_operators: bool = True,
+            by_output: bool = False,
+            by_types: bool = False,
+            # by_operators: bool = True,
             by_order: bool = True):
 
         self.namespace = ns
@@ -60,12 +60,11 @@ class Query(object):  # TODO subclass rdflib.Query?
         # Filter by...
         self.by_output = by_output
         self.by_types = by_types
-        self.by_operators = by_operators
+        # self.by_operators = by_operators
         self.by_order = by_order
 
         self.root = rdflib.Variable("workflow")
         self.output = rdflib.Variable("output")
-
 
         self.flow: Flow1[Type | Operator] | None = None
         if flow:
@@ -81,8 +80,8 @@ class Query(object):  # TODO subclass rdflib.Query?
                         self.set_type(self.output, item)
 
             for item in Flow.leaves(self.flow):
-                if self.by_operators and isinstance(item, Operator):
-                    self.set_operator(self.root, item, TA.member)
+                # if self.by_operators and isinstance(item, Operator):
+                #     self.set_operator(self.root, item, TA.member)
 
                 if self.by_types and isinstance(item, Type):
                     self.set_type(self.root, item, TA.member)
