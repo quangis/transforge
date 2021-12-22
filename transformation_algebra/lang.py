@@ -101,45 +101,14 @@ class Language(object):
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
-        sources: dict[int, Source] = dict()
-        stack: list[Optional[Expr]] = [None]
-        stackT: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
-        type_mode: bool = False
+        return self.parse_expr(string)
 
-        for token in tokenize(string, "(,):;~"):
-            if type_mode:
-                if token == "(":
-                    stackT.append([])
-                elif token in "),":
-                    unit = stackT.pop()
-                    assert isinstance(unit, TypeInstance)
-                    params = stackT.pop()
-                    assert isinstance(params, list)
-                    params.append(unit)
-                    stackT.append(params)
-                    if token == ")":
-                        params = stackT.pop()
-                        assert isinstance(params, list)
-                        op = stackT.pop()
-                        assert isinstance(op, TypeOperator)
-                        stackT.append(op(*params))
-                elif token == "_":
-                    stackT.append(TypeVariable())
-                else:
-                    try:
-                        op = self.types[token]
-                    except KeyError as e:
-                        raise UndefinedToken(token) from e
-                    stackT.append(op() if op.arity == 0 else op)
-                if len(stackT) == 1 and isinstance(stackT[0], TypeInstance):
-                    type_mode = False
-                    t = stackT.pop()
-                    assert isinstance(t, TypeInstance)
-                    previous = stack[-1]
-                    assert isinstance(previous, Expr)
-                    previous.type.unify(t, subtype=True)
-                    previous.type.fix(prefer_lower=False)
-                continue
+    def parse_expr(self, val: str | Iterator[str]) -> Expr:
+        tokens = tokenize(val, "(,):;~") if isinstance(val, str) else val
+        stack: list[Expr | None] = [None]
+        sources: dict[int, Source] = dict()
+
+        while token := next(tokens, None):
 
             if token in "(,)":
                 if token in "),":
@@ -153,7 +122,11 @@ class Language(object):
                 if token in "(,":
                     stack.append(None)
             elif token == ":":
-                type_mode = True
+                previous = stack[-1]
+                assert isinstance(previous, Expr)
+                t = self.parse_type(tokens)
+                previous.type.unify(t, subtype=True)
+                previous.type.fix(prefer_lower=False)
             elif token == ";":
                 stack.clear()
                 stack.append(None)
@@ -161,8 +134,9 @@ class Language(object):
                 previous = stack.pop()
                 if previous:
                     stack.append(previous)
-                stack.append(Source())
-                type_mode = True
+                t = self.parse_type(tokens)
+                stack.append(Source(type=t))
+
             else:
                 current: Optional[Expr]
                 previous = stack.pop()
@@ -207,6 +181,42 @@ class Language(object):
                 return result
         else:
             raise BracketMismatch(")")
+
+        raise NotImplementedError
+
+    def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
+        tokens = tokenize(value, "(,)") if isinstance(value, str) else value
+        stack: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
+
+        while token := next(tokens, None):
+            if token == "(":
+                stack.append([])
+            elif token in "),":
+                unit = stack.pop()
+                assert isinstance(unit, TypeInstance)
+                params = stack.pop()
+                assert isinstance(params, list)
+                params.append(unit)
+                stack.append(params)
+                if token == ")":
+                    params = stack.pop()
+                    assert isinstance(params, list)
+                    op = stack.pop()
+                    assert isinstance(op, TypeOperator)
+                    stack.append(op(*params))
+            elif token == "_":
+                stack.append(TypeVariable())
+            else:
+                try:
+                    op = self.types[token]
+                except KeyError as e:
+                    raise UndefinedToken(token) from e
+                stack.append(op() if op.arity == 0 else op)
+            if len(stack) == 1 and isinstance(stack[0], TypeInstance):
+                t = stack.pop()
+                assert isinstance(t, TypeInstance)
+                return t
+        raise RuntimeError
 
 
 def tokenize(string: str, specials: str = "") -> Iterator[str]:
