@@ -2,47 +2,46 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation algebra is a notational system for describing *tools* as 
-abstract semantic *transformations*. The expressions of such an algebra are 
-not necessarily associated with any concrete data structure or implementation: 
-they merely describe input and output in terms of some *conceptual properties* 
-that are deemed relevant.
+A transformation language is a notational system for describing *processes*, 
+like workflows or tools, as abstract *transformations* between types. An 
+expression of such a language is not necessarily associated with any concrete 
+implementation, and the types may not denote any realized data structure. The 
+goal is merely to capture some *conceptual* properties that are deemed 
+relevant.
 
 -  In order to reason about about transformations, we implemented [type 
-   inference](https://en.wikipedia.org/wiki/Type_inference) in Python. While 
-   the algorithm is perhaps also useful in the more traditional programming 
-   context of catching implementation errors, it was written to be separate 
-   from such concerns. It accommodates both 
-   [subtype](https://en.wikipedia.org/wiki/Subtyping) and [parametric 
-   polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism).
+   inference](https://en.wikipedia.org/wiki/Type_inference) in Python, separate 
+   from the context of software implementation. It accommodates both 
+   [subtype-](https://en.wikipedia.org/wiki/Subtyping) and 
+   [parametric](https://en.wikipedia.org/wiki/Parametric_polymorphism) 
+   polymorphism.
 
--  To enable flexible searching through the tool workflows described in this 
-   way, algebra expressions can be serialized into 
-   [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and 
-   queried through [SPARQL](https://en.wikipedia.org/wiki/SPARQL). 
+-  To enable flexible searching through processes, transformation expressions 
+   can be serialized into 
+   [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) graphs 
+   and queried through [SPARQL](https://en.wikipedia.org/wiki/SPARQL).
 
+The rest of this document intended to be a cursory user's guide. The library 
+was developed for the core concept transformation algebra for geographical 
+information ([CCT](https://github.com/quangis/cct)) — the contents of that 
+repository may act as an example.
 
-For now, refer to the [source 
-code](https://github.com/quangis/transformation_algebra/blob/master/transformation_algebra/type.py) 
-to gain a deeper understanding. This document is merely intended to be a 
-user's guide. The library was developed for the core concept transformation 
-algebra for geographical information ([CCT](https://github.com/quangis/cct)) — 
-code in that repository may act as an example.
-
+**This library is still in development. Interfaces might change without 
+warning.**
 
 ## Concrete types and subtypes
 
 To specify type transformations, we first need to declare *base types*. To 
-this end, we use the `Type.declare` function. 
+this end, we use the `TypeOperator` class.
 
     >>> from transformation_algebra import *
-    >>> Real = Type.declare("Real")
+    >>> Real = TypeOperator(name="Real")
 
 Base types may have supertypes. For instance, anything of type `Int` is also 
 automatically of type `Real`, but not necessarily of type `Nat`:
 
-    >>> Int = Type.declare("Int", supertype=Real)
-    >>> Nat = Type.declare("Nat", supertype=Int)
+    >>> Int = TypeOperator(name="Int", supertype=Real)
+    >>> Nat = TypeOperator(name="Nat", supertype=Int)
     >>> Int <= Real
     True
     >>> Int <= Nat
@@ -52,7 +51,7 @@ automatically of type `Real`, but not necessarily of type `Nat`:
 represent the type of sets of integers. This would automatically be a subtype 
 of `Set(Real)`.
 
-    >>> Set = Type.declare("Set", params=1)
+    >>> Set = TypeOperator(name="Set", params=1)
     >>> Set(Int) <= Set(Real)
     True
 
@@ -119,55 +118,51 @@ interdependencies between types:
     >>> f.apply(Set(Int))
     Int
 
-Finally, `operators` is a helper function for specifying typeclasses: it 
+Finally, `with_parameters` is a helper function for specifying typeclasses: it 
 generates type terms that contain certain parameters.
 
-    >>> Map = Type.declare("Map", params=2)
-    >>> operators(Map, param=Int)
+    >>> Map = TypeOperator(name="Map", params=2)
+    >>> with_parameters(Map, param=Int)
     [Map(Int, _), Map(_, Int)]
 
 
-## Algebra and expressions
+## Language and expressions
 
-Now that we know how types work, we can use them to define the types, data 
-inputs and operations of an algebra.
+Now that we know how types work, we can use them to define the operations of a 
+*language*. Note that we can leave the `name` parameter blank now: it will be 
+filled automatically.
 
-    >>> alg = TransformationAlgebra()
-    >>> alg.add(
-            Int,
-            one=Data(Int),
-            add=Operation(Int ** Int ** Int)
-            ...
-        )
+    >>> lang = Language()
+    >>> lang.Int = Int = TypeOperator()
+    >>> lang.add = Operator(type=Int ** Int ** Int)
 
-In fact, for convenience, you may provide your definitions globally and 
-automatically incorporate them into the algebra:
+In fact, for convenience, you can simply incorporate *all* operators in scope 
+into your language:
 
-    >>> one = Data(Int)
-    >>> add = Operation(Int ** Int ** Int)
-    >>> alg = TransformationAlgebra()
-    >>> alg.add(**globals())
+    >>> Int = TypeOperator()
+    >>> add = Operator(type=Int ** Int ** Int)
+    >>> lang = Language(scope=locals())
 
 It is possible to define *composite* transformations: transformations that are 
-derived from other, simpler ones. This definition should not necessarily be 
-thought of as an *implementation*: it merely represents a decomposition into 
-more primitive conceptual building blocks.
+derived from other, simpler ones. This should not necessarily be thought of as 
+providing an *implementation*: it merely represents a decomposition into more 
+primitive conceptual building blocks.
 
-    >>> add1 = Operation(
-            Int ** Int,
-            derived=lambda x: add(x, one)
+    >>> add1 = Operator(
+            type=Int ** Int,
+            define=lambda x: add(x, ~Int)
         )
     >>> compose = Operation(
-            lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-            derived=lambda f, g, x: f(g(x))
+            type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            define=lambda f, g, x: f(g(x))
         )
 
-With these definitions added to `alg`, we are able to parse an expression 
+With these definitions added to `lang`, we are able to parse an expression 
 using the `.parse()` function. If the result typechecks, we obtain an `Expr` 
 object. This object knows its inferred type as well as that of its 
 sub-expressions:
 
-    >>> expr = alg.parse("compose add1 add1 one")
+    >>> expr = lang.parse("compose add1 add1 ~Int")
     >>> expr.type
     Int
     >>> expr
@@ -177,7 +172,7 @@ sub-expressions:
      │  │  ├─╼ compose : (Int ** Int) ** (Int ** Int) ** Int ** Int
      │  │  └─╼ add1 : Int ** Int
      │  └─╼ add1 : Int ** Int
-     └─╼ one : Int
+     └─╼ ~Int
 
 If desired, the underlying primitive expression can be derived using 
 `.primitive()`:
@@ -189,9 +184,9 @@ If desired, the underlying primitive expression can be derived using
      │  └─Int
      │     ├─Int ** Int
      │     │  ├─╼ add : Int ** Int ** Int
-     │     │  └─╼ one : Int
-     │     └─╼ one : Int
-     └─╼ one : Int
+     │     │  └─╼ ~Int : Int
+     │     └─╼ ~Int : Int
+     └─╼ ~Int : Int
 
 
 ## Graphs and queries
@@ -215,9 +210,8 @@ In practical terms, to obtain a graph representation of the previous expression,
     >>> from transformation_algebra.rdf import TransformationGraph
     >>> g = TransformationGraph()
     >>> g.add_expr(expr)
+    >>> g.serialize("graph.ttl", format="ttl")
 
-You could then use `rdflib`'s tools to visualize it as a GraphViz file:
+You may use the [viz.sh](tools/viz.sh) script to visualize the graph.
 
-    >>> from rdflib.tools.rdf2dot import rdf2dot
-    >>> with open("output.dot", 'w') as f:
-    >>>     rdf2dot(g, f)
+These graphs can be queried via constructs from the [SPARQL 1.1 specification](https://www.w3.org/TR/sparql11-query/).
