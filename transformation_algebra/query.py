@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import rdflib
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
-from rdflib.term import Node, URIRef
+from rdflib.term import Node
 from rdflib.namespace import Namespace, RDFS, RDF
 from itertools import count
-from typing import Iterator, Union, Optional, Literal
-from enum import Enum, auto
+from typing import Iterator, Union, Literal
 
-from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, FlowShorthand
+from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, \
+    FlowShorthand
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
@@ -108,12 +108,6 @@ class Query(object):  # TODO subclass rdflib.Query?
         query.extend(self.statements)
         query.append("} GROUP BY ?workflow ?description")
         return "\n".join(query)
-
-        # TODO return sparql.Query instead, to avoid parsing at all. This does
-        # not avoid parsing:
-        # return sparql.prepareQuery("\n".join(query),
-        #         initNs={'ta': TA, 'rdf': RDF, 'rdfs': RDFS}
-        # )
 
     def triple(self, *items: Node | Path) -> None:
         """
@@ -251,20 +245,6 @@ class Query(object):  # TODO subclass rdflib.Query?
 
             lskip = skip_between
             current = item.items[-1]
-
-            # # If there is a skip before an item that is not a unit (can only be
-            # # the last item at the moment), then then we must make an
-            # # intermediary node that subsequent sequences can attach to. See
-            # # issue #61. This is only necessary if subsequent sequences don't
-            # # all start with a skip.
-            # if lskip and isinstance(current, AND) and not all(
-            #         isinstance(item, SEQ) and item.skips[0]
-            #         for item in current.items):
-            #     var = next(self.generator)
-            #     self.triple(lvar, ~TA.feeds * ZeroOrMore, var)
-            #     lunit = None
-            #     lskip = False
-            #     lvar = var
 
             return self.connect(lvar, lunit, lskip, current)
 
