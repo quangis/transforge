@@ -55,9 +55,15 @@ class Flow(Generic[T]):
         `LINKED`) to real flows.
         """
         if isinstance(value, list):
-            return SERIES(*value)
+            if len(value) == 1:
+                return Flow.shorthand(value[0])
+            else:
+                return SERIES(*value)
         elif isinstance(value, tuple):
-            return LINKED(*value)
+            if len(value) == 1:
+                return Flow.shorthand(value[0])
+            else:
+                return LINKED(*value)
         else:
             return value
 
