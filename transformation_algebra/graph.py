@@ -221,7 +221,7 @@ class TransformationGraph(Graph):
 
                 if self.with_labels:
                     self.add((current, RDFS.label,
-                        Literal(f"{expr.type} (source)")))
+                        Literal(f"{expr.type}  (source data)")))
 
                 if self.with_classes:
                     self.add((current, RDF.type, TA.SourceData))
@@ -236,8 +236,8 @@ class TransformationGraph(Graph):
                 current = self.expr_nodes[source]
 
         elif isinstance(expr, Operation):
-            assert not expr.operator.definition, \
-                f"{expr.operator} should be a primitive"
+            # assert not expr.operator.definition, \
+            #     f"{expr.operator} should be a primitive"
 
             datatype = expr.type.output()
 
@@ -304,7 +304,8 @@ class TransformationGraph(Graph):
                     self.add((internal, RDF.type, TA.InternalData))
 
                 if self.with_labels:
-                    self.add((internal, RDFS.label, Literal("internal")))
+                    self.add((internal, RDFS.label, Literal(
+                        "unknown (internal)")))
 
                 if isinstance(expr.x, Abstraction):
                     for p in expr.x.params:
