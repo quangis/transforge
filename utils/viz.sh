@@ -7,6 +7,8 @@
 # >>> from rdflib.tools.rdf2dot import rdf2dot
 # >>> with open("output.dot", 'w') as f:
 # >>>     rdf2dot(graph, f)
+# ... or on the command line:
+# $ rdf2dot "$1" | xdot -
 
 set -euo pipefail
 
