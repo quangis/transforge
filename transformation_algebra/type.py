@@ -197,6 +197,15 @@ class TypeInstance(Type):
     def __str__(self):
         return self.text(with_constraints=True)
 
+    def depth(self) -> int:
+        """
+        The maximum nesting level of type parameters.
+        """
+        if isinstance(self, TypeVariable):
+            raise ValueError("Attempted to calculate depth for variable")
+        assert isinstance(self, TypeOperation)
+        return max(p.depth() for p in self.params) + 1 if self.params else 0
+
     def text(self,
             labels: dict[TypeVariable, str] = Labels("τ", subscript=True),
             with_constraints: bool = False,
