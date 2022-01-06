@@ -42,7 +42,8 @@ class Language(object):
         Irrelevant items are filtered out without complaint.
         """
         for k, v in dict(scope).items():
-            if isinstance(v, (Operator, TypeOperator, TypeOperation)):
+            if isinstance(v, (Operator, TypeOperator)) or (
+                    isinstance(v, TypeOperation) and not any(v.variables())):
                 self.add(item=v, name=k)
 
     def add(self, item: Operator | TypeOperator | TypeOperation,

@@ -1,6 +1,6 @@
 import unittest
 
-from transformation_algebra.type import TypeOperator, SubtypeMismatch
+from transformation_algebra.type import TypeOperator, SubtypeMismatch, _
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 
@@ -33,6 +33,13 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals())
 
         lang.parse("f(1 : A) : FA")
+
+    def test_type_synonyms_no_variables(self):
+        A, F = TypeOperator(), TypeOperator(params=1)
+        FA, FV = F(A), F(_)
+        lang = Language(scope=locals())
+        self.assertIn(FA, lang.synonyms.values())
+        self.assertNotIn(FV, lang.synonyms.values())
 
     def test_parse_sources(self):
         A = TypeOperator()
