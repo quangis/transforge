@@ -25,6 +25,15 @@ class TestAlgebra(unittest.TestCase):
 
         lang.parse("f x : A")
 
+    def test_type_synonyms(self):
+        A = TypeOperator()
+        F = TypeOperator(params=1)
+        FA = F(A)
+        f = Operator(type=lambda x: x ** F(x))
+        lang = Language(scope=locals())
+
+        lang.parse("f(1 : A) : FA")
+
     def test_parse_sources(self):
         A = TypeOperator()
         B = TypeOperator()

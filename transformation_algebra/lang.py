@@ -9,7 +9,7 @@ from itertools import groupby
 from typing import Optional, Iterator, Any, TYPE_CHECKING
 
 from transformation_algebra.type import \
-    TypeOperator, TypeInstance, TypeVariable
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -22,6 +22,8 @@ class Language(object):
             namespace: Namespace | None = None):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
+        self.synonyms: dict[str, TypeOperation] = dict()
+
         self._namespace = namespace
         if scope:
             self.add_scope(scope)
@@ -40,24 +42,33 @@ class Language(object):
         Irrelevant items are filtered out without complaint.
         """
         for k, v in dict(scope).items():
-            if isinstance(v, (Operator, TypeOperator)):
+            if isinstance(v, (Operator, TypeOperator, TypeOperation)):
                 self.add(item=v, name=k)
 
-    def add(self, item: Operator | TypeOperator, name: Optional[str] = None):
+    def add(self, item: Operator | TypeOperator | TypeOperation,
+            name: str | None = None):
 
         # The item must already have a name or be named here
-        if name:
-            name = item.name = name.rstrip("_")
-        else:
-            name = item.name
+        if isinstance(item, (Operator, TypeOperator)):
+            if name:
+                name = item.name = name.rstrip("_")
+            else:
+                name = item.name
+        elif not name:
+            raise ValueError("no name provided for synonym")
 
-        if name in self.operators or name in self.types:
-            raise ValueError("already exists")
+        if name in self:
+            raise ValueError(f"symbol {name} already exists in the language")
+
+        if isinstance(item, TypeOperation) and any(item.variables()):
+            raise ValueError("synonyms must not contain variable instance")
 
         if isinstance(item, Operator):
             self.operators[name] = item
-        else:
+        elif isinstance(item, TypeOperator):
             self.types[name] = item
+        else:
+            self.synonyms[name] = item
 
     def __getattr__(self, name: str) -> Operator | TypeOperator:
         result = self.operators.get(name) or self.types.get(name)
@@ -74,7 +85,8 @@ class Language(object):
 
     def __contains__(self, key: str | Operator | TypeOperator) -> bool:
         if isinstance(key, str):
-            return key in self.operators or key in self.types
+            return key in self.operators or key in self.types \
+                or key in self.synonyms
         elif isinstance(key, TypeOperator):
             assert isinstance(key.name, str)
             return self.types.get(key.name) is key
@@ -207,15 +219,20 @@ class Language(object):
             elif token == "_":
                 stack.append(TypeVariable())
             else:
+                t: TypeInstance | TypeOperator
                 try:
                     op = self.types[token]
-                except KeyError as e:
-                    raise UndefinedToken(token) from e
-                stack.append(op() if op.arity == 0 else op)
+                    t = op() if op.arity == 0 else op
+                except KeyError:
+                    try:
+                        t = self.synonyms[token]
+                    except KeyError as e:
+                        raise UndefinedToken(token) from e
+                stack.append(t)
             if len(stack) == 1 and isinstance(stack[0], TypeInstance):
-                t = stack.pop()
-                assert isinstance(t, TypeInstance)
-                return t
+                final = stack.pop()
+                assert isinstance(final, TypeInstance)
+                return final
         raise RuntimeError
 
 
