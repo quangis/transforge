@@ -60,13 +60,17 @@ class Language(object):
         stack = sorted(self.synonyms.values(), key=TypeInstance.depth)
         while stack:
             t = stack.pop()
-            subtypes = (t._operator(*params) for params in product(*(
+
+            if t not in taxonomy:
+                taxonomy[t] = None
+
+            subtypes = [t._operator(*params) for params in product(*(
                 successors(p, v is Variance.CO)
                 for v, p in zip(t._operator.variance, t.params)
-            )))
+            ))]
 
             for s in subtypes:
-                if s != t and s not in taxonomy:
+                if s != t and not taxonomy.get(s):
                     taxonomy[s] = t
                     stack.append(s)
         return taxonomy
