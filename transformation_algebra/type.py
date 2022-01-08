@@ -208,32 +208,35 @@ class TypeInstance(Type):
 
     def text(self,
             labels: dict[TypeVariable, str] = Labels("τ", subscript=True),
-            spacer: str = ", ",
+            sep: str = ", ",
+            lparen: str = "(",
+            rparen: str = ")",
             arrow: str = "→",
             with_constraints: bool = False) -> str:
         """
         Convert the given type to a textual representation.
         """
 
+        args = labels, sep, lparen, rparen, arrow
+
         if isinstance(self, TypeOperation):
             if self._operator == Function:
                 i, o = self.params
                 if isinstance(i, TypeOperation) and i._operator == Function:
-                    result = f"({i.text(labels, spacer, arrow)}) " \
-                        f"{arrow} {o.text(labels)}"
+                    result = f"{lparen}{i.text(*args)}{rparen} " \
+                        f"{arrow} {o.text(*args)}"
                 else:
-                    result = f"{i.text(labels, spacer, arrow)} " \
-                        f"{arrow} {o.text(labels, spacer, arrow)}"
+                    result = f"{i.text(*args)} {arrow} {o.text(*args)}"
             else:
                 if self.params:
-                    result = f"{self._operator}" \
-                        f"({spacer.join(t.text(labels, spacer, arrow) for t in self.params)})"
+                    result = f"{self._operator}{lparen}" \
+                        f"{sep.join(t.text(*args) for t in self.params)}{rparen}"
                 else:
                     result = str(self._operator)
         else:
             assert isinstance(self, TypeVariable)
             if self.unification:
-                result = self.unification.text(labels)
+                result = self.unification.text(*args)
             elif self.wildcard:
                 result = "_"
             else:
@@ -254,14 +257,12 @@ class TypeInstance(Type):
             result_aux = [result]
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(
-                        f"{v.text(labels, spacer, arrow)} ≥ {v.lower}")
+                    result_aux.append(f"{v.text(*args)} ≥ {v.lower}")
                 if v.upper:
-                    result_aux.append(
-                        f"{v.text(labels, spacer, arrow)} ≤ {v.upper}")
+                    result_aux.append(f"{v.text(*args)} ≤ {v.upper}")
 
             result_aux.extend(
-                c.text(labels, spacer, arrow) for c in self.constraints())
+                c.text(*args) for c in self.constraints())
             return ' | '.join(result_aux)
         else:
             return result

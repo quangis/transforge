@@ -35,7 +35,7 @@ class LanguageNamespace(ClosedNamespace):
         terms = chain(
             alg.operators.keys(),
             alg.types.keys(),
-            (t.text(spacer=",") for t in alg.taxonomy().keys())
+            (t.text(sep=".", lparen="_", rparen="") for t in alg.taxonomy().keys())
         )
         rt = super().__new__(cls, uri, terms)
         return rt
@@ -44,7 +44,7 @@ class LanguageNamespace(ClosedNamespace):
         if isinstance(value, (Operator, TypeOperator)):
             return super().term(value.name)
         elif isinstance(value, TypeOperation):
-            return super().term(value.text(spacer=","))
+            return super().term(value.text(sep=".", lparen="_", rparen=""))
         else:
             return super().term(value)
 
@@ -86,7 +86,8 @@ class TransformationGraph(Graph):
 
         self.taxonomy = language.taxonomy()
         for t in self.taxonomy:
-            self.type_nodes[t] = self.language.namespace[t.text(spacer=",")]
+            self.type_nodes[t] = self.language.namespace[
+                t.text(sep=".", lparen="_", rparen="")]
 
         self.bind("ta", TA)
         self.bind("lang", self.language.namespace)
@@ -116,7 +117,7 @@ class TransformationGraph(Graph):
                 self.add((uri, RDF.type, TA.Type))
 
             if self.with_labels:
-                self.add((uri, RDFS.label, Literal(str(t))))
+                self.add((uri, RDFS.label, Literal(t.text())))
 
     def add_operators(self) -> None:
         for op in self.language.operators.values():

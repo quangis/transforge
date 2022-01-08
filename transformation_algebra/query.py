@@ -146,7 +146,7 @@ class Query(object):  # TODO subclass rdflib.Query?
         elif t in self.taxonomy:
             self.triple(variable,
                 predicate / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
-                self.namespace[t.text(spacer=",")])
+                self.namespace[t.text(sep=".", lparen="_", rparen="")])
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
             if t.params and t not in self.cache:
