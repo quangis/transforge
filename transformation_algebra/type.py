@@ -208,8 +208,9 @@ class TypeInstance(Type):
 
     def text(self,
             labels: dict[TypeVariable, str] = Labels("τ", subscript=True),
-            with_constraints: bool = False,
-            arrow: str = "→") -> str:
+            spacer: str = ", ",
+            arrow: str = "→",
+            with_constraints: bool = False) -> str:
         """
         Convert the given type to a textual representation.
         """
@@ -218,13 +219,15 @@ class TypeInstance(Type):
             if self._operator == Function:
                 i, o = self.params
                 if isinstance(i, TypeOperation) and i._operator == Function:
-                    result = f"({i.text(labels)}) {arrow} {o.text(labels)}"
+                    result = f"({i.text(labels, spacer, arrow)}) " \
+                        f"{arrow} {o.text(labels)}"
                 else:
-                    result = f"{i.text(labels)} {arrow} {o.text(labels)}"
+                    result = f"{i.text(labels, spacer, arrow)} " \
+                        f"{arrow} {o.text(labels, spacer, arrow)}"
             else:
                 if self.params:
                     result = f"{self._operator}" \
-                        f"({', '.join(t.text(labels) for t in self.params)})"
+                        f"({spacer.join(t.text(labels, spacer, arrow) for t in self.params)})"
                 else:
                     result = str(self._operator)
         else:
@@ -251,10 +254,14 @@ class TypeInstance(Type):
             result_aux = [result]
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v.text(labels)} ≥ {v.lower}")
+                    result_aux.append(
+                        f"{v.text(labels, spacer, arrow)} ≥ {v.lower}")
                 if v.upper:
-                    result_aux.append(f"{v.text(labels)} ≤ {v.upper}")
-            result_aux.extend(c.text(labels) for c in self.constraints())
+                    result_aux.append(
+                        f"{v.text(labels, spacer, arrow)} ≤ {v.upper}")
+
+            result_aux.extend(
+                c.text(labels, spacer, arrow) for c in self.constraints())
             return ' | '.join(result_aux)
         else:
             return result
@@ -668,10 +675,10 @@ class Constraint(object):
 
         self.fulfilled()
 
-    def text(self, labels: dict[TypeVariable, str]) -> str:
+    def text(self, *args, **kwargs) -> str:
         return (
-            f"{self.reference.text(labels)}"
-            f" << [{', '.join(a.text(labels) for a in self.alternatives)}]"
+            f"{self.reference.text(*args, **kwargs)} << ["
+            f"{', '.join(a.text(*args, **kwargs) for a in self.alternatives)}]"
         )
 
     def variables(self, indirect: bool = True) -> set[TypeVariable]:

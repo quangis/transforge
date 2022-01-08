@@ -34,7 +34,8 @@ class LanguageNamespace(ClosedNamespace):
     def __new__(cls, uri, alg: Language):
         terms = chain(
             alg.operators.keys(),
-            alg.types.keys()
+            alg.types.keys(),
+            (t.text(spacer=",") for t in alg.taxonomy().keys())
         )
         rt = super().__new__(cls, uri, terms)
         return rt
@@ -42,6 +43,8 @@ class LanguageNamespace(ClosedNamespace):
     def term(self, value) -> URIRef:
         if isinstance(value, (Operator, TypeOperator)):
             return super().term(value.name)
+        elif isinstance(value, TypeOperation):
+            return super().term(value.text(spacer=","))
         else:
             return super().term(value)
 
@@ -81,6 +84,10 @@ class TransformationGraph(Graph):
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
+        self.taxonomy = language.taxonomy()
+        for t in self.taxonomy:
+            self.type_nodes[t] = self.language.namespace[t.text(spacer=",")]
+
         self.bind("ta", TA)
         self.bind("lang", self.language.namespace)
 
@@ -89,40 +96,31 @@ class TransformationGraph(Graph):
         Add the RDF vocabulary for describing expressions in terms of the types
         and operations defined for this transformation algebra.
         """
-        ns = self.language.namespace
+        self.add_types()
+        self.add_operators()
 
-        # Add type operators to the vocabulary
-        for t in self.language.types.values():
-            if t.arity > 0:
-                current_uri = ns[t.name]
+    def add_taxonomy(self) -> None:
+        for t, parent in self.taxonomy.items():
+            uri = self.type_nodes[t]
 
-                if self.with_classes:
-                    self.add((current_uri, RDF.type, TA.Type))
-                    self.add((current_uri, RDFS.subClassOf, RDF.Seq))
+            if parent:
+                self.add((uri, RDFS.subClassOf, self.type_nodes[parent]))
+            elif t._operator.arity != 0:
+                self.add((uri, RDFS.subClassOf,
+                    self.language.namespace[t._operator.name]))
 
-                if self.with_labels:
-                    self.add((current_uri, RDFS.label, Literal(str(t))))
-            else:
-                previous_uri = None
-                current: Optional[TypeOperator] = t
-                while current:
-                    current_uri = ns[current.name]
+            for i, param in enumerate(t.params, start=1):
+                self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
 
-                    if self.with_labels:
-                        self.add((current_uri, RDFS.label, Literal(str(t))))
+            if self.with_classes:
+                self.add((uri, RDF.type, TA.Type))
 
-                    if self.with_classes:
-                        self.add((current_uri, RDF.type, TA.Type))
+            if self.with_labels:
+                self.add((uri, RDFS.label, Literal(str(t))))
 
-                    if previous_uri:
-                        self.add((previous_uri, RDFS.subClassOf, current_uri))
-
-                    previous_uri = current_uri
-                    current = current.supertype
-
-        # Add operations to the vocabulary
+    def add_operators(self) -> None:
         for op in self.language.operators.values():
-            node = ns[op.name]
+            node = self.language.namespace[op.name]
 
             if self.with_classes:
                 self.add((node, RDF.type, TA.Operation))
