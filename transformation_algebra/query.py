@@ -10,7 +10,7 @@ from __future__ import annotations
 import rdflib
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node
-from rdflib.namespace import Namespace, RDFS, RDF
+from rdflib.namespace import RDFS, RDF
 from itertools import count
 from typing import Iterator, Union, Literal
 
@@ -19,6 +19,7 @@ from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, \
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
+from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA
 
 Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
@@ -43,7 +44,7 @@ class Query(object):  # TODO subclass rdflib.Query?
     """
 
     def __init__(self,
-            ns: Namespace,
+            lang: Language,
             flow: FlowShorthand[Type | Operator] | None = None,
             generator: Iterator[rdflib.Variable] | None = None,
             by_output: bool = False,
@@ -51,7 +52,9 @@ class Query(object):  # TODO subclass rdflib.Query?
             # by_operators: bool = True,
             by_order: bool = True):
 
-        self.namespace = ns
+        self.language = lang
+        self.taxonomy = lang.taxonomy()
+        self.namespace = lang.namespace
         self.generator = generator or \
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
         self.statements: list[str] = []
@@ -90,7 +93,7 @@ class Query(object):  # TODO subclass rdflib.Query?
                 self.connect(self.output, "start", False, self.flow)
 
     def spawn(self) -> Query:
-        return Query(self.namespace, None, self.generator)
+        return Query(self.language, None, self.generator)
 
     def sparql(self) -> str:
         """
@@ -134,12 +137,16 @@ class Query(object):  # TODO subclass rdflib.Query?
         Produce SPARQL constraints for the given (non-function) type.
         """
 
-        t = type.instance()
+        t = type.instance().normalize()
 
         if isinstance(t, TypeVariable):
             # If a type in a trace query contains variables, it must be a
             # wildcard --- because we don't do anything with it
             assert t.wildcard
+        elif t in self.taxonomy:
+            self.triple(variable,
+                predicate / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
+                self.namespace[t.text(spacer=",")])
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
             if t.params and t not in self.cache:

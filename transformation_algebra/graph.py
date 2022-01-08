@@ -96,7 +96,7 @@ class TransformationGraph(Graph):
         Add the RDF vocabulary for describing expressions in terms of the types
         and operations defined for this transformation algebra.
         """
-        self.add_types()
+        self.add_taxonomy()
         self.add_operators()
 
     def add_taxonomy(self) -> None:
