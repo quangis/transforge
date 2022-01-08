@@ -6,6 +6,31 @@ from transformation_algebra.lang import Language
 
 
 class TestAlgebra(unittest.TestCase):
+
+    def test_taxonomy(self):
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        FAA = F(A, A)
+        lang = Language(scope=locals())
+
+        # Note that types are subtypes of just one parent, so even though
+        # F(B, B) should reasonably be child of both F(A, B) and F(B, A), we
+        # just note F(A, A) for now.
+        actual = lang.taxonomy()
+        expected = {
+            A(): None,
+            B(): A(),
+            F(A, A): None,
+            F(A, B): F(A, A),
+            F(B, A): F(A, A),
+            F(B, B): F(A, A)
+        }
+
+        for sub, sup in actual.items():
+            self.assertIn(sub, expected)
+            self.assertEqual(actual[sub], expected[sub])
+
     def test_string_schematic_type(self):
         """
         Test that schematic types are printed with the names of their schematic
