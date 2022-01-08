@@ -5,11 +5,11 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from itertools import groupby
+from itertools import groupby, product
 from typing import Optional, Iterator, Any, TYPE_CHECKING
 
 from transformation_algebra.type import \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, Variance
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -27,6 +27,49 @@ class Language(object):
         self._namespace = namespace
         if scope:
             self.add_scope(scope)
+
+    def taxonomy(self) -> dict[TypeOperation, TypeOperation | None]:
+        """
+        Generate a taxonomy of canonical types, mapping each of them to their
+        supertype. The canonical types consist of all base types, plus those
+        compound types that have an explicit synonym, or that are subtypes of
+        types that do.
+
+        These types are of special interest among the potentially infinite
+        number of types.
+        """
+        # Start with the taxonomy of base types
+        taxonomy: dict[TypeOperation, TypeOperation | None] = {
+            op(): op.supertype() if op.supertype else None
+            for op in self.types.values()
+            if not op.arity
+        }
+
+        # Extract the direct sub- or supertypes from the growing taxonomy
+        def successors(t: TypeInstance, sub: bool) -> Iterator[TypeOperation]:
+            assert isinstance(t, TypeOperation)
+            yield t
+            if sub:
+                yield from (subtype for subtype, supertype in taxonomy.items()
+                    if supertype == t)
+            elif supertype := taxonomy[t]:
+                yield supertype
+
+        # By sorting on depth, we get a guarantee that, by the time we are
+        # adding a type of depth n, we know all successor types of depth n-1.
+        stack = sorted(self.synonyms.values(), key=TypeInstance.depth)
+        while stack:
+            t = stack.pop()
+            subtypes = (t._operator(*params) for params in product(*(
+                successors(p, v is Variance.CO)
+                for v, p in zip(t._operator.variance, t.params)
+            )))
+
+            for s in subtypes:
+                if s != t and s not in taxonomy:
+                    taxonomy[s] = t
+                    stack.append(s)
+        return taxonomy
 
     @property
     def namespace(self) -> Namespace:
