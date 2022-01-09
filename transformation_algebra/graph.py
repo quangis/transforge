@@ -62,6 +62,7 @@ class TransformationGraph(Graph):
             with_output: bool | None = None,
             with_inputs: bool | None = None,
             with_membership: bool | None = None,
+            with_type_parameters: bool | None = None,
             with_labels: bool | None = None,
             with_classes: bool | None = None,
             *nargs, **kwargs):
@@ -79,6 +80,7 @@ class TransformationGraph(Graph):
         self.with_output = default(with_output)
         self.with_inputs = default(with_inputs)
         self.with_membership = default(with_membership)
+        self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
@@ -110,8 +112,9 @@ class TransformationGraph(Graph):
                 self.add((uri, RDFS.subClassOf,
                     self.language.namespace[t._operator.name]))
 
-            for i, param in enumerate(t.params, start=1):
-                self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
+            if self.with_type_parameters:
+                for i, param in enumerate(t.params, start=1):
+                    self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
 
             if self.with_classes:
                 self.add((uri, RDF.type, TA.Type))
@@ -147,8 +150,9 @@ class TransformationGraph(Graph):
                     self.add((node, RDFS.subClassOf,
                         self.language.namespace[t._operator.name]))
 
-                    for i, param in enumerate(t.params, start=1):
-                        self.add((node, RDF[f"_{i}"], self.add_type(param)))
+                    if self.with_type_parameters:
+                        for i, param in enumerate(t.params, start=1):
+                            self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
                     if self.with_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
