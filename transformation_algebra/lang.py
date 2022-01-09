@@ -51,7 +51,7 @@ class Language(object):
             yield t
             if sub:
                 yield from (subtype for subtype, supertype in taxonomy.items()
-                    if supertype == t)
+                    if supertype and supertype.match(t))
             elif supertype := taxonomy[t]:
                 yield supertype
 

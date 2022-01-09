@@ -127,8 +127,8 @@ class Query(object):  # TODO subclass rdflib.Query?
     def set_operator(self, variable: rdflib.Variable, op: Operator,
             predicate: Node | Path = TA.via) -> None:
         if op.definition:
-            import warnings
-            warnings.warn(f"query used a non-primitive operation {op.name}")
+            from warnings import warn
+            warn(f"query used a non-primitive operation {op.name}")
         self.triple(variable, predicate, self.namespace[op.name])
 
     def set_type(self, variable: rdflib.Variable, type: Type,
@@ -138,6 +138,10 @@ class Query(object):  # TODO subclass rdflib.Query?
         """
 
         t = type.instance().normalize()
+
+        if t not in self.taxonomy:
+            from warnings import warn
+            warn(f"type {t} in query is non-canonical")
 
         if isinstance(t, TypeVariable):
             # If a type in a trace query contains variables, it must be a
