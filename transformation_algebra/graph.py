@@ -17,7 +17,7 @@ from rdflib import URIRef, Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS, ClosedNamespace
 
-from typing import Optional
+from typing import Optional, Iterator
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 TEST = Namespace("https://example.com/#")
@@ -65,6 +65,7 @@ class TransformationGraph(Graph):
             with_type_parameters: bool | None = None,
             with_labels: bool | None = None,
             with_classes: bool | None = None,
+            with_transitive_closure: bool | None = None,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
@@ -82,6 +83,7 @@ class TransformationGraph(Graph):
         self.with_membership = default(with_membership)
         self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
+        self.with_transitive_closure = default(with_transitive_closure)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -103,24 +105,40 @@ class TransformationGraph(Graph):
         self.add_operators()
 
     def add_taxonomy(self) -> None:
-        for t, parent in self.taxonomy.items():
+
+        def supertypes(t: TypeOperation) -> Iterator[Node]:
+            st: TypeOperation | None = t
+            while st := self.taxonomy.get(st):  # type: ignore
+                yield self.type_nodes[st]
+            if t._operator.arity != 0:
+                yield self.language.namespace[t._operator.name]
+
+        for t in self.taxonomy:
             uri = self.type_nodes[t]
-
-            if parent:
-                self.add((uri, RDFS.subClassOf, self.type_nodes[parent]))
-            elif t._operator.arity != 0:
-                self.add((uri, RDFS.subClassOf,
-                    self.language.namespace[t._operator.name]))
-
-            if self.with_type_parameters:
-                for i, param in enumerate(t.params, start=1):
-                    self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
 
             if self.with_classes:
                 self.add((uri, RDF.type, TA.Type))
 
             if self.with_labels:
                 self.add((uri, RDFS.label, Literal(t.text())))
+
+            if self.with_type_parameters:
+                for i, param in enumerate(t.params, start=1):
+                    self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
+
+            for st in supertypes(t):
+                self.add((uri, RDFS.subClassOf, st))
+                if not self.with_transitive_closure:
+                    break
+
+            if self.with_transitive_closure:
+                self.add((uri, RDFS.subClassOf, uri))
+
+        # Add reflexive connections to top-level compound operators
+        if self.with_transitive_closure:
+            for op in self.language.types:
+                uri = self.language.namespace[op]
+                self.add((uri, RDFS.subClassOf, uri))
 
     def add_operators(self) -> None:
         for op in self.language.operators.values():
