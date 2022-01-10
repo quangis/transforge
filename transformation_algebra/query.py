@@ -105,11 +105,10 @@ class Query(object):  # TODO subclass rdflib.Query?
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             # f"PREFIX {self.prefix}: <{self.namespace}>",
-            "SELECT ?workflow ?description WHERE {",
-            "OPTIONAL {?workflow rdfs:comment ?description}",
+            "SELECT ?workflow WHERE {",
         ]
         query.extend(self.statements)
-        query.append("} GROUP BY ?workflow ?description")
+        query.append("} GROUP BY ?workflow")
         return "\n".join(query)
 
     def triple(self, *items: Node | Path) -> None:
