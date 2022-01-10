@@ -149,7 +149,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             assert t.wildcard
         elif t in self.taxonomy:
             self.triple(variable,
-                predicate / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
+                predicate / RDFS.subClassOf,  # type: ignore
                 self.namespace[t.text(sep=".", lparen="_", rparen="")])
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
@@ -167,7 +167,7 @@ class Query(object):  # TODO subclass rdflib.Query?
                     node = self.cache[t]
                 self.triple(
                     variable,
-                    predicate / (RDFS.subClassOf * ZeroOrMore),  # type: ignore
+                    predicate / RDFS.subClassOf,  # type: ignore
                     node)
 
     def __str__(self) -> str:
