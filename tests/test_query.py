@@ -205,6 +205,7 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=1)
+        FX, FY = F(X), F(Y)
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {

@@ -48,7 +48,8 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     """
     Transform an expression to a transformation graph.
     """
-    g = TransformationGraph(alg, minimal=True, with_operators=True)
+    g = TransformationGraph(alg, minimal=True, with_operators=True,
+        with_type_parameters=True)
     if isinstance(value, Expr):
         root = BNode()
         g.add_expr(value, root)
