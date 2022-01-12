@@ -149,6 +149,7 @@ class TypeOperator(Type):
         self.variance = list(Variance.CO for _ in range(params)) \
             if isinstance(params, int) else list(params)
         self.arity = len(self.variance)
+        self.depth: int = supertype.depth + 1 if supertype else 0
 
         if self.supertype and self.arity > 0:
             raise ValueError("only nullary types can have direct supertypes")

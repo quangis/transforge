@@ -11,25 +11,46 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        FAA = F(A, A)
+        AA = F(A, A)
         lang = Language(scope=locals())
 
-        # Note that types are subtypes of just one parent, so even though
-        # F(B, B) should reasonably be child of both F(A, B) and F(B, A), we
-        # just note F(A, A) for now.
         actual = lang.taxonomy()
         expected = {
-            A(): None,
-            B(): A(),
-            F(A, A): None,
-            F(A, B): F(A, A),
-            F(B, A): F(A, A),
-            F(B, B): F(A, A)
+            A(): {B()},
+            B(): set(),
+            F(A, A): {F(A, B), F(B, A)},
+            F(A, B): {F(B, B)},
+            F(B, A): {F(B, B)},
+            F(B, B): set()
         }
 
-        for sub, sup in actual.items():
-            self.assertIn(sub, expected)
-            self.assertEqual(actual[sub], expected[sub])
+        self.assertEqual(expected, actual)
+
+    def test_complex_taxonomy(self):
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        C = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        AA = F(A, A)
+        lang = Language(scope=locals())
+
+        actual = lang.taxonomy()
+        expected = {
+            A(): {B(), C()},
+            B(): set(),
+            C(): set(),
+            F(A, A): {F(A, B), F(A, C), F(B, A), F(C, A)},
+            F(A, B): {F(B, B), F(C, B)},
+            F(A, C): {F(B, C), F(C, C)},
+            F(B, A): {F(B, B), F(B, C)},
+            F(C, A): {F(C, B), F(C, C)},
+            F(B, B): set(),
+            F(B, C): set(),
+            F(C, B): set(),
+            F(C, C): set(),
+        }
+
+        self.assertEqual(expected, actual)
 
     def test_string_schematic_type(self):
         """

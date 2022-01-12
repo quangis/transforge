@@ -5,7 +5,7 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from itertools import groupby, product
+from itertools import groupby, product, count
 from typing import Optional, Iterator, Any, TYPE_CHECKING
 
 from transformation_algebra.type import \
@@ -28,51 +28,44 @@ class Language(object):
         if scope:
             self.add_scope(scope)
 
-    def taxonomy(self) -> dict[TypeOperation, TypeOperation | None]:
+    def taxonomy(self) -> dict[TypeOperation, set[TypeOperation]]:
         """
         Generate a taxonomy of canonical types, mapping each of them to their
-        supertype. The canonical types consist of all base types, plus those
+        subtypes. The canonical types consist of all base types, plus those
         compound types that have an explicit synonym, or that are subtypes of
         types that do.
 
         These types are of special interest among the potentially infinite
         number of types.
         """
-        # Start with the taxonomy of base types
-        taxonomy: dict[TypeOperation, TypeOperation | None] = {
-            op(): op.supertype() if op.supertype else None
-            for op in self.types.values()
-            if not op.arity
-        }
+        taxonomy: dict[TypeOperation, set[TypeOperation]] = dict()
 
-        # Extract the direct sub- or supertypes from the growing taxonomy
-        def successors(t: TypeInstance, sub: bool) -> Iterator[TypeOperation]:
-            assert isinstance(t, TypeOperation)
-            yield t
-            if sub:
-                yield from (subtype for subtype, supertype in taxonomy.items()
-                    if supertype and supertype.match(t))
-            elif supertype := taxonomy[t]:
-                yield supertype
+        # Start with the taxonomy of base types
+        for op in sorted(self.types.values(), key=lambda op: op.depth):
+            if op.arity == 0:
+                t = op()
+                taxonomy[t] = taxonomy.get(t, set())
+                if op.supertype:
+                    taxonomy[op.supertype()].add(t)
 
         # By sorting on depth, we get a guarantee that, by the time we are
         # adding a type of depth n, we know all successor types of depth n-1.
         stack = sorted(self.synonyms.values(), key=TypeInstance.depth)
         while stack:
-            t = stack.pop()
+            if (t := stack.pop()) not in taxonomy:
+                taxonomy[t] = set()
+                for i, v, p in zip(count(), t._operator.variance, t.params):
+                    assert isinstance(p, TypeOperation)
+                    p_successors = taxonomy[p] if v is Variance.CO else (
+                        supertype for supertype, subtypes in taxonomy.items()
+                        if any(s.match(t) for s in subtypes))
 
-            if t not in taxonomy:
-                taxonomy[t] = None
+                    for p_succ in p_successors:
+                        q = t._operator(*(p_succ if i == j else p_orig
+                            for j, p_orig in enumerate(t.params)))
+                        taxonomy[t].add(q)
+                        stack.append(q)
 
-            subtypes = [t._operator(*params) for params in product(*(
-                successors(p, v is Variance.CO)
-                for v, p in zip(t._operator.variance, t.params)
-            ))]
-
-            for s in subtypes:
-                if s != t and not taxonomy.get(s):
-                    taxonomy[s] = t
-                    stack.append(s)
         return taxonomy
 
     @property
