@@ -10,43 +10,17 @@ from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source, Operator, Variable, \
     ApplicationError
-from transformation_algebra.lang import Language
+from transformation_algebra.lang import Language, LanguageNamespace
 
 from itertools import chain
-from rdflib import URIRef, Graph, Namespace, BNode, Literal
+from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
-from rdflib.namespace import RDF, RDFS, ClosedNamespace
+from rdflib.namespace import RDF, RDFS
 
 from typing import Optional, Iterator
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 TEST = Namespace("https://example.com/#")
-
-
-class LanguageNamespace(ClosedNamespace):
-    """
-    A algebra-aware namespace for rdflib. That is, it allows URIs to be written
-    as `NS[f]` for an operation or base type `f`. It is also closed: it fails
-    when referencing URIs for types or operations that are not part of the
-    relevant transformation algebra.
-    """
-
-    def __new__(cls, uri, alg: Language):
-        terms = chain(
-            alg.operators.keys(),
-            alg.types.keys(),
-            (t.text(sep=".", lparen="_", rparen="") for t in alg.taxonomy.keys())
-        )
-        rt = super().__new__(cls, uri, terms)
-        return rt
-
-    def term(self, value) -> URIRef:
-        if isinstance(value, (Operator, TypeOperator)):
-            return super().term(value.name)
-        elif isinstance(value, TypeOperation):
-            return super().term(value.text(sep=".", lparen="_", rparen=""))
-        else:
-            return super().term(value)
 
 
 class TransformationGraph(Graph):

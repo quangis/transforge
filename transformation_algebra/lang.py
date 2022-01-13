@@ -5,8 +5,9 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from itertools import groupby, count
+from itertools import groupby, count, chain
 from typing import Optional, Iterator, Any, TYPE_CHECKING
+from rdflib.namespace import ClosedNamespace
 
 from transformation_algebra.type import Variance, \
     TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
@@ -14,7 +15,7 @@ from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
 if TYPE_CHECKING:
-    from rdflib import Namespace
+    from rdflib import URIRef
 
 # Map all types to their direct subtypes
 Taxonomy = dict[TypeOperation, set[TypeOperation]]
@@ -22,15 +23,14 @@ Taxonomy = dict[TypeOperation, set[TypeOperation]]
 
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
-            namespace: Namespace | None = None):
+            namespace: str | None = None):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
 
         self._closed = False
-
         self._taxonomy: Taxonomy | None = None
-        self._namespace = namespace
+        self._namespace: LanguageNamespace | str | None = namespace
 
         if scope:
             self.add_scope(scope)
@@ -39,14 +39,19 @@ class Language(object):
     def taxonomy(self) -> Taxonomy:
         if not self._taxonomy:
             self._taxonomy = self.generate_taxonomy()
+            self._closed = True
         return self._taxonomy
 
     @property
-    def namespace(self) -> Namespace:
+    def namespace(self) -> LanguageNamespace:
         if self._namespace is None:
             raise RuntimeError("No associated namespace.")
-        else:
-            return self._namespace
+        elif not isinstance(self._namespace, LanguageNamespace):
+            assert isinstance(self._namespace, str)
+            self._namespace = LanguageNamespace(self._namespace, self)
+            self._closed = True
+
+        return self._namespace
 
     def generate_taxonomy(self) -> Taxonomy:
         """
@@ -58,7 +63,6 @@ class Language(object):
         These types are of special interest among the potentially infinite
         number of types.
         """
-        self._closed = True
         taxonomy: dict[TypeOperation, set[TypeOperation]] = dict()
 
         # Start with the taxonomy of base types
@@ -307,6 +311,34 @@ def tokenize(string: str, specials: str = "") -> Iterator[str]:
             yield "".join(tokens)
         elif group >= 0:
             yield from tokens
+
+
+class LanguageNamespace(ClosedNamespace):
+    """
+    A algebra-aware namespace for rdflib. That is, it allows URIs to be written
+    as `NS[f]` for an operation or base type `f`. It is also closed: it fails
+    when referencing URIs for types or operations that are not part of the
+    relevant transformation algebra.
+    """
+
+    def __new__(cls, uri, lang: Language):
+        terms = chain(
+            lang.operators.keys(),
+            lang.types.keys(),
+            (t.text(sep=".", lparen="_", rparen="") for t in lang.taxonomy)
+        )
+        rt = super().__new__(cls, uri, terms)
+        cls.lang = lang
+        return rt
+
+    def term(self, value) -> URIRef:
+        if isinstance(value, (Operator, TypeOperator)):
+            return super().term(value.name)
+        elif isinstance(value, TypeOperation):
+            assert value in self.lang.taxonomy
+            return super().term(value.text(sep=".", lparen="_", rparen=""))
+        else:
+            return super().term(value)
 
 
 # Errors #####################################################################
