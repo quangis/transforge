@@ -16,6 +16,9 @@ from transformation_algebra.expr import \
 if TYPE_CHECKING:
     from rdflib import Namespace
 
+# Map all types to their direct subtypes
+Taxonomy = dict[TypeOperation, set[TypeOperation]]
+
 
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
@@ -24,11 +27,28 @@ class Language(object):
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
 
+        self._closed = False
+
+        self._taxonomy: Taxonomy | None = None
         self._namespace = namespace
+
         if scope:
             self.add_scope(scope)
 
-    def taxonomy(self) -> dict[TypeOperation, set[TypeOperation]]:
+    @property
+    def taxonomy(self) -> Taxonomy:
+        if not self._taxonomy:
+            self._taxonomy = self.generate_taxonomy()
+        return self._taxonomy
+
+    @property
+    def namespace(self) -> Namespace:
+        if self._namespace is None:
+            raise RuntimeError("No associated namespace.")
+        else:
+            return self._namespace
+
+    def generate_taxonomy(self) -> Taxonomy:
         """
         Generate a taxonomy of canonical types, mapping each of them to their
         subtypes. The canonical types consist of all base types, plus those
@@ -38,6 +58,7 @@ class Language(object):
         These types are of special interest among the potentially infinite
         number of types.
         """
+        self._closed = True
         taxonomy: dict[TypeOperation, set[TypeOperation]] = dict()
 
         # Start with the taxonomy of base types
@@ -71,13 +92,6 @@ class Language(object):
 
         return taxonomy
 
-    @property
-    def namespace(self) -> Namespace:
-        if self._namespace is None:
-            raise RuntimeError("No associated namespace.")
-        else:
-            return self._namespace
-
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
         For convenience, you may add types and operations in bulk via a
@@ -90,6 +104,9 @@ class Language(object):
 
     def add(self, item: Operator | TypeOperator | TypeAlias,
             name: str | None = None):
+
+        if self._closed:
+            raise RuntimeError("Cannot add to language after closing.")
 
         # The item must already have a name or be named here
         if name:
@@ -141,6 +158,7 @@ class Language(object):
     def validate(self) -> None:
         # Validation can only happen once all operations have been defined. If
         # we did it at define-time, it would lead to issues --- see issue #3
+        self._closed = True
 
         for op in self.operators.values():
             # Check declared types of operations against their inferred type

@@ -35,7 +35,7 @@ class LanguageNamespace(ClosedNamespace):
         terms = chain(
             alg.operators.keys(),
             alg.types.keys(),
-            (t.text(sep=".", lparen="_", rparen="") for t in alg.taxonomy().keys())
+            (t.text(sep=".", lparen="_", rparen="") for t in alg.taxonomy.keys())
         )
         rt = super().__new__(cls, uri, terms)
         return rt
@@ -88,8 +88,7 @@ class TransformationGraph(Graph):
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
-        self.taxonomy = language.taxonomy()
-        for t in self.taxonomy:
+        for t in self.language.taxonomy:
             self.type_nodes[t] = self.language.namespace[
                 t.text(sep=".", lparen="_", rparen="")]
 
@@ -105,7 +104,9 @@ class TransformationGraph(Graph):
         self.add_operators()
 
     def add_taxonomy(self) -> None:
-        for t, subtypes in self.taxonomy.items():
+        taxonomy = self.language.taxonomy
+
+        for t, subtypes in taxonomy.items():
             uri = self.type_nodes[t]
 
             if self.with_classes:
@@ -123,14 +124,14 @@ class TransformationGraph(Graph):
 
         # Connect top-level type nodes (i.e. compound type operators) to the
         # roots of their respective trees
-        for root in set(self.taxonomy) - set.union(*self.taxonomy.values()):
+        for root in set(taxonomy) - set.union(*taxonomy.values()):
             if root._operator.arity > 0:
                 self.add((self.type_nodes[root], RDFS.subClassOf,
                     self.language.namespace[root._operator.name]))
 
         if self.with_transitive_closure:
             nodes = set(chain(
-                (self.type_nodes[t] for t in self.taxonomy),
+                (self.type_nodes[t] for t in taxonomy),
                 (self.language.namespace[op] for op in self.language.types)
             ))
             for node in nodes:

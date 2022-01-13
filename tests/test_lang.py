@@ -15,7 +15,7 @@ class TestAlgebra(unittest.TestCase):
         AA = TypeAlias(F(A, A))
         lang = Language(scope=locals())
 
-        actual = lang.taxonomy()
+        actual = lang.taxonomy
         expected = {
             A(): {B()},
             B(): set(),
@@ -35,7 +35,7 @@ class TestAlgebra(unittest.TestCase):
         AA = TypeAlias(F(A, A))
         lang = Language(scope=locals())
 
-        actual = lang.taxonomy()
+        actual = lang.taxonomy
         expected = {
             A(): {B(), C()},
             B(): set(),

@@ -53,7 +53,6 @@ class Query(object):  # TODO subclass rdflib.Query?
             by_order: bool = True):
 
         self.language = lang
-        self.taxonomy = lang.taxonomy()
         self.namespace = lang.namespace
         self.generator = generator or \
             iter(rdflib.Variable(f"n{i}") for i in count(start=1))
@@ -138,7 +137,9 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         t = type.instance().normalize()
 
-        if t not in self.taxonomy:
+        taxonomy = self.language.taxonomy
+
+        if t not in taxonomy:
             from warnings import warn
             warn(f"type {t} in query is non-canonical")
 
@@ -146,7 +147,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             # If a type in a trace query contains variables, it must be a
             # wildcard --- because we don't do anything with it
             assert t.wildcard
-        elif t in self.taxonomy:
+        elif t in taxonomy:
             self.triple(variable,
                 predicate / RDFS.subClassOf,  # type: ignore
                 self.namespace[t.text(sep=".", lparen="_", rparen="")])
