@@ -8,8 +8,8 @@ from __future__ import annotations
 from itertools import groupby, count
 from typing import Optional, Iterator, Any, TYPE_CHECKING
 
-from transformation_algebra.type import \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, Variance
+from transformation_algebra.type import Variance, \
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -22,7 +22,7 @@ class Language(object):
             namespace: Namespace | None = None):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
-        self.synonyms: dict[str, TypeOperation] = dict()
+        self.synonyms: dict[str, TypeAlias] = dict()
 
         self._namespace = namespace
         if scope:
@@ -50,7 +50,8 @@ class Language(object):
 
         # By sorting on depth, we get a guarantee that, by the time we are
         # adding a type of depth n, we know all successor types of depth n-1.
-        stack = sorted(self.synonyms.values(), key=TypeInstance.depth)
+        stack: list[TypeOperation] = sorted(self.synonyms.values(),
+            key=TypeInstance.depth)
         while stack:
             t = stack.pop()
             if t not in taxonomy:
@@ -83,21 +84,19 @@ class Language(object):
         Irrelevant items are filtered out without complaint.
         """
         for k, v in dict(scope).items():
-            if isinstance(v, (Operator, TypeOperator)) or (
-                    isinstance(v, TypeOperation) and not any(v.variables())):
+            if isinstance(v, (Operator, TypeOperator, TypeAlias)):
                 self.add(item=v, name=k)
 
-    def add(self, item: Operator | TypeOperator | TypeOperation,
+    def add(self, item: Operator | TypeOperator | TypeAlias,
             name: str | None = None):
 
         # The item must already have a name or be named here
-        if isinstance(item, (Operator, TypeOperator)):
-            if name:
-                name = item.name = name.rstrip("_")
-            else:
-                name = item.name
-        elif not name:
-            raise ValueError("no name provided for synonym")
+        if name:
+            name = item.name = name.rstrip("_")
+        elif item.name:
+            name = item.name
+        else:
+            raise RuntimeError("unnamed")
 
         if name in self:
             raise ValueError(f"symbol {name} already exists in the language")

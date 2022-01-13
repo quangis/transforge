@@ -654,6 +654,25 @@ class TypeVariable(TypeInstance):
             c for c in self._constraints if not c.fulfilled())
 
 
+class TypeAlias(TypeOperation):
+    """
+    A type alias is a type synonym. It cannot have variables. By default, any
+    type alias is canonical, which means that it has some special significance
+    among the potentially infinite number of types.
+    """
+
+    def __init__(self, alias: TypeOperator | TypeOperation,
+            name: str | None = None):
+        if isinstance(alias, TypeOperator):
+            alias = alias()
+
+        if any(alias.variables()):
+            raise RuntimeError("Type alias must not contain variables.")
+
+        super().__init__(alias._operator, *alias.params)
+        self.name = name
+
+
 class Constraint(object):
     """
     A constraint enforces that its reference is a subtype of one of the given

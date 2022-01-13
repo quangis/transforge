@@ -5,7 +5,7 @@ from rdflib.term import Node, URIRef
 from rdflib.namespace import RDF
 
 from transformation_algebra.flow import FlowShorthand
-from transformation_algebra.type import TypeOperator, Type
+from transformation_algebra.type import TypeOperator, Type, TypeAlias
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
@@ -205,7 +205,7 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=1)
-        FX, FY = F(X), F(Y)
+        FX, FY = TypeAlias(F(X)), TypeAlias(F(Y))
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {

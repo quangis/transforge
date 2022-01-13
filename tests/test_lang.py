@@ -1,6 +1,7 @@
 import unittest
 
-from transformation_algebra.type import TypeOperator, SubtypeMismatch, _
+from transformation_algebra.type import TypeOperator, TypeAlias, \
+    SubtypeMismatch, _
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 
@@ -11,7 +12,7 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = F(A, A)
+        AA = TypeAlias(F(A, A))
         lang = Language(scope=locals())
 
         actual = lang.taxonomy()
@@ -31,7 +32,7 @@ class TestAlgebra(unittest.TestCase):
         B = TypeOperator(supertype=A)
         C = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = F(A, A)
+        AA = TypeAlias(F(A, A))
         lang = Language(scope=locals())
 
         actual = lang.taxonomy()
@@ -74,18 +75,15 @@ class TestAlgebra(unittest.TestCase):
     def test_type_synonyms(self):
         A = TypeOperator()
         F = TypeOperator(params=1)
-        FA = F(A)
+        FA = TypeAlias(F(A))
         f = Operator(type=lambda x: x ** F(x))
         lang = Language(scope=locals())
 
         lang.parse("f(1 : A) : FA")
 
     def test_type_synonyms_no_variables(self):
-        A, F = TypeOperator(), TypeOperator(params=1)
-        FA, FV = F(A), F(_)
-        lang = Language(scope=locals())
-        self.assertIn(FA, lang.synonyms.values())
-        self.assertNotIn(FV, lang.synonyms.values())
+        F = TypeOperator(params=1)
+        self.assertRaises(RuntimeError, TypeAlias, F(_))
 
     def test_parse_sources(self):
         A = TypeOperator()
