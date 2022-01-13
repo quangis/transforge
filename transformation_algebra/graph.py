@@ -105,15 +105,7 @@ class TransformationGraph(Graph):
         self.add_operators()
 
     def add_taxonomy(self) -> None:
-
-        def supertypes(t: TypeOperation) -> Iterator[Node]:
-            st: TypeOperation | None = t
-            while st := self.taxonomy.get(st):  # type: ignore
-                yield self.type_nodes[st]
-            if t._operator.arity != 0:
-                yield self.language.namespace[t._operator.name]
-
-        for t in self.taxonomy:
+        for t, subtypes in self.taxonomy.items():
             uri = self.type_nodes[t]
 
             if self.with_classes:
@@ -126,19 +118,24 @@ class TransformationGraph(Graph):
                 for i, param in enumerate(t.params, start=1):
                     self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
 
-            for st in supertypes(t):
-                self.add((uri, RDFS.subClassOf, st))
-                if not self.with_transitive_closure:
-                    break
+            for s in subtypes:
+                self.add((self.type_nodes[s], RDFS.subClassOf, uri))
 
-            if self.with_transitive_closure:
-                self.add((uri, RDFS.subClassOf, uri))
+        # Connect top-level type nodes (i.e. compound type operators) to the
+        # roots of their respective trees
+        for root in set(self.taxonomy) - set.union(*self.taxonomy.values()):
+            if root._operator.arity > 0:
+                self.add((self.type_nodes[root], RDFS.subClassOf,
+                    self.language.namespace[root._operator.name]))
 
-        # Add reflexive connections to top-level compound operators
         if self.with_transitive_closure:
-            for op in self.language.types:
-                uri = self.language.namespace[op]
-                self.add((uri, RDFS.subClassOf, uri))
+            nodes = set(chain(
+                (self.type_nodes[t] for t in self.taxonomy),
+                (self.language.namespace[op] for op in self.language.types)
+            ))
+            for node in nodes:
+                for desc in self.transitive_subjects(RDFS.subClassOf, node):
+                    self.add((desc, RDFS.subClassOf, node))
 
     def add_operators(self) -> None:
         for op in self.language.operators.values():

@@ -5,7 +5,7 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from itertools import groupby, product, count
+from itertools import groupby, count
 from typing import Optional, Iterator, Any, TYPE_CHECKING
 
 from transformation_algebra.type import \
@@ -52,7 +52,8 @@ class Language(object):
         # adding a type of depth n, we know all successor types of depth n-1.
         stack = sorted(self.synonyms.values(), key=TypeInstance.depth)
         while stack:
-            if (t := stack.pop()) not in taxonomy:
+            t = stack.pop()
+            if t not in taxonomy:
                 taxonomy[t] = set()
                 for i, v, p in zip(count(), t._operator.variance, t.params):
                     assert isinstance(p, TypeOperation)
