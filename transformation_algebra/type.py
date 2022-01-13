@@ -662,6 +662,7 @@ class TypeAlias(TypeOperation):
     """
 
     def __init__(self, alias: TypeOperator | TypeOperation,
+            canonical: bool = True,
             name: str | None = None):
         if isinstance(alias, TypeOperator):
             alias = alias()
@@ -671,6 +672,7 @@ class TypeAlias(TypeOperation):
 
         super().__init__(alias._operator, *alias.params)
         self.name = name
+        self.canonical = canonical
 
 
 class Constraint(object):

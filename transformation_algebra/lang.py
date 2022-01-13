@@ -50,7 +50,8 @@ class Language(object):
 
         # By sorting on depth, we get a guarantee that, by the time we are
         # adding a type of depth n, we know all successor types of depth n-1.
-        stack: list[TypeOperation] = sorted(self.synonyms.values(),
+        stack: list[TypeOperation] = sorted(
+            (s for s in self.synonyms.values() if s.canonical),
             key=TypeInstance.depth)
         while stack:
             t = stack.pop()
