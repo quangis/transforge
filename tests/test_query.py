@@ -9,7 +9,7 @@ from transformation_algebra.type import TypeOperator, Type, TypeAlias
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
-from transformation_algebra.query import Query, OR, AND
+from transformation_algebra.query import Query, OR, AND, LINK
 
 
 def make_graph(lang: Language,
@@ -56,15 +56,15 @@ class TestAlgebra(unittest.TestCase):
 
         graph = make_graph(alg, {TEST.wf1: b2c(a2b(~A))})
 
-        self.assertQuery(alg, graph, (C, b2c, B, a2b, A),
+        self.assertQuery(alg, graph, LINK(C, b2c, B, a2b, A),
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (C, B, A),
+        self.assertQuery(alg, graph, LINK(C, B, A),
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (b2c, a2b),
+        self.assertQuery(alg, graph, LINK(b2c, a2b),
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (C, a2b, B, b2c, A),
+        self.assertQuery(alg, graph, LINK(C, a2b, B, b2c, A),
             results=None)
-        self.assertQuery(alg, graph, (B, b2c, C, a2b, A),
+        self.assertQuery(alg, graph, LINK(B, b2c, C, a2b, A),
             results=None)
 
     def test_serial_skip(self):
@@ -80,11 +80,11 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1})
         self.assertQuery(alg, graph, [c2d, a2b],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (c2d, b2c, a2b),
+        self.assertQuery(alg, graph, LINK(c2d, b2c, a2b),
             results={TEST.wf1})
         self.assertQuery(alg, graph, [D, b2c, A],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (D, b2c, A),
+        self.assertQuery(alg, graph, LINK(D, b2c, A),
             results=None)
         self.assertQuery(alg, graph, [D, B, a2b, A],
             results={TEST.wf1})
@@ -106,11 +106,11 @@ class TestAlgebra(unittest.TestCase):
             results={TEST.wf1, TEST.wf2})
         self.assertQuery(alg, graph, [D, bc2d, AND(B, C, a2b, b2c)],
             results={TEST.wf2})
-        self.assertQuery(alg, graph, [D, bc2d, AND((B, a2b), (C, b2c))],
+        self.assertQuery(alg, graph, [D, bc2d, AND(LINK(B, a2b), LINK(C, b2c))],
             results={TEST.wf2})
         self.assertQuery(alg, graph, [D, bc2d, AND(A, B)],
             results={TEST.wf2})
-        self.assertQuery(alg, graph, (D, bc2d, AND(A, B)),
+        self.assertQuery(alg, graph, LINK(D, bc2d, AND(A, B)),
             results=None)
 
     def test_choice(self):
@@ -127,18 +127,18 @@ class TestAlgebra(unittest.TestCase):
             TEST.wf2: bc2d(~B, b2c(a2b(~A)))
         })
 
-        self.assertQuery(lang, graph, (D, bc2d, OR(A, D)),
+        self.assertQuery(lang, graph, LINK(D, bc2d, OR(A, D)),
             results=None)
         self.assertQuery(lang, graph, [D, bc2d, OR(A, B)],
             results={TEST.wf1, TEST.wf2})
         self.assertQuery(lang, graph, [D, bc2d, OR(B, C)],
             results={TEST.wf1, TEST.wf2})
 
-        self.assertQuery(lang, graph, (D, bc2d, OR((B, a2b), (C, a2b))),
+        self.assertQuery(lang, graph, LINK(D, bc2d, OR(LINK(B, a2b), LINK(C, a2b))),
             results={TEST.wf1})
 
         # Choice between operations in non-last place
-        self.assertQuery(lang, graph, (D, bc2d, OR(b2c, b2c2), B),
+        self.assertQuery(lang, graph, LINK(D, bc2d, OR(b2c, b2c2), B),
             results={TEST.wf1, TEST.wf2})
 
     def test_sequenced_skips(self):
@@ -153,7 +153,7 @@ class TestAlgebra(unittest.TestCase):
         })
 
         # Test that a query for direct output really only captures that
-        self.assertQuery(lang, graph, (C, a2b), results=set())
+        self.assertQuery(lang, graph, LINK(C, a2b), results=set())
 
         # Test that a query for indirect output also captures direct output
         self.assertQuery(lang, graph, [C, a2b], results={TEST.e})
@@ -185,9 +185,9 @@ class TestAlgebra(unittest.TestCase):
         })
 
         self.assertQuery(lang, graph,
-            (A, AND(
+            LINK(A, AND(
                 [C, a2b],
-                (C, a2b)
+                LINK(C, a2b)
             )),
             results={}
         )

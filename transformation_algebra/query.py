@@ -15,7 +15,7 @@ from itertools import count, chain, product, starmap
 from typing import Iterator, Iterable, Union, TypeVar
 from collections import defaultdict
 
-from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, \
+from transformation_algebra.flow import Flow, Flow1, SKIP, LINK, AND, OR, \
     FlowShorthand
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
@@ -237,8 +237,8 @@ class Query(object):  # TODO subclass rdflib.Query?
             return [[current]], [current]
 
         # Sequential flows
-        elif isinstance(item, (SERIES, LINKED)):
-            skip = not isinstance(item, LINKED)
+        elif isinstance(item, (SKIP, LINK)):
+            skip = not isinstance(item, LINK)
             subs = [self.add_flow(i) for i in item.items]
             for (_, exits), (entrances, _) in zip(subs, subs[1:]):
                 for exit_point in exits:
@@ -249,7 +249,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         # Branching flows
         else:
-            assert isinstance(item, (OR, AND))
+            assert isinstance(item, (OR, AND)), type(item)
             subs = [self.add_flow(i) for i in item.items]
             # Exit points are just the concatenation of final nodes. Entry
             # points differ depending on whether we should consider them

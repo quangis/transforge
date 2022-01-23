@@ -17,13 +17,13 @@ class Flow(Generic[T]):
     The sequence is 'reversed' (that is, specified from end to beginning). This
     allows for a convenient tree-like notation, but it may trip you up.
 
-    A shorthand notation allows lists to be interpreted as `SERIES` and tuples
-    as `LINKED` series.
+    A shorthand notation allows lists to be interpreted as `SKIP` and tuples
+    as `LINK` series.
 
     For example, the following flow of type `Flow[int]` describes a flow ending
     in 9, in which step 3 directly combines the outputs from steps 1 and 2.
 
-        [9, (3, AND(1, 2))]
+        [9, LINK(3, AND(1, 2))]
     """
 
     def __init__(self, *items: FlowShorthand[T]):
@@ -33,12 +33,6 @@ class Flow(Generic[T]):
 
     def __iter__(self) -> Iterator[Flow1[T]]:
         return iter(self.items)
-
-    def debug(self) -> Iterator[Flow[T]]:
-        """
-        Generate partial flows. For debugging.
-        """
-        return NotImplemented
 
     @staticmethod
     def leaves(self: Flow1[T],
@@ -57,24 +51,18 @@ class Flow(Generic[T]):
     @staticmethod
     def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
         """
-        Translate shorthand data structures (list for `SERIES`, tuples for
-        `LINKED`) to real flows.
+        Translate shorthand data structures (list for `SKIP`) to real flows.
         """
         if isinstance(value, list):
             if len(value) == 1:
                 return Flow.shorthand(value[0])
             else:
-                return SERIES(*value)
-        elif isinstance(value, tuple):
-            if len(value) == 1:
-                return Flow.shorthand(value[0])
-            else:
-                return LINKED(*value)
+                return SKIP(*value)
         else:
             return value
 
 
-class LINKED(Flow[T]):
+class LINK(Flow[T]):
     """
     A series linked in a chain, where each node must *immediately* follow the
     one after.
@@ -82,7 +70,7 @@ class LINKED(Flow[T]):
     pass
 
 
-class SERIES(Flow[T]):
+class SKIP(Flow[T]):
     """
     A sequence where each node must follow the one after, but not necessarily
     immediately.
@@ -111,4 +99,4 @@ class OR(Flow[T]):
 A shorthand for specifying `Flow`s.
 """
 Flow1 = Union[T, Flow[T]]
-FlowShorthand = Union[Flow1[T], list[Flow1[T]], tuple[Flow1[T]]]
+FlowShorthand = Union[Flow1[T], list[Flow1[T]]]
