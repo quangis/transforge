@@ -34,6 +34,12 @@ class Flow(Generic[T]):
     def __iter__(self) -> Iterator[Flow1[T]]:
         return iter(self.items)
 
+    def debug(self) -> Iterator[Flow[T]]:
+        """
+        Generate partial flows. For debugging.
+        """
+        return NotImplemented
+
     @staticmethod
     def leaves(self: Flow1[T],
             targets: bool = False, sources: bool = False) -> Iterator[T]:

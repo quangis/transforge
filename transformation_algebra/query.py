@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import rdflib
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
-from rdflib.term import Node
+from rdflib.term import Node, Variable
 from rdflib.namespace import RDFS, RDF
-from itertools import count
-from typing import Iterator, Union, Literal
+from itertools import count, chain, product, starmap
+from typing import Iterator, Iterable, Union, TypeVar
+from collections import defaultdict
 
 from transformation_algebra.flow import Flow, Flow1, SERIES, LINKED, AND, OR, \
     FlowShorthand
@@ -26,6 +27,20 @@ Operators = Flow[Union[Type, Operator]]  # really: OR[Operator]
 Triple = tuple[Node, Union[Path, Node], Node]
 
 
+A = TypeVar('A')
+
+
+def flatten(xs: Iterable[Iterable[A]]) -> list[A]:
+    return list(chain.from_iterable(xs))
+
+
+def union(*xs: str) -> Iterator[str]:
+    if len(xs) > 1:
+        yield "{{{}}}".format("\n} UNION {\n".join(xs))
+    else:
+        yield from xs
+
+
 class Query(object):  # TODO subclass rdflib.Query?
     """
     A flow captures some relevant aspects of a conceptual process, in terms of
@@ -37,27 +52,25 @@ class Query(object):  # TODO subclass rdflib.Query?
 
     Note that the flow is 'reversed' (from output to input). This allows for a
     convenient tree-like notation, but it may trip you up.
-
-    Furthermore, for succinct notation, lists are interpreted as `SEQ`
-    transformation flows and the ellipsis indicates we may skip any number of
-    steps.
     """
 
-    def __init__(self,
-            lang: Language,
-            flow: FlowShorthand[Type | Operator] | None = None,
-            generator: Iterator[rdflib.Variable] | None = None,
+    def __init__(self, lang: Language, flow: FlowShorthand[Type | Operator],
             by_output: bool = False,
             by_types: bool = False,
             # by_operators: bool = True,
             by_order: bool = True):
 
         self.language = lang
-        self.namespace = lang.namespace
-        self.generator = generator or \
-            iter(rdflib.Variable(f"n{i}") for i in count(start=1))
-        self.statements: list[str] = []
-        self.cache: dict[Type, rdflib.Variable] = dict()
+        self.flow: Flow1[Type | Operator] = Flow.shorthand(flow)
+
+        # Connect each node to a disjunction of conjunction of nodes
+        self.conns: dict[Variable, list[list[Variable]]] = defaultdict(list)
+        self.skips: dict[Variable, bool] = defaultdict(bool)
+        self.attr_via: dict[Variable, list[Operator]] = defaultdict(list)
+        self.attr_type: dict[Variable, list[Type]] = defaultdict(list)
+
+        self.cache: dict[Type, Variable] = dict()
+        self.generator = iter(Variable(f"_{i}") for i in count())
 
         # Filter by...
         self.by_output = by_output
@@ -65,72 +78,101 @@ class Query(object):  # TODO subclass rdflib.Query?
         # self.by_operators = by_operators
         self.by_order = by_order
 
-        self.root = rdflib.Variable("workflow")
-        self.output = rdflib.Variable("output")
+        self.workflow = rdflib.Variable("workflow")
 
-        self.flow: Flow1[Type | Operator] | None = None
-        if flow:
-            self.flow = Flow.shorthand(flow)
+        entrances, _ = self.add_flow(self.flow)
+        assert len(entrances) == 1 and len(entrances[0]) == 1
+        self.output = entrances[0][0]
 
-        if self.flow:
+        # if self.by_output:
+        #     for item in Flow.leaves(self.flow, targets=True):
+        #         if isinstance(item, Type):
+        #             self.set_type(self.output, item)
 
-            self.triple(self.root, TA.output, self.output)
+        # for item in Flow.leaves(self.flow):
+        #     # if self.by_operators and isinstance(item, Operator):
+        #     #     self.set_operator(self.root, item, TA.member)
 
-            if self.by_output:
-                for item in Flow.leaves(self.flow, targets=True):
-                    if isinstance(item, Type):
-                        self.set_type(self.output, item)
+        #     if self.by_types and isinstance(item, Type):
+        #         self.set_type(self.root, item, TA.member)
 
-            for item in Flow.leaves(self.flow):
-                # if self.by_operators and isinstance(item, Operator):
-                #     self.set_operator(self.root, item, TA.member)
-
-                if self.by_types and isinstance(item, Type):
-                    self.set_type(self.root, item, TA.member)
-
-            if self.by_order:
-                self.connect(self.output, "start", False, self.flow)
-
-    def spawn(self) -> Query:
-        return Query(self.language, None, self.generator)
+        # if self.by_order:
+        #     self.connect(self.output, "start", False, self.flow)
 
     def sparql(self) -> str:
         """
         Convert the flow to a full SPARQL query.
         """
-
-        query = [
+        return "\n".join(chain([
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
-            # f"PREFIX {self.prefix}: <{self.namespace}>",
-            "SELECT ?workflow WHERE {",
-        ]
-        query.extend(self.statements)
-        query.append("} GROUP BY ?workflow")
-        return "\n".join(query)
+            "SELECT ?workflow WHERE {"],
+            self.chronology(self.output),
+            ["} GROUP BY ?workflow"]
 
-    def triple(self, *items: Node | Path) -> None:
-        """
-        Add a triple pattern.
-        """
+        ))
+
+    def chronology(self, target: Variable,
+            entrance: Variable | None = None) -> Iterator[str]:
+
+        # Connecting to target node
+        if entrance:
+            if self.attr_type[entrance] and not self.attr_type[target]:
+                if self.skips[entrance]:
+                    yield self.triple(entrance, ~TA.feeds * ZeroOrMore, target)
+                else:
+                    yield f"BIND({entrance.n3()} AS {target.n3()})"
+            else:
+                if self.skips[entrance]:
+                    yield self.triple(entrance, ~TA.feeds * OneOrMore, target)
+                else:
+                    yield self.triple(entrance, ~TA.feeds, target)
+        else:
+            # assert entrance == self.output, f"{entrance} != {self.output}"
+            assert target == self.output
+            yield self.triple(self.workflow, TA.output, self.output)
+
+        # Node's own attributes
+        yield from union(*("\n".join(self.set_type(target, t)) for t in
+            self.attr_type[target]))
+        yield from union(*("\n".join(self.set_operator(target, o)) for o in
+            self.attr_via[target]))
+
+        # Connecting to rest of the tree
+        connections = self.conns[target]
+        if len(connections) > 1:
+            yield "{"
+            yield "\n} UNION {\n".join(
+                "\n".join(chain.from_iterable(
+                    self.chronology(conj, target) for conj in disj
+                ))
+                for disj in connections
+            )
+            yield "}"
+        elif connections:
+            for conj in connections[0]:
+                yield from self.chronology(conj, target)
+
+    def triple(self, *items: Node | Path) -> str:
         result = []
         for item in items:
             try:
                 result.append(item.n3())
             except TypeError:
                 result.append(str(item))
-        self.statements.append(" ".join(result) + ".")
+        return " ".join(result) + "."
 
     def set_operator(self, variable: rdflib.Variable, op: Operator,
-            predicate: Node | Path = TA.via) -> None:
+            predicate: Node | Path = TA.via) -> Iterator[str]:
+
         if op.definition:
             from warnings import warn
             warn(f"query used a non-primitive operation {op.name}")
-        self.triple(variable, predicate, self.namespace[op.name])
+        yield self.triple(variable, predicate, self.language.namespace[op])
 
     def set_type(self, variable: rdflib.Variable, type: Type,
-            predicate: Node | Path = RDF.type) -> None:
+            predicate: Node | Path = RDF.type) -> Iterator[str]:
         """
         Produce SPARQL constraints for the given (non-function) type.
         """
@@ -148,115 +190,71 @@ class Query(object):  # TODO subclass rdflib.Query?
             # wildcard --- because we don't do anything with it
             assert t.wildcard
         elif t in taxonomy:
-            self.triple(variable,
+            yield self.triple(variable,
                 predicate / RDFS.subClassOf,  # type: ignore
-                self.namespace[t.text(sep=".", lparen="_", rparen="")])
+                self.language.namespace[t])
         else:
             assert isinstance(t, TypeOperation) and t.operator != Function
-            if t.params and t not in self.cache:
+            if t.params:  # and t not in self.cache:
                 self.cache[t] = bnode = next(self.generator)
-                self.triple(variable, predicate, bnode)
-                self.triple(bnode, RDFS.subClassOf,
-                    self.namespace[t._operator.name])
+                yield self.triple(variable, predicate, bnode)
+                yield self.triple(bnode, RDFS.subClassOf,
+                    self.language.namespace[t._operator])
                 for i, param in enumerate(t.params, start=1):
-                    self.set_type(bnode, param, predicate=RDF[f"_{i}"])
+                    yield from self.set_type(bnode, param, predicate=RDF[f"_{i}"])
             else:
                 if not t.params:
-                    node = self.namespace[t._operator.name]
-                else:
-                    node = self.cache[t]
-                self.triple(
+                    node = self.language.namespace[t._operator]
+                # else:
+                #     node = self.cache[t]
+                yield self.triple(
                     variable,
                     predicate / RDFS.subClassOf,  # type: ignore
                     node)
 
-    def __str__(self) -> str:
-        return "\n".join(self.statements)
+    def add_flow(self, item: Flow1[Type | Operator]) \
+            -> tuple[list[list[Variable]], list[Variable]]:
 
-    def union(self, *queries: Query) -> None:
-        self.statements.append("{")
-        self.statements.append("\n} UNION {\n".join(str(q) for q in queries))
-        self.statements.append("}")
+        # Unit flows
+        if isinstance(item, Type):
+            current = next(self.generator)
+            self.attr_type[current].append(item)
+            return [[current]], [current]
 
-    def connect(self,
-            lvar: rdflib.Variable,
-            lunit: Type | Operator | OR[Operator] | Literal["start"] | None,
-            lskip: bool,
-            item: Flow1[Type | Operator]) -> rdflib.Var | None:
+        elif isinstance(item, Operator):
+            current = next(self.generator)
+            self.attr_via[current].append(item)
+            return [[current]], [current]
 
-        # Handle units
-        is_operator = isinstance(item, Operator) or (
-            isinstance(item, OR) and
-            all(isinstance(i, Operator) for i in item.items)
-        )
+        elif isinstance(item, OR) and all(
+                isinstance(i, (Type, Operator)) for i in item.items):
+            current = next(self.generator)
+            for i in item.items:
+                if isinstance(i, Operator):
+                    self.attr_via[current].append(i)
+                elif isinstance(i, Type):
+                    self.attr_type[current].append(i)
+            return [[current]], [current]
 
-        if is_operator or isinstance(item, Type):
+        # Sequential flows
+        elif isinstance(item, (SERIES, LINKED)):
+            skip = not isinstance(item, LINKED)
+            subs = [self.add_flow(i) for i in item.items]
+            for (_, exits), (entrances, _) in zip(subs, subs[1:]):
+                for exit_point in exits:
+                    assert not self.conns[exit_point]
+                    self.skips[exit_point] = skip
+                    self.conns[exit_point] = entrances
+            return subs[0][0], subs[-1][-1]
 
-            # Connect this node to left node
-            if lunit == "start" or (is_operator and isinstance(lunit, Type)):
-                if lskip:
-                    var = next(self.generator)
-                    self.triple(lvar, ~TA.feeds * ZeroOrMore, var)
-                else:
-                    var = lvar
-            else:
-                var = next(self.generator)
-                self.triple(
-                    lvar,
-                    ~TA.feeds * OneOrMore if lskip else ~TA.feeds,
-                    var
-                )
-
-            # Set properties of node itself
-            if isinstance(item, Type):
-                self.set_type(var, item)
-            elif isinstance(item, Operator):
-                self.set_operator(var, item)
-            else:
-                assert isinstance(item, OR)
-                subs = []
-                for i in item:
-                    assert isinstance(i, Operator)
-                    subquery = self.spawn()
-                    subquery.set_operator(var, i)
-                    subs.append(subquery)
-                self.union(*subs)
-            return var
-
-        elif isinstance(item, AND):
-
-            for i in item:
-                subquery = self.spawn()
-                subquery.connect(lvar, lunit, lskip, i)
-                self.statements.extend(subquery.statements)
-
-        elif isinstance(item, OR):
-
-            subs = []
-            for i in item:
-                subquery = self.spawn()
-                subquery.connect(lvar, lunit, lskip, i)
-                subs.append(subquery)
-            self.union(*subs)
-
+        # Branching flows
         else:
-            assert isinstance(item, (SERIES, LINKED))
-
-            skip_between = isinstance(item, SERIES)
-
-            for current in item.items[:-1]:
-                assert isinstance(current, (Type, Operator)) or (
-                    isinstance(current, OR) and
-                    all(isinstance(i, Operator) for i in current.items)
-                )
-                var = self.connect(lvar, lunit, lskip, current)
-                lvar = var
-                lunit = current
-                lskip = skip_between
-
-            lskip = skip_between
-            current = item.items[-1]
-
-            return self.connect(lvar, lunit, lskip, current)
-
-        return None
+            assert isinstance(item, (OR, AND))
+            subs = [self.add_flow(i) for i in item.items]
+            # Exit points are just the concatenation of final nodes. Entry
+            # points differ depending on whether we should consider them
+            # conjunctively or disjunctively.
+            exits = flatten(s[-1] for s in subs)
+            entrances = [flatten(p) for p in product(*(s[0] for s in subs))] \
+                if isinstance(item, AND) else flatten(s[0] for s in subs)
+            return entrances, exits
