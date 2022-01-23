@@ -17,13 +17,12 @@ class Flow(Generic[T]):
     The sequence is 'reversed' (that is, specified from end to beginning). This
     allows for a convenient tree-like notation, but it may trip you up.
 
-    A shorthand notation allows lists to be interpreted as `SKIP` and tuples
-    as `LINK` series.
+    A shorthand notation allows lists to be interpreted as `JUMP` sequences.
 
     For example, the following flow of type `Flow[int]` describes a flow ending
     in 9, in which step 3 directly combines the outputs from steps 1 and 2.
 
-        [9, LINK(3, AND(1, 2))]
+        [9, STEP(3, AND(1, 2))]
     """
 
     def __init__(self, *items: FlowShorthand[T]):
@@ -57,12 +56,12 @@ class Flow(Generic[T]):
             if len(value) == 1:
                 return Flow.shorthand(value[0])
             else:
-                return SKIP(*value)
+                return JUMP(*value)
         else:
             return value
 
 
-class LINK(Flow[T]):
+class STEP(Flow[T]):
     """
     A series linked in a chain, where each node must *immediately* follow the
     one after.
@@ -70,7 +69,7 @@ class LINK(Flow[T]):
     pass
 
 
-class SKIP(Flow[T]):
+class JUMP(Flow[T]):
     """
     A sequence where each node must follow the one after, but not necessarily
     immediately.
