@@ -54,11 +54,14 @@ class Query(object):  # TODO subclass rdflib.Query?
     convenient tree-like notation, but it may trip you up.
     """
 
-    def __init__(self, lang: Language, flow: FlowShorthand[Type | Operator]):
+    def __init__(self, lang: Language, flow: FlowShorthand[Type | Operator],
+            allow_noncanonical: bool = False):
 
         self.language = lang
         self.flow: Flow1[Type | Operator] = Flow.shorthand(flow)
         self.generator = iter(Variable(f"_{i}") for i in count())
+
+        self.allow_noncanonical = allow_noncanonical
 
         # Remember which types occur in the flow in its totality
         self.bags: list[set[Type | Operator]] = Flow.bags(self.flow)
@@ -202,6 +205,10 @@ class Query(object):  # TODO subclass rdflib.Query?
                 predicate / RDFS.subClassOf,  # type: ignore
                 self.language.namespace[t])
         else:
+
+            if not self.allow_noncanonical and not t.variables():
+                raise RuntimeError(f"Encountered non-canonical type {t}")
+
             assert isinstance(t, TypeOperation) and t.operator != Function
             if t.params:  # and t not in self.cache:
                 self.cache[t] = bnode = next(self.generator)
