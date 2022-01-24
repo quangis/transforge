@@ -50,7 +50,7 @@ class Flow(Generic[T]):
                     return list(chain.from_iterable(
                         _bags(i) for i in v.items))
                 else:
-                    assert isinstance(v, (AND, STEP, JUMP))
+                    assert isinstance(v, (AND, IMMEDIATELY, EVENTUALLY))
                     return list(set(chain.from_iterable(p))
                         for p in product(*(_bags(i) for i in v.items)))
             else:
@@ -69,12 +69,12 @@ class Flow(Generic[T]):
             if len(value) == 1:
                 return Flow.shorthand(value[0])
             else:
-                return JUMP(*value)
+                return EVENTUALLY(*value)
         else:
             return value
 
 
-class STEP(Flow[T]):
+class IMMEDIATELY(Flow[T]):
     """
     A series linked in a chain, where each node must *immediately* follow the
     one after.
@@ -82,7 +82,7 @@ class STEP(Flow[T]):
     pass
 
 
-class JUMP(Flow[T]):
+class EVENTUALLY(Flow[T]):
     """
     A sequence where each node must follow the one after, but not necessarily
     immediately.
