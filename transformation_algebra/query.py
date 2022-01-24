@@ -101,7 +101,7 @@ class Query(object):  # TODO subclass rdflib.Query?
     def output_type(self) -> Iterator[str]:
         for t in self.attr_type[self.output]:
             yield from self.set_type(self.workflow, t,
-               TA.output / RDF.type / RDFS.subClassOf)
+               TA.output / RDF.type)
 
     def bag(self, types: bool = False, operators: bool = False) \
             -> Iterator[str]:
