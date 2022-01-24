@@ -11,7 +11,7 @@ import rdflib
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node, Variable
 from rdflib.namespace import RDFS, RDF
-from itertools import count, chain, product, starmap
+from itertools import count, chain, product
 from typing import Iterator, Iterable, Union, TypeVar
 from collections import defaultdict
 
@@ -54,14 +54,14 @@ class Query(object):  # TODO subclass rdflib.Query?
     convenient tree-like notation, but it may trip you up.
     """
 
-    def __init__(self, lang: Language, flow: FlowShorthand[Type | Operator],
-            by_output: bool = False,
-            by_types: bool = False,
-            # by_operators: bool = True,
-            by_order: bool = True):
+    def __init__(self, lang: Language, flow: FlowShorthand[Type | Operator]):
 
         self.language = lang
         self.flow: Flow1[Type | Operator] = Flow.shorthand(flow)
+        self.generator = iter(Variable(f"_{i}") for i in count())
+
+        # Remember which types occur in the flow in its totality
+        self.bags: list[set[Type | Operator]] = Flow.bags(self.flow)
 
         # Connect each node to a disjunction of conjunction of nodes
         self.conns: dict[Variable, list[list[Variable]]] = defaultdict(list)
@@ -70,13 +70,6 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.attr_type: dict[Variable, list[Type]] = defaultdict(list)
 
         self.cache: dict[Type, Variable] = dict()
-        self.generator = iter(Variable(f"_{i}") for i in count())
-
-        # Filter by...
-        self.by_output = by_output
-        self.by_types = by_types
-        # self.by_operators = by_operators
-        self.by_order = by_order
 
         self.workflow = rdflib.Variable("workflow")
 
@@ -84,22 +77,11 @@ class Query(object):  # TODO subclass rdflib.Query?
         assert len(entrances) == 1 and len(entrances[0]) == 1
         self.output = entrances[0][0]
 
-        # if self.by_output:
-        #     for item in Flow.leaves(self.flow, targets=True):
-        #         if isinstance(item, Type):
-        #             self.set_type(self.output, item)
-
-        # for item in Flow.leaves(self.flow):
-        #     # if self.by_operators and isinstance(item, Operator):
-        #     #     self.set_operator(self.root, item, TA.member)
-
-        #     if self.by_types and isinstance(item, Type):
-        #         self.set_type(self.root, item, TA.member)
-
-        # if self.by_order:
-        #     self.connect(self.output, "start", False, self.flow)
-
-    def sparql(self) -> str:
+    def sparql(self,
+            by_output: bool = True,
+            by_types: bool = True,
+            by_operators: bool = True,
+            by_chronology: bool = True) -> str:
         """
         Convert the flow to a full SPARQL query.
         """
@@ -108,9 +90,36 @@ class Query(object):  # TODO subclass rdflib.Query?
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             "SELECT ?workflow WHERE {"],
-            self.chronology(self.output),
+            self.output_type() if by_output else (),
+            self.bag(operators=True) if by_operators else (),
+            self.bag(types=True) if by_types else (),
+            self.chronology(self.output) if by_chronology else (),
             ["} GROUP BY ?workflow"]
 
+        ))
+
+    def output_type(self) -> Iterator[str]:
+        for t in self.attr_type[self.output]:
+            yield from self.set_type(self.workflow, t,
+               TA.output / RDF.type / RDFS.subClassOf)
+
+    def bag(self, types: bool = False, operators: bool = False) \
+            -> Iterator[str]:
+
+        def units(values: set[Type | Operator]) -> list[str]:
+            res: list[str] = []
+            for item in values:
+                if isinstance(item, Type):
+                    res.extend(self.set_type(self.workflow, item, TA.member))
+                elif isinstance(item, Operator):
+                    res.extend(self.set_operator(self.workflow, item,
+                        TA.member))
+            return res
+
+        yield from units(self.bags[0])
+        yield from union(*(
+            "\n".join(u)
+            for bag in self.bags[1:] if (u := units(bag))
         ))
 
     def chronology(self, target: Variable,
@@ -129,7 +138,6 @@ class Query(object):  # TODO subclass rdflib.Query?
                 else:
                     yield self.triple(entrance, ~TA.feeds, target)
         else:
-            # assert entrance == self.output, f"{entrance} != {self.output}"
             assert target == self.output
             yield self.triple(self.workflow, TA.output, self.output)
 

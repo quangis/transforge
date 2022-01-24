@@ -4,6 +4,7 @@ Defines the generic `Flow` class.
 
 from __future__ import annotations
 
+from itertools import chain, product
 from typing import Iterator, TypeVar, Generic, Union
 
 T = TypeVar('T')
@@ -34,18 +35,30 @@ class Flow(Generic[T]):
         return iter(self.items)
 
     @staticmethod
-    def leaves(self: Flow1[T],
-            targets: bool = False, sources: bool = False) -> Iterator[T]:
+    def bags(value: Flow1[T]) -> list[set[T]]:
         """
-        Find the leaves
+        Determine the possible sets items occurring in the flow. Returns a
+        list where the first item contains the set of items in all branches,
+        and the remainder is the disjunction of sets of items occurring in at
+        least one branch.
         """
-        assert not (targets and sources)
-        if isinstance(self, Flow):
-            for item in self.items[-1 if sources else None:
-                    1 if targets else None]:
-                yield from Flow.leaves(item, targets, sources)
-        else:
-            yield self
+        # TODO efficiency: for example, bags might pointlessly contain the same
+        # items
+        def _bags(v: Flow1[T]) -> list[set[T]]:
+            if isinstance(v, Flow):
+                if isinstance(v, OR):
+                    return list(chain.from_iterable(
+                        _bags(i) for i in v.items))
+                else:
+                    assert isinstance(v, (AND, STEP, JUMP))
+                    return list(set(chain.from_iterable(p))
+                        for p in product(*(_bags(i) for i in v.items)))
+            else:
+                return [{v}]
+        everything = _bags(value)
+        intersection = set.intersection(*everything)
+        disjunctions = list(a for s in everything if (a := s - intersection))
+        return [intersection] + disjunctions
 
     @staticmethod
     def shorthand(value: FlowShorthand[T]) -> Flow1[T]:
