@@ -35,7 +35,7 @@ class TestAlgebra(unittest.TestCase):
     def assertQuery(self, lang: Language,
             graph: TransformationGraph,
             query: Query | FlowShorthand[Type | Operator],
-            results: set[Node] | None) -> None:
+            results: set[Node] | None, **kwargs) -> None:
 
         if isinstance(query, Query):
             query1 = query
@@ -44,7 +44,7 @@ class TestAlgebra(unittest.TestCase):
 
         self.assertEqual(
             results or set(),
-            set(r.workflow for r in graph.query(query1.sparql()))
+            set(r.workflow for r in graph.query(query1.sparql(**kwargs)))
         )
 
     def test_serial(self):
@@ -197,6 +197,35 @@ class TestAlgebra(unittest.TestCase):
                 [C, a2b]
             )],
             results={TEST.wf1}
+        )
+
+    def test_query_specific_aspects(self):
+        # See issue #46
+        A, B, C = (TypeOperator() for _ in range(3))
+        a2b = Operator(type=A ** B)
+        b2c = Operator(type=B ** C)
+        lang = Language(locals(), namespace=TEST)
+
+        graph = make_graph(lang, {
+            TEST.wf1: a2b(~A),
+            TEST.wf2: b2c(a2b(~A))
+        })
+
+        self.assertQuery(lang, graph,
+            [B], by_output=False, by_chronology=False,
+            results={TEST.wf1, TEST.wf2}
+        )
+        self.assertQuery(lang, graph,
+            [B], by_output=True, by_chronology=False,
+            results={TEST.wf1}
+        )
+        self.assertQuery(lang, graph,
+            [C, A, B], by_output=True, by_chronology=False,
+            results={TEST.wf2}
+        )
+        self.assertQuery(lang, graph,
+            [C, A, B], by_output=True, by_chronology=True,
+            results={}
         )
 
     def test_that_supertypes_are_captured(self):
