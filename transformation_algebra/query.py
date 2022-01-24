@@ -16,7 +16,7 @@ from typing import Iterator, Iterable, Union, TypeVar
 from collections import defaultdict
 
 from transformation_algebra.flow import Flow, Flow1, FlowShorthand, \
-    IMMEDIATELY, EVENTUALLY, AND, OR
+    STEPS, JUMPS, AND, OR
 from transformation_algebra.type import Type, TypeOperation, \
     Function, TypeVariable
 from transformation_algebra.expr import Operator
@@ -245,8 +245,8 @@ class Query(object):  # TODO subclass rdflib.Query?
             return [[current]], [current]
 
         # Sequential flows
-        elif isinstance(item, (IMMEDIATELY, EVENTUALLY)):
-            skip = isinstance(item, EVENTUALLY)
+        elif isinstance(item, (STEPS, JUMPS)):
+            skip = isinstance(item, JUMPS)
             subs = [self.add_flow(i) for i in item.items]
             for (_, exits), (entrances, _) in zip(subs, subs[1:]):
                 for exit_point in exits:
