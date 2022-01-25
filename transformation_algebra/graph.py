@@ -40,6 +40,7 @@ class TransformationGraph(Graph):
             with_labels: bool | None = None,
             with_classes: bool | None = None,
             with_transitive_closure: bool | None = None,
+            with_noncanonical_types: bool | None = None,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
@@ -58,6 +59,7 @@ class TransformationGraph(Graph):
         self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
         self.with_transitive_closure = default(with_transitive_closure)
+        self.with_noncanonical_types = default(with_noncanonical_types)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -205,7 +207,9 @@ class TransformationGraph(Graph):
                 if self.with_inputs:
                     self.add((root, TA.input, current))
 
-                if self.with_types:
+                if self.with_types and (self.with_noncanonical_types or
+                        expr.type in self.language.taxonomy):
+
                     type_node = self.add_type(expr.type)
                     self.add((current, RDF.type, type_node))
 
@@ -214,7 +218,7 @@ class TransformationGraph(Graph):
 
                 if self.with_labels:
                     self.add((current, RDFS.label,
-                        Literal(f"{expr.type}  (source data)")))
+                        Literal(f"{expr.type} (source data)")))
 
                 if self.with_classes:
                     self.add((current, RDF.type, TA.SourceData))
@@ -232,7 +236,7 @@ class TransformationGraph(Graph):
             # assert not expr.operator.definition, \
             #     f"{expr.operator} should be a primitive"
 
-            datatype = expr.type.output()
+            datatype = expr.type.output().normalize()
 
             if self.with_operators:
                 op_node = self.language.namespace[expr.operator.name]
@@ -241,7 +245,8 @@ class TransformationGraph(Graph):
                 if self.with_membership:
                     self.add((root, TA.member, op_node))
 
-            if self.with_types:
+            if self.with_types and (self.with_noncanonical_types or
+                    datatype in self.language.taxonomy):
                 type_node = self.add_type(datatype)
                 self.add((current, RDF.type, type_node))
 
