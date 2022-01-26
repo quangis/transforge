@@ -525,3 +525,33 @@ class TestAlgebraRDF(unittest.TestCase):
         )
 
         self.assertIsomorphic(actual, expected)
+
+    def test_inter_tool_types(self):
+        # Types should work between tools, not just inside tools. Say that we
+        # have a function f : x ** x | x << Ratio and a tool T that implements
+        # that function. We then write the algebra expression for T as
+        # f(~Ratio), but that should mean that `f` still produces a subtype of
+        # Ratio if presented with a subtype of Ratio. See issue #72.
+
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x)
+        ℒ = Language(locals(), namespace=TEST)
+
+        actual = TransformationGraph(ℒ,
+            minimal=True, with_types=True, with_operators=True)
+
+        root = BNode()
+        src = ~B
+        app = f(~A)
+        actual.add_workflow(root, {
+            src: [],
+            app: [src]
+        })
+
+        expected = graph_manual(
+            source=Step(type=TEST.B),
+            app=Step(TEST.f, input="source", type=TEST.B),
+        )
+
+        self.assertIsomorphic(actual, expected)
