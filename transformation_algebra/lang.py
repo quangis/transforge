@@ -76,7 +76,7 @@ class Language(object):
         # By sorting on depth, we get a guarantee that, by the time we are
         # adding a type of depth n, we know all successor types of depth n-1.
         stack: list[TypeOperation] = sorted(
-            (s for s in self.synonyms.values() if s.canonical),
+            (s.instance() for s in self.synonyms.values() if s.canonical),
             key=TypeInstance.depth)
         while stack:
             t = stack.pop()
@@ -266,7 +266,8 @@ class Language(object):
 
     def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
         tokens = tokenize(value, "(,)") if isinstance(value, str) else value
-        stack: list[TypeInstance | TypeOperator | list[TypeInstance]] = []
+        stack: list[TypeInstance | TypeOperator | TypeAlias
+            | list[TypeInstance]] = []
 
         while token := next(tokens, None):
             if token == "(":
@@ -282,18 +283,19 @@ class Language(object):
                     params = stack.pop()
                     assert isinstance(params, list)
                     op = stack.pop()
-                    assert isinstance(op, TypeOperator)
+                    assert isinstance(op, (TypeOperator, TypeAlias))
                     stack.append(op(*params))
             elif token == "_":
                 stack.append(TypeVariable())
             else:
-                t: TypeInstance | TypeOperator
+                t: TypeInstance | TypeOperator | TypeAlias
                 try:
                     op = self.types[token]
                     t = op() if op.arity == 0 else op
                 except KeyError:
                     try:
                         t = self.synonyms[token]
+                        t = t.instance() if t.arity == 0 else t
                     except KeyError as e:
                         raise UndefinedToken(token) from e
                 stack.append(t)

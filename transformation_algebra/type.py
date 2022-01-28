@@ -654,25 +654,55 @@ class TypeVariable(TypeInstance):
             c for c in self._constraints if not c.fulfilled())
 
 
-class TypeAlias(TypeOperation):
+class TypeAlias(Type):
     """
-    A type alias is a type synonym. It cannot have variables. By default, any
-    type alias is canonical, which means that it has some special significance
-    among the potentially infinite number of types.
+    A type alias is a type synonym. It cannot contain variables, but it may be
+    parameterized. By default, any type alias is canonical, which means that it
+    has some special significance among the potentially infinite number of
+    types.
     """
 
-    def __init__(self, alias: TypeOperator | TypeOperation,
-            canonical: bool = True,
-            name: str | None = None):
-        if isinstance(alias, TypeOperator):
-            alias = alias()
+    def __init__(self, alias: Type | Callable[..., TypeOperation], *args: Type,
+            canonical: bool = True, name: str | None = None):
 
-        if any(alias.variables()):
-            raise RuntimeError("Type alias must not contain variables.")
-
-        super().__init__(alias._operator, *alias.params)
         self.name = name
         self.canonical = canonical
+        self.args = args
+        self.arity = len(args)
+        self.alias: TypeOperation | Callable[..., TypeOperation]
+
+        if self.arity == 0:
+            assert isinstance(alias, Type)
+            alias = alias.instance()
+            assert isinstance(alias, TypeOperation)
+            self.alias = alias
+        else:
+            assert callable(alias) and \
+                self.arity == len(signature(alias).parameters)
+            self.alias = alias
+
+        if any(self.instance().variables()):
+            raise RuntimeError("Type alias must not contain variables.")
+
+    def instance(self) -> TypeOperation:
+        if self.arity > 0:
+            assert callable(self.alias)
+            return self.alias(*self.args)
+        else:
+            assert isinstance(self.alias, TypeOperation)
+            return self.alias
+
+    def __call__(self, *args: Type) -> TypeOperation:
+        if len(args) == 0:
+            assert isinstance(self.alias, TypeOperation)
+            return self.alias
+        else:
+            assert callable(self.alias)
+            return self.alias(*args)
+
+            # TODO do we want this?
+            # for p, q in zip(args, self.args):
+            #     p.unify(q, subtype=True)
 
 
 class Constraint(object):

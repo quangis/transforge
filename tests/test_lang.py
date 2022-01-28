@@ -53,6 +53,22 @@ class TestAlgebra(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
+    def test_taxonomy_with_parameterized_type_alias(self):
+        # See issue #73
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        G = TypeAlias(lambda x: F(x, B), A)
+        lang = Language(scope=locals())
+
+        actual = lang.taxonomy
+        expected = {
+            A(): {B()},
+            B(): set(),
+            F(A, B): {F(B, B)},
+            F(B, B): set(),
+        }
+
     def test_string_schematic_type(self):
         """
         Test that schematic types are printed with the names of their schematic
@@ -106,6 +122,18 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(
             lang.parse("f ~A ~F(A)").match(f(~A, ~F(A)))
         )
+
+    def test_parameterized_type_alias(self):
+        # See issue #73
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        G = TypeAlias(lambda x: F(x, B), A)
+        lang = Language(scope=locals())
+        self.assertTrue(
+            lang.parse("~G(B)").match(~F(B, B))
+        )
+        self.assertRaises(RuntimeError, lang.parse, "~G")
 
 
 if __name__ == '__main__':
