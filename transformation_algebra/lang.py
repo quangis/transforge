@@ -208,10 +208,11 @@ class Language(object):
                 stack.append(None)
             elif token == "~":
                 previous = stack.pop()
-                if previous:
-                    stack.append(previous)
                 t = self.parse_type(tokens)
-                stack.append(Source(type=t))
+                current_: Expr = Source(type=t)
+                if previous:
+                    current_ = Application(previous, current_)
+                stack.append(current_)
 
             else:
                 current: Optional[Expr]
@@ -256,6 +257,9 @@ class Language(object):
             else:
                 return result
         else:
+            for s in stack:
+                print(s)
+            print()
             raise BracketMismatch(")")
 
         raise NotImplementedError

@@ -97,9 +97,14 @@ class TestAlgebra(unittest.TestCase):
 
     def test_parse_anonymous_source(self):
         A = TypeOperator()
+        F = TypeOperator(params=1)
+        f = Operator(type=A ** F(A) ** A)
         lang = Language(scope=locals())
         self.assertTrue(
             lang.parse("~A").match(~A)
+        )
+        self.assertTrue(
+            lang.parse("f ~A ~F(A)").match(f(~A, ~F(A)))
         )
 
 
