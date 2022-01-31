@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import reduce
-from itertools import chain, product
+from itertools import chain
 from inspect import signature
 from typing import Optional, Callable, Iterator
 
@@ -147,13 +147,9 @@ class Expr(ABC):
             with_parentheses = False
             result = str(self.operator)
         elif isinstance(self, Source):
-            if self.label:
-                with_type = True
-                result = str(self.label)
-            else:
-                with_type = False
-                with_parentheses = False
-                result = f"~{self.type.text()}"
+            with_type = False
+            with_parentheses = False
+            result = f"~{self.type.text()}"
         elif isinstance(self, Application):
             parens = not isinstance(self.f, Application)
             result = f"{self.f.text(labels, with_parentheses=parens)} "\
@@ -270,7 +266,7 @@ class Expr(ABC):
         a = self.normalize(recursive=False)
         b = other.normalize(recursive=False)
         if isinstance(a, Source) and isinstance(b, Source):
-            return bool(a.type.match(b.type)) and a.label == b.label
+            return bool(a.type.match(b.type))
         elif isinstance(a, Operation) and isinstance(b,
                 Operation):
             return a.operator == b.operator
@@ -280,54 +276,6 @@ class Expr(ABC):
             return all(x.match(y) for x, y in zip(a.params, b.params)) and \
                 a.body.match(b.body)
         return a == b
-
-    def attach(self, inputs: list[Expr | None]) -> None:
-        """
-        Unify the types of labelled sources with the types of the input source
-        expressions with which they are to be substituted.
-        """
-
-        # TODO should be an actual test when constructing
-        source_anchors = set(s for s in self.leaves()
-            if isinstance(s, Source) and s.label is not None)
-        assert all(x is y or x.label != y.label for x, y in
-            product(source_anchors, source_anchors)), \
-            "No two distinct sources can have the same label"
-
-        # When we substitute a labelled source with another expression, we are
-        # doing something similar to supplying arguments to a function.
-        # Consider that, in normal application, when you apply a function `f :
-        # t ** t` to an argument with a concrete type, say `x : A`, then you
-        # can deduce that `t >= A`. After all, any supertype of `A` in `f`'s
-        # signature might still be possible, but a subtype would be too
-        # restrictive. (This does *not* mean that giving a sub-`A` value to `f`
-        # is illegal!) So, when we have an expression `f(1 : t, 2 : t) : t` and
-        # we substitute an expression of type `A` for source `1`, we must use
-        # similar logic: the lower bound on source `1` becomes `A`, so `t >=
-        # A`. This is not immediately intuitive in that the type of the
-        # expression then substituted into source `2` might very well be a
-        # *sub*type of `A` --- it's just the type variable `t` for which the
-        # condition `t >= A` holds.
-        # We must then fix the type of the enclosing applications to deduce
-        # that the most specific type of `f(1, 2)` is indeed `A`, not just
-        # `t >= A`.
-
-        a = self.normalize(recursive=False)
-        if isinstance(a, Source):
-            source = inputs[a.label - 1] if a.label else None
-            if source:
-                try:
-                    source.type.unify(a.type, subtype=True)
-                except TypingError as e:
-                    raise SourceError(a, source) from e
-        elif isinstance(a, Abstraction):
-            a.body.attach(inputs)
-        elif isinstance(a, Application):
-            a.f.attach(inputs)
-            a.x.attach(inputs)
-            a.type.fix()
-        else:
-            assert isinstance(a, (Operation, Variable))
 
     def leaves(self) -> Iterator[Expr]:
         """
@@ -358,8 +306,7 @@ class Operation(Expr):
 class Source(Expr):
     "A source data input."
 
-    def __init__(self, label: int | None = None, type: Type = _):
-        self.label: int | None = label
+    def __init__(self, type: Type = _):
         super().__init__(type=type.instance())
 
 

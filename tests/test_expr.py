@@ -138,8 +138,9 @@ class TestAlgebra(TestCase):
         f = Operator(type=A ** B ** A)
         lang = Language(locals())
 
-        lang.parse("f (1 : A) (2 : B)")
-        self.assertRaises(TypeMismatch, lang.parse, "f (1 : A) (1 : B)")
+        lang.parse("f (1 : A) (2 : B)", Source(), Source())
+        self.assertRaises(TypeMismatch, lang.parse, "f (1 : A) (1 : B)",
+            Source())
 
 
 if __name__ == '__main__':

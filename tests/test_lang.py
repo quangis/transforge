@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra.type import TypeOperator, TypeAlias, \
     SubtypeMismatch, _
-from transformation_algebra.expr import Operator, Expr
+from transformation_algebra.expr import Operator, Expr, Source
 from transformation_algebra.lang import Language
 
 
@@ -95,7 +95,7 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=lambda x: x ** F(x))
         lang = Language(scope=locals())
 
-        lang.parse("f(1 : A) : FA")
+        lang.parse("f(1 : A) : FA", Source())
 
     def test_type_synonyms_no_variables(self):
         F = TypeOperator(params=1)
@@ -108,8 +108,8 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=lambda x: x ** x)
         lang = Language(scope=locals())
 
-        lang.parse("f 1 : A")
-        self.assertRaises(SubtypeMismatch, lang.parse, "1 : B; f 1 : A")
+        lang.parse("f 1 : A", Source())
+        self.assertRaises(SubtypeMismatch, lang.parse, "1 : B; f 1 : A", Source())
 
     def test_parse_anonymous_source(self):
         A = TypeOperator()

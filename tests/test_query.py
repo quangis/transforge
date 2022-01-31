@@ -13,7 +13,7 @@ from transformation_algebra.query import Query, OR, AND, STEPS
 
 
 def make_graph(lang: Language,
-        workflows: dict[URIRef, Expr | dict[Expr, list[Expr | Node]]]
+        workflows: dict[URIRef, Expr | dict[Node, tuple[str, list[Node]]]]
         ) -> TransformationGraph:
     """
     Convenience method for constructing a graph containing workflows.

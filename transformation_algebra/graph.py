@@ -6,18 +6,15 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, TypeOperator, TypeInstance, TypingError
+    Function, TypeInstance
 from transformation_algebra.expr import \
-    Expr, Operation, Application, Abstraction, Source, Operator, Variable, \
-    ApplicationError
-from transformation_algebra.lang import Language, LanguageNamespace
+    Expr, Operation, Application, Abstraction, Source
+from transformation_algebra.lang import Language
 
 from itertools import chain
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
-
-from typing import Optional, Iterator
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 TEST = Namespace("https://example.com/#")
@@ -163,8 +160,8 @@ class TransformationGraph(Graph):
             self.type_nodes[t] = node
             return node
 
-    def add_expr(self, expr: Expr, root: Node, current: Optional[Node] = None,
-            sources: list[Node | Expr] = []) -> Node:
+    def add_expr(self, expr: Expr, root: Node,
+            current: Node | None = None) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -182,55 +179,33 @@ class TransformationGraph(Graph):
         current = current or BNode()
 
         if isinstance(expr, Source):
-
-            # Retrieve the expression with which to substitute a labelled
-            # source, or the origin node to which it gets attached.
-            source: Expr | Node | None
-            if expr.label:
-                try:
-                    source = sources[expr.label - 1]
-                except KeyError as e:
-                    msg = f"no input node {expr.label}"
-                    raise RuntimeError(msg) from e
-            else:
-                source = None
-
             # An unlabelled source, or a labelled source that gets attached to
             # an origin node, is 'at the end of the road' and gets put into the
             # graph as source data.
-            if isinstance(source, Node) or source is None:
-                expr.type = expr.type.fix(prefer_lower=False)
+            # if isinstance(source, Node) or source is None:
+            expr.type = expr.type.fix(prefer_lower=False)
 
-                if source:
-                    self.add((current, TA.origin, source))
+            # if source:
+            #     self.add((current, TA.origin, source))
 
-                if self.with_inputs:
-                    self.add((root, TA.input, current))
+            if self.with_inputs:
+                self.add((root, TA.input, current))
 
-                if self.with_types and (self.with_noncanonical_types or
-                        expr.type in self.language.taxonomy):
+            if self.with_types and (self.with_noncanonical_types or
+                    expr.type in self.language.taxonomy):
 
-                    type_node = self.add_type(expr.type)
-                    self.add((current, RDF.type, type_node))
+                type_node = self.add_type(expr.type)
+                self.add((current, RDF.type, type_node))
 
-                    if self.with_membership:
-                        self.add((root, TA.member, type_node))
+                if self.with_membership:
+                    self.add((root, TA.member, type_node))
 
-                if self.with_labels:
-                    self.add((current, RDFS.label,
-                        Literal(f"{expr.type} (source data)")))
+            if self.with_labels:
+                self.add((current, RDFS.label,
+                    Literal(f"{expr.type} (source data)")))
 
-                if self.with_classes:
-                    self.add((current, RDF.type, TA.SourceData))
-
-            # When an expression is instead substituted, we assume that the
-            # corresponding nodes are already calculated with correct types.
-            else:
-                assert isinstance(source, Expr)
-                assert source in self.expr_nodes, \
-                    "the node corresponding to a source should have been " \
-                    "precalculated in add_workflow"
-                current = self.expr_nodes[source]
+            if self.with_classes:
+                self.add((current, RDF.type, TA.SourceData))
 
         elif isinstance(expr, Operation):
             # assert not expr.operator.definition, \
@@ -271,7 +246,7 @@ class TransformationGraph(Graph):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.add_expr(expr.f, root, current, sources)
+            f = self.add_expr(expr.f, root, current)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -309,12 +284,12 @@ class TransformationGraph(Graph):
                     for p in expr.x.params:
                         self.expr_nodes[p] = internal
 
-                    x = self.add_expr(expr.x.body, root, BNode(), sources)
+                    x = self.add_expr(expr.x.body, root, BNode())
                 else:
-                    x = self.add_expr(expr.x, root, BNode(), sources)
+                    x = self.add_expr(expr.x, root, BNode())
                     self.add((internal, TA.feeds, x))
             else:
-                x = self.add_expr(expr.x, root, BNode(), sources)
+                x = self.add_expr(expr.x, root, BNode())
             self.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
@@ -341,7 +316,8 @@ class TransformationGraph(Graph):
         return current
 
     def add_workflow(self, root: Node,
-            steps: dict[Expr, list[Node | Expr]]) -> Node:
+            steps: dict[Node, tuple[str, list[Node]]],
+            sources: set[Node] = set()) -> Node:
         """
         Convert a workflow to a full transformation graph by converting its
         individual steps to representations of expressions in RDF and combining
@@ -351,34 +327,54 @@ class TransformationGraph(Graph):
         step (e.g. application of a tool), paired with the inputs to those
         expressions. Every input must be either a source node or an expression.
         """
-        # TODO cycles can occur
 
-        # First, make sure the points where sources get attached are typed
-        for expr, inputs in steps.items():
-            expr.attach([i if isinstance(i, Expr) else None for i in inputs])
+        # One of the steps must be 'last': it represents the tool finally
+        # producing the output and so isn't an input to another.
+        all_inputs = set(i for tool in steps.values() for i in tool[1])
+        try:
+            final_tool, = [e for e in steps.keys() if e not in all_inputs]
+        except ValueError:
+            raise RuntimeError("must have exactly one final step")
 
-        # One of the tool expressions must be 'last': it represents the tool
-        # finally producing the output and so isn't an input to another.
-        all_inputs = set(i for s in steps.values() for i in s)
-        final_expressions = [e for e in steps.keys() if e not in all_inputs]
-        assert len(final_expressions) == 1, "must have exactly one final step"
-        top_level_expression = final_expressions[0]
+        # 1. Construct expressions for each step, possibly using expressions
+        # from previous steps
+        step_exprs: dict[Node, Expr] = dict()
 
-        def to_expr_node(expr: Expr) -> Node:
+        def step2expr(step: Node) -> Expr:
             try:
-                return self.expr_nodes[expr]
+                return step_exprs[step]
             except KeyError:
-                pass
+                string, input_nodes = steps[step]
+                step_exprs[step] = expr = self.language.parse(string,
+                    *(step2expr(n) for n in input_nodes))
+                return expr
 
-            for source in steps[expr]:
-                if isinstance(source, Expr):
-                    to_expr_node(source)
+        for node in sources:
+            step_exprs[node] = Source(type=TypeVariable())
 
-            self.expr_nodes[expr] = node = self.add_expr(expr,
-                root, sources=steps[expr])
+        step2expr(final_tool)
+
+        # 2. Convert tool application & source nodes to expression nodes. We
+        # must do this in the proper order, so that expression nodes for the
+        # same tool/source nodes get saved in self.expr_nodes and reused rather
+        # than regenerated
+        def step2node(step: Node) -> Node:
+            expr = step2expr(step)
+            try:
+                node = self.expr_nodes[expr]
+            except KeyError:
+                if step not in sources:
+                    for input_step in steps[step][1]:
+                        step2node(input_step)
+                self.expr_nodes[expr] = node = self.add_expr(expr, root)
+
             return node
 
-        result_node = to_expr_node(top_level_expression)
+        result_node = step2node(final_tool)
+
+        for node in sources:
+            expr_node = step2node(node)
+            self.add((expr_node, TA.origin, node))
 
         if self.with_output:
             self.add((root, TA.output, result_node))

@@ -3,10 +3,6 @@ Tests for the graph conversion process of algebra expressions. To check the
 tests, it's recommended to draw out the graphs with a pen.
 """
 
-# Untested:
-# - source labels
-# - types
-
 from __future__ import annotations
 import unittest
 
@@ -416,15 +412,14 @@ class TestAlgebraRDF(unittest.TestCase):
         ℒ = Language(locals(), namespace=TEST)
 
         root = BNode()
-        source = TEST["~source"]
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        actual.add_workflow(root, {
-            f(Source(1)): [source]
-        })
+        actual.add_workflow(root,
+            {BNode(): ("f(1)", [TEST.source])},
+            {TEST.source})
 
         expected = graph_manual(
-            x=Step(type=TEST.A, origin=source),
+            x=Step(type=TEST.A, origin=TEST.source),
             f=Step(via=TEST.f, input="x", type=TEST.B),
         )
 
@@ -441,42 +436,30 @@ class TestAlgebraRDF(unittest.TestCase):
         root = BNode()
 
         # 1
-        sourceA = ~A
-        sourceA1 = ~A1
-        app = f(Source(1), Source(2))
-
         actual1 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual1.add_workflow(root, {
-            sourceA: [],
-            sourceA1: [],
-            app: [sourceA, sourceA1]
+            TEST.sourceA: ("~A", []),
+            TEST.sourceA1: ("~A1", []),
+            TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceA1])
         })
 
         # 2
-        sourceA = ~A
-        sourceA1 = ~A1
-        app = f(Source(1), Source(2))
-
         actual2 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual2.add_workflow(root, {
-            sourceA: [],
-            sourceA1: [],
-            app: [sourceA1, sourceA]
+            TEST.sourceA: ("~A", []),
+            TEST.sourceA1: ("~A1", []),
+            TEST.app: ("f 1 2", [TEST.sourceA1, TEST.sourceA])
         })
 
         # Mismatch
-        sourceA = ~A
-        sourceB = ~B
-        app = f(Source(1), Source(2))
-
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         self.assertRaises(SourceError, actual3.add_workflow, root, {
-            sourceA: [],
-            sourceB: [],
-            app: [sourceA, sourceB]
+            TEST.sourceA: ("~A", []),
+            TEST.sourceB: ("~B", []),
+            TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
         })
 
     def test_reuse_sources(self):
@@ -487,15 +470,11 @@ class TestAlgebraRDF(unittest.TestCase):
         ℒ = Language(locals(), namespace=TEST)
 
         root = BNode()
-
-        source = Source()
-        app = f(Source(1), Source(2))
-
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual.add_workflow(root, {
-            source: [],
-            app: [source, source]
+            TEST.step1: ("~A", []),
+            TEST.step2: ("f 1 2", [TEST.step1, TEST.step1])
         })
 
     def test_unify_type_when_attaching_source(self):
@@ -512,11 +491,9 @@ class TestAlgebraRDF(unittest.TestCase):
             minimal=True, with_types=True, with_operators=True)
 
         root = BNode()
-        src = ~A
-        app = f(Source(1))
         actual.add_workflow(root, {
-            src: [],
-            app: [src]
+            TEST.step1: ("~A", []),
+            TEST.step2: ("f 1", [TEST.step1])
         })
 
         expected = graph_manual(
@@ -542,11 +519,9 @@ class TestAlgebraRDF(unittest.TestCase):
             minimal=True, with_types=True, with_operators=True)
 
         root = BNode()
-        src = ~B
-        app = f(~A)
         actual.add_workflow(root, {
-            src: [],
-            app: [src]
+            TEST.step1: ("~B", []),
+            TEST.step2: ("f(1: A)", [TEST.step1])
         })
 
         expected = graph_manual(

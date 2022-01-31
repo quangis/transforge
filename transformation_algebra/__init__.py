@@ -3,8 +3,8 @@ from transformation_algebra.type import \
 from transformation_algebra.expr import \
     Operator, Expr, Source
 from transformation_algebra.lang import \
-    Language
+    Language, LanguageNamespace
 from transformation_algebra.graph import \
-    TransformationGraph, LanguageNamespace, TA
+    TransformationGraph, TA
 from transformation_algebra.query import \
     Query

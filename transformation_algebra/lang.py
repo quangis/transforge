@@ -173,16 +173,15 @@ class Language(object):
                 if t not in self:
                     raise ValueError
 
-    def parse(self, string: str) -> Expr:
+    def parse(self, string: str, *args: Expr) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
-        return self.parse_expr(string)
+        return self.parse_expr(string, *args)
 
-    def parse_expr(self, val: str | Iterator[str]) -> Expr:
+    def parse_expr(self, val: str | Iterator[str], *args: Expr) -> Expr:
         tokens = tokenize(val, "(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
-        sources: dict[int, Source] = dict()
 
         while token := next(tokens, None):
 
@@ -216,37 +215,20 @@ class Language(object):
 
             else:
                 current: Optional[Expr]
-                previous = stack.pop()
-                if previous and isinstance(previous, Source):
-                    current = None
-
-                    # TODO Deprecated: labelling a source by suffixing it with
-                    # "xn". Will be removed in next version.
-                    assert token[0] == 'x'
-                    n = int(token[1:])
-
+                if token.isnumeric():
                     try:
-                        previous = sources[n]
+                        current = args[int(token) - 1]
                     except KeyError:
-                        assert not previous.label
-                        previous.label = n
-                        sources[n] = previous
-                    stack.append(previous)
-                    continue
-                if token == "-":
-                    current = Source()
-                elif token.isnumeric():
-                    n = int(token)
-                    try:
-                        current = sources[n]
-                    except KeyError:
-                        current = sources[n] = Source(label=n)
+                        raise RuntimeError(
+                            f"{token} should be replaced with expression, but "
+                            f"none was given")
                 else:
                     try:
                         current = self.operators[token].instance()
                     except KeyError as e:
                         raise UndefinedToken(token) from e
-                if previous and current:
+                previous = stack.pop()
+                if previous:
                     current = Application(previous, current)
                 stack.append(current)
 
@@ -257,9 +239,6 @@ class Language(object):
             else:
                 return result
         else:
-            for s in stack:
-                print(s)
-            print()
             raise BracketMismatch(")")
 
         raise NotImplementedError
