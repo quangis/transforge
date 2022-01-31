@@ -179,14 +179,12 @@ class TransformationGraph(Graph):
         current = current or BNode()
 
         if isinstance(expr, Source):
-            # An unlabelled source, or a labelled source that gets attached to
-            # an origin node, is 'at the end of the road' and gets put into the
-            # graph as source data.
-            # if isinstance(source, Node) or source is None:
+            # Once we arrive at a data source, we just assume its type to be
+            # the most general possible. This is so that we don't have to give
+            # a specific type for data source 1 when we have a tool with
+            # expression `f (1: A)`. See also issue #72. The type inference has
+            # already run its course at this point, so it should be safe.
             expr.type = expr.type.fix(prefer_lower=False)
-
-            # if source:
-            #     self.add((current, TA.origin, source))
 
             if self.with_inputs:
                 self.add((root, TA.input, current))

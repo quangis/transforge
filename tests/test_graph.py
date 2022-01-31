@@ -11,8 +11,9 @@ from rdflib.term import Node
 from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
-from transformation_algebra.type import Type, TypeOperator, TypeVariable
-from transformation_algebra.expr import Expr, Operator, Source, SourceError
+from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
+    SubtypeMismatch
+from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TEST, TransformationGraph
 
@@ -415,7 +416,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual.add_workflow(root,
-            {BNode(): ("f(1)", [TEST.source])},
+            {BNode(): ("f (1: A)", [TEST.source])},
             {TEST.source})
 
         expected = graph_manual(
@@ -456,7 +457,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # Mismatch
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        self.assertRaises(SourceError, actual3.add_workflow, root, {
+        self.assertRaises(SubtypeMismatch, actual3.add_workflow, root, {
             TEST.sourceA: ("~A", []),
             TEST.sourceB: ("~B", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
@@ -473,7 +474,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual.add_workflow(root, {
-            TEST.step1: ("~A", []),
+            TEST.step1: ("~A1", []),
             TEST.step2: ("f 1 2", [TEST.step1, TEST.step1])
         })
 

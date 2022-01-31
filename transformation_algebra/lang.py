@@ -201,7 +201,7 @@ class Language(object):
                 assert isinstance(previous, Expr)
                 t = self.parse_type(tokens)
                 previous.type.unify(t, subtype=True)
-                previous.type.fix(prefer_lower=False)
+                # previous.type.fix(prefer_lower=False)
             elif token == ";":
                 stack.clear()
                 stack.append(None)
