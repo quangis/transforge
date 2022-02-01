@@ -315,11 +315,12 @@ class TransformationGraph(Graph):
 
     def add_workflow(self, root: Node,
             steps: dict[Node, tuple[str, list[Node]]],
-            sources: set[Node] = set()) -> Node:
+            sources: set[Node] = set()) -> dict[Node, Node]:
         """
         Convert a workflow to a full transformation graph by converting its
         individual steps to representations of expressions in RDF and combining
-        them. Return the final 'output' node of the expression.
+        them. Return a mapping between tool/source nodes and their expression
+        nodes.
 
         A workflow consists of a collection of algebra expressions for each
         step (e.g. application of a tool), paired with the inputs to those
@@ -380,4 +381,5 @@ class TransformationGraph(Graph):
         if self.with_classes:
             self.add((root, RDF.type, TA.Transformation))
 
-        return result_node
+        return {step: self.expr_nodes[expr]
+            for step, expr in step_exprs.items()}
