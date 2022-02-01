@@ -133,19 +133,6 @@ class Language(object):
         else:
             self.synonyms[name] = item
 
-    def __getattr__(self, name: str) -> Operator | TypeOperator:
-        result = self.operators.get(name) or self.types.get(name)
-        if result:
-            return result
-        else:
-            raise AttributeError
-
-    def __setattr__(self, name: str, value: Operator | TypeOperator) -> None:
-        if isinstance(value, (Operator, TypeOperator)):
-            self.add(value, name)
-        else:
-            super().__setattr__(name, value)
-
     def __contains__(self, key: str | Operator | TypeOperator) -> bool:
         if isinstance(key, str):
             return key in self.operators or key in self.types \
