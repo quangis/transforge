@@ -69,8 +69,8 @@ class Query(object):  # TODO subclass rdflib.Query?
         # Connect each node to a disjunction of conjunction of nodes
         self.conns: dict[Variable, list[list[Variable]]] = defaultdict(list)
         self.skips: dict[Variable, bool] = defaultdict(bool)
-        self.attr_via: dict[Variable, list[Operator]] = defaultdict(list)
-        self.attr_type: dict[Variable, list[Type]] = defaultdict(list)
+        self.via: dict[Variable, list[Operator]] = defaultdict(list)
+        self.type: dict[Variable, list[Type]] = defaultdict(list)
 
         self.cache: dict[Type, Variable] = dict()
 
@@ -102,7 +102,7 @@ class Query(object):  # TODO subclass rdflib.Query?
         ))
 
     def output_type(self) -> Iterator[str]:
-        for t in self.attr_type[self.output]:
+        for t in self.type[self.output]:
             yield from self.set_type(self.workflow, t,
                TA.output / RDF.type)
 
@@ -130,7 +130,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         # Connecting to target node
         if entrance:
-            if self.attr_type[entrance] and not self.attr_type[target]:
+            if self.type[entrance] and not self.type[target]:
                 if self.skips[entrance]:
                     yield self.triple(entrance, ~TA.feeds * ZeroOrMore, target)
                 else:
@@ -146,9 +146,9 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         # Node's own attributes
         yield from union(*("\n".join(self.set_type(target, t)) for t in
-            self.attr_type[target]))
+            self.type[target]))
         yield from union(*("\n".join(self.set_operator(target, o)) for o in
-            self.attr_via[target]))
+            self.via[target]))
 
         # Connecting to rest of the tree
         connections = self.conns[target]
@@ -233,12 +233,12 @@ class Query(object):  # TODO subclass rdflib.Query?
         # Unit flows
         if isinstance(item, Type):
             current = next(self.generator)
-            self.attr_type[current].append(item)
+            self.type[current].append(item)
             return [[current]], [current]
 
         elif isinstance(item, Operator):
             current = next(self.generator)
-            self.attr_via[current].append(item)
+            self.via[current].append(item)
             return [[current]], [current]
 
         elif isinstance(item, OR) and all(
@@ -246,9 +246,9 @@ class Query(object):  # TODO subclass rdflib.Query?
             current = next(self.generator)
             for i in item.items:
                 if isinstance(i, Operator):
-                    self.attr_via[current].append(i)
+                    self.via[current].append(i)
                 elif isinstance(i, Type):
-                    self.attr_type[current].append(i)
+                    self.type[current].append(i)
             return [[current]], [current]
 
         # Sequential flows
