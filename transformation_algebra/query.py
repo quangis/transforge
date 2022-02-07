@@ -96,10 +96,30 @@ class Query(object):  # TODO subclass rdflib.Query?
             self.output_type() if by_output else (),
             self.bag(operators=True) if by_operators else (),
             self.bag(types=True) if by_types else (),
-            self.chronology(self.output) if by_chronology else (),
+            self.chronology() if by_chronology else (),
             ["} GROUP BY ?workflow"]
 
         ))
+
+    def sparql_diagnostics(self) -> Iterator[str]:
+        """
+        Generate debug queries.
+        """
+
+        n = 0
+        for d in count():
+            statements = list(self.chronology(depth=d))
+
+            # Quit once we reach a fixed point
+            if n == (m := len(statements)):
+                break
+
+            yield "\n".join(chain(
+                ["SELECT (COUNT(*) AS ?number_of_results) WHERE {"],
+                statements,
+                ["}"]))
+
+            n = m
 
     def output_type(self) -> Iterator[str]:
         for t in self.type[self.output]:
@@ -124,8 +144,12 @@ class Query(object):  # TODO subclass rdflib.Query?
             u for bag in self.bags[1:] if (u := units(bag))
         ])
 
-    def chronology(self, target: Variable,
-            entrance: Variable | None = None) -> Iterator[str]:
+    def chronology(self, target: Variable | None = None,
+            entrance: Variable | None = None,
+            depth: int | None = None) -> Iterator[str]:
+
+        if not target:
+            target = self.output
 
         # Connection from the entrance to this node
         if entrance:
@@ -147,10 +171,12 @@ class Query(object):  # TODO subclass rdflib.Query?
         yield from self.attributes(target)
 
         # Connecting to rest of the tree
-        yield from union([
-            chain.from_iterable(self.chronology(conj, target) for conj in disj)
-            for disj in self.conns[target]
-        ])
+        if depth is None or (depth := depth - 1) >= 0:
+            yield from union([
+                chain.from_iterable(
+                    self.chronology(conj, target, depth) for conj in disj)
+                for disj in self.conns[target]
+            ])
 
     def triple(self, *items: Node | Path) -> str:
         result = []
