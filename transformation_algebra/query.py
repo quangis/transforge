@@ -34,11 +34,11 @@ def flatten(xs: Iterable[Iterable[A]]) -> list[A]:
     return list(chain.from_iterable(xs))
 
 
-def union(*xs: str) -> Iterator[str]:
+def union(xs: list[Iterable[str]]) -> Iterator[str]:
     if len(xs) > 1:
-        yield "{{{}}}".format("\n} UNION {\n".join(xs))
-    else:
-        yield from xs
+        yield "{{{}}}".format("\n} UNION {\n".join("\n".join(x) for x in xs))
+    elif xs:
+        yield from xs[0]
 
 
 class Query(object):  # TODO subclass rdflib.Query?
@@ -103,7 +103,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
     def output_type(self) -> Iterator[str]:
         for t in self.type[self.output]:
-            yield from self.set_type(self.workflow, t,
+            yield from self.attr_type(self.workflow, t,
                TA.output / RDF.type)
 
     def bag(self, types: bool = False, operators: bool = False) \
@@ -113,22 +113,21 @@ class Query(object):  # TODO subclass rdflib.Query?
             res: list[str] = []
             for item in values:
                 if isinstance(item, Type):
-                    res.extend(self.set_type(self.workflow, item, TA.member))
+                    res.extend(self.attr_type(self.workflow, item, TA.member))
                 elif isinstance(item, Operator):
-                    res.extend(self.set_operator(self.workflow, item,
+                    res.extend(self.attr_operator(self.workflow, item,
                         TA.member))
             return res
 
         yield from units(self.bags[0])
-        yield from union(*(
-            "\n".join(u)
-            for bag in self.bags[1:] if (u := units(bag))
-        ))
+        yield from union([
+            u for bag in self.bags[1:] if (u := units(bag))
+        ])
 
     def chronology(self, target: Variable,
             entrance: Variable | None = None) -> Iterator[str]:
 
-        # Connecting to target node
+        # Connection from the entrance to this node
         if entrance:
             if self.type[entrance] and not self.type[target]:
                 if self.skips[entrance]:
@@ -145,25 +144,13 @@ class Query(object):  # TODO subclass rdflib.Query?
             yield self.triple(self.workflow, TA.output, self.output)
 
         # Node's own attributes
-        yield from union(*("\n".join(self.set_type(target, t)) for t in
-            self.type[target]))
-        yield from union(*("\n".join(self.set_operator(target, o)) for o in
-            self.via[target]))
+        yield from self.attributes(target)
 
         # Connecting to rest of the tree
-        connections = self.conns[target]
-        if len(connections) > 1:
-            yield "{"
-            yield "\n} UNION {\n".join(
-                "\n".join(chain.from_iterable(
-                    self.chronology(conj, target) for conj in disj
-                ))
-                for disj in connections
-            )
-            yield "}"
-        elif connections:
-            for conj in connections[0]:
-                yield from self.chronology(conj, target)
+        yield from union([
+            chain.from_iterable(self.chronology(conj, target) for conj in disj)
+            for disj in self.conns[target]
+        ])
 
     def triple(self, *items: Node | Path) -> str:
         result = []
@@ -174,7 +161,14 @@ class Query(object):  # TODO subclass rdflib.Query?
                 result.append(str(item))
         return " ".join(result) + "."
 
-    def set_operator(self, variable: rdflib.Variable, op: Operator,
+    def attributes(self, target: Variable) -> Iterator[str]:
+        yield from union([self.attr_type(target, t)
+            for t in self.type[target]
+        ])
+        yield from union([self.attr_operator(target, o)
+            for o in self.via[target]])
+
+    def attr_operator(self, variable: rdflib.Variable, op: Operator,
             predicate: Node | Path = TA.via) -> Iterator[str]:
 
         if op.definition:
@@ -182,7 +176,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             warn(f"query used a non-primitive operation {op.name}")
         yield self.triple(variable, predicate, self.language.namespace[op])
 
-    def set_type(self, variable: rdflib.Variable, type: Type,
+    def attr_type(self, variable: rdflib.Variable, type: Type,
             predicate: Node | Path = RDF.type) -> Iterator[str]:
         """
         Produce SPARQL constraints for the given (non-function) type.
@@ -216,7 +210,7 @@ class Query(object):  # TODO subclass rdflib.Query?
                 yield self.triple(bnode, RDFS.subClassOf,
                     self.language.namespace[t._operator])
                 for i, param in enumerate(t.params, start=1):
-                    yield from self.set_type(bnode, param, predicate=RDF[f"_{i}"])
+                    yield from self.attr_type(bnode, param, predicate=RDF[f"_{i}"])
             else:
                 if not t.params:
                     node = self.language.namespace[t._operator]
