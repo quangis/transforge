@@ -13,7 +13,7 @@ from rdflib.term import Node, Variable
 from rdflib.namespace import RDFS, RDF
 from itertools import count, chain, product
 from typing import Iterator, Iterable, Union, TypeVar
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from transformation_algebra.flow import Flow, Flow1, FlowShorthand, \
     STEPS, JUMPS, AND, OR
@@ -36,7 +36,11 @@ def flatten(xs: Iterable[Iterable[A]]) -> list[A]:
 
 def union(xs: list[Iterable[str]]) -> Iterator[str]:
     if len(xs) > 1:
-        yield "{{{}}}".format("\n} UNION {\n".join("\n".join(x) for x in xs))
+        combination = "\n} UNION {\n".join(
+            s for x in xs if (s := "\n".join(x))
+        )
+        if combination:
+            yield f"{{{combination}}}"
     elif xs:
         yield from xs[0]
 
@@ -101,24 +105,28 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         ))
 
-    def sparql_diagnostics(self) -> Iterator[str]:
+    def sparql_diagnostics(self) -> Iterator[tuple[str, str]]:
         """
-        Generate debug queries.
+        Generate debug queries: an iterator queries containing progressively
+        more nodes, tupled with the constraints on the last node.
         """
 
         n = 0
-        for d in count():
-            statements = list(self.chronology(depth=d))
+        for d in count(start=1):
+            visited: list[Variable] = []
+            statements = list(self.chronology(d, visited))
 
             # Quit once we reach a fixed point
             if n == (m := len(statements)):
                 break
 
-            yield "\n".join(chain(
+            node = ". ".join(self.attributes(visited[-1]))
+            query = "\n".join(chain(
                 ["SELECT (COUNT(*) AS ?number_of_results) WHERE {"],
                 statements,
                 ["}"]))
 
+            yield query, node
             n = m
 
     def output_type(self) -> Iterator[str]:
@@ -144,37 +152,36 @@ class Query(object):  # TODO subclass rdflib.Query?
             u for bag in self.bags[1:] if (u := units(bag))
         ])
 
-    def chronology(self, target: Variable | None = None,
+    def chronology(self,
+            visits: int | None = None,
+            visited: list[Variable] | None = None,
+            target: Variable | None = None,
             entrance: Variable | None = None,
-            depth: int | None = None) -> Iterator[str]:
+            ) -> Iterator[str]:
 
-        if not target:
-            target = self.output
+        if visited is None or (visits and len(visited) <= visits):
 
-        # Connection from the entrance to this node
-        if entrance:
-            if self.type[entrance] and not self.type[target]:
-                if self.skips[entrance]:
-                    yield self.triple(entrance, ~TA.feeds * ZeroOrMore, target)
-                else:
-                    yield f"BIND({entrance.n3()} AS {target.n3()})"
+            if not target:
+                target = self.output
+
+            if visited is not None:
+                visited.append(target)
+
+            # Connection from the entrance to this node
+            if entrance:
+                yield self.connection(entrance, target)
             else:
-                if self.skips[entrance]:
-                    yield self.triple(entrance, ~TA.feeds * OneOrMore, target)
-                else:
-                    yield self.triple(entrance, ~TA.feeds, target)
-        else:
-            assert target == self.output
-            yield self.triple(self.workflow, TA.output, self.output)
+                assert target == self.output
+                yield self.triple(self.workflow, TA.output, self.output)
 
-        # Node's own attributes
-        yield from self.attributes(target)
+            # Node's own attributes
+            yield from self.attributes(target)
 
-        # Connecting to rest of the tree
-        if depth is None or (depth := depth - 1) >= 0:
+            # Connecting to rest of the tree
             yield from union([
                 chain.from_iterable(
-                    self.chronology(conj, target, depth) for conj in disj)
+                    self.chronology(visits, visited, conj, target)
+                    for conj in disj)
                 for disj in self.conns[target]
             ])
 
@@ -186,6 +193,18 @@ class Query(object):  # TODO subclass rdflib.Query?
             except TypeError:
                 result.append(str(item))
         return " ".join(result) + "."
+
+    def connection(self, entrance: Variable, target: Variable) -> str:
+        if self.type[entrance] and not self.type[target]:
+            if self.skips[entrance]:
+                return self.triple(entrance, ~TA.feeds * ZeroOrMore, target)
+            else:
+                return f"BIND({entrance.n3()} AS {target.n3()})"
+        else:
+            if self.skips[entrance]:
+                return self.triple(entrance, ~TA.feeds * OneOrMore, target)
+            else:
+                return self.triple(entrance, ~TA.feeds, target)
 
     def attributes(self, target: Variable) -> Iterator[str]:
         yield from union([self.attr_type(target, t)
