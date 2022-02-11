@@ -11,10 +11,12 @@ from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language
 
-from itertools import chain
+from itertools import chain, count
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
+
+from typing import Iterator
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 TEST = Namespace("https://example.com/#")
@@ -61,12 +63,17 @@ class TransformationGraph(Graph):
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
+        self.identifiers: Iterator[int] | None = None
+
         for t in self.language.taxonomy:
             self.type_nodes[t] = self.language.namespace[
                 t.text(sep=".", lparen="_", rparen="")]
 
         self.bind("ta", TA)
         self.bind("lang", self.language.namespace)
+
+    def ref(self) -> str:
+        return f"{next(self.identifiers)}. " if self.identifiers else ""
 
     def add_vocabulary(self) -> None:
         """
@@ -200,7 +207,7 @@ class TransformationGraph(Graph):
 
             if self.with_labels:
                 self.add((current, RDFS.label,
-                    Literal(f"{expr.type} (source data)")))
+                    Literal(f"{self.ref()}{expr.type} (source data)")))
 
             if self.with_classes:
                 self.add((current, RDF.type, TA.SourceData))
@@ -227,8 +234,8 @@ class TransformationGraph(Graph):
                     self.add((root, TA.member, type_node))
 
             if self.with_labels:
-                self.add((current, RDFS.label,
-                    Literal(f"{datatype} (via {expr.operator.name})")))
+                self.add((current, RDFS.label, Literal(
+                    f"{self.ref()}{datatype} (via {expr.operator.name})")))
 
             if self.with_classes:
                 self.add((current, RDF.type, TA.TransformedData))
@@ -276,7 +283,7 @@ class TransformationGraph(Graph):
 
                 if self.with_labels:
                     self.add((internal, RDFS.label, Literal(
-                        "unknown (internal)")))
+                        "(internal)")))
 
                 if isinstance(expr.x, Abstraction):
                     for p in expr.x.params:
@@ -326,6 +333,8 @@ class TransformationGraph(Graph):
         step (e.g. application of a tool), paired with the inputs to those
         expressions. Every input must be either a source node or an expression.
         """
+
+        self.identifiers = count(start=1)
 
         # One of the steps must be 'last': it represents the tool finally
         # producing the output and so isn't an input to another.
@@ -380,6 +389,8 @@ class TransformationGraph(Graph):
 
         if self.with_classes:
             self.add((root, RDF.type, TA.Transformation))
+
+        self.identifiers = None  # reset the identifiers
 
         return {step: self.expr_nodes[expr]
             for step, expr in step_exprs.items()}

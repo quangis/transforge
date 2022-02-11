@@ -159,7 +159,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             entrance: Variable | None = None,
             ) -> Iterator[str]:
 
-        if visited is None or (visits and len(visited) <= visits):
+        if visited is None or (visits and len(visited) < visits):
 
             if not target:
                 target = self.output
