@@ -122,8 +122,14 @@ class Query(object):  # TODO subclass rdflib.Query?
 
             node = ". ".join(self.attributes(visited[-1]))
             query = "\n".join(chain(
-                ["SELECT (COUNT(*) AS ?number_of_results) WHERE {"],
+                # ["SELECT (COUNT(*) AS ?number_of_results) WHERE {"],
+                ["PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+                "SELECT "],
+                [f"?{node}L" for node in visited],
+                ["WHERE {"],
                 statements,
+                [f"?{node} rdfs:label ?{node}L."
+                    for node in visited],
                 ["}"]))
 
             yield query, node
