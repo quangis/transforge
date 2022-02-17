@@ -108,7 +108,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             self.stmts_output_type() if by_output else (),
             self.stmts_bag(operators=True) if by_operators else (),
             self.stmts_bag(types=True) if by_types else (),
-            self.stmts_chronology() if by_chronology else (),
+            self.stmts_chronology(self.output) if by_chronology else (),
             "} GROUP BY ?workflow"
         )
 
@@ -119,7 +119,8 @@ class Query(object):  # TODO subclass rdflib.Query?
         """
 
         visited: list[Variable] = []
-        statements = list(self.stmts_chronology(d, visited))
+        statements = list(self.stmts_chronology(self.output, visits=d,
+            visited=visited))
         assert self.steps[step] == visited[-1]
         return sparql(
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -138,7 +139,8 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         for d, _ in enumerate(self.steps):
             visited: list[Variable] = []
-            statements = list(self.stmts_chronology(d, visited))
+            statements = list(self.stmts_chronology(self.output, visits=d,
+                visited=visited))
             assert self.steps[d] == visited[-1]
             yield d, sparql(
                 "SELECT (COUNT(*) AS ?number_of_results) WHERE {",
@@ -170,16 +172,13 @@ class Query(object):  # TODO subclass rdflib.Query?
         ])
 
     def stmts_chronology(self,
+            target: Variable,
+            entrance: Variable | None = None,
             visits: int | None = None,
             visited: list[Variable] | None = None,
-            target: Variable | None = None,
-            entrance: Variable | None = None,
             ) -> Iterator[str]:
 
         if visited is None or (visits and len(visited) < visits):
-
-            if not target:
-                target = self.output
 
             if visited is not None:
                 visited.append(target)
@@ -197,7 +196,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             # Connecting to rest of the tree
             yield from union([
                 chain.from_iterable(
-                    self.stmts_chronology(visits, visited, conj, target)
+                    self.stmts_chronology(conj, target, visits, visited)
                     for conj in disj)
                 for disj in self.conns[target]
             ])
