@@ -44,6 +44,11 @@ def union(xs: list[Iterable[str]]) -> Iterator[str]:
     elif xs:
         yield from xs[0]
 
+def sparql(*elems: str | Iterator[str]) -> None:
+    return "\n".join(chain.from_iterable(
+        (elem,) if isinstance(elem, str) else elem for elem in elems
+    ))
+
 
 class Query(object):  # TODO subclass rdflib.Query?
     """
@@ -66,6 +71,9 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.generator = iter(Variable(f"_{i}") for i in count())
 
         self.allow_noncanonical = allow_noncanonical
+
+        # Every step occurring in this query
+        self.steps: list[Variable] = []
 
         # Remember which types occur in the flow in its totality
         self.bags: list[set[Type | Operator]] = Flow.bags(self.flow)
@@ -90,50 +98,53 @@ class Query(object):  # TODO subclass rdflib.Query?
             by_operators: bool = True,
             by_chronology: bool = True) -> str:
         """
-        Convert the flow to a full SPARQL query.
+        Obtain a SPARQL query.
         """
-        return "\n".join(chain([
+        return sparql(
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
-            "SELECT ?workflow WHERE {"],
+            "SELECT ?workflow WHERE {",
             self.output_type() if by_output else (),
             self.bag(operators=True) if by_operators else (),
             self.bag(types=True) if by_types else (),
             self.chronology() if by_chronology else (),
-            ["} GROUP BY ?workflow"]
+            "} GROUP BY ?workflow"
+        )
 
-        ))
-
-    def sparql_diagnostics(self) -> Iterator[tuple[str, str]]:
+    def sparql_chronology_steps(self, step: int | None = None) -> str:
         """
-        Generate debug queries: an iterator queries containing progressively
-        more nodes, tupled with the constraints on the last node.
+        Obtain a SPARQL query that reveals the exact solutions available at a
+        step (or the last step if none is given).
         """
 
-        n = 0
-        for d in count(start=1):
+        visited: list[Variable] = []
+        statements = list(self.chronology(d, visited))
+        assert self.steps[step] == visited[-1]
+        return sparql(
+            "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+            "SELECT ?workflow ", (f"?{node}L" for node in visited),
+            "WHERE {",
+            statements,
+            (f"?{node} rdfs:label ?{node}L." for node in visited),
+            "}"
+        )
+
+    def sparql_chronology_diagnostics(self) -> Iterator[tuple[int, str]]:
+        """
+        Obtain multiple SPARQL queries that reveal how many solutions there are
+        at each step in the process.
+        """
+
+        for d, _ in enumerate(self.steps):
             visited: list[Variable] = []
             statements = list(self.chronology(d, visited))
-
-            # Quit once we reach a fixed point
-            if n == (m := len(statements)):
-                break
-
-            node = ". ".join(self.attributes(visited[-1]))
-            query = "\n".join(chain(
-                # ["SELECT (COUNT(*) AS ?number_of_results) WHERE {"],
-                ["PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-                "SELECT "],
-                [f"?{node}L" for node in visited],
-                ["WHERE {"],
+            assert self.steps[d] == visited[-1]
+            yield d, sparql(
+                "SELECT (COUNT(*) AS ?number_of_results) WHERE {",
                 statements,
-                [f"?{node} rdfs:label ?{node}L."
-                    for node in visited],
-                ["}"]))
-
-            yield query, node
-            n = m
+                "}"
+            )
 
     def output_type(self) -> Iterator[str]:
         for t in self.type[self.output]:
@@ -201,6 +212,7 @@ class Query(object):  # TODO subclass rdflib.Query?
         return " ".join(result) + "."
 
     def connection(self, entrance: Variable, target: Variable) -> str:
+        # assert any(entrance in a for a in self.conns[target])
         if self.type[entrance] and not self.type[target]:
             if self.skips[entrance]:
                 return self.triple(entrance, ~TA.feeds * ZeroOrMore, target)
@@ -278,17 +290,20 @@ class Query(object):  # TODO subclass rdflib.Query?
         # Unit flows
         if isinstance(item, Type):
             current = next(self.generator)
+            self.steps.append(current)
             self.type[current].append(item)
             return [[current]], [current]
 
         elif isinstance(item, Operator):
             current = next(self.generator)
+            self.steps.append(current)
             self.via[current].append(item)
             return [[current]], [current]
 
         elif isinstance(item, OR) and all(
                 isinstance(i, (Type, Operator)) for i in item.items):
             current = next(self.generator)
+            self.steps.append(current)
             for i in item.items:
                 if isinstance(i, Operator):
                     self.via[current].append(i)
