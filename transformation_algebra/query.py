@@ -105,10 +105,10 @@ class Query(object):  # TODO subclass rdflib.Query?
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             "SELECT ?workflow WHERE {",
-            self.output_type() if by_output else (),
-            self.bag(operators=True) if by_operators else (),
-            self.bag(types=True) if by_types else (),
-            self.chronology() if by_chronology else (),
+            self.stmts_output_type() if by_output else (),
+            self.stmts_bag(operators=True) if by_operators else (),
+            self.stmts_bag(types=True) if by_types else (),
+            self.stmts_chronology() if by_chronology else (),
             "} GROUP BY ?workflow"
         )
 
@@ -119,7 +119,7 @@ class Query(object):  # TODO subclass rdflib.Query?
         """
 
         visited: list[Variable] = []
-        statements = list(self.chronology(d, visited))
+        statements = list(self.stmts_chronology(d, visited))
         assert self.steps[step] == visited[-1]
         return sparql(
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -138,7 +138,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
         for d, _ in enumerate(self.steps):
             visited: list[Variable] = []
-            statements = list(self.chronology(d, visited))
+            statements = list(self.stmts_chronology(d, visited))
             assert self.steps[d] == visited[-1]
             yield d, sparql(
                 "SELECT (COUNT(*) AS ?number_of_results) WHERE {",
@@ -146,21 +146,21 @@ class Query(object):  # TODO subclass rdflib.Query?
                 "}"
             )
 
-    def output_type(self) -> Iterator[str]:
+    def stmts_output_type(self) -> Iterator[str]:
         for t in self.type[self.output]:
-            yield from self.attr_type(self.workflow, t,
+            yield from self.stmts_type(self.workflow, t,
                TA.output / RDF.type)
 
-    def bag(self, types: bool = False, operators: bool = False) \
+    def stmts_bag(self, types: bool = False, operators: bool = False) \
             -> Iterator[str]:
 
         def units(values: set[Type | Operator]) -> list[str]:
             res: list[str] = []
             for item in values:
                 if isinstance(item, Type):
-                    res.extend(self.attr_type(self.workflow, item, TA.member))
+                    res.extend(self.stmts_type(self.workflow, item, TA.member))
                 elif isinstance(item, Operator):
-                    res.extend(self.attr_operator(self.workflow, item,
+                    res.extend(self.stmts_operator(self.workflow, item,
                         TA.member))
             return res
 
@@ -169,7 +169,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             u for bag in self.bags[1:] if (u := units(bag))
         ])
 
-    def chronology(self,
+    def stmts_chronology(self,
             visits: int | None = None,
             visited: list[Variable] | None = None,
             target: Variable | None = None,
@@ -186,18 +186,18 @@ class Query(object):  # TODO subclass rdflib.Query?
 
             # Connection from the entrance to this node
             if entrance:
-                yield self.connection(entrance, target)
+                yield self.stmt_connection(entrance, target)
             else:
                 assert target == self.output
                 yield self.triple(self.workflow, TA.output, self.output)
 
             # Node's own attributes
-            yield from self.attributes(target)
+            yield from self.stmts_attributes(target)
 
             # Connecting to rest of the tree
             yield from union([
                 chain.from_iterable(
-                    self.chronology(visits, visited, conj, target)
+                    self.stmts_chronology(visits, visited, conj, target)
                     for conj in disj)
                 for disj in self.conns[target]
             ])
@@ -211,7 +211,7 @@ class Query(object):  # TODO subclass rdflib.Query?
                 result.append(str(item))
         return " ".join(result) + "."
 
-    def connection(self, entrance: Variable, target: Variable) -> str:
+    def stmt_connection(self, entrance: Variable, target: Variable) -> str:
         # assert any(entrance in a for a in self.conns[target])
         if self.type[entrance] and not self.type[target]:
             if self.skips[entrance]:
@@ -224,14 +224,14 @@ class Query(object):  # TODO subclass rdflib.Query?
             else:
                 return self.triple(entrance, ~TA.feeds, target)
 
-    def attributes(self, target: Variable) -> Iterator[str]:
-        yield from union([self.attr_type(target, t)
+    def stmts_attributes(self, target: Variable) -> Iterator[str]:
+        yield from union([self.stmts_type(target, t)
             for t in self.type[target]
         ])
-        yield from union([self.attr_operator(target, o)
+        yield from union([self.stmts_operator(target, o)
             for o in self.via[target]])
 
-    def attr_operator(self, variable: rdflib.Variable, op: Operator,
+    def stmts_operator(self, variable: rdflib.Variable, op: Operator,
             predicate: Node | Path = TA.via) -> Iterator[str]:
 
         if op.definition:
@@ -239,7 +239,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             warn(f"query used a non-primitive operation {op.name}")
         yield self.triple(variable, predicate, self.language.namespace[op])
 
-    def attr_type(self, variable: rdflib.Variable, type: Type,
+    def stmts_type(self, variable: rdflib.Variable, type: Type,
             predicate: Node | Path = RDF.type) -> Iterator[str]:
         """
         Produce SPARQL constraints for the given (non-function) type.
@@ -273,7 +273,8 @@ class Query(object):  # TODO subclass rdflib.Query?
                 yield self.triple(bnode, RDFS.subClassOf,
                     self.language.namespace[t._operator])
                 for i, param in enumerate(t.params, start=1):
-                    yield from self.attr_type(bnode, param, predicate=RDF[f"_{i}"])
+                    yield from self.stmts_type(bnode, param,
+                        predicate=RDF[f"_{i}"])
             else:
                 if not t.params:
                     node = self.language.namespace[t._operator]
