@@ -44,7 +44,8 @@ def union(xs: list[Iterable[str]]) -> Iterator[str]:
     elif xs:
         yield from xs[0]
 
-def sparql(*elems: str | Iterator[str]) -> None:
+
+def sparql(*elems: str | Iterable[str]) -> str:
     return "\n".join(chain.from_iterable(
         (elem,) if isinstance(elem, str) else elem for elem in elems
     ))
@@ -118,16 +119,11 @@ class Query(object):  # TODO subclass rdflib.Query?
         step (or the last step if none is given).
         """
 
-        visited: list[Variable] = []
-        statements = list(self.stmts_chronology(self.output, visits=d,
-            visited=visited))
-        assert self.steps[step] == visited[-1]
         return sparql(
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-            "SELECT ?workflow ", (f"?{node}L" for node in visited),
+            "SELECT ?workflow ", (f"?{node}L" for node in self.steps),
             "WHERE {",
-            statements,
-            (f"?{node} rdfs:label ?{node}L." for node in visited),
+            self.stmts_chronology(self.output, stop_at=step, with_labels=True),
             "}"
         )
 
@@ -138,13 +134,9 @@ class Query(object):  # TODO subclass rdflib.Query?
         """
 
         for d, _ in enumerate(self.steps):
-            visited: list[Variable] = []
-            statements = list(self.stmts_chronology(self.output, visits=d,
-                visited=visited))
-            assert self.steps[d] == visited[-1]
             yield d, sparql(
                 "SELECT (COUNT(*) AS ?number_of_results) WHERE {",
-                statements,
+                self.stmts_chronology(self.output, stop_at=d),
                 "}"
             )
 
@@ -172,34 +164,41 @@ class Query(object):  # TODO subclass rdflib.Query?
         ])
 
     def stmts_chronology(self,
-            target: Variable,
+            start: Variable,
             entrance: Variable | None = None,
-            visits: int | None = None,
-            visited: list[Variable] | None = None,
+            stop_at: int | None = None,
+            with_labels: bool = False,
+            _visited: list[Variable] | None = None,
             ) -> Iterator[str]:
 
-        if visited is None or (visits and len(visited) < visits):
+        visited = _visited or []
 
-            if visited is not None:
-                visited.append(target)
+        if not stop_at or len(visited) < stop_at:
+
+            visited.append(start)
 
             # Connection from the entrance to this node
             if entrance:
-                yield self.stmt_connection(entrance, target)
+                yield self.stmt_connection(entrance, start)
             else:
-                assert target == self.output
+                assert start == self.output
                 yield self.triple(self.workflow, TA.output, self.output)
 
             # Node's own attributes
-            yield from self.stmts_attributes(target)
+            yield from self.stmts_attributes(start)
 
             # Connecting to rest of the tree
             yield from union([
                 chain.from_iterable(
-                    self.stmts_chronology(conj, target, visits, visited)
+                    self.stmts_chronology(conj, start, stop_at, with_labels,
+                        visited)
                     for conj in disj)
-                for disj in self.conns[target]
+                for disj in self.conns[start]
             ])
+
+            if with_labels and _visited is None:
+                for v in visited:
+                    yield self.triple(v, RDFS.label, Variable(v + "L"))
 
     def triple(self, *items: Node | Path) -> str:
         result = []
