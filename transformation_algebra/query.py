@@ -95,10 +95,10 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.output = entrances[0][0]
 
     def query_diagnostic(self, graph: Graph) -> Iterator[tuple[Variable, int]]:
-        for i, sparql in self.sparql_chronology_diagnostics():
+        for step, sparql in self.sparql_chronology_diagnostics():
             result = graph.query(sparql)
             count = next(iter(result)).number_of_results if result else 0
-            yield self.steps[i - 1], count
+            yield step, count
 
     def query_step_bindings(self, graph: Graph, at_step: int
             ) -> Iterator[dict[Variable, str]]:
@@ -131,7 +131,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             "} GROUP BY ?workflow"
         )
 
-    def sparql_chronology_steps(self, step: int | None = None) -> str:
+    def sparql_chronology_steps(self, step: Variable | None = None) -> str:
         """
         Obtain a SPARQL query that reveals the exact solutions available at a
         step (or the last step if none is given).
@@ -145,16 +145,16 @@ class Query(object):  # TODO subclass rdflib.Query?
             "}"
         )
 
-    def sparql_chronology_diagnostics(self) -> Iterator[tuple[int, str]]:
+    def sparql_chronology_diagnostics(self) -> Iterator[tuple[Variable, str]]:
         """
         Obtain multiple SPARQL queries that reveal how many solutions there are
         at each step in the process.
         """
 
-        for d, _ in enumerate(self.steps, start=1):
-            yield d, sparql(
+        for step in self.steps:
+            yield step, sparql(
                 "SELECT (COUNT(*) AS ?number_of_results) WHERE {",
-                self.stmts_chronology(self.output, stop_at=d),
+                self.stmts_chronology(self.output, stop_at=step),
                 "}"
             )
 
@@ -184,28 +184,25 @@ class Query(object):  # TODO subclass rdflib.Query?
     def stmts_chronology(self,
             start: Variable,
             entrance: Variable | None = None,
-            stop_at: int | None = None,
+            stop_at: Variable | None = None,
             with_labels: bool = False,
-            _visited: list[Variable] | None = None,
-            ) -> Iterator[str]:
+            _visited: list[Variable] | None = None) -> Iterator[str]:
 
         visited = _visited or []
+        visited.append(start)
 
-        if not stop_at or len(visited) < stop_at:
+        # Connection from the entrance to this node
+        if entrance:
+            yield self.stmt_connection(entrance, start)
+        else:
+            assert start == self.output
+            yield self.triple(self.workflow, TA.output, self.output)
 
-            visited.append(start)
+        # Node's own attributes
+        yield from self.stmts_attributes(start)
 
-            # Connection from the entrance to this node
-            if entrance:
-                yield self.stmt_connection(entrance, start)
-            else:
-                assert start == self.output
-                yield self.triple(self.workflow, TA.output, self.output)
-
-            # Node's own attributes
-            yield from self.stmts_attributes(start)
-
-            # Connecting to rest of the tree
+        # Connecting to rest of the tree
+        if not start == stop_at:
             yield from union([
                 chain.from_iterable(
                     self.stmts_chronology(conj, start, stop_at, with_labels,
@@ -214,9 +211,9 @@ class Query(object):  # TODO subclass rdflib.Query?
                 for disj in self.conns[start]
             ])
 
-            if with_labels and _visited is None:
-                for v in visited:
-                    yield self.triple(v, RDFS.label, Variable(v + "L"))
+        if with_labels and _visited is None:
+            for v in visited:
+                yield self.triple(v, RDFS.label, Variable(v + "L"))
 
     def triple(self, *items: Node | Path) -> str:
         result = []
