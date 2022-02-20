@@ -210,10 +210,7 @@ class Language(object):
                             f"{token} should be replaced with expression, but "
                             f"none was given")
                 else:
-                    try:
-                        current = self.operators[token].instance()
-                    except KeyError as e:
-                        raise UndefinedToken(token) from e
+                    current = self.parse_operator(token).instance()
                 previous = stack.pop()
                 if previous:
                     current = Application(previous, current)
@@ -229,6 +226,18 @@ class Language(object):
             raise BracketMismatch(")")
 
         raise NotImplementedError
+
+    def parse_elem(self, token: str) -> Operator | TypeInstance:
+        try:
+            return self.parse_operator(token)
+        except UndefinedToken:
+            return self.parse_type(token)
+
+    def parse_operator(self, token: str) -> Operator:
+        try:
+            return self.operators[token]
+        except KeyError as e:
+            raise UndefinedToken(token) from e
 
     def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
         tokens = tokenize(value, "(,)") if isinstance(value, str) else value
