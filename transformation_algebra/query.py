@@ -94,16 +94,22 @@ class Query(object):  # TODO subclass rdflib.Query?
         assert len(entrances) == 1 and len(entrances[0]) == 1
         self.output = entrances[0][0]
 
-    def query_diagnostic(self, graph: Graph) -> Iterator[tuple[Variable, int]]:
+    def query_diagnostic(self, g: Graph
+            ) -> Iterator[tuple[Variable, int | None, str]]:
         for step, sparql in self.sparql_chronology_diagnostics():
-            result = graph.query(sparql)
-            count = next(iter(result)).number_of_results if result else 0
-            yield step, count
+            try:
+                result = g.query(sparql)
+            except ValueError:
+                yield step, None, sparql
+                break
+            else:
+                count = next(iter(result)).number_of_results if result else 0
+                yield step, count, sparql
 
-    def query_step_bindings(self, graph: Graph, at_step: int
+    def query_step_bindings(self, g: Graph, at_step: Variable
             ) -> Iterator[dict[Variable, str]]:
         sparql = self.sparql_chronology_steps(at_step)
-        result = graph.query(sparql)
+        result = g.query(sparql)
         for r in result:
             yield {
                 Variable(label[:-1]): r[label]
