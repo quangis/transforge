@@ -111,11 +111,13 @@ class Query(object):  # TODO subclass rdflib.Query?
         sparql = self.sparql_chronology_steps(at_step)
         result = g.query(sparql)
         for r in result:
-            yield {
+            d = {
                 Variable(label[:-1]): r[label]
                 for label in r.labels
                 if label.startswith("_") and label.endswith("L")
             }
+            d[Variable("workflow")] = r.workflow
+            yield d
 
     def sparql(self,
             by_output: bool = True,
