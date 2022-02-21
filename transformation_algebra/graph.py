@@ -235,7 +235,7 @@ class TransformationGraph(Graph):
 
             if self.with_labels:
                 self.add((current, RDFS.label, Literal(
-                    f"{self.ref()}{expr.operator.name} \u2933 {datatype}")))
+                    f"{self.ref()}{datatype} via {expr.operator.name}")))
 
             if self.with_classes:
                 self.add((current, RDF.type, TA.TransformedData))
