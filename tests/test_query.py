@@ -12,21 +12,16 @@ from transformation_algebra.graph import TransformationGraph, TA, TEST
 from transformation_algebra.query import Query, OR, AND, STEPS
 
 
-def make_graph(lang: Language,
-        workflows: dict[URIRef, Expr | dict[Node, tuple[str, list[Node]]]]
-        ) -> TransformationGraph:
+def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> TransformationGraph:
     """
     Convenience method for constructing a graph containing workflows.
     """
     graph = TransformationGraph(lang)
     graph.add_vocabulary()
     for wfnode, content in workflows.items():
-        if isinstance(content, Expr):
-            e = graph.add_expr(content, wfnode)
-            graph.add((wfnode, RDF.type, TA.Transformation))
-            graph.add((wfnode, TA.output, e))
-        else:
-            graph.add_workflow(wfnode, content)
+        e = graph.add_expr(content, wfnode)
+        graph.add((wfnode, RDF.type, TA.Transformation))
+        graph.add((wfnode, TA.output, e))
     return graph
 
 
@@ -251,6 +246,21 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(lang, graph, Y, results={TEST.y})
         self.assertQuery(lang, graph, F(X), results={TEST.fx, TEST.fy})
         self.assertQuery(lang, graph, F(Y), results={TEST.fy})
+
+    # def test_that_sources_with_nonnormalized_type_get_type_in_graph(self):
+    #     # There was an issue where the type of a source would not be saved in
+    #     # the graphs if it was not yet normalized, causing a subtle bug.
+    #     # I commented the test out for now since figuring out a MWE was
+    #     # taking too much time; the issue was with not normalizing the source
+    #     T = TypeOperator()
+    #     S = TypeOperator()
+    #     F = Operator(type=T ** S)
+    #     lang = Language(locals(), namespace=TEST)
+    #     graph = TransformationGraph(lang)
+    #     graph.add_vocabulary()
+    #     graph.add_workflow(TEST.wf1, {TEST.x: ("F(1)", [TEST.y])}, {TEST.y})
+    #     graph.serialize("test.ttl")
+    #     self.assertQuery(lang, graph, [S, T], results={TEST.wf1})
 
     # @unittest.skip("Obsoleted since it is no longer possible to skip at "
     #         "the beginning of a flow.")

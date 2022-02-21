@@ -191,7 +191,7 @@ class TransformationGraph(Graph):
             # a specific type for data source 1 when we have a tool with
             # expression `f (1: A)`. See also issue #72. The type inference has
             # already run its course at this point, so it should be safe.
-            expr.type = expr.type.fix(prefer_lower=False)
+            expr.type = expr.type.fix(prefer_lower=False).normalize()
 
             if self.with_inputs:
                 self.add((root, TA.input, current))
