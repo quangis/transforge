@@ -13,8 +13,8 @@ from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node, Variable
 from rdflib.namespace import RDFS, RDF
 from itertools import count, chain, product
-from typing import Iterator, Iterable, Union, TypeVar
-from collections import defaultdict, deque
+from typing import Iterator, Iterable, Union, TypeVar, TypedDict
+from collections import defaultdict
 
 from transformation_algebra.flow import Flow, Flow1, FlowShorthand, \
     STEPS, JUMPS, AND, OR
@@ -121,6 +121,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
     def sparql(self,
             by_output: bool = True,
+            by_input: bool = False,
             by_types: bool = True,
             by_operators: bool = True,
             by_chronology: bool = True) -> str:
@@ -133,6 +134,7 @@ class Query(object):  # TODO subclass rdflib.Query?
             "PREFIX ta: <https://github.com/quangis/transformation-algebra#>",
             "SELECT ?workflow WHERE {",
             self.stmts_output_type() if by_output else (),
+            self.stmts_input_type() if by_input else (),
             self.stmts_bag(operators=True) if by_operators else (),
             self.stmts_bag(types=True) if by_types else (),
             self.stmts_chronology(self.output) if by_chronology else (),
@@ -170,6 +172,18 @@ class Query(object):  # TODO subclass rdflib.Query?
         for t in self.type[self.output]:
             yield from self.stmts_type(self.workflow, t,
                TA.output / RDF.type)
+
+    def stmts_input_type(self) -> Iterator[str]:
+        """
+        Warning: This assumes that every terminus represents the type of a
+        known input. This does not necessarily hold, as a query may only
+        specify intermediate steps.
+        """
+        for v, ts in self.type.items():
+            if not self.conns.get(v):
+                for t in ts:
+                    yield from self.stmts_type(self.workflow, t,
+                       TA.input / RDF.type)
 
     def stmts_bag(self, types: bool = False, operators: bool = False) \
             -> Iterator[str]:
