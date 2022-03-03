@@ -198,14 +198,14 @@ class TypeInstance(Type):
     def __str__(self):
         return self.text(with_constraints=True)
 
-    def depth(self) -> int:
+    def nesting(self) -> int:
         """
         The maximum nesting level of type parameters.
         """
         if isinstance(self, TypeVariable):
-            raise ValueError("Attempted to calculate depth for variable")
+            raise ValueError("Attempted to calculate nesting for variable")
         assert isinstance(self, TypeOperation)
-        return max(p.depth() for p in self.params) + 1 if self.params else 0
+        return max(p.nesting() for p in self.params) + 1 if self.params else 0
 
     def text(self,
             labels: dict[TypeVariable, str] = Labels("τ", subscript=True),
@@ -817,7 +817,7 @@ _ = TypeSchema(lambda: TypeVariable(wildcard=True))
 
 
 def with_parameters(
-        *type_operators: TypeOperator,
+        *type_operators: TypeOperator | Callable[..., TypeOperation],
         param: Optional[Type] = None,
         at: int = None) -> list[TypeInstance]:
     """
@@ -826,10 +826,14 @@ def with_parameters(
     """
     options: list[TypeInstance] = []
     for op in type_operators:
-        for i in ([at - 1] if at else range(op.arity)) if param else [-1]:
-            if i < op.arity:
+        if isinstance(op, TypeOperator):
+            arity = op.arity
+        else:
+            arity = len(signature(op).parameters)
+        for i in ([at - 1] if at else range(arity)) if param else [-1]:
+            if i < arity:
                 options.append(op(*(
-                    param if param and i == j else _ for j in range(op.arity)
+                    param if param and i == j else _ for j in range(arity)
                 )))
     return options
 

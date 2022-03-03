@@ -73,11 +73,11 @@ class Language(object):
                 if op.supertype:
                     taxonomy[op.supertype()].add(t)
 
-        # By sorting on depth, we get a guarantee that, by the time we are
-        # adding a type of depth n, we know all successor types of depth n-1.
+        # By sorting on nesting level, we get a guarantee that by the time we
+        # add a type of level n, we know all successor types of level n-1.
         stack: list[TypeOperation] = sorted(
             (s.instance() for s in self.synonyms.values() if s.canonical),
-            key=TypeInstance.depth)
+            key=TypeInstance.nesting, reverse=True)
         while stack:
             t = stack.pop()
             if t not in taxonomy:
@@ -227,7 +227,7 @@ class Language(object):
 
         raise NotImplementedError
 
-    def parse_elem(self, token: str) -> Operator | TypeInstance:
+    def parse_atom(self, token: str) -> Operator | TypeInstance:
         try:
             return self.parse_operator(token)
         except UndefinedToken:
