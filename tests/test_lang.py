@@ -75,7 +75,7 @@ class TestAlgebra(unittest.TestCase):
         variables.
         """
         A = TypeOperator()
-        f = Operator(type=lambda x: x | x << A)
+        f = Operator(type=lambda x: x @ {x: A})
         lang = Language(scope=locals())
 
         self.assertEqual(str(f.type), "x | x << [A]")

@@ -500,26 +500,20 @@ class TypeInstance(Type):
     def operator(self) -> Optional[TypeOperator]:
         return self._operator if isinstance(self, TypeOperation) else None
 
-    def __or__(self, constraint: Constraint) -> TypeInstance:
+    def __matmul__(self, other: dict[TypeInstance, Type | Iterable[Type]]
+            ) -> TypeInstance:
         """
         Another abuse of Python's operators, allowing us to add constraints to
-        a type instance by using the | operator.
+        a type instance by using the @ operator. Example:
+
+            >>> TypeSchema(lambda x, y: F(x, y) @ {x: A, y: B})
         """
         # Constraints are attached to the relevant variables when the
-        # constraint is instantiated; so at this point, we only attach context.
-        constraint.set_context(self)
+        # constraint is instantiated
+        for ref, alts in other.items():
+            c = Constraint(ref, (alts,) if isinstance(alts, Type) else alts)
+            c.set_context(self)
         return self
-
-    def __lshift__(self, other: Type | Iterable[Type]) -> Constraint:
-        """
-        Allows us to write typeclass constraints using `<<`.
-        """
-        if isinstance(other, Type):
-            return Constraint(self, other.instance())
-        else:
-            assert isinstance(other, Iterable)
-            return Constraint(self, *(o.instance() for o in other))
-
 
 class TypeOperation(TypeInstance):
     """
@@ -714,10 +708,10 @@ class Constraint(object):
     def __init__(
             self,
             reference: TypeInstance,
-            *alternatives: TypeInstance,
+            alternatives: Iterable[Type],
             context: Optional[TypeInstance] = None):
         self.reference = reference
-        self.alternatives = list(alternatives)
+        self.alternatives = list(a.instance() for a in alternatives)
         self.context = context
         self.skeleton: Optional[TypeInstance] = None
 
