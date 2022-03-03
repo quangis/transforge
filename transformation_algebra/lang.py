@@ -57,8 +57,8 @@ class Language(object):
         """
         Generate a taxonomy of canonical types, mapping each of them to their
         subtypes. The canonical types consist of all base types, plus those
-        compound types that have an explicit synonym, or that are subtypes of
-        types that do.
+        compound types that have an explicit synonym, or that are subtypes or
+        parameters of types that do.
 
         These types are of special interest among the potentially infinite
         number of types.
@@ -81,18 +81,29 @@ class Language(object):
         while stack:
             t = stack.pop()
             if t not in taxonomy:
-                taxonomy[t] = set()
-                for i, v, p in zip(count(), t._operator.variance, t.params):
-                    assert isinstance(p, TypeOperation)
-                    p_successors = taxonomy[p] if v is Variance.CO else (
-                        supertype for supertype, subtypes in taxonomy.items()
-                        if any(s.match(t) for s in subtypes))
 
-                    for p_succ in p_successors:
-                        q = t._operator(*(p_succ if i == j else p_orig
-                            for j, p_orig in enumerate(t.params)))
-                        taxonomy[t].add(q)
-                        stack.append(q)
+                # Any non-basic type that occurs as parameter of a canonical
+                # type must itself be canonical, and it must already in the
+                # taxonomy; if it is not, we handle it before going forward
+                for p in t.params:
+                    if p not in taxonomy:
+                        stack.append(t)
+                        stack.append(p)
+                        break
+                else:
+                    taxonomy[t] = set()
+                    for i, v, p in zip(count(), t._operator.variance, t.params):
+                        assert isinstance(p, TypeOperation)
+                        p_successors = taxonomy[p] if v is Variance.CO else (
+                            supertype
+                            for supertype, subtypes in taxonomy.items()
+                            if any(s.match(t) for s in subtypes))
+
+                        for p_succ in p_successors:
+                            q = t._operator(*(p_succ if i == j else p_orig
+                                for j, p_orig in enumerate(t.params)))
+                            taxonomy[t].add(q)
+                            stack.append(q)
 
         return taxonomy
 
