@@ -124,6 +124,17 @@ class TypeSchema(Type):
         return self.schema(*(TypeVariable(origin=origin)
             for _ in range(self.n)))
 
+    def validate_no_free_variables(self) -> None:
+        """
+        Raise an error if not all variables in the constraints are bound to a
+        variable in the context in which it is applied.
+        """
+        context = self.instance()
+        for constraint in context.constraints():
+            if not all(v.wildcard or v in context
+                    for v in constraint.variables(indirect=False)):
+                raise ConstrainFreeVariable(constraint, self)
+
     def only_schematic(self) -> bool:
         """
         Return `True` if all variables occuring in the schema are wildcards or
@@ -500,19 +511,31 @@ class TypeInstance(Type):
     def operator(self) -> Optional[TypeOperator]:
         return self._operator if isinstance(self, TypeOperation) else None
 
-    def __matmul__(self, other: dict[TypeInstance, Type | Iterable[Type]]
-            ) -> TypeInstance:
+    def __rrshift__(self, other: Iterable[Type]) -> Type:
         """
-        Another abuse of Python's operators, allowing us to add constraints to
-        a type instance by using the @ operator. Example:
+        Abuse of Python's notation to go along with __getitem__. Allows an
+        alternative method to specify constraints upfront. Example:
 
-            >>> TypeSchema(lambda x, y: F(x, y) @ {x: A, y: B})
+            >>> TypeSchema(lambda x, y: {x[A]} >> F(x) ** x)
+
+        This also allows you to set constraints on type combinations that don't
+        occur in that configuration in the context:
+
+            >>> TypeSchema(lambda x, y: {G(x, B)[G(A, y)]} >> F(x) ** y)
         """
-        # Constraints are attached to the relevant variables when the
-        # constraint is instantiated
-        for ref, alts in other.items():
-            c = Constraint(ref, (alts,) if isinstance(alts, Type) else alts)
-            c.set_context(self)
+        return self
+
+    def __getitem__(self, value: Type | tuple[Type]) -> TypeInstance:
+        """
+        Another abuse of Python's notation, allowing us to add constraints to a
+        type by using indexing notation. Example:
+
+            >>> TypeSchema(lambda x, y: F(x[A]) ** x)
+        """
+
+        # Constraints are attached to the relevant variables as the constraint
+        # is instantiated
+        Constraint(self, (value,) if isinstance(value, Type) else value)
         return self
 
 class TypeOperation(TypeInstance):
@@ -533,9 +556,6 @@ class TypeOperation(TypeInstance):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, TypeInstance) and bool(self.match(other))
-
-    def __getitem__(self, key: int) -> TypeInstance:
-        return self.params[key]
 
     def __hash__(self) -> int:
         """
@@ -708,11 +728,9 @@ class Constraint(object):
     def __init__(
             self,
             reference: TypeInstance,
-            alternatives: Iterable[Type],
-            context: Optional[TypeInstance] = None):
+            alternatives: Iterable[Type]):
         self.reference = reference
         self.alternatives = list(a.instance() for a in alternatives)
-        self.context = context
         self.skeleton: Optional[TypeInstance] = None
 
         # Inform variables about the constraint present on them
@@ -733,20 +751,6 @@ class Constraint(object):
         for e in chain(self.reference, *self.alternatives):
             result.update(e.variables(indirect=indirect, target=result))
         return result
-
-    def set_context(self, context: TypeInstance) -> None:
-        self.context = context
-        if not self.all_variables_occur_in_context():
-            raise ConstrainFreeVariable(self)
-
-    def all_variables_occur_in_context(self) -> bool:
-        """
-        Are all variables in this constraint bound to a variable in the
-        context in which it is applied?
-        """
-        return bool(self.context and all(v.wildcard or v in self.context
-            for v in self.variables(indirect=False)
-        ))
 
     def minimize(self) -> None:
         """
@@ -895,8 +899,9 @@ class ConstrainFreeVariable(TypingError):
     context.
     """
 
-    def __init__(self, constraint: Constraint):
+    def __init__(self, constraint: Constraint, context: TypeSchema):
         self.constraint = constraint
+        self.context = context
 
     def __str__(self) -> str:
         return f"A free variable occurs in constraint {self.constraint}"

@@ -108,7 +108,7 @@ class TestType(unittest.TestCase):
         self.apply(f, A, B, result=TypeMismatch)
 
     def test_order_of_subtype_application_with_constraints(self):
-        f = TypeSchema(lambda α: α ** α ** B @ {α: A})
+        f = TypeSchema(lambda α: α[A] >> α ** α ** B)
         self.apply(f, A1, A, result=B)
         self.apply(f, A, A1, result=B)
 
@@ -117,20 +117,20 @@ class TestType(unittest.TestCase):
 
 
     def test_preservation_of_subtypes_in_constraints(self):
-        f = TypeSchema(lambda α: α ** α @ {α: [A, Z(A)]})
+        f = TypeSchema(lambda α: {α[A, Z(A)]} >> α ** α)
         self.apply(f, A1, result=A1)
         self.apply(f, Z(A1), result=Z(A1))
         self.apply(f, B, result=ConstraintViolation)
 
     def test_unification_of_compound_types_in_constraints(self):
-        f = TypeSchema(lambda xs, x: xs ** x @ {xs: [W(x), Z(x)]})
+        f = TypeSchema(lambda xs, x: {xs[W(x), Z(x)]} >> xs ** x)
         self.apply(f, W(A), result=A)
 
     def test_non_unification_of_base_types(self):
         # We can't unify with base types from constraints, as they might be
         # subtypes. So in this case, we know that x is an F, but we don't know
         # that its parameters is exactly A: that might be too general a bound.
-        f = TypeSchema(lambda x: x ** x @ {x: Z(A)})
+        f = TypeSchema(lambda x: {x[Z(A)]} >> x ** x)
         result = f.apply(TypeVariable())
         self.assertEqual(result.operator, Z)
         self.assertTrue(isinstance(result.params[0], TypeVariable))
@@ -146,14 +146,16 @@ class TestType(unittest.TestCase):
         self.apply(f, A1 ** A, result=TypeMismatch)
 
     def test_constrain_wildcard(self):
-        f = TypeSchema(lambda x: x ** x @ {x: [_]})
+        f = TypeSchema(lambda x: {x[_]} >> x ** x)
         self.apply(f, A, result=A)
 
     def test_constrain_free_variable(self):
-        f = TypeSchema(lambda x, y, z: x ** x @ {y: [x, z]})
-        g = TypeSchema(lambda x, y, z: x ** x @ {x: [y, z]})
-        self.assertRaises(ConstrainFreeVariable, TypeSchema.instance, f)
-        self.assertRaises(ConstrainFreeVariable, TypeSchema.instance, g)
+        f = TypeSchema(lambda x, y, z: {y[x, z]} >> x ** x)
+        g = TypeSchema(lambda x, y, z: {x[y, z]} >> x ** x)
+        self.assertRaises(ConstrainFreeVariable,
+            TypeSchema.validate_no_free_variables, f)
+        self.assertRaises(ConstrainFreeVariable,
+            TypeSchema.validate_no_free_variables, g)
 
     def test_global_subtype_resolution(self):
         f = TypeSchema(lambda x: x ** (x ** x) ** x)
@@ -161,7 +163,7 @@ class TestType(unittest.TestCase):
         self.apply(f, A, A ** A1, result=A)
 
     def test_interdependent_types(self):
-        f = TypeSchema(lambda α, β: α ** β @ {α: [Z(β), F(_, β)]})
+        f = TypeSchema(lambda α, β: {α[Z(β), F(_, β)]} >> α ** β)
         self.apply(f, Z(A), result=A)
         self.apply(f, A, result=ConstraintViolation)
 
@@ -193,13 +195,13 @@ class TestType(unittest.TestCase):
 
     def test_constrained_to_base_type(self):
         # See issue #2, which caused an infinite loop
-        f = TypeSchema(lambda x: x ** x @ {x: A})
+        f = TypeSchema(lambda x: {x[A]} >> x ** x)
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
     def test_constrained_to_compound_type(self):
         # See issue #2
-        f = TypeSchema(lambda x: x ** x @ {x: Z(A)})
+        f = TypeSchema(lambda x: {x[Z(A)]} >> x ** x)
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
@@ -208,18 +210,18 @@ class TestType(unittest.TestCase):
         A, B, C = TypeOperator('A'), TypeOperator('B'), TypeOperator('C')
         R2, R3 = TypeOperator('R2', 2), TypeOperator('R3', 3)
         actual = TypeSchema(lambda x:
-                R3(A, x, C) @ {R2(C, B): [R2(A, x), R2(C, x)]})
+            {R2(C, B)[R2(A, x), R2(C, x)]} >> R3(A, x, C))
         expected = R3(A, B, C)
         self.assertEqual(actual.instance(), expected.instance())
 
     def test_timely_constraint_check(self):
         # See issue #13
-        f = TypeSchema(lambda r, x: r ** x @ {r: [F(A, x), F(B, x)]})
+        f = TypeSchema(lambda r, x: {r[F(A, x), F(B, x)]} >> r ** x)
         self.apply(f, F(A, B), result=B)
 
     def test_unification_of_constraint_options(self):
         # See issue #11
-        non_function = TypeSchema(lambda x: x @ {F(A, A): [F(A, x), F(A, x)]})
+        non_function = TypeSchema(lambda x: {F(A, A)[F(A, x), F(A, x)]} >> x)
         self.apply(non_function, result=A)
 
     def test_overeager_unification_of_constraint_options(self):
@@ -245,7 +247,7 @@ class TestType(unittest.TestCase):
 
     def test_unification_of_constraint_option_subtypes(self):
         # See issue #16
-        f = TypeSchema(lambda x, y: F(x, y) @ {F(y, A): [F(A, x), F(A1, x)]})
+        f = TypeSchema(lambda x, y: {F(y, A)[F(A, x), F(A1, x)]} >> F(x, y))
         self.assertEqual(
             f.instance().params[0],
             A()
@@ -253,7 +255,7 @@ class TestType(unittest.TestCase):
 
     def test_constraint_check_on_intertwined_variables1(self):
         # See issue #18
-        f = TypeSchema(lambda x, y, z: (x ** y) ** z @ {z: F(x, y)})
+        f = TypeSchema(lambda x, y, z: {z[F(x, y)]} >> (x ** y) ** z)
         g = TypeSchema(lambda x, y: x ** y)
         x, y = f.apply(g).params
         self.assertEqual(len(x._constraints), 0)
@@ -262,19 +264,21 @@ class TestType(unittest.TestCase):
     def test_constraint_check_on_intertwined_variables2(self):
         # See issue #18
         f = TypeSchema(lambda x, y: F(x, y) ** y)
-        g = TypeSchema(lambda a, b: F(a, b) @ {F(a, b): F(a, b)})
+        g = TypeSchema(lambda a, b: {F(a, b)[F(a, b)]} >> F(a, b))
         y = f.apply(g)
         self.assertEqual(len(y._constraints), 0)
 
     def test_reach_all_constraints(self):
-        f = TypeSchema(lambda a, b, c: a ** b ** c
-            @ {c: [b, _], b: [c, a], a: [b, c]}).instance()
-        self.assertEqual(len(f[1][1].constraints()), 3)
+        f = TypeSchema(lambda a, b, c:
+            {c[b, _], b[c, a], a[b, c]} >> a ** b ** c
+        ).instance()
+        self.assertEqual(len(f.params[1].params[1].constraints()), 3)
 
     def test_reach_all_operators(self):
-        f = TypeSchema(lambda a, b, c: a ** b ** c
-                @ {c: [b, _], b: [a, _], a: [A, _]}).instance()
-        self.assertEqual(f[1][1].operators(), {A})
+        f = TypeSchema(lambda a, b, c: 
+            {c[b, _], b[a, _], a[A, _]} >> a ** b ** c
+        ).instance()
+        self.assertEqual(f.params[1].params[1].operators(), {A})
 
     def test_curried_function_signature_same_as_uncurried(self):
         # See issue #53

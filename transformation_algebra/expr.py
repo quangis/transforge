@@ -81,6 +81,8 @@ class Operator(object):
             either wildcards or schematic variables. If they are not, that
             indicates that we are manipulating a "global" type variable, which
             is probably not what we want!
+        -   If the type is constrained in any way, then the constrained
+            variables must be drawn from the type.
 
         This validation step is not performed during initialization, but
         deferred instead to the point at which all operators in the primitive
@@ -93,6 +95,10 @@ class Operator(object):
             if (isinstance(t, TypeSchema) and not t.only_schematic()) or \
                     isinstance(t, TypeInstance) and any(t.variables()):
                 raise NonSchematicVariables(self.type)
+
+            # Check that constraints contain no free variables
+            if isinstance(t, TypeSchema):
+                t.validate_no_free_variables()
 
             # If the operation is composite, check that its declared type is no
             # more general than the type we can infer from the definition
