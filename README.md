@@ -88,18 +88,18 @@ substituting its type variables:
     Int ** Real
 
 The schema is defined by an anonymous Python function whose parameters declare 
-the type variables that occur in its body. This is akin to quantifying those 
-variables (don't be fooled by the `lambda` keyword — it has little to do with 
-lambda abstraction!). When instantiated, the *schematic* variables are 
-automatically populated with concrete *instances* of type variables.
+the *schematic* type variables that occur in its body. (Don't be fooled by the 
+`lambda` keyword: it has little to do with lambda abstraction, and is more akin 
+to universal quantification.) When the type schema is used somewhere, the 
+schematic variables are automatically instantiated with concrete ones.
 
-Often, variables in a schema are *constrained* to some typeclass. We can use 
-the notation `context | type @ alternatives` notation to constrain a type to 
-some ad-hoc typeclass --- meaning that the `type` must be a subtype of one of 
-the types specified in the `alternatives`. For instance, we might want to 
-define a function that applies to both single integers and sets of integers:
+Often, variables in a schema cannot be just *any* type. We can use the notation 
+`variable[alternatives]` to *constrain* a type to an ad-hoc typeclass --- 
+meaning that the reference `variable` must be a subtype of one of the types 
+specified in the `alternatives`. For instance, we might want to define a 
+function that applies to both single integers and sets of integers:
 
-    >>> f = TypeSchema(lambda α: α ** α | α @ [Int, Set(Int)])
+    >>> f = TypeSchema(lambda α: α[Int, Set(Int)] ** α)
     >>> f.apply(Set(Nat))
     Set(Nat)
 
@@ -114,9 +114,27 @@ and supertype of *anything*. (Note that it must be explicitly imported.)
 Typeclass constraints and wildcards can often aid in inference, figuring out 
 interdependencies between types:
 
-    >>> f = TypeSchema(lambda α, β: α ** β | α @ [Set(β), Map(_, β)])
+    >>> f = TypeSchema(lambda α, β: α[Set(β), Map(β, _)] ** β)
     >>> f.apply(Set(Int))
     Int
+
+For large signatures, it is sometimes clearer to specify the typeclass 
+constraints upfront using the `>>` notation:
+
+    >>> f = TypeSchema(lambda α, β:
+            {α[Set(β), Map(β, _)]} >> α ** β
+        )
+
+A note on type inference in the presence of subtypes. Consider that, when you 
+apply a function of type `τ ** τ ** τ` to an argument with a concrete type, say 
+`A`, then you can deduce that `τ >= A`. Any more specific type would be too 
+restrictive. (This does *not* suggest that providing a sub-`A` *value* is 
+illegal --- just that `f`'s signature should be more general.) Once all 
+arguments have been supplied, `τ` can be fixed to the most specific type 
+possible. This is why it's sometimes necessary to say `τ[A] ** τ ** τ` rather 
+than just `A ** A ** A`: while the two are identical in what types they 
+*accept*, the former can produce an *output type* that is more specific than 
+`A`.
 
 Finally, `with_parameters` is a helper function for specifying typeclasses: it 
 generates type terms that contain certain parameters.
@@ -215,3 +233,4 @@ In practical terms, to obtain a graph representation of the previous expression,
 You may use the [viz.sh](tools/viz.sh) script to visualize the graph.
 
 These graphs can be queried via constructs from the [SPARQL 1.1 specification](https://www.w3.org/TR/sparql11-query/).
+
