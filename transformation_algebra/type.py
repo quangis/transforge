@@ -62,6 +62,13 @@ class Type(ABC):
         else:
             return other.__pow__(self)
 
+    def __mul__(self, other: Type) -> TypeInstance:
+        """
+        Tuple operator.
+        """
+        # See issue #78
+        return Tuple(self.instance(), other.instance())
+
     def __lt__(self, other: Type) -> Optional[bool]:
         a, b = self.instance(), other.instance()
         return not a.match(b) and a <= b
@@ -223,22 +230,26 @@ class TypeInstance(Type):
             sep: str = ", ",
             lparen: str = "(",
             rparen: str = ")",
-            arrow: str = "→",
+            arrow: str = " → ",
+            prod: str = " × ",
             with_constraints: bool = False) -> str:
         """
         Convert the given type to a textual representation.
         """
 
-        args = labels, sep, lparen, rparen, arrow
+        args = labels, sep, lparen, rparen, arrow, prod
 
         if isinstance(self, TypeOperation):
             if self._operator == Function:
                 i, o = self.params
                 if isinstance(i, TypeOperation) and i._operator == Function:
-                    result = f"{lparen}{i.text(*args)}{rparen} " \
-                        f"{arrow} {o.text(*args)}"
+                    result = f"{lparen}{i.text(*args)}{rparen}" \
+                        f"{arrow}{o.text(*args)}"
                 else:
-                    result = f"{i.text(*args)} {arrow} {o.text(*args)}"
+                    result = f"{i.text(*args)}{arrow}{o.text(*args)}"
+            elif self._operator == Tuple and prod:
+                a, b = self.params
+                result = f"{lparen}{a.text(*args)}{prod}{b.text(*args)}{rparen}"
             else:
                 if self.params:
                     result = f"{self._operator}{lparen}" \
@@ -809,6 +820,12 @@ class Constraint(object):
 
 "The special constructor for function types."
 Function = TypeOperator('Function', params=[Variance.CONTRA, Variance.CO])
+
+"The special constructor for tuple types."
+Tuple = TypeOperator('Tuple', params=2)
+
+"The special constructor for the unit type."
+Unit = TypeOperator('Unit')
 
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
 _ = TypeSchema(lambda: TypeVariable(wildcard=True))

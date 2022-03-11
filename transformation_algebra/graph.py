@@ -6,7 +6,7 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, TypeInstance
+    Function, Tuple, Unit, TypeInstance
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language
@@ -67,7 +67,7 @@ class TransformationGraph(Graph):
 
         for t in self.language.taxonomy:
             self.type_nodes[t] = self.language.namespace[
-                t.text(sep=".", lparen="_", rparen="")]
+                t.text(sep=".", lparen="_", rparen="", prod="")]
 
         self.bind("ta", TA)
         self.bind("lang", self.language.namespace)
@@ -107,6 +107,7 @@ class TransformationGraph(Graph):
         for root in set(taxonomy) - set.union(*taxonomy.values()):
             if root._operator.arity > 0:
                 self.add((self.type_nodes[root], RDFS.subClassOf,
+                    TA.Tuple if root._operator is Tuple else
                     self.language.namespace[root._operator.name]))
 
         if self.with_transitive_closure:
@@ -143,8 +144,11 @@ class TransformationGraph(Graph):
             if isinstance(t, TypeOperation):
                 if t.params:
                     node = BNode()
-                    self.add((node, RDFS.subClassOf,
-                        self.language.namespace[t._operator.name]))
+                    if t._operator is Tuple:
+                        self.add((node, RDFS.subClassOf, TA.Tuple))
+                    else:
+                        self.add((node, RDFS.subClassOf,
+                            self.language.namespace[t._operator.name]))
 
                     if self.with_type_parameters:
                         for i, param in enumerate(t.params, start=1):
@@ -153,7 +157,10 @@ class TransformationGraph(Graph):
                     if self.with_labels:
                         self.add((node, RDFS.label, Literal(str(t))))
                 else:
-                    node = self.language.namespace[t._operator.name]
+                    if t._operator is Unit:
+                        node = TA.Unit
+                    else:
+                        node = self.language.namespace[t._operator.name]
             else:
                 assert isinstance(t, TypeVariable)
                 node = BNode()

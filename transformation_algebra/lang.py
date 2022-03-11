@@ -87,6 +87,7 @@ class Language(object):
                 # taxonomy; if it is not, we handle it before going forward
                 for p in t.params:
                     if p not in taxonomy:
+                        assert isinstance(p, TypeOperation)
                         stack.append(t)
                         stack.append(p)
                         break
@@ -317,7 +318,8 @@ class LanguageNamespace(ClosedNamespace):
         terms = chain(
             lang.operators.keys(),
             lang.types.keys(),
-            (t.text(sep=".", lparen="_", rparen="") for t in lang.taxonomy)
+            (t.text(sep=".", lparen="_", rparen="", prod="")
+                for t in lang.taxonomy)
         )
         rt = super().__new__(cls, uri, terms)
         cls.lang = lang
@@ -328,7 +330,8 @@ class LanguageNamespace(ClosedNamespace):
             return super().term(value.name)
         elif isinstance(value, TypeOperation):
             assert value in self.lang.taxonomy
-            return super().term(value.text(sep=".", lparen="_", rparen=""))
+            return super().term(value.text(sep=".", lparen="_", rparen="",
+                prod=""))
         else:
             return super().term(value)
 
