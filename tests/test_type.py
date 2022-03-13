@@ -224,6 +224,19 @@ class TestType(unittest.TestCase):
         non_function = TypeSchema(lambda x: {F(A, A)[F(A, x), F(A, x)]} >> x)
         self.apply(non_function, result=A)
 
+    def test_unification_of_constraint_options3(self):
+        # See #85
+        f = TypeSchema(lambda x, y, z: F(x, x) ** z[F(x, A)])
+        g = TypeSchema(lambda x, y, z: F(x, x) ** z[F(x, x)])
+        self.apply(f, F(A, A), result=F(A, A))
+        self.apply(g, F(A, A), result=F(A, A))
+
+    def test_unification_of_constraint_options2(self):
+        # If options in a constraint turn out to come down to the same thing,
+        # they should unify. Also see #85
+        f = TypeSchema(lambda x, y, z: F(x, y) ** z[F(x, A), F(y, A)])
+        self.apply(f, F(A, A), result=F(A, A))
+
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
         self.assertEqual(F(A, _) <= F(_, A), True)
