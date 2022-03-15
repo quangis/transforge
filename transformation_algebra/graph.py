@@ -32,6 +32,7 @@ class TransformationGraph(Graph):
             minimal: bool = False,
             with_operators: bool | None = None,
             with_types: bool | None = None,
+            with_intermediate_types: bool | None = None,
             with_output: bool | None = None,
             with_inputs: bool | None = None,
             with_membership: bool | None = None,
@@ -44,13 +45,14 @@ class TransformationGraph(Graph):
 
         super().__init__(*nargs, **kwargs)
 
-        def default(switch: bool | None) -> bool:
-            assert isinstance(minimal, bool)
-            return (not minimal) if switch is None else switch
+        def default(switch: bool | None, inherit: bool = not minimal) -> bool:
+            return inherit if switch is None else switch
 
         self.language = language
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
+        self.with_intermediate_types = default(with_intermediate_types,
+            self.with_types)
         self.with_labels = default(with_labels)
         self.with_output = default(with_output)
         self.with_inputs = default(with_inputs)
@@ -175,7 +177,7 @@ class TransformationGraph(Graph):
             return node
 
     def add_expr(self, expr: Expr, root: Node,
-            current: Node | None = None) -> Node:
+            current: Node | None = None, intermediate: bool = False) -> Node:
         """
         Translate and add the given expression to a representation in RDF and
         add it to the given graph. Inputs that match the labels in the
@@ -193,6 +195,8 @@ class TransformationGraph(Graph):
         current = current or BNode()
 
         if isinstance(expr, Source):
+            intermediate = False
+
             # Once we arrive at a data source, we just assume its type to be
             # the most general possible. This is so that we don't have to give
             # a specific type for data source 1 when we have a tool with
@@ -232,8 +236,11 @@ class TransformationGraph(Graph):
                 if self.with_membership:
                     self.add((root, TA.member, op_node))
 
-            if self.with_types and (self.with_noncanonical_types or
-                    datatype in self.language.taxonomy):
+            if (self.with_types
+                    and (self.with_noncanonical_types or
+                        datatype in self.language.taxonomy)
+                    and (self.with_intermediate_types or not intermediate)):
+
                 type_node = self.add_type(datatype)
                 self.add((current, RDF.type, type_node))
 
@@ -258,7 +265,7 @@ class TransformationGraph(Graph):
             # to the current node, and attaching a new node for the parameter
             # part, we eventually get a node for the function to which nodes
             # for all parameters are attached.
-            f = self.add_expr(expr.f, root, current)
+            f = self.add_expr(expr.f, root, current, intermediate=intermediate)
 
             # For simple data, we can simply attach the node for the parameter
             # directly. But when the parameter is a *function*, we need to be
@@ -296,12 +303,13 @@ class TransformationGraph(Graph):
                     for p in expr.x.params:
                         self.expr_nodes[p] = internal
 
-                    x = self.add_expr(expr.x.body, root, BNode())
+                    x = self.add_expr(expr.x.body, root, BNode(),
+                        intermediate=True)
                 else:
-                    x = self.add_expr(expr.x, root, BNode())
+                    x = self.add_expr(expr.x, root, BNode(), intermediate=True)
                     self.add((internal, TA.feeds, x))
             else:
-                x = self.add_expr(expr.x, root, BNode())
+                x = self.add_expr(expr.x, root, BNode(), intermediate=True)
             self.add((x, TA.feeds, f))
 
             # If `x` has internal operations of its own, then those inner
@@ -324,6 +332,9 @@ class TransformationGraph(Graph):
                 for data_input in self.subjects(TA.feeds, f):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
+
+        # self.add((current, TEST["hi"], TEST["intermediate" if intermediate
+        #     else "significant"]))
 
         return current
 
@@ -366,8 +377,6 @@ class TransformationGraph(Graph):
 
         for node in sources:
             step_exprs[node] = Source(type=TypeVariable())
-
-        step2expr(final_tool)
 
         # 2. Convert tool application & source nodes to expression nodes. We
         # must do this in the proper order, so that expression nodes for the

@@ -12,7 +12,7 @@ from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
 from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
-    SubtypeMismatch
+    SubtypeMismatch, TypeAlias
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TEST, TransformationGraph
@@ -529,5 +529,39 @@ class TestAlgebraRDF(unittest.TestCase):
             source=Step(type=TEST.B),
             app=Step(TEST.f, input="source", type=TEST.B),
         )
+
+        self.assertIsomorphic(actual, expected)
+
+    def test_within_tool_types(self):
+        # Optionally, only the types at the entrance and exit of a tool will be
+        # recorded. See issue #81
+
+        A = TypeOperator()
+        F = TypeOperator(params=1)
+        FA = TypeAlias(F(A))
+        FFA = TypeAlias(F(F(A)))
+        FFFA = TypeAlias(F(F(F(A))))
+        f = Operator(type=lambda x: x ** F(x))
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            s1=Step(type=TEST.A),
+            s2=Step(TEST.f, input="s1", type=None),
+            s3=Step(TEST.f, input="s2", type=TEST.F_F_A),
+            s4=Step(TEST.f, input="s3", type=TEST.F_F_F_A),
+        )
+
+        actual = TransformationGraph(lang,
+            minimal=True, with_operators=True,
+            with_types=True, with_intermediate_types=False)
+        actual.add_taxonomy()
+
+        expected += actual
+
+        root = BNode()
+        actual.add_workflow(root, {
+            TEST.step1: ("f (f (~A))", []),
+            TEST.step2: ("f (1: F(F(_)))", [TEST.step1])
+        })
 
         self.assertIsomorphic(actual, expected)
