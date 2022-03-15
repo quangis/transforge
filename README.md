@@ -2,16 +2,16 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation language is a notational system for describing *processes*, 
-like workflows or tools, as abstract *transformations* between types. An 
-expression of such a language is not necessarily associated with any concrete 
-implementation, and the types may not denote any realized data structure. The 
-goal is merely to capture some *conceptual* properties that are deemed 
-relevant.
+A transformation language can describe *processes*, like workflows or tools, as 
+abstract *transformations between types*. The types do not necessarily denote 
+any concrete data structure, and the transformation expression is not 
+associated with any particular implementation. The goal is merely to capture 
+some *conceptual* properties that are deemed relevant, in order to annotate 
+*procedural metadata*.
 
--  In order to reason about about transformations, we implemented [type 
-   inference](https://en.wikipedia.org/wiki/Type_inference) in Python, separate 
-   from the context of software implementation. It accommodates both 
+-  In order to reason about about transformations, we implemented a stand-alone 
+   [type inference](https://en.wikipedia.org/wiki/Type_inference) module in 
+   Python. It accommodates both 
    [subtype-](https://en.wikipedia.org/wiki/Subtyping) and 
    [parametric](https://en.wikipedia.org/wiki/Parametric_polymorphism) 
    polymorphism.
