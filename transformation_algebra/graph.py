@@ -41,6 +41,7 @@ class TransformationGraph(Graph):
             with_classes: bool | None = None,
             with_transitive_closure: bool | None = None,
             with_noncanonical_types: bool | None = None,
+            passthrough: bool = True,
             *nargs, **kwargs):
 
         super().__init__(*nargs, **kwargs)
@@ -49,6 +50,7 @@ class TransformationGraph(Graph):
             return inherit if switch is None else switch
 
         self.language = language
+        self.passthrough = passthrough
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
         self.with_intermediate_types = default(with_intermediate_types,
@@ -333,72 +335,81 @@ class TransformationGraph(Graph):
                     if x != data_input:
                         self.add((data_input, TA.feeds, current_internal))
 
-        # self.add((current, TEST["hi"], TEST["intermediate" if intermediate
-        #     else "significant"]))
-
         return current
 
     def add_workflow(self, root: Node,
-            steps: dict[Node, tuple[str, list[Node]]],
+            tool_apps: dict[Node, tuple[str, list[Node]]],
             sources: set[Node] = set()) -> dict[Node, Node]:
         """
         Convert a workflow to a full transformation graph by converting its
-        individual steps to representations of expressions in RDF and combining
-        them. Return a mapping between tool/source nodes and their expression
-        nodes.
+        individual workflow steps to representations of expressions in RDF.
+        Return a mapping between tool application/source nodes and their
+        expression nodes.
 
-        A workflow consists of a collection of algebra expressions for each
-        step (e.g. application of a tool), paired with the inputs to those
-        expressions. Every input must be either a source node or an expression.
+        A workflow consists of a dictionary of transformation expressions for
+        each step (e.g. application of a tool), paired with the inputs to those
+        expressions. Every input must be either a source node or a node for the
+        output of another step.
         """
 
         self.identifiers = count(start=1)
 
-        # One of the steps must be 'last': it represents the tool finally
-        # producing the output and so isn't an input to another.
-        all_inputs = set(i for tool in steps.values() for i in tool[1])
+        # One of the steps must be 'last': it represents the tool application
+        # that finally produces the output and so isn't an input to another.
+        all_inputs = set(i for _, inputs in tool_apps.values() for i in inputs)
         try:
-            final_tool, = [e for e in steps.keys() if e not in all_inputs]
+            final_app, = [app for app in tool_apps.keys()
+                if app not in all_inputs]
         except ValueError:
-            raise RuntimeError("must have exactly one final step")
+            raise RuntimeError("must have exactly one final tool application")
 
-        # 1. Construct expressions for each step, possibly using expressions
-        # from previous steps
-        step_exprs: dict[Node, Expr] = dict()
+        # 1. Construct expressions for each step in the workflow (source or
+        # tool application), possibly using expressions from previous steps
+        exprs: dict[Node, Expr] = dict()
+        indirection: dict[Expr, Source] = dict()
 
-        def step2expr(step: Node) -> Expr:
+        for source in sources:
+            exprs[source] = Source()
+
+        def wfnode2expr(wfnode: Node) -> Expr:
             try:
-                return step_exprs[step]
+                return exprs[wfnode]
             except KeyError:
-                string, input_nodes = steps[step]
-                step_exprs[step] = expr = self.language.parse(string,
-                    *(step2expr(n) for n in input_nodes))
+                tool_description, input_nodes = tool_apps[wfnode]
+                input_exprs = [wfnode2expr(n) for n in input_nodes]
+                if not self.passthrough:
+                    indirect_input_exprs = [Source() for node in input_nodes]
+                    indirection.update({k: v
+                        for k, v in zip(input_exprs, indirect_input_exprs)})
+                    input_exprs = indirect_input_exprs
+                exprs[wfnode] = expr = self.language.parse(tool_description,
+                    *input_exprs)
                 return expr
 
-        for node in sources:
-            step_exprs[node] = Source(type=TypeVariable())
-
-        # 2. Convert tool application & source nodes to expression nodes. We
-        # must do this in the proper order, so that expression nodes for the
-        # same tool/source nodes get saved in self.expr_nodes and reused rather
-        # than regenerated
-        def step2node(step: Node) -> Node:
-            expr = step2expr(step)
+        # 2. Convert individual transformation expressions to nodes and add
+        # them. We must do this in the proper order, so that expression nodes
+        # for the same tool/source nodes get saved in self.expr_nodes and
+        # reused rather than regenerated
+        def wfnode2tfmnode(wfnode: Node) -> Node:
+            expr = wfnode2expr(wfnode)
             try:
                 node = self.expr_nodes[expr]
             except KeyError:
-                if step not in sources:
-                    for input_step in steps[step][1]:
-                        step2node(input_step)
+                if wfnode not in sources:
+                    for input_node in tool_apps[wfnode][1]:
+                        wfnode2tfmnode(input_node)
                 self.expr_nodes[expr] = node = self.add_expr(expr, root)
 
+            if expr in indirection:
+                iexpr = indirection[expr]
+                self.expr_nodes[iexpr] = inode = self.add_expr(iexpr, root)
+                self.add((node, TA.feeds, inode))
             return node
 
-        result_node = step2node(final_tool)
+        result_node = wfnode2tfmnode(final_app)
 
-        for node in sources:
-            expr_node = step2node(node)
-            self.add((expr_node, TA.origin, node))
+        for source in sources:
+            self.add((wfnode2tfmnode(source), TA.origin, source))
 
         if self.with_output:
             self.add((root, TA.output, result_node))
@@ -408,5 +419,5 @@ class TransformationGraph(Graph):
 
         self.identifiers = None  # reset the identifiers
 
-        return {step: self.expr_nodes[expr]
-            for step, expr in step_exprs.items()}
+        return {wfnode: self.expr_nodes[expr]
+            for wfnode, expr in exprs.items()}

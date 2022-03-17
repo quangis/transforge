@@ -565,3 +565,37 @@ class TestAlgebraRDF(unittest.TestCase):
         })
 
         self.assertIsomorphic(actual, expected)
+
+    def test_disabling_of_output_passthrough(self):
+        # Optionally, instead of passing the output of one tool directly to the
+        # next tool (with a type that is potentially more specific than the
+        # most general type the tool can work with), it is possible to disable
+        # this mechanism and instead have every tool work with the most general
+        # type. In the graph, to connect two tool applications, there is then a
+        # Source (of the general type) that takes an expression output (of the
+        # specific type) as input. See issue #81.
+
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x[A] ** x)
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            s1=Step(type=TEST.B),
+            s2=Step(TEST.f, input="s1", type=TEST.B),
+            s3=Step(type=TEST.A, input="s2"),
+            s4=Step(TEST.f, input="s3", type=TEST.A),
+        )
+
+        actual = TransformationGraph(lang, passthrough=False,
+            minimal=True, with_operators=True, with_types=True)
+        root = BNode()
+        actual.add_workflow(root, {
+            TEST.tool1: ("f (~B)", []),
+            TEST.tool2: ("f (1: A)", [TEST.tool1])
+        })
+
+        actual.serialize('actual.ttl')
+        expected.serialize('expected.ttl')
+
+        self.assertIsomorphic(actual, expected)
