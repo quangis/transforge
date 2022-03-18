@@ -206,6 +206,10 @@ class TransformationGraph(Graph):
             # already run its course at this point, so it should be safe.
             expr.type = expr.type.fix(prefer_lower=False).normalize()
 
+            # Sources are always saved since they must always be reused when
+            # used multiple times, especially if passthrough is disabled
+            self.expr_nodes[expr] = current
+
             if self.with_inputs:
                 self.add((root, TA.input, current))
 
@@ -358,15 +362,18 @@ class TransformationGraph(Graph):
         # that finally produces the output and so isn't an input to another.
         all_inputs = set(i for _, inputs in tool_apps.values() for i in inputs)
         try:
-            final_app, = [app for app in tool_apps.keys()
+            final_tool_app, = [app for app in tool_apps.keys()
                 if app not in all_inputs]
         except ValueError:
             raise RuntimeError("must have exactly one final tool application")
 
-        # 1. Construct expressions for each step in the workflow (source or
-        # tool application), possibly using expressions from previous steps
+        # 1. Construct expressions for each wfnode step (source or tool
+        # application), possibly using expressions from previous steps
         exprs: dict[Node, Expr] = dict()
-        indirection: dict[Expr, Source] = dict()
+
+        # If passthrough is disabled, we record connections between sources and
+        # the expressions they are derived from (which may be more specific)
+        indirection: dict[Source, Expr] = dict()
 
         for source in sources:
             exprs[source] = Source()
@@ -378,10 +385,11 @@ class TransformationGraph(Graph):
                 tool_description, input_nodes = tool_apps[wfnode]
                 input_exprs = [wfnode2expr(n) for n in input_nodes]
                 if not self.passthrough:
-                    indirect_input_exprs = [Source() for node in input_nodes]
-                    indirection.update({k: v
-                        for k, v in zip(input_exprs, indirect_input_exprs)})
-                    input_exprs = indirect_input_exprs
+                    for i in range(len(input_exprs)):
+                        if input_nodes[i] not in sources:
+                            e = input_exprs[i]
+                            s = input_exprs[i] = Source()
+                            indirection[s] = e
                 exprs[wfnode] = expr = self.language.parse(tool_description,
                     *input_exprs)
                 return expr
@@ -393,20 +401,24 @@ class TransformationGraph(Graph):
         def wfnode2tfmnode(wfnode: Node) -> Node:
             expr = wfnode2expr(wfnode)
             try:
-                node = self.expr_nodes[expr]
+                tfmnode = self.expr_nodes[expr]
             except KeyError:
                 if wfnode not in sources:
-                    for input_node in tool_apps[wfnode][1]:
-                        wfnode2tfmnode(input_node)
-                self.expr_nodes[expr] = node = self.add_expr(expr, root)
+                    for input_wfnode in tool_apps[wfnode][1]:
+                        # Running this has the side effect that the wfnode for
+                        # every input will already have been added
+                        wfnode2tfmnode(input_wfnode)
+                self.expr_nodes[expr] = tfmnode = self.add_expr(expr, root)
+            return tfmnode
 
-            if expr in indirection:
-                iexpr = indirection[expr]
-                self.expr_nodes[iexpr] = inode = self.add_expr(iexpr, root)
-                self.add((node, TA.feeds, inode))
-            return node
+        result_node = wfnode2tfmnode(final_tool_app)
 
-        result_node = wfnode2tfmnode(final_app)
+        # If passthrough is disabled, connections between the outputs of one
+        # tool and the inputs of the next are not established; do that now
+        for source_expr, ref_expr in indirection.items():
+            src_tfmnode = self.add_expr(source_expr, root)
+            ref_tfmnode = self.expr_nodes[ref_expr]
+            self.add((ref_tfmnode, TA.feeds, src_tfmnode))
 
         for source in sources:
             self.add((wfnode2tfmnode(source), TA.origin, source))

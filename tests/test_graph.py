@@ -581,7 +581,7 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         expected = graph_manual(
-            s1=Step(type=TEST.B),
+            s1=Step(type=TEST.B, origin=TEST.src1),
             s2=Step(TEST.f, input="s1", type=TEST.B),
             s3=Step(type=TEST.A, input="s2"),
             s4=Step(TEST.f, input="s3", type=TEST.A),
@@ -591,9 +591,9 @@ class TestAlgebraRDF(unittest.TestCase):
             minimal=True, with_operators=True, with_types=True)
         root = BNode()
         actual.add_workflow(root, {
-            TEST.tool1: ("f (~B)", []),
+            TEST.tool1: ("f (1: B)", [TEST.src1]),
             TEST.tool2: ("f (1: A)", [TEST.tool1])
-        })
+        }, {TEST.src1})
 
         actual.serialize('actual.ttl')
         expected.serialize('expected.ttl')
