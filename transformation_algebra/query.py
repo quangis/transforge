@@ -7,13 +7,14 @@ specified order.
 
 from __future__ import annotations
 
+import json
 import rdflib
 from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
 from rdflib.term import Node, Variable
 from rdflib.namespace import RDFS, RDF
 from itertools import count, chain, product
-from typing import Iterator, Iterable, Union, TypeVar, TypedDict
+from typing import Iterator, Iterable, Union, TypeVar, TypedDict, Literal
 from collections import defaultdict
 
 from transformation_algebra.flow import Flow, Flow1, FlowShorthand, \
@@ -30,6 +31,108 @@ Triple = tuple[Node, Union[Path, Node], Node]
 
 A = TypeVar('A')
 
+
+def dict2steps(lang: Language, value: dict | str) -> Steps:
+    """
+    Make sure that a dictionary is typed according to the specification of
+    `Steps`. Allows various shortcuts.
+    """
+    if isinstance(value, str):
+        atom = lang.parse_atom(value)
+        if isinstance(atom, Type):
+            rd1: Data = {"type": "data", "data": atom}
+            return rd1
+        else:
+            assert isinstance(atom, Operator)
+            rv1: Via = {"type": "via", "via": atom}
+            return rv1
+    elif isinstance(value, list):
+        rchain1: Chain = {
+            "type": "chain", "chain": [dict2steps(lang, e) for e in value]}
+        return rchain1
+    elif isinstance(value, dict):
+        step_types = [k for k in ("any", "all", "chain", "data", "via")
+            if k in value]
+        assert len(step_types) == 1, "object represents unknown step type"
+        t = step_types[0]
+        assert value.get("type", t) == t, "conflicting step types"
+
+        if t == "data":
+            rdata: Data = {
+                "type": "data",
+                "data": lang.parse_type(value["data"])}
+            return rdata
+        elif t == "via":
+            rvia: Via = {
+                "type": "via",
+                "via": lang.parse_operator(value["via"])}
+            return rvia
+        elif t == "chain":
+            rchain: Chain = {
+                "type": "chain",
+                "chain": [dict2steps(lang, e) for e in value["chain"]],
+                "linked": True if value.get("linked") else False
+            }
+            return rchain
+        elif t == "any":
+            rany: Any = {
+                "type": "any",
+                "any": [dict2steps(lang, e) for e in value["any"]],
+            }
+            return rany
+        else:
+            assert t == "all"
+            rall: All = {
+                "type": "all",
+                "all": [dict2steps(lang, e) for e in value["all"]],
+            }
+            return rall
+
+
+def steps2flow(dct: Steps) -> Flow1[Type | Operator]:
+    """
+    This is a temporary structure for as long as we use `Flow`s.
+    """
+    t = dct["type"]
+    if t in ("data", "via"):
+        return dct[t]  # type: ignore
+    elif t == "any":
+        return OR(*(steps2flow(e) for e in dct["any"]))  # type: ignore
+    elif t == "all":
+        return AND(*(steps2flow(e) for e in dct["all"]))  # type: ignore
+    else:
+        assert t == "chain"
+        if dct.get("linked"):
+            return STEPS(*(steps2flow(e) for e in dct["chain"]))  # type: ignore
+        else:
+            return JUMPS(*(steps2flow(e) for e in dct["chain"]))  # type: ignore
+
+
+class Steps(TypedDict):
+    type: Literal["data", "via", "any", "all", "chain"]
+
+class Via(Steps):
+    via: Operator | None
+
+class DataOptional(Steps, total=False):
+    keywords: list[str]
+    note: str
+
+class Data(DataOptional):
+    data: Type
+
+class Any(Steps):
+    any: list[Steps]
+
+class All(Steps):
+    all: list[Steps]
+
+class Chain(Steps):
+    chain: list[Steps]
+    linked: bool
+
+
+##############################################################################
 
 def flatten(xs: Iterable[Iterable[A]]) -> list[A]:
     return list(chain.from_iterable(xs))
@@ -93,6 +196,12 @@ class Query(object):  # TODO subclass rdflib.Query?
         entrances, _ = self.add_flow(self.flow)
         assert len(entrances) == 1 and len(entrances[0]) == 1
         self.output = entrances[0][0]
+
+    @staticmethod
+    def from_file(lang: Language, path: str) -> Query:
+        with open(path, 'r') as fp:
+            d = json.load(fp)
+        return Query(lang=lang, flow=steps2flow(dict2steps(lang, d["query"])))
 
     def query_diagnostic(self, g: Graph
             ) -> Iterator[tuple[Variable, int | None, str]]:
