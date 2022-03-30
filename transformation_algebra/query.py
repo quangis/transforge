@@ -7,7 +7,6 @@ specified order.
 
 from __future__ import annotations
 
-import json
 import rdflib
 from rdflib import Graph
 from rdflib.paths import Path, ZeroOrMore, OneOrMore
@@ -47,11 +46,11 @@ def dict2steps(lang: Language, value: dict | str) -> Steps:
             rv1: Via = {"type": "via", "via": atom}
             return rv1
     elif isinstance(value, list):
-        rchain1: Chain = {
-            "type": "chain", "chain": [dict2steps(lang, e) for e in value]}
+        rchain1: Transform = {
+            "type": "transform", "transform": [dict2steps(lang, e) for e in value]}
         return rchain1
     elif isinstance(value, dict):
-        step_types = [k for k in ("any", "all", "chain", "data", "via")
+        step_types = [k for k in ("any", "all", "transform", "data", "via")
             if k in value]
         assert len(step_types) == 1, "object represents unknown step type"
         t = step_types[0]
@@ -67,11 +66,11 @@ def dict2steps(lang: Language, value: dict | str) -> Steps:
                 "type": "via",
                 "via": lang.parse_operator(value["via"])}
             return rvia
-        elif t == "chain":
-            rchain: Chain = {
-                "type": "chain",
-                "chain": [dict2steps(lang, e) for e in value["chain"]],
-                "linked": True if value.get("linked") else False
+        elif t == "transform":
+            rchain: Transform = {
+                "type": "transform",
+                "transform": [dict2steps(lang, e) for e in value["transform"]],
+                "chain": True if value.get("chain") else False
             }
             return rchain
         elif t == "any":
@@ -81,7 +80,7 @@ def dict2steps(lang: Language, value: dict | str) -> Steps:
             }
             return rany
         else:
-            assert t == "all"
+            assert t == "all", t
             rall: All = {
                 "type": "all",
                 "all": [dict2steps(lang, e) for e in value["all"]],
@@ -101,15 +100,15 @@ def steps2flow(dct: Steps) -> Flow1[Type | Operator]:
     elif t == "all":
         return AND(*(steps2flow(e) for e in dct["all"]))  # type: ignore
     else:
-        assert t == "chain"
-        if dct.get("linked"):
-            return STEPS(*(steps2flow(e) for e in dct["chain"]))  # type: ignore
+        assert t == "transform"
+        if dct.get("chain"):
+            return STEPS(*(steps2flow(e) for e in dct["transform"]))  # type: ignore
         else:
-            return JUMPS(*(steps2flow(e) for e in dct["chain"]))  # type: ignore
+            return JUMPS(*(steps2flow(e) for e in dct["transform"]))  # type: ignore
 
 
 class Steps(TypedDict):
-    type: Literal["data", "via", "any", "all", "chain"]
+    type: Literal["data", "via", "any", "all", "transform"]
 
 class Via(Steps):
     via: Operator | None
@@ -127,9 +126,9 @@ class Any(Steps):
 class All(Steps):
     all: list[Steps]
 
-class Chain(Steps):
-    chain: list[Steps]
-    linked: bool
+class Transform(Steps):
+    transform: list[Steps]
+    chain: bool
 
 
 ##############################################################################
@@ -198,10 +197,8 @@ class Query(object):  # TODO subclass rdflib.Query?
         self.output = entrances[0][0]
 
     @staticmethod
-    def from_file(lang: Language, path: str) -> Query:
-        with open(path, 'r') as fp:
-            d = json.load(fp)
-        return Query(lang=lang, flow=steps2flow(dict2steps(lang, d["query"])))
+    def from_dict(lang: Language, d: dict) -> Query:
+        return Query(lang=lang, flow=steps2flow(dict2steps(lang, d)))
 
     def query_diagnostic(self, g: Graph
             ) -> Iterator[tuple[Variable, int | None, str]]:
