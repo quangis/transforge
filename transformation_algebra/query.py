@@ -39,50 +39,50 @@ def dict2steps(lang: Language, value: dict | str) -> Steps:
     if isinstance(value, str):
         atom = lang.parse_atom(value)
         if isinstance(atom, Type):
-            rd1: Data = {"type": "data", "data": atom}
+            rd1: Data = {"key": "data", "data": atom}
             return rd1
         else:
             assert isinstance(atom, Operator)
-            rv1: Via = {"type": "via", "via": atom}
+            rv1: Via = {"key": "via", "via": atom}
             return rv1
     elif isinstance(value, list):
         rchain1: Transform = {
-            "type": "transform", "transform": [dict2steps(lang, e) for e in value]}
+            "key": "transform", "transform": [dict2steps(lang, e) for e in value]}
         return rchain1
     elif isinstance(value, dict):
         step_types = [k for k in ("any", "all", "transform", "data", "via")
             if k in value]
         assert len(step_types) == 1, "object represents unknown step type"
         t = step_types[0]
-        assert value.get("type", t) == t, "conflicting step types"
+        assert value.get("key", t) == t, "conflicting step types"
 
         if t == "data":
             rdata: Data = {
-                "type": "data",
+                "key": "data",
                 "data": lang.parse_type(value["data"])}
             return rdata
         elif t == "via":
             rvia: Via = {
-                "type": "via",
+                "key": "via",
                 "via": lang.parse_operator(value["via"])}
             return rvia
         elif t == "transform":
             rchain: Transform = {
-                "type": "transform",
+                "key": "transform",
                 "transform": [dict2steps(lang, e) for e in value["transform"]],
                 "chain": True if value.get("chain") else False
             }
             return rchain
         elif t == "any":
             rany: Any = {
-                "type": "any",
+                "key": "any",
                 "any": [dict2steps(lang, e) for e in value["any"]],
             }
             return rany
         else:
             assert t == "all", t
             rall: All = {
-                "type": "all",
+                "key": "all",
                 "all": [dict2steps(lang, e) for e in value["all"]],
             }
             return rall
@@ -92,7 +92,7 @@ def steps2flow(dct: Steps) -> Flow1[Type | Operator]:
     """
     This is a temporary structure for as long as we use `Flow`s.
     """
-    t = dct["type"]
+    t = dct["key"]
     if t in ("data", "via"):
         return dct[t]  # type: ignore
     elif t == "any":
@@ -108,7 +108,7 @@ def steps2flow(dct: Steps) -> Flow1[Type | Operator]:
 
 
 class Steps(TypedDict):
-    type: Literal["data", "via", "any", "all", "transform"]
+    key: Literal["data", "via", "any", "all", "transform"]
 
 class Via(Steps):
     via: Operator | None
