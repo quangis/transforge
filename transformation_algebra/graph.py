@@ -235,12 +235,16 @@ class TransformationGraph(Graph):
 
             datatype = expr.type.output().normalize()
 
+            type_str = op_str = "?"
+
             if self.with_operators:
                 op_node = self.language.namespace[expr.operator.name]
                 self.add((current, TA.via, op_node))
 
                 if self.with_membership:
                     self.add((root, TA.member, op_node))
+
+                op_str = expr.operator.name
 
             if (self.with_types
                     and (self.with_noncanonical_types or
@@ -253,9 +257,11 @@ class TransformationGraph(Graph):
                 if self.with_membership:
                     self.add((root, TA.member, type_node))
 
+                type_str = str(datatype)
+
             if self.with_labels:
                 self.add((current, RDFS.label, Literal(
-                    f"{self.ref()}{datatype} via {expr.operator.name}")))
+                    f"{self.ref()}{type_str} via {op_str}")))
 
             if self.with_classes:
                 self.add((current, RDF.type, TA.TransformedData))
