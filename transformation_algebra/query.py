@@ -46,9 +46,12 @@ def dict2steps(lang: Language, value: dict | str) -> Steps:
             rv1: Via = {"key": "via", "via": atom}
             return rv1
     elif isinstance(value, list):
-        rchain1: Transform = {
-            "key": "transform", "transform": [dict2steps(lang, e) for e in value]}
-        return rchain1
+        if len(value) > 1:
+            rchain1: Transform = {
+                "key": "transform", "transform": [dict2steps(lang, e) for e in value]}
+            return rchain1
+        else:
+            return dict2steps(lang, value[0])
     elif isinstance(value, dict):
         step_types = [k for k in ("any", "all", "transform", "data", "via")
             if k in value]
