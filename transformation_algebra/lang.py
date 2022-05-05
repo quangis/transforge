@@ -10,7 +10,7 @@ from typing import Optional, Iterator, Any, TYPE_CHECKING
 from rdflib.namespace import ClosedNamespace
 
 from transformation_algebra.type import Variance, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, Tuple
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, Product
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -298,7 +298,7 @@ class Language(object):
             elif token == "*":
                 t1 = stack.pop()
                 assert isinstance(t1, TypeInstance)
-                stack.append(Tuple)
+                stack.append(Product)
                 stack.append(t1)
             else:
                 t: TypeInstance | TypeOperator | TypeAlias

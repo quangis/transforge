@@ -85,7 +85,7 @@
     a rdfs:Class; rdfs:subClassOf :Type;
     rdfs:comment "The class of function types.".
 
-:Tuple
+:Product
     a rdfs:Class; rdfs:subClassOf :Type;
     rdfs:comment "The class of tuple types.".
 

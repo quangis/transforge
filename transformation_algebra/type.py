@@ -67,7 +67,7 @@ class Type(ABC):
         Tuple operator.
         """
         # See issue #78
-        return Tuple(self.instance(), other.instance())
+        return Product(self.instance(), other.instance())
 
     def __lt__(self, other: Type) -> Optional[bool]:
         a, b = self.instance(), other.instance()
@@ -247,7 +247,7 @@ class TypeInstance(Type):
                         f"{arrow}{o.text(*args)}"
                 else:
                     result = f"{i.text(*args)}{arrow}{o.text(*args)}"
-            elif self._operator == Tuple and prod:
+            elif self._operator == Product and prod:
                 a, b = self.params
                 result = f"{lparen}{a.text(*args)}{prod}{b.text(*args)}{rparen}"
             else:
@@ -821,8 +821,8 @@ class Constraint(object):
 "The special constructor for function types."
 Function = TypeOperator('Function', params=[Variance.CONTRA, Variance.CO])
 
-"The special constructor for tuple types."
-Tuple = TypeOperator('Tuple', params=2)
+"The special constructor for tuple (or product) types."
+Product = TypeOperator('Product', params=2)
 
 "The special constructor for the unit type."
 Unit = TypeOperator('Unit')

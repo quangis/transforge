@@ -6,7 +6,7 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, Tuple, Unit, TypeInstance
+    Function, Product, Unit, TypeInstance
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language
@@ -111,7 +111,7 @@ class TransformationGraph(Graph):
         for root in set(taxonomy) - set.union(*taxonomy.values()):
             if root._operator.arity > 0:
                 self.add((self.type_nodes[root], RDFS.subClassOf,
-                    TA.Tuple if root._operator is Tuple else
+                    TA.Product if root._operator is Product else
                     self.language.namespace[root._operator.name]))
 
         if self.with_transitive_closure:
@@ -148,8 +148,8 @@ class TransformationGraph(Graph):
             if isinstance(t, TypeOperation):
                 if t.params:
                     node = BNode()
-                    if t._operator is Tuple:
-                        self.add((node, RDFS.subClassOf, TA.Tuple))
+                    if t._operator is Product:
+                        self.add((node, RDFS.subClassOf, TA.Product))
                     else:
                         self.add((node, RDFS.subClassOf,
                             self.language.namespace[t._operator.name]))
