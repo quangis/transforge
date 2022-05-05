@@ -10,7 +10,7 @@ from typing import Optional, Iterator, Any, TYPE_CHECKING
 from rdflib.namespace import ClosedNamespace
 
 from transformation_algebra.type import Variance, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, Tuple
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -179,7 +179,7 @@ class Language(object):
         return self.parse_expr(string, *args)
 
     def parse_expr(self, val: str | Iterator[str], *args: Expr) -> Expr:
-        tokens = tokenize(val, "(,):;~") if isinstance(val, str) else val
+        tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
 
         while token := next(tokens, None):
@@ -252,28 +252,54 @@ class Language(object):
             raise UndefinedToken(token) from e
 
     def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
-        tokens = tokenize(value, "(,)") if isinstance(value, str) else value
-        stack: list[TypeInstance | TypeOperator | TypeAlias
-            | list[TypeInstance]] = []
+        if isinstance(value, str):
+            consume_all = True
+            tokens = tokenize(value, "*(,)")
+        else:
+            consume_all = False
+            tokens = value
 
+        stack: list[None | TypeInstance | TypeOperator | TypeAlias] = [None]
+
+        def backtrack():
+            args: list[TypeInstance] = []
+            while stack:
+                arg = stack.pop()
+                if arg is None:
+                    if len(args) == 1 and isinstance(args[0], TypeInstance):
+                        stack.append(args[0])
+                        return
+                    else:
+                        raise RuntimeError
+                elif isinstance(arg, (TypeOperator, TypeAlias)):
+                    if not len(args) == arg.arity:
+                        raise RuntimeError(
+                            f"Tried to apply {len(args)} arguments to "
+                            f"operator {arg} of arity {arg.arity}")
+                    stack.append(arg(*reversed(args)))
+                    args = []
+                else:
+                    args.append(arg)
+            raise RuntimeError(args)
+
+        level = 0
         while token := next(tokens, None):
             if token == "(":
-                stack.append([])
+                stack.append(None)
+                level += 1
             elif token in "),":
-                unit = stack.pop()
-                assert isinstance(unit, TypeInstance)
-                params = stack.pop()
-                assert isinstance(params, list)
-                params.append(unit)
-                stack.append(params)
+                backtrack()
                 if token == ")":
-                    params = stack.pop()
-                    assert isinstance(params, list)
-                    op = stack.pop()
-                    assert isinstance(op, (TypeOperator, TypeAlias))
-                    stack.append(op(*params))
+                    level -= 1
+                else:
+                    stack.append(None)
             elif token == "_":
                 stack.append(TypeVariable())
+            elif token == "*":
+                t1 = stack.pop()
+                assert isinstance(t1, TypeInstance)
+                stack.append(Tuple)
+                stack.append(t1)
             else:
                 t: TypeInstance | TypeOperator | TypeAlias
                 try:
@@ -286,11 +312,19 @@ class Language(object):
                     except KeyError as e:
                         raise UndefinedToken(token) from e
                 stack.append(t)
-            if len(stack) == 1 and isinstance(stack[0], TypeInstance):
-                final = stack.pop()
-                assert isinstance(final, TypeInstance)
-                return final
-        raise RuntimeError
+
+            if not consume_all and (
+                    isinstance(stack[1], TypeInstance) or (
+                        isinstance(stack[1], (TypeOperator, TypeAlias))
+                        and level == 0 and len(stack) > 2)):
+                break
+
+        backtrack()
+
+        if len(stack) == 1 and isinstance(stack[0], TypeInstance):
+            return stack[0]
+        else:
+            raise RuntimeError(stack)
 
 
 def tokenize(string: str, specials: str = "") -> Iterator[str]:
@@ -338,7 +372,7 @@ class LanguageNamespace(ClosedNamespace):
 
 # Errors #####################################################################
 
-class ParseError(Exception):
+class ParseError(RuntimeError):
     pass
 
 

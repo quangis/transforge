@@ -123,6 +123,25 @@ class TestAlgebra(unittest.TestCase):
             lang.parse("f ~A ~F(A)").match(f(~A, ~F(A)))
         )
 
+    def test_parse_tuple(self):
+        A = TypeOperator()
+        F = TypeOperator(params=2)
+        lang = Language(scope=locals())
+        self.assertTrue(lang.parse_type("A * A").match(A * A))
+        self.assertTrue(lang.parse_type("(A * A) * A").match((A * A) * A))
+        self.assertTrue(lang.parse_type("A * (A * A)").match(A * (A * A)))
+        self.assertTrue(lang.parse_type("A * A * A").match(A * (A * A)))
+        # for now, associativity doesn't match but won't matter later because
+        # it's a non-associative operator anyway
+
+        self.assertTrue(lang.parse_type("F(A * A, A)").match(F(A * A, A)))
+        self.assertTrue(lang.parse_type("F(A, A * A)").match(F(A, A * A)))
+        self.assertTrue(lang.parse_type("F((A * A), (A))").match(F(A * A, A)))
+        self.assertTrue(lang.parse_type("F((A), (A * A))").match(F(A, A * A)))
+
+        self.assertTrue(lang.parse("~(A * A)").match(~(A * A)))
+        self.assertRaises(RuntimeError, lang.parse, "~A * A")
+
     def test_parameterized_type_alias(self):
         # See issue #73
         A = TypeOperator()
