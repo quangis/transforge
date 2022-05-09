@@ -27,7 +27,9 @@ class TestType(unittest.TestCase):
                 res = res.apply(x.instance())
             return res
 
-        if isinstance(result, type) and issubclass(result, Exception):
+        if result is TypeVariable:
+            self.assertIsInstance(do_apply(), TypeVariable)
+        elif isinstance(result, type) and issubclass(result, Exception):
             self.assertRaises(result, do_apply)
         elif result:
             assert isinstance(result, Type)
@@ -35,6 +37,7 @@ class TestType(unittest.TestCase):
                 do_apply(),
                 result.instance())
         else:
+            assert result is None
             do_apply()
 
     def test_with_parameters(self):
@@ -219,23 +222,83 @@ class TestType(unittest.TestCase):
         f = TypeSchema(lambda r, x: {r[F(A, x), F(B, x)]} >> r ** x)
         self.apply(f, F(A, B), result=B)
 
-    def test_unification_of_constraint_options(self):
-        # See issue #11
-        non_function = TypeSchema(lambda x: {F(A, A)[F(A, x), F(A, x)]} >> x)
-        self.apply(non_function, result=A)
-
-    def test_unification_of_constraint_options3(self):
+    def test_concrete_base_types_in_constraint_dont_prevent_unifying(self):
         # See #85
-        f = TypeSchema(lambda x, y, z: F(x, x) ** z[F(x, A)])
-        g = TypeSchema(lambda x, y, z: F(x, x) ** z[F(x, x)])
-        self.apply(f, F(A, A), result=F(A, A))
-        self.apply(g, F(A, A), result=F(A, A))
+        # We used to unify with the skeleton of the final option in any
+        # constraint, meaning that, if the last option is F(A), we would unify
+        # with F(_). The intention was to avoid unifying with an overly loose
+        # subtype constraint. However, this has the undesirable effect that
+        # type variables that are subsequently bound are used for unifying,
+        # while concrete types aren't.
+        A = TypeOperator('A')
+        F = TypeOperator('F', params=2)
+        f = TypeSchema(lambda x, y: x ** y[F(x, A)])
+        g = TypeSchema(lambda x, y: x ** y[F(x, x)])
+        self.apply(f, A, result=F(A, A))
+        self.apply(g, A, result=F(A, A))
 
-    def test_unification_of_constraint_options2(self):
-        # If options in a constraint turn out to come down to the same thing,
-        # they should unify. Also see #85
+    def test_unify_unifiable_constraint_options(self):
+        # See issues #11, #85
+        # If all options in a constraint turn out to come down to the same
+        # thing, they should unify.
+        A = TypeOperator('A')
+        F = TypeOperator('F', params=2)
         f = TypeSchema(lambda x, y, z: F(x, y) ** z[F(x, A), F(y, A)])
         self.apply(f, F(A, A), result=F(A, A))
+
+        g = TypeSchema(lambda x: {F(A, A)[F(A, x), F(A, x)]} >> x)
+        self.apply(g, result=A)
+
+    def test_unify_subtypable_constraint_options(self):
+        # See issues #11, #85
+        # If options in a constraint are merely subtypes of another, they
+        # should unify
+        A = TypeOperator('A')
+        B = TypeOperator('B', supertype=A)
+        F = TypeOperator('F', params=2)
+        f = TypeSchema(lambda x, y: x ** y[F(A, x), F(B, x)])
+        self.assertEqual(f.apply(A).params[1], A())
+
+    def test_unify_bottom_types(self):
+        # We don't have special notation for subtypes and supertypes, nor
+        # unfold types into their super-/subtypes. Instead, we assume that
+        # every type also stands for its subtypes. This is almost always what
+        # you want, so there's no point in increasing the number of checks we
+        # do. However, if a type has *no* subtypes, we can already unify.
+        # See #85
+        A = TypeOperator('A')
+        B = TypeOperator('B', supertype=A)
+        f = TypeSchema(lambda x: x[A])
+        g = TypeSchema(lambda x: x[B])
+        self.apply(f, result=TypeVariable)
+        self.apply(g, result=B)
+
+    def test_unify_type_operator(self):
+        # In case there are multiple types in the constraint, but they all have
+        # the same type operator, we can already unify with that operator, in
+        # case that narrows down other constraints.
+        # See #85
+        A = TypeOperator('A')
+        B = TypeOperator('B')
+        F = TypeOperator('F', params=1)
+        f = TypeSchema(lambda x: x[F(A), F(B)])
+        self.assertEqual(f.instance().operator, F)
+
+    # def test_asdf3(self):
+    #     # See #85
+    #     # When there is only a single remaining option in a constraint left, we
+    #     # used to unify with its skeleton. That is, if the remaining option is
+    #     # F(A), we unified with F(_). Instead, at least for compound types, we
+    #     # should unify with the entire type and just pass the subtype
+    #     # constraints along. So we would unify with F(x) where x is constrained
+    #     # by A. I think.
+    #     A = TypeOperator()
+    #     TypeOperator(supertype=A)
+    #     F = TypeOperator(params=2)
+    #     f = TypeSchema(lambda x: x[F(A)])
+    #     fi = f.instance()
+    #     self.assertEqual(fi.operator, F)
+    #     self.assertEqual(fi.params[0], TypeVariable)
 
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
@@ -288,7 +351,7 @@ class TestType(unittest.TestCase):
         self.assertEqual(len(f.params[1].params[1].constraints()), 3)
 
     def test_reach_all_operators(self):
-        f = TypeSchema(lambda a, b, c: 
+        f = TypeSchema(lambda a, b, c:
             {c[b, _], b[a, _], a[A, _]} >> a ** b ** c
         ).instance()
         self.assertEqual(f.params[1].params[1].operators(), {A})
