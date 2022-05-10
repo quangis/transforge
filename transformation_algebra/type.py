@@ -164,13 +164,16 @@ class TypeOperator(Type):
             supertype: Optional[TypeOperator] = None):
         self._name = name
         self.supertype: Optional[TypeOperator] = supertype
+        self.subtypes: set[TypeOperator] = set()
         self.variance = list(Variance.CO for _ in range(params)) \
             if isinstance(params, int) else list(params)
         self.arity = len(self.variance)
         self.depth: int = supertype.depth + 1 if supertype else 0
 
         if self.supertype and self.arity > 0:
-            raise ValueError("only nullary types can have direct supertypes")
+            raise ValueError("only nullary types can have explicit supertypes")
+        if supertype:
+            supertype.subtypes.add(self)
 
     def __str__(self) -> str:
         return self._name or object.__repr__(self)
@@ -532,7 +535,7 @@ class TypeInstance(Type):
         This also allows you to set constraints on type combinations that don't
         occur in that configuration in the context:
 
-            >>> TypeSchema(lambda x, y: {G(x, B)[G(A, y)]} >> F(x) ** y)
+            >>> TypeSchema(lambda x, y: {(x * B)[A * y]} >> F(x) ** y)
         """
         return self
 

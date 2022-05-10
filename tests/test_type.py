@@ -56,6 +56,18 @@ class TestType(unittest.TestCase):
             [F(A, _), G(A, _)]
         )
 
+    def test_base_super_subtypes(self):
+        # Test that base type operators are aware of their sub- and supertypes
+
+        A = TypeOperator('A')
+        B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
+        self.assertEqual(A.supertype, None)
+        self.assertEqual(B.subtypes, set())
+        self.assertEqual(C.subtypes, set())
+        self.assertEqual(B.supertype, A)
+        self.assertEqual(C.supertype, A)
+        self.assertEqual(A.subtypes, {B, C})
+
     def test_apply_non_function(self):
         self.apply(A, A, result=FunctionApplicationError)
 
