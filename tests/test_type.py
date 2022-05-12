@@ -61,12 +61,12 @@ class TestType(unittest.TestCase):
 
         A = TypeOperator('A')
         B, C = TypeOperator('B', supertype=A), TypeOperator('C', supertype=A)
-        self.assertEqual(A.supertype, None)
-        self.assertEqual(B.subtypes, set())
-        self.assertEqual(C.subtypes, set())
-        self.assertEqual(B.supertype, A)
-        self.assertEqual(C.supertype, A)
-        self.assertEqual(A.subtypes, {B, C})
+        self.assertEqual(A.parent, None)
+        self.assertEqual(B.children, set())
+        self.assertEqual(C.children, set())
+        self.assertEqual(B.parent, A)
+        self.assertEqual(C.parent, A)
+        self.assertEqual(A.children, {B, C})
 
     def test_apply_non_function(self):
         self.apply(A, A, result=FunctionApplicationError)

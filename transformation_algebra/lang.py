@@ -70,8 +70,8 @@ class Language(object):
             if op.arity == 0:
                 t = op()
                 taxonomy[t] = taxonomy.get(t, set())
-                if op.supertype:
-                    taxonomy[op.supertype()].add(t)
+                if op.parent:
+                    taxonomy[op.parent()].add(t)
 
         # By sorting on nesting level, we get a guarantee that by the time we
         # add a type of level n, we know all successor types of level n-1.

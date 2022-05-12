@@ -163,17 +163,17 @@ class TypeOperator(Type):
             params: int | list[Variance] = 0,
             supertype: Optional[TypeOperator] = None):
         self._name = name
-        self.supertype: Optional[TypeOperator] = supertype
-        self.subtypes: set[TypeOperator] = set()
+        self.parent: Optional[TypeOperator] = supertype
+        self.children: set[TypeOperator] = set()
         self.variance = list(Variance.CO for _ in range(params)) \
             if isinstance(params, int) else list(params)
         self.arity = len(self.variance)
         self.depth: int = supertype.depth + 1 if supertype else 0
 
-        if self.supertype and self.arity > 0:
+        if self.parent and self.arity > 0:
             raise ValueError("only nullary types can have explicit supertypes")
         if supertype:
-            supertype.subtypes.add(self)
+            supertype.children.add(self)
 
     def __str__(self) -> str:
         return self._name or object.__repr__(self)
@@ -184,7 +184,7 @@ class TypeOperator(Type):
     def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
         assert isinstance(other, TypeOperator)
         return ((not strict and self == other) or
-            bool(self.supertype and self.supertype.subtype(other)))
+            bool(self.parent and self.parent.subtype(other)))
 
     def normalize(self) -> TypeInstance:
         return self.instance()
@@ -484,7 +484,7 @@ class TypeInstance(Type):
             if a in b:
                 raise RecursiveType(a, b)
             elif b.basic:
-                if not (skeletal and b._operator.subtypes):
+                if not (skeletal and b._operator.children):
                     if subtype:
                         a.below(b._operator)
                     else:
@@ -498,7 +498,7 @@ class TypeInstance(Type):
             if b in a:
                 raise RecursiveType(b, a)
             elif a.basic:
-                if not (skeletal and a._operator.subtypes):
+                if not (skeletal and a._operator.children):
                     if subtype:
                         b.above(a._operator)
                     else:
