@@ -577,6 +577,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = TypeOperator()
         B = TypeOperator(supertype=A)
+        TypeOperator(supertype=B)
         f = Operator(type=lambda x: x[A] ** x)
         lang = Language(locals(), namespace=TEST)
 

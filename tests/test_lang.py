@@ -75,6 +75,7 @@ class TestAlgebra(unittest.TestCase):
         variables.
         """
         A = TypeOperator()
+        TypeOperator(supertype=A)
         f = Operator(type=lambda x: x[A])
         lang = Language(scope=locals())
 

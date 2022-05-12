@@ -395,21 +395,6 @@ class TypeInstance(Type):
             a = a.unification
         return a
 
-    def skeleton(self) -> TypeInstance:
-        """
-        A copy in which base types are substituted with fresh variables.
-        """
-        assert self.normalized()
-        if isinstance(self, TypeOperation):
-            if self.basic:
-                return TypeVariable()
-            else:
-                return TypeOperation(
-                    self._operator,
-                    *(p.follow().skeleton() for p in self.params))
-        else:
-            return self
-
     def match(self, other: TypeInstance, subtype: bool = False,
             accept_wildcard: bool = False) -> Optional[bool]:
         """
@@ -464,11 +449,15 @@ class TypeInstance(Type):
                 return False
         return None
 
-    def unify(self, other: TypeInstance, subtype: bool = False) -> None:
+    def unify(self, other: TypeInstance, subtype: bool = False,
+            skeletal: bool = False) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables, also
         produces new variables with subtype- and supertype bounds.
+
+        Skeletal unifications will not unify any variables to base types that
+        have subtypes, so as to avoid fixing an overly general type.
         """
         a = self.follow()
         b = other.follow()
@@ -477,6 +466,7 @@ class TypeInstance(Type):
             a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
+                subtype = subtype or skeletal
                 if subtype and not a._operator.subtype(b._operator):
                     raise SubtypeMismatch(a._operator, b._operator)
                 elif not subtype and a._operator != b._operator:
@@ -484,30 +474,39 @@ class TypeInstance(Type):
             elif a._operator == b._operator:
                 for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        x.unify(y, subtype=subtype)
+                        x.unify(y, subtype=subtype, skeletal=skeletal)
                     else:
                         assert v == Variance.CONTRA
-                        y.unify(x, subtype=subtype)
+                        y.unify(x, subtype=subtype, skeletal=skeletal)
             else:
                 raise TypeMismatch(a, b)
+        elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
+            if a in b:
+                raise RecursiveType(a, b)
+            elif b.basic:
+                if not (skeletal and b._operator.subtypes):
+                    if subtype:
+                        a.below(b._operator)
+                    else:
+                        a.bind(b)
+            else:
+                skeleton = b._operator(*(TypeVariable() for _ in b.params))
+                a.bind(skeleton)
+                a.unify(b, subtype=subtype, skeletal=skeletal)
         else:
-            if isinstance(a, TypeOperation) and isinstance(b, TypeVariable):
-                op, var, f = a, b, TypeVariable.above
+            assert isinstance(a, TypeOperation) and isinstance(b, TypeVariable)
+            if b in a:
+                raise RecursiveType(b, a)
+            elif a.basic:
+                if not (skeletal and a._operator.subtypes):
+                    if subtype:
+                        b.above(a._operator)
+                    else:
+                        b.bind(a)
             else:
-                assert isinstance(a, TypeVariable) and \
-                    isinstance(b, TypeOperation)
-                op, var, f = b, a, TypeVariable.below
-
-            if var in op:
-                raise RecursiveType(var, op)
-            elif op.basic:
-                if subtype:
-                    f(var, op._operator)
-                else:
-                    var.bind(op)
-            else:
-                var.bind(op.skeleton())
-                var.unify(op, subtype=subtype)
+                skeleton = a._operator(*(TypeVariable() for _ in a.params))
+                b.bind(skeleton)
+                a.unify(b, subtype=subtype, skeletal=skeletal)
 
     def instance(self) -> TypeInstance:
         return self.follow()
@@ -745,7 +744,7 @@ class Constraint(object):
             alternatives: Iterable[Type]):
         self.reference = reference
         self.alternatives = list(a.instance() for a in alternatives)
-        self.skeleton: Optional[TypeInstance] = None
+        self.check = True
 
         # Inform variables about the constraint present on them
         for v in self.variables():
@@ -808,15 +807,18 @@ class Constraint(object):
         if len(self.alternatives) == 0:
             raise ConstraintViolation(self)
 
-        # If there is only one possibility left, we can unify, but *only* with
-        # the skeleton: the base types must remain variable, because we don't
-        # want to fix to an overly loose subtype bound.
-        elif len(self.alternatives) == 1 and not self.skeleton:
-            self.skeleton = self.alternatives[0].skeleton()
-            self.reference.unify(self.skeleton)
+        # If there is only one possibility left, we can unify, but *only*
+        # in a way that makes sure that base types with subtypes remain
+        # variable, because we don't want to fix an overly loose subtype.
+        elif self.check and len(self.alternatives) == 1:
+            self.check = False
+            self.reference.unify(self.alternatives[0], subtype=True,
+                skeletal=True)
+            self.check = True
 
         # Fulfillment is achieved if the reference is fully concrete and there
         # is at least one definitely compatible alternative
+        # TODO
         return (not any(self.reference.variables()) and any(compatibility)) \
             or self.reference in self.alternatives
 
