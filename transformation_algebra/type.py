@@ -69,21 +69,30 @@ class Type(ABC):
         # See issue #78
         return Product(self.instance(), other.instance())
 
-    def __lt__(self, other: Type) -> Optional[bool]:
+    # def __lt__(self, other: Type) -> Optional[bool]:
+    #     a, b = self.instance(), other.instance()
+    #     return not a.match(b) and a <= b
+
+    # def __gt__(self, other: Type) -> Optional[bool]:
+    #     a, b = self.instance(), other.instance()
+    #     return not a.match(b) and a >= b
+
+    # def __le__(self, other: Type) -> Optional[bool]:
+    #     return self.instance().match(other.instance(),
+    #         accept_wildcard=True, subtype=True)
+
+    # def __ge__(self, other: Type) -> Optional[bool]:
+    #     return self.instance().match(other.instance(),
+    #         accept_wildcard=True, subtype=True)
+
+    def is_subtype(self, other: Type, strict: bool = False) -> Optional[bool]:
+        """
+        Test whether one type is a subtype of another. Return `None` if the
+        answer depends on the binding of variables.
+        """
         a, b = self.instance(), other.instance()
-        return not a.match(b) and a <= b
-
-    def __gt__(self, other: Type) -> Optional[bool]:
-        a, b = self.instance(), other.instance()
-        return not a.match(b) and a >= b
-
-    def __le__(self, other: Type) -> Optional[bool]:
-        return self.instance().match(other.instance(),
-            accept_wildcard=True, subtype=True)
-
-    def __ge__(self, other: Type) -> Optional[bool]:
-        return self.instance().match(other.instance(),
-            accept_wildcard=True, subtype=True)
+        return a.match(b, accept_wildcard=True, subtype=True) \
+            and (not strict or not a.match(b))
 
     def apply(self, arg: Type) -> TypeInstance:
         """

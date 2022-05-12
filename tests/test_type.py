@@ -183,30 +183,30 @@ class TestType(unittest.TestCase):
         self.apply(f, A, result=ConstraintViolation)
 
     def test_subtyping_of_concrete_functions(self):
-        self.assertTrue(A ** A <= A1 ** A)
-        self.assertTrue(A ** A <= A ** Ω)
-        self.assertFalse(A ** A <= Ω ** A)
-        self.assertFalse(A ** A <= A ** A1)
+        self.assertTrue((A ** A).is_subtype(A1 ** A))
+        self.assertTrue((A ** A).is_subtype(A ** Ω))
+        self.assertFalse((A ** A).is_subtype(Ω ** A))
+        self.assertFalse((A ** A).is_subtype(A ** A1))
 
     def test_subtyping_of_variables(self):
         x = TypeVariable()
-        self.assertEqual(x < x, False)
-        self.assertEqual(x <= x, True)
+        self.assertEqual(x.is_subtype(x, strict=True), False)
+        self.assertEqual(x.is_subtype(x), True)
 
     def test_subtyping_of_variable_functions(self):
         x = TypeVariable()
-        self.assertEqual(x ** A <= A1 ** A, None)
-        self.assertEqual(A ** x <= A ** Ω, None)
-        self.assertEqual(A ** A <= x ** A, None)
-        self.assertEqual(A ** A <= A ** x, None)
+        self.assertEqual((x ** A).is_subtype(A1 ** A), None)
+        self.assertEqual((A ** x).is_subtype(A ** Ω), None)
+        self.assertEqual((A ** A).is_subtype(x ** A), None)
+        self.assertEqual((A ** A).is_subtype(A ** x), None)
 
     def test_subtyping_of_wildcard_functions(self):
-        self.assertTrue(_ ** A <= A1 ** A)
-        self.assertTrue(A ** _ <= A ** Ω)
-        self.assertTrue(A ** A <= _ ** A)
-        self.assertTrue(A ** A <= A ** _)
-        self.assertFalse(_ ** Ω <= A1 ** A)
-        self.assertFalse(A1 ** _ <= A ** Ω)
+        self.assertTrue((_ ** A).is_subtype(A1 ** A))
+        self.assertTrue((A ** _).is_subtype(A ** Ω))
+        self.assertTrue((A ** A).is_subtype(_ ** A))
+        self.assertTrue((A ** A).is_subtype(A ** _))
+        self.assertFalse((_ ** Ω).is_subtype(A1 ** A))
+        self.assertFalse((A1 ** _).is_subtype(A ** Ω))
 
     def test_constrained_to_base_type(self):
         # See issue #2, which caused an infinite loop
@@ -316,7 +316,7 @@ class TestType(unittest.TestCase):
 
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
-        self.assertEqual(F(A, _) <= F(_, A), True)
+        self.assertEqual(F(A, _).is_subtype(F(_, A)), True)
         x = TypeVariable()
         c = Constraint(x, [F(A, _), F(_, A)])
         self.assertEqual(len(c.alternatives), 2)
