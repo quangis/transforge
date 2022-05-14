@@ -64,26 +64,47 @@ class Type(ABC):
 
     def __mul__(self, other: Type) -> TypeInstance:
         """
-        Tuple operator.
+        Product (tuple) type operator.
         """
         # See issue #78
         return Product(self.instance(), other.instance())
 
-    # def __lt__(self, other: Type) -> Optional[bool]:
-    #     a, b = self.instance(), other.instance()
-    #     return not a.match(b) and a <= b
+    def __rshift__(self, other: Type) -> Type:
+        return other.__rrshift__(self)
 
-    # def __gt__(self, other: Type) -> Optional[bool]:
-    #     a, b = self.instance(), other.instance()
-    #     return not a.match(b) and a >= b
+    def __rrshift__(self, other: Type | Iterable[Type | Constraint]) -> Type:
+        """
+        Abuse of Python's notation to go along with __getitem__. Allows an
+        alternative method to specify constraints upfront. Example:
 
-    # def __le__(self, other: Type) -> Optional[bool]:
-    #     return self.instance().match(other.instance(),
-    #         accept_wildcard=True, subtype=True)
+            >>> TypeSchema(lambda x, y: {x[A]} >> F(x) ** x)
 
-    # def __ge__(self, other: Type) -> Optional[bool]:
-    #     return self.instance().match(other.instance(),
-    #         accept_wildcard=True, subtype=True)
+        This also allows you to set constraints on type combinations that don't
+        occur in that configuration in the context:
+
+            >>> TypeSchema(lambda x, y: {(x * B)[A * y]} >> F(x) ** y)
+        """
+        return self
+
+    def __getitem__(self, value: Type | tuple[Type]) -> TypeInstance:
+        """
+        Another abuse of Python's notation, allowing us to add elimination
+        constraints to a type by using indexing notation. Example:
+
+            >>> TypeSchema(lambda x, y: (x[A]) >> F(x) ** x)
+        """
+
+        # Constraints are attached to the relevant variables as the constraint
+        # is instantiated
+        constraint = EliminationConstraint(
+            self.instance(), (value,) if isinstance(value, Type) else value)
+        return constraint.reference
+
+    def __lt__(self, other: Type) -> SubtypeConstraint:
+        return SubtypeConstraint(self.instance(), other.instance(), strict=True)
+
+    def __le__(self, other: Type) -> SubtypeConstraint:
+        return SubtypeConstraint(self.instance(), other.instance())
 
     def is_subtype(self, other: Type, strict: bool = False) -> Optional[bool]:
         """
@@ -365,8 +386,8 @@ class TypeInstance(Type):
             target = target or set()
             target.update(direct_variables)
             for v in direct_variables:
-                for c in v._constraints:
-                    for e in chain(c.reference, *c.alternatives):
+                for constraint in v._constraints:
+                    for e in constraint:
                         e.variables(indirect=True, target=target)
             return target
         else:
@@ -383,7 +404,7 @@ class TypeInstance(Type):
         if indirect:
             for constraint in self.constraints(indirect=True):
                 result.update(*(p.operators(indirect=False) for p in
-                    chain(constraint.reference, *constraint.alternatives)))
+                    constraint))
         return result
 
     def constraints(self, indirect: bool = True) -> set[Constraint]:
@@ -458,15 +479,11 @@ class TypeInstance(Type):
                 return False
         return None
 
-    def unify(self, other: TypeInstance, subtype: bool = False,
-            skeletal: bool = False) -> None:
+    def unify(self, other: TypeInstance, subtype: bool = False) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables, also
         produces new variables with subtype- and supertype bounds.
-
-        Skeletal unifications will not unify any variables to base types that
-        have subtypes, so as to avoid fixing an overly general type.
         """
         a = self.follow()
         b = other.follow()
@@ -475,7 +492,7 @@ class TypeInstance(Type):
             a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                subtype = subtype or skeletal
+                subtype = subtype
                 if subtype and not a._operator.subtype(b._operator):
                     raise SubtypeMismatch(a._operator, b._operator)
                 elif not subtype and a._operator != b._operator:
@@ -483,39 +500,27 @@ class TypeInstance(Type):
             elif a._operator == b._operator:
                 for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        x.unify(y, subtype=subtype, skeletal=skeletal)
+                        x.unify(y, subtype=subtype)
                     else:
                         assert v == Variance.CONTRA
-                        y.unify(x, subtype=subtype, skeletal=skeletal)
+                        y.unify(x, subtype=subtype)
             else:
                 raise TypeMismatch(a, b)
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
             if a in b:
                 raise RecursiveType(a, b)
-            elif b.basic:
-                if not (skeletal and b._operator.children):
-                    if subtype:
-                        a.below(b._operator)
-                    else:
-                        a.bind(b)
+            elif b.basic and subtype:
+                a.below(b._operator)
             else:
-                skeleton = b._operator(*(TypeVariable() for _ in b.params))
-                a.bind(skeleton)
-                a.unify(b, subtype=subtype, skeletal=skeletal)
+                a.bind(b)
         else:
             assert isinstance(a, TypeOperation) and isinstance(b, TypeVariable)
             if b in a:
                 raise RecursiveType(b, a)
-            elif a.basic:
-                if not (skeletal and a._operator.children):
-                    if subtype:
-                        b.above(a._operator)
-                    else:
-                        b.bind(a)
+            elif a.basic and subtype:
+                b.above(a._operator)
             else:
-                skeleton = a._operator(*(TypeVariable() for _ in a.params))
-                b.bind(skeleton)
-                a.unify(b, subtype=subtype, skeletal=skeletal)
+                b.bind(a)
 
     def instance(self) -> TypeInstance:
         return self.follow()
@@ -533,32 +538,6 @@ class TypeInstance(Type):
     def operator(self) -> Optional[TypeOperator]:
         return self._operator if isinstance(self, TypeOperation) else None
 
-    def __rrshift__(self, other: Iterable[Type]) -> Type:
-        """
-        Abuse of Python's notation to go along with __getitem__. Allows an
-        alternative method to specify constraints upfront. Example:
-
-            >>> TypeSchema(lambda x, y: {x[A]} >> F(x) ** x)
-
-        This also allows you to set constraints on type combinations that don't
-        occur in that configuration in the context:
-
-            >>> TypeSchema(lambda x, y: {(x * B)[A * y]} >> F(x) ** y)
-        """
-        return self
-
-    def __getitem__(self, value: Type | tuple[Type]) -> TypeInstance:
-        """
-        Another abuse of Python's notation, allowing us to add constraints to a
-        type by using indexing notation. Example:
-
-            >>> TypeSchema(lambda x, y: F(x[A]) ** x)
-        """
-
-        # Constraints are attached to the relevant variables as the constraint
-        # is instantiated
-        Constraint(self, (value,) if isinstance(value, Type) else value)
-        return self
 
 class TypeOperation(TypeInstance):
     """
@@ -605,6 +584,9 @@ class TypeVariable(TypeInstance):
         self.upper: Optional[TypeOperator] = None
         self._constraints: set[Constraint] = set()
         self.origin = origin
+
+    def check_constraints(self) -> None:
+        self._constraints = set(c for c in self._constraints if not c.check())
 
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
@@ -685,10 +667,6 @@ class TypeVariable(TypeInstance):
         else:
             raise SubtypeMismatch(new, upper)
 
-    def check_constraints(self) -> None:
-        self._constraints = set(
-            c for c in self._constraints if not c.fulfilled())
-
 
 class TypeAlias(Type):
     """
@@ -742,9 +720,96 @@ class TypeAlias(Type):
 
 
 class Constraint(object):
+    @abstractmethod
+    def __init__(self):
+        self.fulfilled = False
+        self.inform()
+        self.check()
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[TypeInstance]:
+        return NotImplemented
+
+    @abstractmethod
+    def text(self, *args, **kwargs) -> str:
+        return NotImplemented
+
+    @abstractmethod
+    def check(self) -> bool:
+        """
+        Check that the constraint has not been violated and raise an error
+        otherwise. Additionally, return `True` if it has been completely
+        fulfilled and needs not be enforced any longer.
+        """
+        return NotImplemented
+
+    def variables(self, indirect: bool = True) -> set[TypeVariable]:
+        result: set[TypeVariable] = set()
+        for e in self:
+            result.update(e.variables(indirect=indirect, target=result))
+        return result
+
+    def inform(self) -> None:
+        """
+        Inform relevant variables that this constraint is present.
+        """
+        for v in self.variables():
+            assert not v.unification
+            v._constraints.add(self)
+
+    def fulfill(self) -> None:
+        """
+        Inform relevant variables that this constraint has been fulfilled.
+        """
+        # TODO
+        self.fulfilled = True
+        for v in self.variables():
+            assert not v.unification
+            v._constraints.remove(self)
+
+
+class SubtypeConstraint(Constraint):
     """
-    A constraint enforces that its reference is a subtype of one of the given
-    alternatives.
+    This constraint enforces that a type variable, or a type operation
+    containing any, can only ever be fixed to a subtype of a certain type.
+    """
+    # This is different from a lower or upper bound on type variables. Lower
+    # and upper bounds are used for fixing type operators to type variables in
+    # the presence of subtyping; these never fix variables to anything, but
+    # only act as guard to make sure that, once they a variable is fixed, it is
+    # a subtype of the given type operator.
+
+    def __init__(self, reference: Type, target: Type, strict: bool = False):
+        self.reference = reference.instance()
+        self.target = target.instance()
+        self.strict = strict
+        super().__init__()
+
+    def __iter__(self) -> Iterator[TypeInstance]:
+        yield from chain(self.reference, self.target)
+
+    def text(self, *args, **kwargs) -> str:
+        symbol = '<' if self.strict else '<='
+        return (
+            f"{self.reference.text(*args, **kwargs)} "
+            f"{symbol} {self.target.text(*args, **kwargs)}"
+        )
+
+    def check(self) -> bool:
+        result = self.reference.match(self.target, subtype=True)
+        if result is True:
+            return True
+        elif result is False:
+            raise ConstraintViolation(self)
+        else:
+            assert result is None
+            return False
+
+class EliminationConstraint(Constraint):
+    """
+    An elimination constraint offers a choice between multiple alternatives:
+    different possible unifications. Once only one alternative remains
+    possible, the unification is performed.
     """
 
     def __init__(
@@ -753,26 +818,16 @@ class Constraint(object):
             alternatives: Iterable[Type]):
         self.reference = reference
         self.alternatives = list(a.instance() for a in alternatives)
-        self.check = True
-
-        # Inform variables about the constraint present on them
-        for v in self.variables():
-            assert not v.unification
-            v._constraints.add(self)
-
-        self.fulfilled()
+        super().__init__()
 
     def text(self, *args, **kwargs) -> str:
         return (
-            f"{self.reference.text(*args, **kwargs)} << ["
+            f"{self.reference.text(*args, **kwargs)}["
             f"{', '.join(a.text(*args, **kwargs) for a in self.alternatives)}]"
         )
 
-    def variables(self, indirect: bool = True) -> set[TypeVariable]:
-        result: set[TypeVariable] = set()
-        for e in chain(self.reference, *self.alternatives):
-            result.update(e.variables(indirect=indirect, target=result))
-        return result
+    def __iter__(self) -> Iterator[TypeInstance]:
+        yield from chain(self.reference, *self.alternatives)
 
     def minimize(self) -> None:
         """
@@ -793,19 +848,20 @@ class Constraint(object):
         self.reference = self.reference.follow()
         self.alternatives = minimized
 
-    def fulfilled(self) -> bool:
+    def check(self) -> bool:
         """
         Check that the constraint has not been violated and raise an error
         otherwise. Additionally, return True if it has been completely
         fulfilled and need not be enforced any longer.
         """
+        assert not self.fulfilled
 
         # TODO Minimization is expensive and it is performed on every variable
         # binding. Make this more efficient?
         self.minimize()
 
-        assert self.reference.normalized() and all(p.normalized() for p in
-                self.alternatives)
+        assert self.reference.normalized() and \
+            all(p.normalized() for p in self.alternatives)
 
         compatibility = [
             self.reference.match(t, subtype=True, accept_wildcard=True)
@@ -819,17 +875,18 @@ class Constraint(object):
         # If there is only one possibility left, we can unify, but *only*
         # in a way that makes sure that base types with subtypes remain
         # variable, because we don't want to fix an overly loose subtype.
-        elif self.check and len(self.alternatives) == 1:
-            self.check = False
-            self.reference.unify(self.alternatives[0], subtype=True,
-                skeletal=True)
-            self.check = True
+        elif len(self.alternatives) == 1:
+            self.fulfill()
+            self.reference.unify(self.alternatives[0], subtype=True)
+            return True
+
+        return False
 
         # Fulfillment is achieved if the reference is fully concrete and there
         # is at least one definitely compatible alternative
         # TODO
-        return (not any(self.reference.variables()) and any(compatibility)) \
-            or self.reference in self.alternatives
+        # return (not any(self.reference.variables()) and any(compatibility)) \
+        #     or self.reference in self.alternatives
 
 
 "The special constructor for function types."
