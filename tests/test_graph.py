@@ -596,7 +596,4 @@ class TestAlgebraRDF(unittest.TestCase):
             TEST.tool2: ("f (1: A)", [TEST.tool1])
         }, {TEST.src1})
 
-        actual.serialize('actual.ttl')
-        expected.serialize('expected.ttl')
-
         self.assertIsomorphic(actual, expected)

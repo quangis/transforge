@@ -75,11 +75,12 @@ class TestAlgebra(unittest.TestCase):
         variables.
         """
         A = TypeOperator()
+        B = TypeOperator()
         TypeOperator(supertype=A)
-        f = Operator(type=lambda x: x[A])
+        f = Operator(type=lambda x: x[A, B])
         lang = Language(scope=locals())
 
-        self.assertEqual(str(f.type), "x | x << [A]")
+        self.assertEqual(str(f.type), "x | x[A, B]")
 
     def test_parse_inline_typing(self):
         A = TypeOperator()
