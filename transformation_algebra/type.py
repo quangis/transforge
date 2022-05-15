@@ -586,7 +586,12 @@ class TypeVariable(TypeInstance):
         self.origin = origin
 
     def check_constraints(self) -> None:
-        self._constraints = set(c for c in self._constraints if not c.check())
+        for c in list(self._constraints):
+            if c.fulfill():
+                try:
+                    self._constraints.remove(c)
+                except KeyError:
+                    pass
 
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
@@ -600,7 +605,6 @@ class TypeVariable(TypeInstance):
             if isinstance(t, TypeVariable):
                 t._constraints.update(self._constraints)
                 self._constraints = t._constraints
-                t.check_constraints()
 
                 t.wildcard = False
 
@@ -626,7 +630,6 @@ class TypeVariable(TypeInstance):
                     )))
                     for v in variables:
                         v._constraints = self._constraints
-                        v.check_constraints()
 
             self.check_constraints()
 
@@ -724,7 +727,7 @@ class Constraint(object):
     def __init__(self):
         self.fulfilled = False
         self.inform()
-        self.check()
+        self.fulfill()
 
     @abstractmethod
     def __iter__(self) -> Iterator[TypeInstance]:
@@ -735,7 +738,7 @@ class Constraint(object):
         return NotImplemented
 
     @abstractmethod
-    def check(self) -> bool:
+    def fulfill(self) -> bool:
         """
         Check that the constraint has not been violated and raise an error
         otherwise. Additionally, return `True` if it has been completely
@@ -756,16 +759,6 @@ class Constraint(object):
         for v in self.variables():
             assert not v.unification
             v._constraints.add(self)
-
-    def fulfill(self) -> None:
-        """
-        Inform relevant variables that this constraint has been fulfilled.
-        """
-        # TODO
-        self.fulfilled = True
-        for v in self.variables():
-            assert not v.unification
-            v._constraints.remove(self)
 
 
 class SubtypeConstraint(Constraint):
@@ -795,15 +788,13 @@ class SubtypeConstraint(Constraint):
             f"{symbol} {self.target.text(*args, **kwargs)}"
         )
 
-    def check(self) -> bool:
+    def fulfill(self) -> bool:
         result = self.reference.match(self.target, subtype=True)
         if result is True:
-            return True
+            self.fulfilled = True
         elif result is False:
             raise ConstraintViolation(self)
-        else:
-            assert result is None
-            return False
+        return self.fulfilled
 
 class EliminationConstraint(Constraint):
     """
@@ -835,6 +826,7 @@ class EliminationConstraint(Constraint):
         alternatives that are equal to, or more specific versions of, other
         alternatives.
         """
+        # TODO more *general* versions
         minimized: list[TypeInstance] = []
         for obj in self.alternatives:
             add = True
@@ -848,13 +840,9 @@ class EliminationConstraint(Constraint):
         self.reference = self.reference.follow()
         self.alternatives = minimized
 
-    def check(self) -> bool:
-        """
-        Check that the constraint has not been violated and raise an error
-        otherwise. Additionally, return True if it has been completely
-        fulfilled and need not be enforced any longer.
-        """
-        assert not self.fulfilled
+    def fulfill(self) -> bool:
+        if self.fulfilled:
+            return True
 
         # TODO Minimization is expensive and it is performed on every variable
         # binding. Make this more efficient?
@@ -863,11 +851,12 @@ class EliminationConstraint(Constraint):
         assert self.reference.normalized() and \
             all(p.normalized() for p in self.alternatives)
 
-        compatibility = [
-            self.reference.match(t, subtype=True, accept_wildcard=True)
-            for t in self.alternatives]
-        self.alternatives = [t for t, c
-            in zip(self.alternatives, compatibility) if c is not False]
+        self.alternatives = [t for t in self.alternatives
+            if self.reference.match(t, subtype=True, accept_wildcard=True)
+            is not False
+        ]
+
+        # TODO update upon narrowing the alternatives
 
         if len(self.alternatives) == 0:
             raise ConstraintViolation(self)
@@ -876,17 +865,10 @@ class EliminationConstraint(Constraint):
         # in a way that makes sure that base types with subtypes remain
         # variable, because we don't want to fix an overly loose subtype.
         elif len(self.alternatives) == 1:
-            self.fulfill()
+            self.fulfilled = True
             self.reference.unify(self.alternatives[0], subtype=True)
-            return True
 
-        return False
-
-        # Fulfillment is achieved if the reference is fully concrete and there
-        # is at least one definitely compatible alternative
-        # TODO
-        # return (not any(self.reference.variables()) and any(compatibility)) \
-        #     or self.reference in self.alternatives
+        return self.fulfilled
 
 
 "The special constructor for function types."
