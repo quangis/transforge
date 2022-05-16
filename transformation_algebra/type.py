@@ -69,41 +69,40 @@ class Type(ABC):
         # See issue #78
         return Product(self.instance(), other.instance())
 
-    def __rshift__(self, other: Type) -> Type:
-        return other.__rrshift__(self)
-
-    def __rrshift__(self, other: Type | Iterable[Type | Constraint]) -> Type:
+    def __getitem__(self, cs: Constraint | tuple[Constraint]) -> TypeInstance:
         """
-        Abuse of Python's notation to go along with __getitem__. Allows an
-        alternative method to specify constraints upfront. Example:
+        An abuse of Python's indexing notation, which allows us to add
+        constraints to type.
 
-            >>> TypeSchema(lambda x, y: {x[A]} >> F(x) ** x)
-
-        This also allows you to set constraints on type combinations that don't
-        occur in that configuration in the context:
-
-            >>> TypeSchema(lambda x, y: {(x * B)[A * y]} >> F(x) ** y)
-        """
-        return self
-
-    def __getitem__(self, value: Type | tuple[Type]) -> TypeInstance:
-        """
-        Another abuse of Python's notation, allowing us to add elimination
-        constraints to a type by using indexing notation. Example:
-
-            >>> TypeSchema(lambda x, y: (x[A]) >> F(x) ** x)
+            >>> TypeSchema(lambda x: F(x) ** x [x < A])
         """
 
         # Constraints are attached to the relevant variables as the constraint
         # is instantiated
-        constraint = EliminationConstraint(
-            self.instance(), (value,) if isinstance(value, Type) else value)
-        return constraint.reference
+        for c in cs if isinstance(cs, tuple) else (cs,):
+            if not isinstance(c, Constraint):
+                raise ValueError("Indexing notation only accepts constraints.")
+        return self.instance()
+
+    def __lshift__(self, other: Iterable[Type]) -> EliminationConstraint:
+        """
+        Abuse of Python's notation to write elimination constraints using the
+        `<<` operator. Example:
+
+            >>> TypeSchema(lambda x, y: F(x) ** y [x * y << {A * B, B * C}])
+        """
+        return EliminationConstraint(self.instance(), other)
 
     def __lt__(self, other: Type) -> SubtypeConstraint:
+        """
+        Write strict subtype constraints using the `<` operator.
+        """
         return SubtypeConstraint(self.instance(), other.instance(), strict=True)
 
     def __le__(self, other: Type) -> SubtypeConstraint:
+        """
+        Write subtype constraints using the `<=` operator.
+        """
         return SubtypeConstraint(self.instance(), other.instance())
 
     def is_subtype(self, other: Type, strict: bool = False) -> Optional[bool]:

@@ -77,7 +77,7 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator()
         TypeOperator(supertype=A)
-        f = Operator(type=lambda x: x[A, B])
+        f = Operator(type=lambda x: x [x << {A, B}])
         lang = Language(scope=locals())
 
         self.assertEqual(str(f.type), "x | x[A, B]")
