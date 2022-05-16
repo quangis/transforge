@@ -479,11 +479,14 @@ class TypeInstance(Type):
                 return False
         return None
 
-    def unify(self, other: TypeInstance, subtype: bool = False) -> None:
+    def unify(self, other: TypeInstance, subtype: bool = False,
+            with_basic: bool = True) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables, also
         produces new variables with subtype- and supertype bounds.
+
+        Optionally, unifying base types can be skipped.
         """
         a = self.follow()
         b = other.follow()
@@ -492,35 +495,44 @@ class TypeInstance(Type):
             a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                subtype = subtype
-                if subtype and not a._operator.subtype(b._operator):
+                if not with_basic:
+                    pass
+                elif subtype and not a._operator.subtype(b._operator):
                     raise SubtypeMismatch(a._operator, b._operator)
                 elif not subtype and a._operator != b._operator:
                     raise TypeMismatch(a, b)
             elif a._operator == b._operator:
                 for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        x.unify(y, subtype=subtype)
+                        x.unify(y, subtype=subtype, with_basic=with_basic)
                     else:
                         assert v == Variance.CONTRA
-                        y.unify(x, subtype=subtype)
+                        y.unify(x, subtype=subtype, with_basic=with_basic)
             else:
                 raise TypeMismatch(a, b)
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
             if a in b:
                 raise RecursiveType(a, b)
-            elif b.basic and subtype:
-                a.below(b._operator)
-            else:
-                a.bind(b)
+            elif with_basic:
+                if b.basic and subtype:
+                    a.below(b._operator)
+                else:
+                    a.bind(b)
+            elif not b.basic:
+                a.bind(b._operator(*(TypeVariable() for _ in b.params)))
+                a.unify(b, subtype=subtype, with_basic=with_basic)
         else:
             assert isinstance(a, TypeOperation) and isinstance(b, TypeVariable)
             if b in a:
                 raise RecursiveType(b, a)
-            elif a.basic and subtype:
-                b.above(a._operator)
-            else:
-                b.bind(a)
+            elif with_basic:
+                if a.basic and subtype:
+                    b.above(a._operator)
+                else:
+                    b.bind(a)
+            elif not a.basic:
+                b.bind(a._operator(*(TypeVariable() for _ in a.params)))
+                b.unify(b, subtype=subtype, with_basic=with_basic)
 
     def instance(self) -> TypeInstance:
         return self.follow()
@@ -789,12 +801,14 @@ class SubtypeConstraint(Constraint):
         )
 
     def fulfill(self) -> bool:
+        self.reference.unify(self.target, subtype=True, with_basic=False)
         result = self.reference.match(self.target, subtype=True)
         if result is True:
             self.fulfilled = True
         elif result is False:
             raise ConstraintViolation(self)
         return self.fulfilled
+
 
 class EliminationConstraint(Constraint):
     """

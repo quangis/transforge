@@ -140,10 +140,9 @@ class TestType(unittest.TestCase):
         f = TypeSchema(lambda xs, x: (xs[W(x), Z(x)]) >> xs ** x)
         self.apply(f, W(A), result=A)
 
-    @unittest.skip("later")
     def test_non_unification_of_base_types(self):
         # We can't unify with base types from constraints, as they might be
-        # subtypes. So in this case, we know that x is an F, but we don't know
+        # subtypes. So in this case, we know that x is a Z, but we don't know
         # that its parameters is exactly A: that might be too general a bound.
         f = TypeSchema(lambda x: (x <= Z(A)) >> x ** x)
         result = f.apply(TypeVariable())
