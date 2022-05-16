@@ -480,22 +480,23 @@ class TypeInstance(Type):
         return None
 
     def unify(self, other: TypeInstance, subtype: bool = False,
-            with_basic: bool = True) -> None:
+            skip_basic: bool = False, skip_wildcard: bool = False) -> None:
         """
         Make sure that a is equal to, or a subtype of b. Like normal
         unification, but instead of just a substitution of variables, also
         produces new variables with subtype- and supertype bounds.
 
-        Optionally, unifying base types can be skipped.
+        Optionally, unifying base types or wildcard variables can be skipped.
         """
         a = self.follow()
         b = other.follow()
 
         if isinstance(a, TypeVariable) and isinstance(b, TypeVariable):
-            a.bind(b)
+            if not skip_wildcard or not (a.wildcard and b.wildcard):
+                a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
             if a.basic:
-                if not with_basic:
+                if skip_basic:
                     pass
                 elif subtype and not a._operator.subtype(b._operator):
                     raise SubtypeMismatch(a._operator, b._operator)
@@ -504,35 +505,68 @@ class TypeInstance(Type):
             elif a._operator == b._operator:
                 for v, x, y in zip(a._operator.variance, a.params, b.params):
                     if v == Variance.CO:
-                        x.unify(y, subtype=subtype, with_basic=with_basic)
+                        x.unify(y, subtype=subtype, skip_basic=skip_basic,
+                            skip_wildcard=skip_wildcard)
                     else:
                         assert v == Variance.CONTRA
-                        y.unify(x, subtype=subtype, with_basic=with_basic)
+                        y.unify(x, subtype=subtype, skip_basic=skip_basic,
+                            skip_wildcard=skip_wildcard)
             else:
                 raise TypeMismatch(a, b)
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
             if a in b:
                 raise RecursiveType(a, b)
-            elif with_basic:
-                if b.basic and subtype:
+            elif b.basic:
+                if skip_basic or (skip_wildcard and a.wildcard):
+                    pass
+                elif subtype:
                     a.below(b._operator)
                 else:
                     a.bind(b)
-            elif not b.basic:
-                a.bind(b._operator(*(TypeVariable() for _ in b.params)))
-                a.unify(b, subtype=subtype, with_basic=with_basic)
+            else:
+                if skip_wildcard or skip_basic:
+                    a.bind(b._operator(*(TypeVariable() for _ in b.params)))
+                    a.unify(b, subtype=subtype, skip_basic=skip_basic,
+                        skip_wildcard=skip_wildcard)
+                else:
+                    a.bind(b)
         else:
             assert isinstance(a, TypeOperation) and isinstance(b, TypeVariable)
             if b in a:
                 raise RecursiveType(b, a)
-            elif with_basic:
-                if a.basic and subtype:
+            elif a.basic:
+                if skip_basic or (skip_wildcard and b.wildcard):
+                    pass
+                elif subtype:
                     b.above(a._operator)
                 else:
                     b.bind(a)
-            elif not a.basic:
-                b.bind(a._operator(*(TypeVariable() for _ in a.params)))
-                b.unify(b, subtype=subtype, with_basic=with_basic)
+            else:
+                if skip_wildcard or skip_basic:
+                    b.bind(a._operator(*(TypeVariable() for _ in a.params)))
+                    b.unify(b, subtype=subtype, skip_basic=skip_basic,
+                        skip_wildcard=skip_wildcard)
+                else:
+                    b.bind(a)
+
+    @staticmethod
+    def common(types: Iterable[TypeInstance]) -> TypeInstance | None:
+        """
+        Find the common structure between multiple types.
+        """
+        ftypes = [t.follow() for t in types]
+        if not ftypes:
+            return None
+        operators = [t.operator for t in ftypes]
+        operator = operators[0]
+
+        if operator is None or not all(o == operator for o in operators):
+            return None
+        else:
+            return operator(*(
+                TypeInstance.common(t.params[i] for t in ftypes) or _
+                for i in range(operator.arity)
+            ))
 
     def instance(self) -> TypeInstance:
         return self.follow()
@@ -801,7 +835,7 @@ class SubtypeConstraint(Constraint):
         )
 
     def fulfill(self) -> bool:
-        self.reference.unify(self.target, subtype=True, with_basic=False)
+        self.reference.unify(self.target, subtype=True, skip_basic=True)
         result = self.reference.match(self.target, subtype=True)
         if result is True:
             self.fulfilled = True
@@ -865,12 +899,20 @@ class EliminationConstraint(Constraint):
         assert self.reference.normalized() and \
             all(p.normalized() for p in self.alternatives)
 
+        # number_before = len(self.alternatives)
         self.alternatives = [t for t in self.alternatives
             if self.reference.match(t, subtype=True, accept_wildcard=True)
             is not False
         ]
+        # number_after = len(self.alternatives)
 
-        # TODO update upon narrowing the alternatives
+        # Every time alternatives are narrowed, see if there's a commonality
+        # between the remaining alternatives
+        # if number_after < number_before or True:
+        #     common = TypeInstance.common(self.alternatives)
+        #     if common:
+        #         self.reference.unify(common, skip_wildcard=True)
+        #     self.minimize()
 
         if len(self.alternatives) == 0:
             raise ConstraintViolation(self)
