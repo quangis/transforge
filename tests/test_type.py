@@ -127,8 +127,10 @@ class TestType(unittest.TestCase):
         self.apply(f, A1, A, result=B)
         self.apply(f, A, A1, result=B)
 
-        # TODO shouldn't this work?
-        # self.apply(f, B, result=ConstraintViolation)
+    @unittest.skip("later")
+    def test_order_of_subtype_application_with_constraints2(self):
+        f = TypeSchema(lambda α: (α <= A) >> α ** α ** B)
+        self.apply(f, B, result=ConstraintViolation)
 
     def test_preservation_of_subtypes_in_constraints(self):
         f = TypeSchema(lambda α, β: (α[β, Z(β)], β <= A) >> α ** α)
@@ -219,7 +221,6 @@ class TestType(unittest.TestCase):
         g = TypeSchema(lambda x, y: (x ** y) ** y)
         self.apply(g, f)
 
-    @unittest.skip("later")
     def test_unification_of_constraint_with_variables(self):
         # See issue #13
         A, B, C = TypeOperator('A'), TypeOperator('B'), TypeOperator('C')

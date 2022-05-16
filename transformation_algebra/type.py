@@ -159,7 +159,7 @@ class TypeSchema(Type):
 
     def instance(self, origin=None) -> TypeInstance:
         return self.schema(*(TypeVariable(origin=origin)
-            for _ in range(self.n)))
+            for _ in range(self.n))).fix(prefer_lower=True)
 
     def validate_no_free_variables(self) -> None:
         """

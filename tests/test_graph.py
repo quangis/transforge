@@ -578,7 +578,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         TypeOperator(supertype=B)
-        f = Operator(type=lambda x: x[A] ** x)
+        f = Operator(type=lambda x: (x <= A) >> x ** x)
         lang = Language(locals(), namespace=TEST)
 
         expected = graph_manual(
