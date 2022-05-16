@@ -131,7 +131,10 @@ class Type(ABC):
             x.unify(f.params[0], subtype=True)
             f.params[0].fix(prefer_lower=False)
             # f.fix()
-            return f.params[1].fix()
+            if f.params[1].operator == Function:
+                return f.params[1]
+            else:
+                return f.params[1].fix()
         else:
             raise FunctionApplicationError(f, x)
 
@@ -689,6 +692,8 @@ class TypeVariable(TypeInstance):
         lower, upper = a.lower or new, a.upper or new
         if upper.subtype(new, True):  # fail when lower bound higher than upper
             raise SubtypeMismatch(new, upper)
+        elif not new.subtype(upper):  # make sure that new type is in same line
+            raise SubtypeMismatch(new, upper)
         elif new.subtype(lower, True):  # ignore lower bound lower than current
             pass
         elif lower.subtype(new):  # tighten the lower bound
@@ -708,6 +713,8 @@ class TypeVariable(TypeInstance):
         lower, upper = a.lower or new, a.upper or new
         if new.subtype(lower, True):
             raise SubtypeMismatch(lower, new)
+        elif not lower.subtype(upper):
+            raise SubtypeMismatch(new, upper)
         elif upper.subtype(new, True):
             pass
         elif new.subtype(upper):
