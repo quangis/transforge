@@ -884,7 +884,7 @@ class EliminationConstraint(Constraint):
                 if obj.match(minimized[i], subtype=True):
                     add = False
             if add:
-                minimized.append(obj.follow())
+                minimized.append(obj.follow().fix())
         self.reference = self.reference.follow()
         self.alternatives = minimized
 

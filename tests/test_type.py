@@ -250,18 +250,6 @@ class TestType(unittest.TestCase):
         self.apply(f, A, result=F(A, A))
         self.apply(g, A, result=F(A, A))
 
-    @unittest.skip("later")
-    def test_unify_unifiable_constraint_options(self):
-        # See issues #11, #85
-        # If all options in a constraint turn out to come down to the same
-        # thing, they should unify.
-        A = TypeOperator('A')
-        F = TypeOperator('F', params=2)
-        f = TypeSchema(lambda x, y, z: (z[F(x, A), F(y, A)]) >> F(x, y) ** z)
-        self.apply(f, F(A, A), result=F(A, A))
-
-        g = TypeSchema(lambda x: (F(A, A)[F(A, x), F(A, x)]) >> x)
-        self.apply(g, result=A)
 
     def test_unify_subtypable_constraint_options(self):
         # See issues #11, #85
@@ -273,23 +261,19 @@ class TestType(unittest.TestCase):
         f = TypeSchema(lambda x, y: y[F(A, x), F(B, x)] >> x ** y)
         self.assertEqual(f.apply(A).params[1], A())
 
-    @unittest.skip("this no longer makes sense")
+    @unittest.skip("not important")
     def test_unify_bottom_types(self):
-        # We don't have special notation for subtypes and supertypes, nor
-        # unfold types into their super-/subtypes. Instead, we assume that
-        # every type also stands for its subtypes. This is almost always what
-        # you want, so there's no point in increasing the number of checks we
-        # do. However, if a type has *no* subtypes, we can already unify.
+        # If a variable must be a subtype of a type that has no subtypes, we
+        # can already unify with the bottom type.
         # See #85
         A = TypeOperator('A')
         B = TypeOperator('B', supertype=A)
-        f = TypeSchema(lambda x: x[A])
-        g = TypeSchema(lambda x: x[B])
+        f = TypeSchema(lambda x: (x <= A) >> x)
+        g = TypeSchema(lambda x: (x <= B) >> x)
         self.apply(f, result=TypeVariable)
         self.apply(g, result=B)
 
-    @unittest.skip("later")
-    def test_unify_type_operator(self):
+    def test_unify_unifiable_constraint_options1(self):
         # In case there are multiple types in the constraint, but they all have
         # the same type operator, we can already unify with that operator, in
         # case that narrows down other constraints.
@@ -299,6 +283,19 @@ class TestType(unittest.TestCase):
         F = TypeOperator('F', params=1)
         f = TypeSchema(lambda x: x[F(A), F(B)] >> x)
         self.assertEqual(f.instance().operator, F)
+
+    def test_unify_unifiable_constraint_options2(self):
+        # See issues #11, #85
+        # If all options in a constraint turn out to come down to the same
+        # thing, they should unify.
+        A = TypeOperator('A')
+        F = TypeOperator('F', params=2)
+        f = TypeSchema(lambda x, y, z: (z[F(x, A), F(y, A)]) >> F(x, y) ** z)
+        self.apply(f, F(A, A), result=F(A, A))
+
+        g = TypeSchema(lambda x: (F(A, A)[F(A, x), F(A, x)]) >> x)
+        self.apply(g, result=A)
+
 
     # def test_asdf3(self):
     #     # See #85
