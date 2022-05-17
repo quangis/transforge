@@ -42,9 +42,9 @@ automatically of type `Real`, but not necessarily of type `Nat`:
 
     >>> Int = TypeOperator(name="Int", supertype=Real)
     >>> Nat = TypeOperator(name="Nat", supertype=Int)
-    >>> Int <= Real
+    >>> Int.subtype(Real)
     True
-    >>> Int <= Nat
+    >>> Int.subtype(Nat)
     False
 
 *Complex types* take other types as parameters. For example, `Set(Int)` could 
@@ -52,7 +52,7 @@ represent the type of sets of integers. This would automatically be a subtype
 of `Set(Real)`.
 
     >>> Set = TypeOperator(name="Set", params=1)
-    >>> Set(Int) <= Set(Real)
+    >>> Set(Int).subtype(Set(Real))
     True
 
 A special complex type is `Function`, which describes a transformation. For 
@@ -93,13 +93,16 @@ the *schematic* type variables that occur in its body. (Don't be fooled by the
 to universal quantification.) When the type schema is used somewhere, the 
 schematic variables are automatically instantiated with concrete ones.
 
-Often, variables in a schema cannot be just *any* type. We can use the notation 
-`variable[alternatives]` to *constrain* a type to an ad-hoc typeclass --- 
-meaning that the reference `variable` must be a subtype of one of the types 
-specified in the `alternatives`. For instance, we might want to define a 
-function that applies to both single integers and sets of integers:
+Often, variables in a schema cannot be just *any* type. We can abuse indexing 
+notation (`x[...]`) to *constrain* a type. A constraint can be a *subtype* 
+constraint, written `x <= y`, meaning that `x`, once it is unified, must be a 
+subtype of the given type `y`. It can also be an *elimination* constraint, 
+written `x << {y, z}` meaning that `x` will be unified to a subtype one of the 
+options, as soon as the alternatives have been eliminated. For instance, we 
+might want to define a function that applies to both single integers and sets 
+of integers:
 
-    >>> f = TypeSchema(lambda α: α[Int, Set(Int)] ** α)
+    >>> f = TypeSchema(lambda α: α ** α [α << {Int, Set(Int)}])
     >>> f.apply(Set(Nat))
     Set(Nat)
 
@@ -114,16 +117,9 @@ and supertype of *anything*. (Note that it must be explicitly imported.)
 Typeclass constraints and wildcards can often aid in inference, figuring out 
 interdependencies between types:
 
-    >>> f = TypeSchema(lambda α, β: α[Set(β), Map(β, _)] ** β)
+    >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
     >>> f.apply(Set(Int))
     Int
-
-For large signatures, it is sometimes clearer to specify the typeclass 
-constraints upfront using the `>>` notation:
-
-    >>> f = TypeSchema(lambda α, β:
-            {α[Set(β), Map(β, _)]} >> α ** β
-        )
 
 A note on type inference in the presence of subtypes. Consider that, when you 
 apply a function of type `τ ** τ ** τ` to an argument with a concrete type, say 
