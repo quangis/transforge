@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra.type import \
-    Type, TypeOperator, TypeSchema, TypeVariable, _, with_parameters, \
+    Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
     FunctionApplicationError, TypeMismatch, \
     ConstraintViolation, ConstrainFreeVariable, EliminationConstraint
 
@@ -100,6 +100,19 @@ class TestType(unittest.TestCase):
         self.apply(compose, A ** B, B ** A1)  # , result=B ** B)
         self.apply(compose, A ** B, B ** B1, result=TypeMismatch)
         self.apply(compose, A1 ** B, B ** A, result=TypeMismatch)
+
+    @unittest.skip("unfinished")
+    def test_equal_lower_and_upper_bound(self):
+        # Test that a situation in which a variable has an equal lower and
+        # upper bound is resolved. I could not quickly reproduce a MWE of the
+        # situation, but it *does* arise naturally, specifically in the output
+        # of the `compose2` operator in the
+        # `SelectLayerByRatioGEQPlainRegionObjects` tool of the
+        # `SolarPowerPotentialGloverPark` workflow at commit
+        # `8b2f38242860c924d003c8d19dfb781248b53fea` of
+        # <https://github.com/quangis/cct>
+        # f = TypeSchema(lambda x, y: x ** y [x << A, A << y])
+        pass
 
     def test_variable_sub(self):
         f = TypeSchema(lambda x: (x ** A1) ** x)
