@@ -30,6 +30,19 @@ Triple = tuple[Node, Union[Path, Node], Node]
 
 A = TypeVar('A')
 
+class QueryGraph(Graph):
+    def __init__(self, lang: Language, file: str):
+        self.parse(file)
+        self.lang = lang
+        self.root = self.value(predicate=RDF.type, object=TA.Query, any=False)
+        self.output = self.value(subject=self.root, predicate=TA.output)
+
+    def to_flow(self):
+        # Turn `lang:type` literals into actual node predicates
+        for node, string_type in self[:self.lang.namespace.type:]:
+            pass
+            # type = self.lang.parse(string_type)
+
 
 def dict2steps(lang: Language, value: dict | str) -> Steps:
     """
@@ -201,6 +214,7 @@ class Query(object):  # TODO subclass rdflib.Query?
 
     @staticmethod
     def from_dict(lang: Language, d: dict) -> Query:
+        "This will be deprecated in the future."
         return Query(lang=lang, flow=steps2flow(dict2steps(lang, d)))
 
     def query_diagnostic(self, g: Graph
