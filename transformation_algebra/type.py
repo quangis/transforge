@@ -84,14 +84,16 @@ class Type(ABC):
                 raise ValueError("Indexing notation only accepts constraints.")
         return self.instance()
 
-    def __lshift__(self, other: Iterable[Type]) -> EliminationConstraint:
+    def __lshift__(self, other: Type | Iterable[Type]) -> EliminationConstraint:
         """
         Abuse of Python's notation to write elimination constraints using the
         `<<` operator. Example:
 
             >>> TypeSchema(lambda x, y: F(x) ** y [x * y << {A * B, B * C}])
+            >>> TypeSchema(lambda x: x [x << A])
         """
-        return EliminationConstraint(self.instance(), other)
+        return EliminationConstraint(self.instance(),
+            (other,) if isinstance(other, Type) else other)
 
     def __lt__(self, other: Type) -> SubtypeConstraint:
         """
