@@ -259,7 +259,7 @@ class TransformationGraph(Graph):
                         datatype in self.language.taxonomy)):
                     type_str = str(datatype)
                 else:
-                    type_str = "?"
+                    type_str = f"? ({datatype})"
 
                 self.add((current, RDFS.label, Literal(
                     f"{self.ref()}{type_str} via {expr.operator.name}")))
