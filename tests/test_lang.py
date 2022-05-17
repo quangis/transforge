@@ -69,19 +69,6 @@ class TestAlgebra(unittest.TestCase):
             F(B, B): set(),
         }
 
-    def test_string_schematic_type(self):
-        """
-        Test that schematic types are printed with the names of their schematic
-        variables.
-        """
-        A = TypeOperator()
-        B = TypeOperator()
-        TypeOperator(supertype=A)
-        f = Operator(type=lambda x: x [x << {A, B}])
-        lang = Language(scope=locals())
-
-        self.assertEqual(str(f.type), "x | x[A, B]")
-
     def test_parse_inline_typing(self):
         A = TypeOperator()
         x = Operator(type=A)

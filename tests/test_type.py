@@ -416,6 +416,29 @@ class TestType(unittest.TestCase):
             (A1, A2) ** A
         )
 
+    def test_printing(self):
+        # Schematic types are printed with the names of their variables
+        f = TypeSchema(lambda foo: foo)
+        self.assertEqual(str(f), "foo")
+
+        # Subtype constraints
+        A = TypeOperator('A')
+        f = TypeSchema(lambda x: x [x <= A])
+        g = TypeSchema(lambda x: x [A <= x])
+        self.assertEqual(str(f), "x [x <= A]")
+        self.assertEqual(str(g), "x [A <= x]")
+
+        # Elimination constraints
+        B = TypeOperator('B')
+        f = TypeSchema(lambda x: x [x << (A, B)])
+        self.assertEqual(str(f), "x [x << (A, B)]")
+
+        # Subtype bounds printed using same notation as elimination constraints
+        f = TypeSchema(lambda x: x [x << A])
+        g = TypeSchema(lambda x: x [A << x])
+        self.assertEqual(str(f), "x [x << A]")
+        self.assertEqual(str(g), "A")  # this subtype bound should be fixed
+
 
 if __name__ == '__main__':
     unittest.main()

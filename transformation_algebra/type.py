@@ -157,7 +157,7 @@ class TypeSchema(Type):
     def __str__(self) -> str:
         names = signature(self.schema).parameters
         variables = [TypeVariable() for _ in names]
-        return self.schema(*variables).text(
+        return self.schema(*variables).fix(prefer_lower=True).text(
             with_constraints=True,
             labels={v: k for k, v in zip(names, variables)})
 
@@ -314,18 +314,18 @@ class TypeInstance(Type):
                     assert result
 
         if with_constraints:
-            result_aux = [result]
+            result_aux = []
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v.text(*args)} ≥ {v.lower}")
+                    result_aux.append(f"{v.lower} << {v.text(*args)}")
                 if v.upper:
-                    result_aux.append(f"{v.text(*args)} ≤ {v.upper}")
+                    result_aux.append(f"{v.text(*args)} << {v.upper}")
 
             result_aux.extend(
                 c.text(*args) for c in self.constraints())
-            return ' | '.join(result_aux)
-        else:
-            return result
+            if result_aux:
+                result += f" [{', '.join(result_aux)}]"
+        return result
 
     def fix(self, prefer_lower: bool = True) -> TypeInstance:
         """
@@ -873,8 +873,8 @@ class EliminationConstraint(Constraint):
 
     def text(self, *args, **kwargs) -> str:
         return (
-            f"{self.reference.text(*args, **kwargs)}["
-            f"{', '.join(a.text(*args, **kwargs) for a in self.alternatives)}]"
+            f"{self.reference.text(*args, **kwargs)} << ("
+            f"{', '.join(a.text(*args, **kwargs) for a in self.alternatives)})"
         )
 
     def __iter__(self) -> Iterator[TypeInstance]:
