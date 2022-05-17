@@ -702,8 +702,8 @@ class TypeVariable(TypeInstance):
             a.check_constraints()
         else:  # fail on bound from other lineage (neither sub- nor supertype)
             raise SubtypeMismatch(lower, new)
-        # if a.lower and a.lower == a.upper and a.lower is not None:
-        #     self.bind(a.lower())  # if A <= x <= A, immediately bind x to A
+        if a.lower and a.lower == a.upper and a.lower is not None:
+            self.bind(a.lower())  # if A <= x <= A, immediately bind x to A
 
     def below(self, new: TypeOperator) -> None:
         """
@@ -725,8 +725,8 @@ class TypeVariable(TypeInstance):
             a.check_constraints()
         else:
             raise SubtypeMismatch(new, upper)
-        # if a.upper and a.upper == a.lower and a.upper is not None:
-        #     self.bind(a.upper())
+        if a.upper and a.upper == a.lower and a.upper is not None:
+            self.bind(a.upper())
 
 
 class TypeAlias(Type):

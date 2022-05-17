@@ -101,18 +101,21 @@ class TestType(unittest.TestCase):
         self.apply(compose, A ** B, B ** B1, result=TypeMismatch)
         self.apply(compose, A1 ** B, B ** A, result=TypeMismatch)
 
-    @unittest.skip("unfinished")
     def test_equal_lower_and_upper_bound(self):
         # Test that a situation in which a variable has an equal lower and
-        # upper bound is resolved. I could not quickly reproduce a MWE of the
-        # situation, but it *does* arise naturally, specifically in the output
-        # of the `compose2` operator in the
-        # `SelectLayerByRatioGEQPlainRegionObjects` tool of the
-        # `SolarPowerPotentialGloverPark` workflow at commit
-        # `8b2f38242860c924d003c8d19dfb781248b53fea` of
-        # <https://github.com/quangis/cct>
-        # f = TypeSchema(lambda x, y: x ** y [x << A, A << y])
-        pass
+        # upper bound is resolved. This does sometimes arise naturally,
+        # specifically in the outputs of the `compose2` operators in the
+        # <https://github.com/quangis/cct> repository. Initial reproduction:
+        # cct.parse("select (compose2 notj leq)").x.type.output()
+        A, R = TypeOperator('A'), TypeOperator('R', params=2)
+        select = TypeSchema(lambda x, y, rel: (x ** y ** A) ** rel ** y ** rel
+                [rel << (R(x, _), R(_, x))]).instance()
+        compose2 = TypeSchema(lambda α, β, γ, δ: (β ** γ) ** (δ ** α ** β) **
+                (δ ** α ** γ)).instance()
+        notj = A ** A
+        leq = A ** A ** A
+        select.apply(compose2.apply(notj).apply(leq))
+        self.assertEqual(compose2.output(), A())
 
     def test_variable_sub(self):
         f = TypeSchema(lambda x: (x ** A1) ** x)
