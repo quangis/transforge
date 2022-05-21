@@ -613,8 +613,6 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, TEST.type, Literal("F(A)")))
-        expected.add((root, TEST.via, Literal("f")))
         expected.add((root, RDF.type, TEST["F_A"]))
         expected.add((root, TA.via, TEST["f"]))
 

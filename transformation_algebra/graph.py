@@ -441,7 +441,7 @@ class TransformationGraph(Graph):
         return {wfnode: self.expr_nodes[expr]
             for wfnode, expr in exprs.items()}
 
-    def parse_shortcuts(self) -> None:
+    def parse_shortcuts(self, remove: bool = True) -> None:
         """
         For convenience, types and operators may be specified as string
         literals in RDF using the `lang:type` and `lang:via` predicates. This
@@ -465,3 +465,7 @@ class TransformationGraph(Graph):
         for subj, obj in self[:ns.via:]:
             operator = self.language.parse_operator(str(obj))
             self.add((subj, TA.via, ns[operator.name]))
+
+        if remove:
+            self.remove((None, ns.type, None))
+            self.remove((None, ns.via, None))
