@@ -600,16 +600,22 @@ class TestAlgebraRDF(unittest.TestCase):
 
     def test_shortcut_parsing(self):
         A = TypeOperator()
+        F = TypeOperator(params=1)
         f = Operator(type=lambda x: x ** x)
+        F_A = TypeAlias(F(A))
         lang = Language(locals(), namespace=TEST)
 
         root = BNode()
+
         actual = TransformationGraph(lang)
-        actual.add((root, TEST.type, Literal("A")))
+        actual.add((root, TEST.type, Literal("F(A)")))
+        actual.add((root, TEST.via, Literal("f")))
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, TEST.type, Literal("A")))
-        expected.add((root, RDF.type, TEST.A))
+        expected.add((root, TEST.type, Literal("F(A)")))
+        expected.add((root, TEST.via, Literal("f")))
+        expected.add((root, RDF.type, TEST["F_A"]))
+        expected.add((root, TA.via, TEST["f"]))
 
         self.assertIsomorphic(actual, expected)

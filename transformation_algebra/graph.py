@@ -458,10 +458,10 @@ class TransformationGraph(Graph):
         ns = self.language.namespace
         # TODO handle collections of types/operators
         for subj, obj in self[:ns.type:]:
-            type = self.language.parse_type(obj)
+            type = self.language.parse_type(str(obj))
             node = self.type_nodes[type]
             self.add((subj, RDF.type, node))
 
         for subj, obj in self[:ns.via:]:
-            operator = self.language.parse_operator(obj)
+            operator = self.language.parse_operator(str(obj))
             self.add((subj, TA.via, ns[operator.name]))
