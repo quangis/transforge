@@ -7,7 +7,7 @@ from __future__ import annotations
 import unittest
 
 from rdflib import Graph, BNode, RDF, RDFS, URIRef
-from rdflib.term import Node
+from rdflib.term import Node, Literal
 from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
@@ -595,5 +595,21 @@ class TestAlgebraRDF(unittest.TestCase):
             TEST.tool1: ("f (1: B)", [TEST.src1]),
             TEST.tool2: ("f (1: A)", [TEST.tool1])
         }, {TEST.src1})
+
+        self.assertIsomorphic(actual, expected)
+
+    def test_shortcut_parsing(self):
+        A = TypeOperator()
+        f = Operator(type=lambda x: x ** x)
+        lang = Language(locals(), namespace=TEST)
+
+        root = BNode()
+        actual = TransformationGraph(lang)
+        actual.add((root, TEST.type, Literal("A")))
+        actual.parse_shortcuts()
+
+        expected = TransformationGraph(lang)
+        expected.add((root, TEST.type, Literal("A")))
+        expected.add((root, RDF.type, TEST.A))
 
         self.assertIsomorphic(actual, expected)

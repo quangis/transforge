@@ -440,3 +440,28 @@ class TransformationGraph(Graph):
 
         return {wfnode: self.expr_nodes[expr]
             for wfnode, expr in exprs.items()}
+
+    def parse_shortcuts(self) -> None:
+        """
+        For convenience, types and operators may be specified as string
+        literals in RDF using the `lang:type` and `lang:via` predicates. This
+        method automatically parses these strings and replaces them with
+        `ta:type` and `ta:via` predicates with the corresponding nodes as
+        object. Example:
+
+            [] cct:type "R(Obj, Reg)".
+
+        Becomes:
+
+            [] ta:type cct:R-Obj-Reg.
+        """
+        ns = self.language.namespace
+        # TODO handle collections of types/operators
+        for subj, obj in self[:ns.type:]:
+            type = self.language.parse_type(obj)
+            node = self.type_nodes[type]
+            self.add((subj, RDF.type, node))
+
+        for subj, obj in self[:ns.via:]:
+            operator = self.language.parse_operator(obj)
+            self.add((subj, TA.via, ns[operator.name]))

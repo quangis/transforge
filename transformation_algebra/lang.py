@@ -121,6 +121,8 @@ class Language(object):
     def add(self, item: Operator | TypeOperator | TypeAlias,
             name: str | None = None):
 
+        reserved = ("via", "type")
+
         if self._closed:
             raise RuntimeError("Cannot add to language after closing.")
 
@@ -132,7 +134,7 @@ class Language(object):
         else:
             raise RuntimeError("unnamed")
 
-        if name in self:
+        if name in self or name in reserved:
             raise ValueError(f"symbol {name} already exists in the language")
 
         if isinstance(item, TypeOperation) and any(item.variables()):
@@ -350,6 +352,7 @@ class LanguageNamespace(ClosedNamespace):
 
     def __new__(cls, uri, lang: Language):
         terms = chain(
+            ("type", "via"),
             lang.operators.keys(),
             lang.types.keys(),
             (t.text(sep=".", lparen="_", rparen="", prod="")
