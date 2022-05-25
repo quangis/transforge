@@ -7,4 +7,4 @@ from transformation_algebra.lang import \
 from transformation_algebra.graph import \
     TransformationGraph, TA
 from transformation_algebra.query import \
-    Query
+    TransformationQuery
