@@ -253,19 +253,19 @@ class TestAlgebra(unittest.TestCase):
         })
 
         self.assertQuery(lang, graph,
-            (B,), by_output=False, by_chronology=False,
+            (B,), by_io=False, by_chronology=False,
             results={TEST.wf1, TEST.wf2}
         )
         self.assertQuery(lang, graph,
-            (B,), by_output=True, by_chronology=False,
+            (B,), by_io=True, by_chronology=False,
             results={TEST.wf1}
         )
         self.assertQuery(lang, graph,
-            (C, [(A, [B])]), by_output=True, by_chronology=False,
+            (C, [(A, [B])]), by_io=True, by_chronology=False,
             results={TEST.wf2}
         )
         self.assertQuery(lang, graph,
-            (C, [(A, [B])]), by_output=True, by_chronology=True,
+            (C, [(A, [B])]), by_io=True, by_chronology=True,
             results={}
         )
 

@@ -7,32 +7,21 @@ specified order.
 
 from __future__ import annotations
 
-from rdflib import BNode
-from rdflib.term import Node, Variable, Path
+from rdflib.term import Node, BNode, URIRef, Variable
 from rdflib.namespace import RDF
 from rdflib.util import guess_format
 from itertools import count, chain
-from typing import Iterable
+from typing import Iterable, Iterator
 from collections import deque
 
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
 
-def triple(*items: Node | Path) -> str:
-    result = []
-    for item in items:
-        try:
-            result.append(item.n3())
-        except TypeError:
-            result.append(str(item))
-    return " ".join(result) + "."
-
-
 class TransformationQuery(object):
     """
-    A transformation can be used to query other transformations: it captures
-    some relevant aspects of a process, in terms of the flow of conceptual
-    types and operations that must occur in it. For example, the following flow
+    A transformation can be used to query other transformations: it should then
+    capture relevant aspects of the process, as a flowchart of some conceptual
+    types and operations that must occur in it. For example, the following
     holds that there must be types `A` and `B` that are fed to an operation `f`
     that eventually results in a type `C`:
 
@@ -44,7 +33,9 @@ class TransformationQuery(object):
                 ]
             ].
 
-    Note that the flow is 'reversed' (from output to input).
+    This transformation can be transformed to a SPARQL query that matches any
+    such transformation. Note that the flow is 'reversed' (from output to
+    input).
     """
 
     def __init__(self, lang: Language, graph: TransformationGraph | str,
@@ -68,8 +59,7 @@ class TransformationQuery(object):
         assert self.root and self.output
 
     def sparql(self,
-            by_output: bool = True,
-            by_input: bool = False,
+            by_io: bool = True,
             by_types: bool = True,
             by_operators: bool = True,
             by_chronology: bool = True) -> str:
@@ -85,21 +75,77 @@ class TransformationQuery(object):
         result = sparql(
             "PREFIX : <https://github.com/quangis/transformation-algebra#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
-            # self.stmts_output_type() if by_output else (),
-            # self.stmts_input_type() if by_input else (),
-            # self.stmts_bag(operators=True) if by_operators else (),
-            # self.stmts_bag(types=True) if by_types else (),
-            # self.stmts_chronology(self.output) if by_chronology else (),
+            self.io() if by_io else (),
+            self.operators() if by_operators else (),
+            self.types() if by_types else (),
             self.chronology() if by_chronology else (),
             "} GROUP BY ?workflow"
         )
-        # print(result)
         return result
 
-    def chronology(self) -> str:
+    def traverse(self) -> Iterator[Node]:
+        """
+        Breadth-first traversal of all conceptual steps, starting at the output
+        node.
+        """
+        # TODO order
+        visited: set[Node] = set()
+        queue: deque[Node] = deque([self.output])
+        while len(queue) > 0:
+            current = queue.popleft()
+            assert current not in visited
+            yield current
+            for before in self.graph.objects(current, TA["from"]):
+                if before not in visited:
+                    queue.append(before)
+            visited.add(current)
+
+    def types(self) -> Iterable[str]:
+        """
+        Conditions for matching on the bag of types used in a query.
+        """
+        result = set()
+        for node in self.traverse():
+            for tp in self.graph.objects(node, RDF.type):
+                assert isinstance(tp, URIRef)
+                result.add(f"?workflow :member/rdfs:subClassOf {tp.n3()}.")
+        return result
+
+    def operators(self) -> Iterable[str]:
+        """
+        Conditions for matching on the bag of operators.
+        """
+        result = set()
+        for node in self.traverse():
+            for op in self.graph.objects(node, TA.via):
+                assert isinstance(op, URIRef)
+                result.add(f"?workflow :member {op.n3()}.")
+        return result
+
+    def io(self) -> Iterable[str]:
+        """
+        Conditions for matching on input and outputs of the query.
+        """
+        result = []
+        for i, output in enumerate(self.graph.objects(self.root, TA.output)):
+            result.append(f"?workflow :output ?output{i}.")
+            for tp in self.graph.objects(output, RDF.type):
+                assert isinstance(tp, URIRef)
+                result.append(f"?output{i} a/rdfs:subClassOf {tp.n3()}.")
+        for i, input in enumerate(self.graph.objects(self.root, TA.input)):
+            result.append(f"?workflow :input ?input{i}.")
+            for tp in self.graph.objects(input, RDF.type):
+                assert isinstance(tp, URIRef)
+                result.append(f"?input{i} rdf:type/rdfs:subClassOf {tp.n3()}.")
+        return result
+
+    def chronology(self) -> Iterable[str]:
+        """
+        Conditions for matching the specific order of a query.
+        """
         result = [
-            "\n# Chronology",
             "?workflow :output ?_0."
         ]
 
@@ -121,23 +167,27 @@ class TransformationQuery(object):
             # Connect it to its predecessors
             for after in self.graph.subjects(TA["from"], current):
                 assert after in mapping  # TODO definitely doesn't hold
+                assert isinstance(after, BNode)
                 bvar = mapping[after]
 
                 if finished[bvar]:
-                    result.append(f"{var.n3()} :feeds+ ?{bvar}.")
+                    result.append(f"{var.n3()} :feeds+ {bvar.n3()}.")
                 else:
-                    result.append(f"{var.n3()} :feeds* ?{bvar}.")
+                    result.append(f"{var.n3()} :feeds* {bvar.n3()}.")
 
             # Determine correct types and operations
             finished[var] = False
             for op in self.graph.objects(current, TA.via):
+                assert isinstance(op, URIRef)
                 result.append(f"{var.n3()} :via {op.n3()}.")
                 finished[var] = True
             for tp in self.graph.objects(current, RDF.type):
+                assert isinstance(tp, URIRef)
                 result.append(f"{var.n3()} a/rdfs:subClassOf {tp.n3()}.")
 
             # Add successors
             for before in self.graph.objects(current, TA["from"]):
+                assert isinstance(before, BNode)
                 queue.append(before)
 
-        return "\n".join(result)
+        return result
