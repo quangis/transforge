@@ -184,25 +184,25 @@ class TestAlgebra(unittest.TestCase):
 
     def test_sequenced_skips(self):
 
-        A, B, C = (TypeOperator() for _ in range(3))
+        A, B, C = (TypeOperator(x) for x in "ABC")
         a2b, b2c = Operator(type=A ** B), Operator(type=B ** C)
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
-            TEST.e: b2c(a2b(~A)),
-            TEST.e2: ~A
+            TEST.wf1: b2c(a2b(~A)),
+            TEST.wf2: ~A
         })
 
         # Test that a query for direct output really only captures that
         self.assertQuery(lang, graph, (C, a2b), results=set())
 
         # Test that a query for indirect output also captures direct output
-        self.assertQuery(lang, graph, (C, [a2b]), results={TEST.e})
-        self.assertQuery(lang, graph, (C, [b2c]), results={TEST.e})
+        self.assertQuery(lang, graph, (C, [a2b]), results={TEST.wf1})
+        self.assertQuery(lang, graph, (C, [b2c]), results={TEST.wf1})
 
         # Test that a query that skips the result type may still capture it
-        self.assertQuery(lang, graph, ([C],), results={TEST.e})
-        self.assertQuery(lang, graph, ([A],), results={TEST.e, TEST.e2})
+        self.assertQuery(lang, graph, ([C],), results={TEST.wf1})
+        self.assertQuery(lang, graph, ([A],), results={TEST.wf1, TEST.wf2})
 
     # def test_multiple_usage_of_units(self):
     #     # The same unit may be used multiple times, so simply assigning a
@@ -292,6 +292,18 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(lang, graph, Y, results={TEST.y})
         self.assertQuery(lang, graph, F(X), results={TEST.fx, TEST.fy})
         self.assertQuery(lang, graph, F(Y), results={TEST.fy})
+
+    def test_that_repeated_nodes_are_handled_correctly(self):
+        A = TypeOperator('A')
+        f = Operator('f', type=A ** A)
+        lang = Language(locals(), namespace=TEST)
+
+        graph = make_graph(lang, {
+            TEST.wf1: ~A,
+            TEST.wf2: f(~A),
+        })
+        self.assertQuery(lang, graph, (A,), results={TEST.wf1, TEST.wf2})
+        self.assertQuery(lang, graph, (A, [A]), results={TEST.wf2})
 
     # # def test_that_sources_with_nonnormalized_type_get_type_in_graph(self):
     # #     # There was an issue where the type of a source would not be saved in
