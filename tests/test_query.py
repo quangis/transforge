@@ -358,6 +358,92 @@ class TestAlgebra(unittest.TestCase):
     # #     self.assertQuery(lang, graph, [D, f2, OR([g, f], [m, n]), A],
     # #         results={TEST.wf1})
 
+    def test_sensible_order(self):
+        # If you have a transformation graph query that goes:
+        #
+        #   input  →  output
+        #      ↘ inter ↗
+        #
+        # Then, depending on Python's whims, either the intermediate or input
+        # node may be first to be visited after the output node. In case we
+        # visit the input node first, we have a problem, since we must declare
+        # that it is preceded by a node that has not yet been assigned any
+        # properties (variable name, types etcetera). And if we choose the
+        # input node before the inter node, then the inter node might be
+        # considered twice. We must deal with both these issues.
+        lang = Language(locals(), TEST)
+
+        # Repeat a couple of times to make it more likely that the bug, if
+        # present, is caught
+        for _ in range(10):
+            graph = TransformationGraph(lang)
+            root = BNode()
+            A, B, C = BNode(), BNode(), BNode()
+            graph.add((root, RDF.type, TA.Query))
+            graph.add((root, TA.output, A))
+            graph.add((A, TA["from"], B))
+            graph.add((A, TA["from"], C))
+            graph.add((B, TA["from"], C))
+            result = list(TransformationQuery(lang, graph).chronology())
+            self.assertTrue(
+                (result == ['?workflow :output ?_0.', '?_1 :feeds* ?_0.',
+                 '?_2 :feeds* ?_0.', '?_2 :feeds* ?_1.']) or
+                (result == ['?workflow :output ?_0.', '?_1 :feeds* ?_0.',
+                 '?_2 :feeds* ?_1.', '?_2 :feeds* ?_0.'])
+            )
+
+    def test_cycles(self):
+        # The code that makes sure we pass `test_sensible_order` must not
+        # introduce infinite loops when we encounter a cycle:
+        #
+        #   input  ←  output
+        #      ↘ inter ↗
+        lang = Language(locals(), TEST)
+        graph = TransformationGraph(lang)
+
+        graph = TransformationGraph(lang)
+        root = BNode()
+        A = BNode()
+        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, TA.output, A))
+        graph.add((A, TA["from"], A))
+        query = TransformationQuery(lang, graph)
+        self.assertRaises(Exception, TransformationQuery.chronology, query)
+
+        graph = TransformationGraph(lang)
+        root = BNode()
+        A, B = BNode(), BNode()
+        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, TA.output, A))
+        graph.add((A, TA["from"], B))
+        graph.add((B, TA["from"], A))
+        query = TransformationQuery(lang, graph)
+        self.assertRaises(Exception, TransformationQuery.chronology, query)
+
+        graph = TransformationGraph(lang)
+        root = BNode()
+        A, B, C = BNode(), BNode(), BNode()
+        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, TA.output, A))
+        graph.add((A, TA["from"], B))
+        graph.add((B, TA["from"], C))
+        graph.add((C, TA["from"], A))
+        query = TransformationQuery(lang, graph)
+        self.assertRaises(Exception, TransformationQuery.chronology, query)
+
+        graph = TransformationGraph(lang)
+        root = BNode()
+        A, B, C, D = BNode(), BNode(), BNode(), BNode()
+        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, TA.output, D))
+        graph.add((D, TA["from"], A))
+        graph.add((A, TA["from"], B))
+        graph.add((B, TA["from"], C))
+        graph.add((C, TA["from"], A))
+        query = TransformationQuery(lang, graph)
+        self.assertRaises(Exception, TransformationQuery.chronology, query)
+
+
 
 if __name__ == '__main__':
     unittest.main()

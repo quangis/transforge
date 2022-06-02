@@ -1,5 +1,5 @@
 """
-This module intends to provide a way to express transformation trees (i.e.
+This module intends to provide a way to express transformation graphs (i.e.
 chains of types and operations) in such a way that a query might use it to
 check if a given transformation expression contains types and operations in the
 specified order.
@@ -13,6 +13,7 @@ from rdflib.util import guess_format
 from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
+from functools import cache
 
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
@@ -98,7 +99,7 @@ class TransformationQuery(object):
         queue: deque[Node] = deque([self.output])
         while len(queue) > 0:
             current = queue.popleft()
-            assert current not in visited
+            # assert current not in visited
             yield current
             for before in self.graph.objects(current, TA["from"]):
                 if before not in visited:
@@ -152,22 +153,45 @@ class TransformationQuery(object):
             "?workflow :output ?_0."
         ]
 
+        # Mapping of nodes in the source graph to variables
         generator = iter(Variable(f"_{i}") for i in count())
-        mapping: dict[BNode, Variable] = dict()
+        variables: dict[BNode, Variable] = defaultdict(lambda: next(generator))
+
+        @cache
+        def connections_to(node: Node) -> list[Node]:
+            return list(self.graph.subjects(TA["from"], node))
 
         # Remember what type/operator is assigned to each step
         operators: dict[Variable, URIRef] = dict()
         types: dict[Variable, URIRef] = dict()
 
-        queue: deque[BNode] = deque([self.output])
-        while len(queue) > 0:
-            current = queue.popleft()
-            assert current not in mapping
+        waiting: list[BNode] = [self.output]
+        processing: deque[BNode] = deque()
+        visited: set[BNode] = set()
+        while True:
 
-            # Assign a variable to this node
-            mapping[current] = var = next(generator)
+            # Add only those nodes from the waitlist for which all "incoming"
+            # nodes (ie nodes that come "after") have been visited
+            new_waiting = []
+            for w in waiting:
+                if all(n in visited for n in connections_to(w)):
+                    processing.append(w)
+                else:
+                    new_waiting.append(w)
+                waiting = new_waiting
 
-            # Determine correct types and operations
+            if not len(processing):
+                break
+
+            current = processing.popleft()
+
+            if current in visited:
+                continue
+
+            # Assign a variable to this step
+            var = variables[current]
+
+            # Determine correct type/operation for this node
             for op in self.graph.objects(current, TA.via):
                 assert isinstance(op, URIRef) and var not in operators
                 operators[var] = op
@@ -175,30 +199,35 @@ class TransformationQuery(object):
                 assert isinstance(tp, URIRef) and var not in types
                 types[var] = tp
 
-            # Connect to "predecessors" (ie. the steps that come after)
-            for after in self.graph.subjects(TA["from"], current):
-                assert after in mapping  # TODO definitely doesn't hold
-                assert isinstance(after, BNode)
-                avar = mapping[after]
-
+            # Write connections to previous nodes (ie ones that come after)
+            for c in connections_to(current):
+                assert c in visited
+                conn = variables[c]
                 # Current and after nodes may refer to the same step if the
-                # graph has a bare operator and then a bare type in succession,
-                # or if the after node has no information at all
-                if not operators.get(avar) and (not types.get(avar) or (
+                # graph has a bare operator and then a bare type in
+                # succession, or if the after node has no information at
+                # all
+                if not operators.get(conn) and (not types.get(conn) or (
                         operators.get(var) and not types.get(var))):
-                    result.append(f"{var.n3()} :feeds* {avar.n3()}.")
+                    result.append(f"{var.n3()} :feeds* {conn.n3()}.")
                 else:
-                    result.append(f"{var.n3()} :feeds+ {avar.n3()}.")
+                    result.append(f"{var.n3()} :feeds+ {conn.n3()}.")
 
-            # Determine correct types and operations
+            # Write operator/type properties of this step
             if operator := operators.get(var):
                 result.append(f"{var.n3()} :via {operator.n3()}.")
             if ctype := types.get(var):
                 result.append(f"{var.n3()} a/rdfs:subClassOf {ctype.n3()}.")
 
-            # Add successors
+            visited.add(current)
+
+            # Add successors to queue
             for before in self.graph.objects(current, TA["from"]):
                 assert isinstance(before, BNode)
-                queue.append(before)
+                if before not in visited:
+                    waiting.append(before)
 
-        return result
+        if waiting:
+            raise ValueError("cycle!")
+        else:
+            return result
