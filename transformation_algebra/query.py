@@ -12,7 +12,7 @@ from rdflib.namespace import RDF
 from rdflib.util import guess_format
 from itertools import count, chain
 from typing import Iterable, Iterator
-from collections import deque, defaultdict
+from collections import deque
 from functools import cache
 
 from transformation_algebra.lang import Language
@@ -26,7 +26,7 @@ class TransformationQuery(object):
     holds that there must be types `A` and `B` that are fed to an operation `f`
     that eventually results in a type `C`:
 
-        [] a :Transformation; :output
+        [] a :Task; :output
             [ type: "C"; from:
                 [ via: "f"; from:
                     [ type: "A" ],
@@ -51,13 +51,13 @@ class TransformationQuery(object):
             self.graph.parse(graph, format=format or guess_format(graph))
         self.graph.parse_shortcuts()
 
-        self.root = self.graph.value(predicate=RDF.type, object=TA.Query,
+        self.root = self.graph.value(predicate=RDF.type, object=TA.Task,
             any=False)
         self.output = self.graph.value(subject=self.root, predicate=TA.output,
             any=False)
 
         if not self.root:
-            raise ValueError("The transformation graph is not a ta:Query.")
+            raise ValueError("The transformation graph is not a ta:Task.")
         if not self.output:
             raise ValueError("The transformation graph has no output.")
 
@@ -80,7 +80,7 @@ class TransformationQuery(object):
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
-            # "?workflow a :Transformation.",
+            "?workflow a :Transformation.",
             self.io() if by_io else (),
             self.operators() if by_operators else (),
             self.types() if by_types else (),
@@ -114,7 +114,7 @@ class TransformationQuery(object):
         for node in self.traverse():
             for tp in self.graph.objects(node, RDF.type):
                 assert isinstance(tp, URIRef)
-                result.add(f"?workflow :member/rdfs:subClassOf {tp.n3()}.")
+                result.add(f"?workflow :contains/rdfs:subClassOf {tp.n3()}.")
         return result
 
     def operators(self) -> Iterable[str]:
@@ -125,7 +125,7 @@ class TransformationQuery(object):
         for node in self.traverse():
             for op in self.graph.objects(node, TA.via):
                 assert isinstance(op, URIRef)
-                result.add(f"?workflow :member {op.n3()}.")
+                result.add(f"?workflow :contains {op.n3()}.")
         return result
 
     def io(self) -> Iterable[str]:
@@ -142,7 +142,7 @@ class TransformationQuery(object):
             result.append(f"?workflow :input ?input{i}.")
             for tp in self.graph.objects(input, RDF.type):
                 assert isinstance(tp, URIRef)
-                result.append(f"?input{i} rdf:type/rdfs:subClassOf {tp.n3()}.")
+                result.append(f"?input{i} a/rdfs:subClassOf {tp.n3()}.")
         return result
 
     def chronology(self) -> Iterable[str]:
@@ -155,10 +155,10 @@ class TransformationQuery(object):
 
         # Mapping of nodes in the source graph to variables
         generator = iter(Variable(f"_{i}") for i in count())
-        variables: dict[BNode, Variable] = defaultdict(lambda: next(generator))
+        variables: dict[BNode, Variable] = dict()
 
         @cache
-        def connections_to(node: Node) -> list[Node]:
+        def connections_to(node: BNode) -> list[BNode]:
             return list(self.graph.subjects(TA["from"], node))
 
         # Remember what type/operator is assigned to each step
@@ -189,7 +189,7 @@ class TransformationQuery(object):
                 continue
 
             # Assign a variable to this step
-            var = variables[current]
+            var = variables[current] = next(generator)
 
             # Determine correct type/operation for this node
             for op in self.graph.objects(current, TA.via):
@@ -209,15 +209,15 @@ class TransformationQuery(object):
                 # all
                 if not operators.get(conn) and (not types.get(conn) or (
                         operators.get(var) and not types.get(var))):
-                    result.append(f"{var.n3()} :feeds* {conn.n3()}.")
+                    result.append(f"{var.n3()} :to* {conn.n3()}.")
                 else:
-                    result.append(f"{var.n3()} :feeds+ {conn.n3()}.")
+                    result.append(f"{var.n3()} :to+ {conn.n3()}.")
 
             # Write operator/type properties of this step
             if operator := operators.get(var):
                 result.append(f"{var.n3()} :via {operator.n3()}.")
-            if ctype := types.get(var):
-                result.append(f"{var.n3()} a/rdfs:subClassOf {ctype.n3()}.")
+            if type := types.get(var):
+                result.append(f"{var.n3()} a/rdfs:subClassOf {type.n3()}.")
 
             visited.add(current)
 

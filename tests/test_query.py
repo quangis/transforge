@@ -26,7 +26,7 @@ def make_query(lang: Language, obj: tuple[Operator | Type | list]
         @prefix from: <https://github.com/quangis/transformation-algebra#from>.
         @prefix type: <https://example.com/#type>.
         @prefix via: <https://example.com/#operator>.
-        [] a :Query; :output
+        [] a :Task; :output
             [ type: "C"; via: "b2c"; from:
                 [ type: "B"; via: "a2b"; from:
                     [ type: "A" ]]].
@@ -36,7 +36,7 @@ def make_query(lang: Language, obj: tuple[Operator | Type | list]
     ns = lang.namespace
     g = TransformationGraph(lang)
     root = BNode()
-    g.add((root, RDF.type, TA.Query))
+    g.add((root, RDF.type, TA.Task))
 
     def f(current: tuple[Operator | Type | list] | Type | Operator) -> Node:
         if isinstance(current, (Type, Operator)):
@@ -379,17 +379,17 @@ class TestAlgebra(unittest.TestCase):
             graph = TransformationGraph(lang)
             root = BNode()
             A, B, C = BNode(), BNode(), BNode()
-            graph.add((root, RDF.type, TA.Query))
+            graph.add((root, RDF.type, TA.Task))
             graph.add((root, TA.output, A))
             graph.add((A, TA["from"], B))
             graph.add((A, TA["from"], C))
             graph.add((B, TA["from"], C))
             result = list(TransformationQuery(lang, graph).chronology())
             self.assertTrue(
-                (result == ['?workflow :output ?_0.', '?_1 :feeds* ?_0.',
-                 '?_2 :feeds* ?_0.', '?_2 :feeds* ?_1.']) or
-                (result == ['?workflow :output ?_0.', '?_1 :feeds* ?_0.',
-                 '?_2 :feeds* ?_1.', '?_2 :feeds* ?_0.'])
+                (result == ['?workflow :output ?_0.', '?_1 :to* ?_0.',
+                 '?_2 :to* ?_0.', '?_2 :to* ?_1.']) or
+                (result == ['?workflow :output ?_0.', '?_1 :to* ?_0.',
+                 '?_2 :to* ?_1.', '?_2 :to* ?_0.'])
             )
 
     def test_cycles(self):
@@ -404,7 +404,7 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A = BNode()
-        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], A))
         query = TransformationQuery(lang, graph)
@@ -413,7 +413,7 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A, B = BNode(), BNode()
-        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], A))
@@ -423,7 +423,7 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A, B, C = BNode(), BNode(), BNode()
-        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], C))
@@ -434,7 +434,7 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A, B, C, D = BNode(), BNode(), BNode(), BNode()
-        graph.add((root, RDF.type, TA.Query))
+        graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, D))
         graph.add((D, TA["from"], A))
         graph.add((A, TA["from"], B))
@@ -442,7 +442,6 @@ class TestAlgebra(unittest.TestCase):
         graph.add((C, TA["from"], A))
         query = TransformationQuery(lang, graph)
         self.assertRaises(Exception, TransformationQuery.chronology, query)
-
 
 
 if __name__ == '__main__':

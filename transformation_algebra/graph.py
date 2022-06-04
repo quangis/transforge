@@ -71,7 +71,7 @@ class TransformationGraph(Graph):
 
         for t in self.language.taxonomy:
             self.type_nodes[t] = self.language.namespace[
-                t.text(sep=".", lparen="_", rparen="", prod="")]
+                t.text(sep="-", lparen="-", rparen="", prod="")]
 
         self.bind("ta", TA)
         self.bind("lang", self.language.namespace)
@@ -220,52 +220,52 @@ class TransformationGraph(Graph):
                 self.add((current, RDF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TA.member, type_node))
+                    self.add((root, TA.contains, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
                     Literal(f"{self.ref()}{expr.type}")))
 
             if self.with_classes:
-                self.add((current, RDF.type, TA.SourceData))
+                self.add((current, RDF.type, TA.SourceConcept))
 
         elif isinstance(expr, Operation):
             # assert not expr.operator.definition, \
             #     f"{expr.operator} should be a primitive"
 
-            datatype = expr.type.output().normalize()
+            output_type = expr.type.output().normalize()
 
             if self.with_operators:
                 op_node = self.language.namespace[expr.operator.name]
                 self.add((current, TA.via, op_node))
 
                 if self.with_membership:
-                    self.add((root, TA.member, op_node))
+                    self.add((root, TA.contains, op_node))
 
             if (self.with_types
                     and (self.with_noncanonical_types or
-                        datatype in self.language.taxonomy)
+                        output_type in self.language.taxonomy)
                     and (self.with_intermediate_types or not intermediate)):
 
-                type_node = self.add_type(datatype)
+                type_node = self.add_type(output_type)
                 self.add((current, RDF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TA.member, type_node))
+                    self.add((root, TA.contains, type_node))
 
             if self.with_labels:
                 if ((self.with_intermediate_types or not intermediate)
                         and (self.with_noncanonical_types or
-                        datatype in self.language.taxonomy)):
-                    type_str = str(datatype)
+                        output_type in self.language.taxonomy)):
+                    type_str = str(output_type)
                 else:
-                    type_str = f"? ({datatype})"
+                    type_str = f"{output_type} (non-canonical)"
 
                 self.add((current, RDFS.label, Literal(
                     f"{self.ref()}{type_str} via {expr.operator.name}")))
 
             if self.with_classes:
-                self.add((current, RDF.type, TA.TransformedData))
+                self.add((current, RDF.type, TA.TransformedConcept))
 
         else:
             assert isinstance(expr, Application)
@@ -306,7 +306,7 @@ class TransformationGraph(Graph):
                 self.add((f, TA.internal, internal))
 
                 if self.with_classes:
-                    self.add((internal, RDF.type, TA.InternalData))
+                    self.add((internal, RDF.type, TA.InternalConcept))
 
                 if self.with_labels:
                     self.add((internal, RDFS.label, Literal(
@@ -320,10 +320,10 @@ class TransformationGraph(Graph):
                         intermediate=True)
                 else:
                     x = self.add_expr(expr.x, root, BNode(), intermediate=True)
-                    self.add((internal, TA.feeds, x))
+                    self.add((internal, TA.to, x))
             else:
                 x = self.add_expr(expr.x, root, BNode(), intermediate=True)
-            self.add((x, TA.feeds, f))
+            self.add((x, TA.to, f))
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
@@ -331,20 +331,20 @@ class TransformationGraph(Graph):
             # used by the inner one. See issues #37 and #41.
             if current_internal:
                 for internal in self.objects(x, TA.internal):
-                    self.add((current_internal, TA.feeds, internal))
+                    self.add((current_internal, TA.to, internal))
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
             for internal in self.objects(f, TA.internal):
                 if internal != current_internal:
-                    self.add((x, TA.feeds, internal))
+                    self.add((x, TA.to, internal))
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
-                for data_input in self.subjects(TA.feeds, f):
-                    if x != data_input:
-                        self.add((data_input, TA.feeds, current_internal))
+                for f_input in self.subjects(TA.to, f):
+                    if x != f_input:
+                        self.add((f_input, TA.to, current_internal))
 
         return current
 
@@ -425,7 +425,7 @@ class TransformationGraph(Graph):
         for source_expr, ref_expr in indirection.items():
             src_tfmnode = self.add_expr(source_expr, root)
             ref_tfmnode = self.expr_nodes[ref_expr]
-            self.add((ref_tfmnode, TA.feeds, src_tfmnode))
+            self.add((ref_tfmnode, TA.to, src_tfmnode))
 
         for source in sources:
             self.add((wfnode2tfmnode(source), TA.origin, source))

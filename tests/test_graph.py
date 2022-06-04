@@ -68,13 +68,13 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
 
     for i, step in steps.items():
         if step.via:
-            kind = TA.TransformedData
+            concept = TA.TransformedConcept
             g.add((nodes[i], TA.via, step.via))
         elif step.internal:
-            kind = TA.InternalData
+            concept = TA.InternalConcept
             g.add((nodes[step.internal], TA.internal, nodes[i]))
         else:
-            kind = TA.SourceData
+            concept = TA.SourceConcept
 
         if step.origin:
             g.add((nodes[i], TA.origin, step.origin))
@@ -86,10 +86,10 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
             g.add((nodes[i], RDF.type, step.type))
 
         if with_classes:
-            g.add((nodes[i], RDF.type, kind))
+            g.add((nodes[i], RDF.type, concept))
 
         for j in step.inputs:
-            g.add((nodes[j], TA.feeds, nodes[i]))
+            g.add((nodes[j], TA.to, nodes[i]))
     return g
 
 
@@ -547,8 +547,8 @@ class TestAlgebraRDF(unittest.TestCase):
         expected = graph_manual(
             s1=Step(type=TEST.A),
             s2=Step(TEST.f, input="s1", type=None),
-            s3=Step(TEST.f, input="s2", type=TEST.F_F_A),
-            s4=Step(TEST.f, input="s3", type=TEST.F_F_F_A),
+            s3=Step(TEST.f, input="s2", type=TEST["F-F-A"]),
+            s4=Step(TEST.f, input="s3", type=TEST["F-F-F-A"]),
         )
 
         actual = TransformationGraph(lang,
@@ -613,7 +613,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, RDF.type, TEST["F_A"]))
+        expected.add((root, RDF.type, TEST["F-A"]))
         expected.add((root, TA.via, TEST["f"]))
 
         self.assertIsomorphic(actual, expected)

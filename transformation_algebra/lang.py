@@ -355,7 +355,7 @@ class LanguageNamespace(ClosedNamespace):
             ("type", "via"),
             lang.operators.keys(),
             lang.types.keys(),
-            (t.text(sep=".", lparen="_", rparen="", prod="")
+            (t.text(sep="-", lparen="-", rparen="", prod="")
                 for t in lang.taxonomy)
         )
         rt = super().__new__(cls, uri, terms)
@@ -367,7 +367,7 @@ class LanguageNamespace(ClosedNamespace):
             return super().term(value.name)
         elif isinstance(value, TypeOperation):
             assert value in self.lang.taxonomy
-            return super().term(value.text(sep=".", lparen="_", rparen="",
+            return super().term(value.text(sep="-", lparen="-", rparen="",
                 prod=""))
         else:
             return super().term(value)
