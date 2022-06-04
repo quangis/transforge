@@ -1,84 +1,85 @@
 @prefix: <http://github.com/quangis/transformation-algebra#>.
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
+@prefix gis: <http://geographicknowledge.de/vocab/GISTools.rdf#>.
 
 :Transformation
     a rdfs:Class;
-    rdfs:comment "The class of composite conceptual transformations of a transformation algebra.".
+    rdfs:comment "The class of conceptual transformations, in the vocabulary of some transformation algebra.".
 
-:member
+:Task
+    a rdfs:Class; rdfs:subClassOf :Transformation;
+    rdfs:comment "A task is a transformation graph that represents a query; it describes pertinent aspects of a transformation, for the purpose of retrieving matching tools or workflows.".
+
+:contains
     a rdf:Property;
     rdfs:subPropertyOf rdfs:member;
-    rdfs:comment "Constituent elements of a transformation in terms of its types and operations.";
+    rdfs:comment "Identifies constituent elements of a transformation, in terms of its types and operations.";
     rdfs:domain :Transformation;
-    rdfs:range :Element.
+    rdfs:range :Atom.
 
 :input
     a rdf:Property;
-    rdfs:comment "Identifies the source data.";
+    rdfs:comment "Identifies the source concept of a transformation, ie. the concept associated with input data.";
     rdfs:domain :Transformation;
-    rdfs:range :SourceData.
+    rdfs:range :SourceConcept.
 
 :output
     a rdf:Property;
-    rdfs:comment "Identifies the target data: the final output data of a transformation as a whole.";
+    rdfs:comment "Identifies the goal concept of a transformation: ie. the concept associated with the result.";
     rdfs:domain :Transformation;
-    rdfs:range :TransformedData.
+    rdfs:range :TransformedConcept.
 
-
-:Data
+:Concept
     a rdfs:Class;
-    rdfs:comment "The class of data instances that are conceptualized at some point during a transformation.".
+    rdfs:comment "The class of instances of a concept; that is, types that are conceptualized at some point during a transformation.".
 
-:SourceData
+:SourceConcept
     a rdfs:Class;
-    rdfs:subClassOf :Data.
+    rdfs:subClassOf :Concept.
 
-:TransformedData
+:TransformedConcept
     a rdfs:Class;
-    rdfs:subClassOf :Data.
+    rdfs:subClassOf :Concept.
 
-:InternalData
+:InternalConcept
     a rdfs:Class;
-    rdfs:subClassOf :Data;
+    rdfs:subClassOf :Concept;
     rdfs:comment "Data produced by some internal process for which the structure is unknown. For example, when an operation *g* is passed as a parameter to some other operation *f*, the data produced by *g* within *f* may be preprocessed by unknown internals.".
 
 :origin
     a rdf:Property;
-    rdfs:comment "Identifies the node that represents the source of some input data.";
-    rdfs:domain :SourceData.
+    rdfs:comment "Identifies the node that represents the data source of an input concept.";
+    rdfs:domain :SourceConcept;
+    rdfs:range wf:Resource.
 
-:feeds
+:to
     a rdf:Property;
-    rdfs:comment "Connects input data to the transformed data that is based on it.";
-    rdfs:domain :Data;
-    rdfs:range :TransformedData.
+    owl:inverseOf :from;
+    rdfs:comment "Connects an input concept to a transformed concept.";
+    rdfs:domain :Concept;
+    rdfs:range :TransformedConcept.
 
-:via
+:from
     a rdf:Property;
-    rdfs:comment "The conceptual operation by which the data was transformed.";
-    rdfs:domain :TransformedData;
-    rdfs:range :Operation.
+    owl:inverseOf :to;
+    rdfs:domain :TransformedConcept;
+    rdfs:range :Concept.
 
-:internal
-    a rdf:Property;
-    rdfs:comment "Indicate that the transformer that produced this data is involved in some internal process.";
-    rdfs:domain :TransformedData;
-    rdfs:range :InternalData.
-
-
-:Element
+:Atom
     a rdfs:Class;
     rdfs:comment "Class comprising both operations and types.".
 
 :Operation
     a rdfs:Class;
-    rdfs:subClassOf :Element;
+    rdfs:subClassOf :Atom;
     rdfs:comment "The class of atomary conceptual transformations.".
 
 :Type
     a rdfs:Class;
-    rdfs:subClassOf :Element;
+    rdfs:subClassOf :Atom;
     rdfs:comment "The class of all transformation types.".
 
 :Function
@@ -92,3 +93,62 @@
 :Unit
     a rdfs:Class; rdfs:subClassOf :Type;
     rdfs:comment "The unit type, containing only a single value.".
+
+:Top
+    a rdfs:Class; rdfs:subClassOf :Type;
+    rdfs:comment "The top type, containing all values. A supertype of all types.".
+
+:Bottom
+    a rdfs:Class; rdfs:subClassOf :Type;
+    rdfs:comment "The bottom type, containing no values. A subtype of all types.".
+
+:via
+    a rdf:Property;
+    rdfs:comment "The conceptual operation by which the data was transformed.";
+    rdfs:domain :TransformedConcept;
+    rdfs:range :Operation.
+
+:type
+    a rdfs:Property; rdfs:subPropertyOf rdf:type;
+    rdfs:domain :Concept;
+    rdfs:range :Type;
+    rdfs:comment "The type of some (conceptual) data.".
+
+:internal
+    a rdf:Property;
+    rdfs:comment "Indicate that the transformer that produced this data is involved in some internal process.";
+    rdfs:domain :TransformedConcept;
+    rdfs:range :InternalConcept.
+
+:question
+    a rdfs:Property;
+    rdfs:domain :Task;
+    rdfs:range rdfs:Literal;
+    rdfs:comment "The question associated with a task.".
+
+:implementation
+    a rdfs:Property;
+    rdfs:domain :Task;
+    rdfs:range :Implementation;
+    rdfs:comment "A tool or workflow that is known to implement a task.".
+
+:Implementation
+    a rdfs:Class;
+    rdfs:superClassOf wf:Workflow, gis:Tool;
+    rdfs:comment "A concrete implementation of a conceptual transformation.".
+
+:Application
+    a rdfs:Class;
+    rdfs:comment "A specific usage of an concrete implementation.".
+
+:application
+    a rdfs:Property;
+    rdfs:domain :Concept;
+    rdfs:range :Application;
+    rdfs:comment "A conceptual step may be realized by some application.".
+
+:using
+    a rdfs:Property; rfds:subPropertyOf wf:applicationOf;
+    rdfs:domain :Application;
+    rdfs:range :Implementation;
+    rdfs:comment "Links a specific usage of an implementation to the implementation in general.".
