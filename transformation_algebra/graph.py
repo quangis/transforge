@@ -44,7 +44,7 @@ class TransformationGraph(Graph):
             passthrough: bool = True,
             *nargs, **kwargs):
 
-        super().__init__(*nargs, **kwargs)
+        super().__init__(*nargs, base=str(language.namespace), **kwargs)
 
         def default(switch: bool | None, inherit: bool = not minimal) -> bool:
             return inherit if switch is None else switch
@@ -73,8 +73,7 @@ class TransformationGraph(Graph):
             self.type_nodes[t] = self.language.namespace[
                 t.text(sep="-", lparen="-", rparen="", prod="")]
 
-        self.bind("ta", TA)
-        self.bind("lang", self.language.namespace)
+        self.bind("", TA)
 
     def ref(self) -> str:
         return f"{next(self.identifiers)}. " if self.identifiers else ""
