@@ -44,7 +44,7 @@ class TransformationGraph(Graph):
             passthrough: bool = True,
             *nargs, **kwargs):
 
-        super().__init__(*nargs, base=str(language.namespace), **kwargs)
+        super().__init__(*nargs, **kwargs)
 
         def default(switch: bool | None, inherit: bool = not minimal) -> bool:
             return inherit if switch is None else switch
