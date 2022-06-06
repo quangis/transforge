@@ -77,10 +77,12 @@ def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> TransformationG
 class TestAlgebra(unittest.TestCase):
 
     def assertQuery(self, lang: Language,
-            graph: TransformationGraph, q_obj: tuple[Type | Operator | list],
+            graph: TransformationGraph,
+            q_obj: TransformationQuery | tuple[Type | Operator | list],
             results: set[Node] | None, **kwargs) -> None:
 
-        query = make_query(lang, q_obj)
+        query = q_obj if isinstance(q_obj, TransformationQuery) \
+            else make_query(lang, q_obj)
         self.assertEqual(
             results or set(),
             set(r.workflow for r in graph.query(query.sparql(**kwargs)))
@@ -285,13 +287,45 @@ class TestAlgebra(unittest.TestCase):
             TEST.fy: ~F(Y)
         })
 
-        # graph.serialize("test.ttl", format="ttl")
-        # print(Query(lang.namespace, X).sparql())
-
         self.assertQuery(lang, graph, X, results={TEST.x, TEST.y})
         self.assertQuery(lang, graph, Y, results={TEST.y})
         self.assertQuery(lang, graph, F(X), results={TEST.fx, TEST.fy})
         self.assertQuery(lang, graph, F(Y), results={TEST.fy})
+
+    def test_tree_unfold(self):
+        # Test if the optional unfolding of trees happens.
+        # We construct a workflow that shouldn't match with the DAG for our
+        # query, but will match if the DAG is unfolded into a tree (thus with
+        # separate nodes for the D's at the end of both paths)
+        A, B, C, D = (TypeOperator(x) for x in "ABCD")
+        bc2a = Operator('bc2a', type=B ** C ** A)
+        d2b = Operator('d2b', type=D ** B)
+        d2c = Operator('d2c', type=D ** C)
+        lang = Language(locals(), namespace=TEST)
+
+        # Workflow graph
+        wfgraph = make_graph(lang, {
+            TEST.wf1: bc2a(d2b(~D), d2c(~D)),
+        })
+
+        # Query graph
+        g = TransformationGraph(lang)
+        root = BNode()
+        a, b, c, d = (BNode() for _ in "abcd")
+        g.add((root, RDF.type, TA.Task))
+        g.add((root, TA.output, a))
+        g.add((a, TA["from"], b))
+        g.add((a, TA["from"], c))
+        g.add((b, TA["from"], d))
+        g.add((c, TA["from"], d))
+        g.add((a, RDF.type, TEST.A))
+        g.add((b, RDF.type, TEST.B))
+        g.add((c, RDF.type, TEST.C))
+        g.add((d, RDF.type, TEST.D))
+        query = TransformationQuery(lang, g)
+        self.assertQuery(lang, wfgraph, query, results=set())
+        query.unfold_tree = True
+        self.assertQuery(lang, wfgraph, query, results={TEST.wf1})
 
     def test_that_repeated_nodes_are_handled_correctly(self):
         A = TypeOperator('A')
