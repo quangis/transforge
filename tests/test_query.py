@@ -358,6 +358,25 @@ class TestAlgebra(unittest.TestCase):
     # #     self.assertQuery(lang, graph, [D, f2, OR([g, f], [m, n]), A],
     # #         results={TEST.wf1})
 
+    def test_multiple_outputs(self):
+        # Test that a transformation can have multiple outputs
+        lang = Language(locals(), TEST)
+        graph = TransformationGraph(lang)
+        root = BNode()
+        A, B, C = BNode(), BNode(), BNode()
+        graph.add((root, RDF.type, TA.Task))
+        graph.add((root, TA.output, A))
+        graph.add((root, TA.output, B))
+        graph.add((A, TA["from"], C))
+        graph.add((B, TA["from"], C))
+        result = list(TransformationQuery(lang, graph).chronology())
+        self.assertTrue(
+            (result == ['?workflow :output ?_0.', '?workflow :output ?_1.',
+                '?_2 :to* ?_1.', '?_2 :to* ?_0.']) or
+            (result == ['?workflow :output ?_0.', '?workflow :output ?_1.',
+                '?_2 :to* ?_0.', '?_2 :to* ?_1.'])
+        )
+
     def test_sensible_order(self):
         # If you have a transformation graph query that goes:
         #

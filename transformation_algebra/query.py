@@ -53,13 +53,9 @@ class TransformationQuery(object):
 
         self.root = self.graph.value(predicate=RDF.type, object=TA.Task,
             any=False)
-        self.output = self.graph.value(subject=self.root, predicate=TA.output,
-            any=False)
 
         if not self.root:
-            raise ValueError("The transformation graph is not a ta:Task.")
-        if not self.output:
-            raise ValueError("The transformation graph has no output.")
+            raise ValueError(f"No {TA.Task.n3()} found in the graph.")
 
     def sparql(self,
             by_io: bool = True,
@@ -96,7 +92,7 @@ class TransformationQuery(object):
         """
         # TODO order
         visited: set[Node] = set()
-        queue: deque[Node] = deque([self.output])
+        queue: deque[Node] = deque(self.graph.objects(self.root, TA.output))
         while len(queue) > 0:
             current = queue.popleft()
             # assert current not in visited
@@ -145,27 +141,25 @@ class TransformationQuery(object):
                 result.append(f"?input{i} a/rdfs:subClassOf {tp.n3()}.")
         return result
 
-    def chronology(self) -> Iterable[str]:
+    def chronology(self, unfold_tree: bool = False) -> Iterable[str]:
         """
         Conditions for matching the specific order of a query.
         """
-        result = [
-            "?workflow :output ?_0."
-        ]
 
         # Mapping of nodes in the source graph to variables
         generator = iter(Variable(f"_{i}") for i in count())
         variables: dict[BNode, Variable] = dict()
 
         @cache
-        def connections_to(node: BNode) -> list[BNode]:
+        def connections_to(node: Node) -> list[Node]:
             return list(self.graph.subjects(TA["from"], node))
 
         # Remember what type/operator is assigned to each step
         operators: dict[Variable, URIRef] = dict()
         types: dict[Variable, URIRef] = dict()
 
-        waiting: list[BNode] = [self.output]
+        result = []
+        waiting: list[Node] = list(self.graph.objects(self.root, TA.output))
         processing: deque[BNode] = deque()
         visited: set[BNode] = set()
         while True:
@@ -175,6 +169,7 @@ class TransformationQuery(object):
             new_waiting = []
             for w in waiting:
                 if all(n in visited for n in connections_to(w)):
+                    assert isinstance(w, BNode)
                     processing.append(w)
                 else:
                     new_waiting.append(w)
@@ -199,8 +194,12 @@ class TransformationQuery(object):
                 assert isinstance(tp, URIRef) and var not in types
                 types[var] = tp
 
+            if not connections_to(current):
+                result.append(f"?workflow :output {var.n3()}.")
+
             # Write connections to previous nodes (ie ones that come after)
             for c in connections_to(current):
+                assert isinstance(c, BNode)
                 assert c in visited
                 conn = variables[c]
                 # Current and after nodes may refer to the same step if the
