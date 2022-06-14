@@ -7,13 +7,12 @@ specified order.
 
 from __future__ import annotations
 
-from rdflib.term import Node, BNode, URIRef, Variable
+from rdflib.term import Node, URIRef, Variable
 from rdflib.namespace import RDF
 from rdflib.util import guess_format
 from itertools import count, chain
-from typing import Iterable, Iterator
-from collections import deque
-from functools import cache
+from typing import Iterable
+from collections import deque, defaultdict
 
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
@@ -40,7 +39,8 @@ class TransformationQuery(object):
     """
 
     def __init__(self, lang: Language, graph: TransformationGraph | str,
-            format: str = "turtle", with_noncanonical_types: bool = False):
+            format: str = "turtle", with_noncanonical_types: bool = False,
+            unfold_tree: bool = False):
 
         self.lang = lang
 
@@ -56,6 +56,65 @@ class TransformationQuery(object):
 
         if not self.root:
             raise ValueError(f"No {TA.Task.n3()} found in the graph.")
+
+        self.unfold_tree = unfold_tree
+
+        # Keep track of the type and operator of each step
+        self.type: dict[Variable, URIRef] = dict()
+        self.operator: dict[Variable, URIRef] = dict()
+
+        # A surjective mapping, associating variables with the step nodes of
+        # the graph on which the query is based.
+        self.steps: dict[Variable, Node] = dict()
+
+        self.before: dict[Variable, list[Variable]] = defaultdict(list)
+        self.after: dict[Variable, list[Variable]] = defaultdict(list)
+
+        # Assign variables to the outputs of the transformation
+        self.outputs: list[Variable] = []
+
+        # If we don't unfold the graph into a tree, there is a 1:1 mapping
+        # between variables and step nodes. Otherwise, we will get a new
+        # variable for every time we encounter that step.
+        self.variables: dict[Node, Variable] | None = \
+            None if self.unfold_tree else dict()
+
+        self.generator = iter(Variable(f"_{i}") for i in count())
+
+        for node in self.graph.objects(self.root, TA.output):
+            self.outputs.append(self.assign_variables(node))
+
+    def assign_variables(self, node: Node, path: list[Node] = []) -> Variable:
+        """
+        Depth-first traversal through the graph, assigning one or more
+        variables to each step node. Raises error when encountering a cycle.
+        """
+        if node in path:
+            raise ValueError("cycle")
+
+        if self.unfold_tree:
+            var = next(self.generator)
+        else:
+            assert isinstance(self.variables, dict)
+            if node in self.variables:
+                var = self.variables[node]
+            else:
+                var = self.variables[node] = next(self.generator)
+
+        assert var not in self.steps or self.steps[var] == node
+        self.steps[var] = node
+
+        if tp := self.graph.value(node, RDF.type, any=False):
+            self.type[var] = tp
+        if op := self.graph.value(node, TA.via, any=False):
+            self.operator[var] = op
+
+        for next_node in self.graph.objects(node, TA["from"]):
+            next_var = self.assign_variables(next_node, path + [node])
+            self.before[var].append(next_var)
+            self.after[next_var].append(var)
+
+        return var
 
     def sparql(self,
             by_io: bool = True,
@@ -85,44 +144,19 @@ class TransformationQuery(object):
         )
         return result
 
-    def traverse(self) -> Iterator[Node]:
-        """
-        Breadth-first traversal of all conceptual steps, starting at the output
-        node.
-        """
-        # TODO order
-        visited: set[Node] = set()
-        queue: deque[Node] = deque(self.graph.objects(self.root, TA.output))
-        while len(queue) > 0:
-            current = queue.popleft()
-            # assert current not in visited
-            yield current
-            for before in self.graph.objects(current, TA["from"]):
-                if before not in visited:
-                    queue.append(before)
-            visited.add(current)
-
     def types(self) -> Iterable[str]:
         """
         Conditions for matching on the bag of types used in a query.
         """
-        result = set()
-        for node in self.traverse():
-            for tp in self.graph.objects(node, RDF.type):
-                assert isinstance(tp, URIRef)
-                result.add(f"?workflow :contains/rdfs:subClassOf {tp.n3()}.")
-        return result
+        return [f"?workflow :contains/rdfs:subClassOf {tp.n3()}."
+            for tp in set(self.type.values())]
 
     def operators(self) -> Iterable[str]:
         """
         Conditions for matching on the bag of operators.
         """
-        result = set()
-        for node in self.traverse():
-            for op in self.graph.objects(node, TA.via):
-                assert isinstance(op, URIRef)
-                result.add(f"?workflow :contains {op.n3()}.")
-        return result
+        return [f"?workflow :contains {op.n3()}."
+            for op in set(self.operator.values())]
 
     def io(self) -> Iterable[str]:
         """
@@ -141,35 +175,23 @@ class TransformationQuery(object):
                 result.append(f"?input{i} a/rdfs:subClassOf {tp.n3()}.")
         return result
 
-    def chronology(self, unfold_tree: bool = False) -> Iterable[str]:
+    def chronology(self) -> Iterable[str]:
         """
         Conditions for matching the specific order of a query.
         """
+        # We can assume at this point that there will not be any cycles
 
-        # Mapping of nodes in the source graph to variables
-        generator = iter(Variable(f"_{i}") for i in count())
-        variables: dict[BNode, Variable] = dict()
-
-        @cache
-        def connections_to(node: Node) -> list[Node]:
-            return list(self.graph.subjects(TA["from"], node))
-
-        # Remember what type/operator is assigned to each step
-        operators: dict[Variable, URIRef] = dict()
-        types: dict[Variable, URIRef] = dict()
-
-        result = []
-        waiting: list[Node] = list(self.graph.objects(self.root, TA.output))
-        processing: deque[BNode] = deque()
-        visited: set[BNode] = set()
+        result: list[str] = []
+        visited: set[Variable] = set()
+        waiting: list[Variable] = list(self.outputs)
+        processing: deque[Variable] = deque()
         while True:
 
-            # Add only those nodes from the waitlist for which all "incoming"
-            # nodes (ie nodes that come "after") have been visited
+            # Add only those steps from the waitlist for which all subsequent
+            # steps have already been visited
             new_waiting = []
             for w in waiting:
-                if all(n in visited for n in connections_to(w)):
-                    assert isinstance(w, BNode)
+                if all(v in visited for v in self.after[w]):
                     processing.append(w)
                 else:
                     new_waiting.append(w)
@@ -183,50 +205,33 @@ class TransformationQuery(object):
             if current in visited:
                 continue
 
-            # Assign a variable to this step
-            var = variables[current] = next(generator)
-
-            # Determine correct type/operation for this node
-            for op in self.graph.objects(current, TA.via):
-                assert isinstance(op, URIRef) and var not in operators
-                operators[var] = op
-            for tp in self.graph.objects(current, RDF.type):
-                assert isinstance(tp, URIRef) and var not in types
-                types[var] = tp
-
-            if not connections_to(current):
-                result.append(f"?workflow :output {var.n3()}.")
+            if not self.after[current]:
+                assert current in self.outputs
+                result.append(f"?workflow :output {current.n3()}.")
 
             # Write connections to previous nodes (ie ones that come after)
-            for c in connections_to(current):
-                assert isinstance(c, BNode)
+            for c in self.after[current]:
                 assert c in visited
-                conn = variables[c]
                 # Current and after nodes may refer to the same step if the
                 # graph has a bare operator and then a bare type in
                 # succession, or if the after node has no information at
                 # all
-                if not operators.get(conn) and (not types.get(conn) or (
-                        operators.get(var) and not types.get(var))):
-                    result.append(f"{var.n3()} :to* {conn.n3()}.")
+                if not self.operator.get(c) and (not self.type.get(c) or (
+                        self.operator.get(current) and not self.type.get(current))):
+                    result.append(f"{current.n3()} :to* {c.n3()}.")
                 else:
-                    result.append(f"{var.n3()} :to+ {conn.n3()}.")
+                    result.append(f"{current.n3()} :to+ {c.n3()}.")
 
             # Write operator/type properties of this step
-            if operator := operators.get(var):
-                result.append(f"{var.n3()} :via {operator.n3()}.")
-            if type := types.get(var):
-                result.append(f"{var.n3()} a/rdfs:subClassOf {type.n3()}.")
-
+            if operator := self.operator.get(current):
+                result.append(f"{current.n3()} :via {operator.n3()}.")
+            if type := self.type.get(current):
+                result.append(f"{current.n3()} a/rdfs:subClassOf {type.n3()}.")
             visited.add(current)
 
             # Add successors to queue
-            for before in self.graph.objects(current, TA["from"]):
-                assert isinstance(before, BNode)
-                if before not in visited:
-                    waiting.append(before)
+            for b in self.before[current]:
+                if b not in visited:
+                    waiting.append(b)
 
-        if waiting:
-            raise ValueError("cycle!")
-        else:
-            return result
+        return result

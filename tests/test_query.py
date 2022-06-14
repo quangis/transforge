@@ -322,10 +322,10 @@ class TestAlgebra(unittest.TestCase):
         g.add((b, RDF.type, TEST.B))
         g.add((c, RDF.type, TEST.C))
         g.add((d, RDF.type, TEST.D))
-        query = TransformationQuery(lang, g)
-        self.assertQuery(lang, wfgraph, query, results=set())
-        query.unfold_tree = True
-        self.assertQuery(lang, wfgraph, query, results={TEST.wf1})
+        query1 = TransformationQuery(lang, g, unfold_tree=False)
+        query2 = TransformationQuery(lang, g, unfold_tree=True)
+        self.assertQuery(lang, wfgraph, query1, results=set())
+        self.assertQuery(lang, wfgraph, query2, results={TEST.wf1})
 
     def test_that_repeated_nodes_are_handled_correctly(self):
         A = TypeOperator('A')
@@ -403,13 +403,16 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, TA.output, B))
         graph.add((A, TA["from"], C))
         graph.add((B, TA["from"], C))
-        result = list(TransformationQuery(lang, graph).chronology())
-        self.assertTrue(
-            (result == ['?workflow :output ?_0.', '?workflow :output ?_1.',
-                '?_2 :to* ?_1.', '?_2 :to* ?_0.']) or
-            (result == ['?workflow :output ?_0.', '?workflow :output ?_1.',
-                '?_2 :to* ?_0.', '?_2 :to* ?_1.'])
-        )
+        query = TransformationQuery(lang, graph, unfold_tree=False)
+        result = list(query.chronology())
+        self.assertIn(result, [
+            ['?workflow :output ?_0.', '?workflow :output ?_1.',
+            '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
+            ['?workflow :output ?_0.', '?workflow :output ?_1.',
+            '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
+            ['?workflow :output ?_0.', '?workflow :output ?_2.',
+            '?_1 :to* ?_0.', '?_1 :to* ?_2.'],
+        ])
 
     def test_sensible_order(self):
         # If you have a transformation graph query that goes:
@@ -437,13 +440,16 @@ class TestAlgebra(unittest.TestCase):
             graph.add((A, TA["from"], B))
             graph.add((A, TA["from"], C))
             graph.add((B, TA["from"], C))
-            result = list(TransformationQuery(lang, graph).chronology())
-            self.assertTrue(
-                (result == ['?workflow :output ?_0.', '?_1 :to* ?_0.',
-                 '?_2 :to* ?_0.', '?_2 :to* ?_1.']) or
-                (result == ['?workflow :output ?_0.', '?_1 :to* ?_0.',
-                 '?_2 :to* ?_1.', '?_2 :to* ?_0.'])
-            )
+            query = TransformationQuery(lang, graph, unfold_tree=False)
+            result = list(query.chronology())
+            self.assertIn(result, [
+                ['?workflow :output ?_0.', '?_1 :to* ?_0.',
+                 '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
+                ['?workflow :output ?_0.', '?_1 :to* ?_0.',
+                 '?_2 :to* ?_1.', '?_2 :to* ?_0.'],
+                ['?workflow :output ?_0.', '?_2 :to* ?_0.',
+                 '?_1 :to* ?_0.', '?_1 :to* ?_2.'],
+            ])
 
     def test_cycles(self):
         # The code that makes sure we pass `test_sensible_order` must not
@@ -460,8 +466,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], A))
-        query = TransformationQuery(lang, graph)
-        self.assertRaises(Exception, TransformationQuery.chronology, query)
+        self.assertRaises(Exception, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -470,8 +475,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], A))
-        query = TransformationQuery(lang, graph)
-        self.assertRaises(Exception, TransformationQuery.chronology, query)
+        self.assertRaises(Exception, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -481,8 +485,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], C))
         graph.add((C, TA["from"], A))
-        query = TransformationQuery(lang, graph)
-        self.assertRaises(Exception, TransformationQuery.chronology, query)
+        self.assertRaises(Exception, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -493,8 +496,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], C))
         graph.add((C, TA["from"], A))
-        query = TransformationQuery(lang, graph)
-        self.assertRaises(Exception, TransformationQuery.chronology, query)
+        self.assertRaises(Exception, TransformationQuery, lang, graph)
 
 
 if __name__ == '__main__':
