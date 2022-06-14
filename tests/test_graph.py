@@ -617,24 +617,3 @@ class TestAlgebraRDF(unittest.TestCase):
         expected.add((root, TA.via, TEST["f"]))
 
         self.assertIsomorphic(actual, expected)
-
-    def test_traversal(self):
-        """
-        Test that we correctly traverse graphs and that cycles are caught.
-        """
-        lang = Language(locals(), namespace=TEST)
-        g = TransformationGraph(lang, minimal=True)
-        g.add((TEST.a, TA.to, TEST.b))
-        g.add((TEST.b, TA.to, TEST.c))
-        self.assertEqual(
-            list(g.traverse(TA.to, TEST.a)),
-            [TEST.a, TEST.b, TEST.c]
-        )
-        g.add((TEST.a, TA.to, TEST.c))
-        self.assertEqual(
-            list(g.traverse(TA.to, TEST.a)),
-            [TEST.a, TEST.b, TEST.c]
-        )
-        g.add((TEST.c, TA.to, TEST.a))
-        self.assertRaises(Exception, TransformationGraph.traverse,
-            TA.to, TEST.a)

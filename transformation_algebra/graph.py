@@ -75,23 +75,6 @@ class TransformationGraph(Graph):
 
         self.bind("", TA)
 
-    def traverse(self, predicate: Node, start: Node,
-            path: list[Node] = [],
-            visited: set[Node] | None = None) -> Iterator[Node]:
-        """
-        Follow starting node along the given predicate in a depth-first manner.
-        Raise an error when a cycle is detected.
-        """
-        if start in path:
-            raise ValueError("cycle")
-        visited = visited or set()
-        if start not in visited:
-            visited.add(start)
-            yield start
-            yield from chain.from_iterable(
-                self.traverse(predicate, n, path + [start], visited)
-                for n in self.objects(start, predicate))
-
     def ref(self) -> str:
         return f"{next(self.identifiers)}. " if self.identifiers else ""
 
