@@ -68,13 +68,9 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
 
     for i, step in steps.items():
         if step.via:
-            concept = TA.TransformedConcept
             g.add((nodes[i], TA.via, step.via))
         elif step.internal:
-            concept = TA.InternalConcept
             g.add((nodes[step.internal], TA.internal, nodes[i]))
-        else:
-            concept = TA.SourceConcept
 
         if step.origin:
             g.add((nodes[i], TA.origin, step.origin))
@@ -83,10 +79,7 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
             g.add((root, TA.output, nodes[i]))
 
         if step.type:
-            g.add((nodes[i], RDF.type, step.type))
-
-        if with_classes:
-            g.add((nodes[i], RDF.type, concept))
+            g.add((nodes[i], TA.type, step.type))
 
         for j in step.inputs:
             g.add((nodes[j], TA.to, nodes[i]))
@@ -613,7 +606,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, RDF.type, TEST["F-A"]))
+        expected.add((root, TA.type, TEST["F-A"]))
         expected.add((root, TA.via, TEST["f"]))
 
         self.assertIsomorphic(actual, expected)

@@ -104,7 +104,7 @@ class TransformationQuery(object):
         assert var not in self.steps or self.steps[var] == node
         self.steps[var] = node
 
-        if tp := self.graph.value(node, RDF.type, any=False):
+        if tp := self.graph.value(node, TA.type, any=False):
             self.type[var] = tp
         if op := self.graph.value(node, TA.via, any=False):
             self.operator[var] = op
@@ -165,14 +165,14 @@ class TransformationQuery(object):
         result = []
         for i, output in enumerate(self.graph.objects(self.root, TA.output)):
             result.append(f"?workflow :output ?output{i}.")
-            for tp in self.graph.objects(output, RDF.type):
+            for tp in self.graph.objects(output, TA.type):
                 assert isinstance(tp, URIRef)
-                result.append(f"?output{i} a/rdfs:subClassOf {tp.n3()}.")
+                result.append(f"?output{i} :type/rdfs:subClassOf {tp.n3()}.")
         for i, input in enumerate(self.graph.objects(self.root, TA.input)):
             result.append(f"?workflow :input ?input{i}.")
-            for tp in self.graph.objects(input, RDF.type):
+            for tp in self.graph.objects(input, TA.type):
                 assert isinstance(tp, URIRef)
-                result.append(f"?input{i} a/rdfs:subClassOf {tp.n3()}.")
+                result.append(f"?input{i} :type/rdfs:subClassOf {tp.n3()}.")
         return result
 
     def chronology(self) -> Iterable[str]:
@@ -226,7 +226,7 @@ class TransformationQuery(object):
             if operator := self.operator.get(current):
                 result.append(f"{current.n3()} :via {operator.n3()}.")
             if type := self.type.get(current):
-                result.append(f"{current.n3()} a/rdfs:subClassOf {type.n3()}.")
+                result.append(f"{current.n3()} :type/rdfs:subClassOf {type.n3()}.")
             visited.add(current)
 
             # Add successors to queue

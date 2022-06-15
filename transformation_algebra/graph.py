@@ -213,7 +213,7 @@ class TransformationGraph(Graph):
                     expr.type in self.language.taxonomy):
 
                 type_node = self.add_type(expr.type)
-                self.add((current, RDF.type, type_node))
+                self.add((current, TA.type, type_node))
 
                 if self.with_membership:
                     self.add((root, TA.contains, type_node))
@@ -241,7 +241,7 @@ class TransformationGraph(Graph):
                     and (self.with_intermediate_types or not intermediate)):
 
                 type_node = self.add_type(output_type)
-                self.add((current, RDF.type, type_node))
+                self.add((current, TA.type, type_node))
 
                 if self.with_membership:
                     self.add((root, TA.contains, type_node))
@@ -447,7 +447,7 @@ class TransformationGraph(Graph):
         for subj, obj in self[:ns.type:]:
             type = self.language.parse_type(str(obj))
             node = self.type_nodes[type]
-            self.add((subj, RDF.type, node))
+            self.add((subj, TA.type, node))
 
         for subj, obj in self[:ns.via:]:
             operator = self.language.parse_operator(str(obj))
