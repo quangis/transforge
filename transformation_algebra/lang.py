@@ -201,8 +201,11 @@ class Language(object):
                 previous = stack[-1]
                 assert isinstance(previous, Expr)
                 t = self.parse_type(tokens)
-                previous.type.unify(t, subtype=True)
-                # previous.type.fix(prefer_lower=False)
+                pt = previous.type
+                if isinstance(pt, TypeVariable) and pt.wildcard:
+                    pt.unify(t)
+                else:
+                    pt.unify(t, subtype=True)
             elif token == ";":
                 stack.clear()
                 stack.append(None)
@@ -213,10 +216,11 @@ class Language(object):
                 if previous:
                     current_ = Application(previous, current_)
                 stack.append(current_)
-
             else:
                 current: Optional[Expr]
-                if token.isnumeric():
+                if token == "-":
+                    current = Source()
+                elif token.isnumeric():
                     try:
                         current = args[int(token) - 1]
                     except KeyError:
