@@ -217,8 +217,10 @@ class TypeOperator(Type):
 
     def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
         assert isinstance(other, TypeOperator)
-        return ((not strict and self == other) or
-            bool(self.parent and self.parent.subtype(other)))
+        return (not strict and self is other) or (
+            self is Bottom or other is Top or
+            bool(self.parent and self.parent.subtype(other))
+        )
 
     def normalize(self) -> TypeInstance:
         return self.instance()
@@ -444,7 +446,7 @@ class TypeInstance(Type):
                 return a._operator == b._operator or \
                     (subtype and a._operator.subtype(b._operator))
             elif a._operator != b._operator:
-                return False
+                return a._operator is Bottom or b._operator is Top
             else:
                 result: Optional[bool] = True
                 for v, s, t in zip(a._operator.variance, a.params, b.params):
@@ -947,6 +949,12 @@ Product = TypeOperator('Product', params=2)
 
 "The special constructor for the unit type."
 Unit = TypeOperator('Unit')
+
+"The bottom type contains no values and is a subtype to everything."
+Bottom = TypeOperator('Bottom')
+
+"The top type contains all values and is a supertype to everything."
+Top = TypeOperator('Top')
 
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
 _ = TypeSchema(lambda: TypeVariable(wildcard=True))
