@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum, auto
 from abc import ABC, abstractmethod
 from functools import reduce
-from itertools import chain
+from itertools import chain, count
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Callable
 
@@ -251,6 +251,20 @@ class TypeInstance(Type):
 
     def normalized(self) -> bool:
         return not (isinstance(self, TypeVariable) and self.unification)
+
+    @abstractmethod
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        """
+        Strict subtypes of this type.
+        """
+        return NotImplemented
+
+    @abstractmethod
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        """
+        Strict supertypes of this type.
+        """
+        return NotImplemented
 
     def __str__(self):
         return self.text(with_constraints=True)
@@ -623,6 +637,43 @@ class TypeOperation(TypeInstance):
     def basic(self) -> bool:
         return self._operator.arity == 0
 
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        if recursive:
+            raise NotImplementedError
+        op = self._operator
+        if op is Top:
+            raise NotImplementedError
+        elif op is Bottom:
+            pass
+        elif op.arity == 0:
+            if op.children:
+                yield from (c() for c in op.children)
+            else:
+                yield Bottom()
+        else:
+            for i, v, p in zip(count(), op.variance, self.params):
+                for q in (p.subtypes() if Variance.CO else p.supertypes()):
+                    yield op(*(q if i == j else p
+                        for j, p in enumerate(self.params)))
+
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        if recursive:
+            raise NotImplementedError
+        op = self._operator
+        if op is Bottom:
+            raise NotImplementedError
+        elif op is Top:
+            pass
+        elif op.arity == 0:
+            if op.parent:
+                yield op.parent()
+            else:
+                yield Top()
+        else:
+            for i, v, p in zip(count(), op.variance, self.params):
+                for q in (p.supertypes() if Variance.CO else p.subtypes()):
+                    yield op(*(q if i == j else p
+                        for j, p in enumerate(self.params)))
 
 class TypeVariable(TypeInstance):
     """
@@ -636,6 +687,12 @@ class TypeVariable(TypeInstance):
         self.upper: Optional[TypeOperator] = None
         self._constraints: set[Constraint] = set()
         self.origin = origin
+
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        raise RuntimeError
+
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+        raise RuntimeError
 
     def check_constraints(self) -> None:
         for c in list(self._constraints):
