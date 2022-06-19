@@ -10,7 +10,8 @@ from typing import Optional, Iterator, Any, TYPE_CHECKING
 from rdflib.namespace import ClosedNamespace
 
 from transformation_algebra.type import Variance, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, Product
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
+    Unit, Top, Bottom, Product
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -28,12 +29,21 @@ class Language(object):
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
 
+        self._canon: set[TypeOperation] = set()
+
         self._closed = False
         self._taxonomy: Taxonomy | None = None
         self._namespace: LanguageNamespace | str | None = namespace
 
         if scope:
             self.add_scope(scope)
+
+    @property
+    def canon(self) -> set[TypeOperation]:
+        if not self._canon:
+            self._canon = self.generate_canon()
+            self._closed = True
+        return self._canon
 
     @property
     def taxonomy(self) -> Taxonomy:
@@ -52,6 +62,22 @@ class Language(object):
             self._closed = True
 
         return self._namespace
+
+    def generate_canon(self) -> set[TypeOperation]:
+        canon: set[TypeOperation] = set()
+        # canon.update((Unit(), Top(), Bottom(), Product()))
+        canon.update((op() for op in self.types.values() if op.arity == 0))
+
+        # Canonicalize subtypes
+        stack: list[TypeOperation] = [s.instance()
+            for s in self.synonyms.values() if s.canonical]
+        while stack:
+            current = stack.pop()
+            canon.add(current)
+            for s in current.subtypes():
+                if s not in canon:
+                    stack.append(s)
+        return canon
 
     def generate_taxonomy(self) -> Taxonomy:
         """
@@ -121,7 +147,8 @@ class Language(object):
     def add(self, item: Operator | TypeOperator | TypeAlias,
             name: str | None = None):
 
-        reserved = ("via", "type")
+        reserved = ("via", "type", "Unit", "Top", "Bottom",
+            "Product", "Intersection", "Union")
 
         if self._closed:
             raise RuntimeError("Cannot add to language after closing.")
@@ -209,6 +236,7 @@ class Language(object):
             elif token == ";":
                 stack.clear()
                 stack.append(None)
+            # `~A` notation is deprecated. Use `- : A` instead.
             elif token == "~":
                 previous = stack.pop()
                 t = self.parse_type(tokens)

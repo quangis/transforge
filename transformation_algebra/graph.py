@@ -6,9 +6,9 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    Function, Product, Unit, TypeInstance
+    TypeOperator, Function, Product, Unit, Top, Bottom, TypeInstance
 from transformation_algebra.expr import \
-    Expr, Operation, Application, Abstraction, Source
+    Operator, Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language
 
 from itertools import chain, count
@@ -69,9 +69,8 @@ class TransformationGraph(Graph):
 
         self.identifiers: Iterator[int] | None = None
 
-        for t in self.language.taxonomy:
-            self.type_nodes[t] = self.language.namespace[
-                t.text(sep="-", lparen="-", rparen="", prod="")]
+        for t in self.language.canon:
+            self.type_nodes[t] = self.uri(t)
 
         self.bind("", TA)
 
@@ -87,35 +86,25 @@ class TransformationGraph(Graph):
         self.add_operators()
 
     def add_taxonomy(self) -> None:
-        taxonomy = self.language.taxonomy
+        """
+        Add a taxonomy of types.
+        """
 
-        for t, subtypes in taxonomy.items():
-            uri = self.type_nodes[t]
-
-            if self.with_classes:
-                self.add((uri, RDF.type, TA.Type))
-
-            if self.with_labels:
-                self.add((uri, RDFS.label, Literal(t.text())))
-
-            if self.with_type_parameters:
-                for i, param in enumerate(t.params, start=1):
-                    self.add((uri, RDF[f"_{i}"], self.type_nodes[param]))
-
-            for s in subtypes:
-                self.add((self.type_nodes[s], RDFS.subClassOf, uri))
+        for t in self.language.canon:
+            node = self.add_type(t)
+            for s in t.subtypes():
+                self.add((self.add_type(s), RDFS.subClassOf, node))
 
         # Connect top-level type nodes (i.e. compound type operators) to the
         # roots of their respective trees
-        for root in set(taxonomy) - set.union(*taxonomy.values()):
-            if root._operator.arity > 0:
-                self.add((self.type_nodes[root], RDFS.subClassOf,
-                    TA.Product if root._operator is Product else
-                    self.language.namespace[root._operator.name]))
+        for root in self.language.canon:
+            op = root._operator
+            if not list(root.supertypes()) and op.arity > 0:
+                self.add((self.type_nodes[root], RDFS.subClassOf, self.uri(op)))
 
         if self.with_transitive_closure:
             nodes = set(chain(
-                (self.type_nodes[t] for t in taxonomy),
+                (self.type_nodes[t] for t in self.language.canon),
                 (self.language.namespace[op] for op in self.language.types)
             ))
             for node in nodes:
@@ -134,6 +123,24 @@ class TransformationGraph(Graph):
                 if op.description:
                     self.add((node, RDFS.comment, Literal(op.description)))
 
+    def uri(self, type: TypeOperator | TypeOperation) -> Node:
+        if isinstance(type, TypeOperator):
+            if type is Unit:
+                return TA.Unit
+            elif type is Top:
+                return TA.Top
+            elif type is Bottom:
+                return TA.Bottom
+            elif type is Product:
+                return TA.Product
+            else:
+                return self.language.namespace[type.name]
+        elif type in self.language.canon:
+            return self.language.namespace[
+                type.text(sep="-", lparen="-", rparen="", prod="")]
+        else:
+            raise ValueError("non-canonical type")
+
     def add_type(self, type: Type) -> Node:
         """
         Translate and add an RDF representation of the given type. Return the
@@ -144,35 +151,26 @@ class TransformationGraph(Graph):
         try:
             return self.type_nodes[t]
         except KeyError:
-            if isinstance(t, TypeOperation):
-                if t.params:
-                    node = BNode()
-                    if t._operator is Product:
-                        self.add((node, RDFS.subClassOf, TA.Product))
-                    else:
-                        self.add((node, RDFS.subClassOf,
-                            self.language.namespace[t._operator.name]))
-
-                    if self.with_type_parameters:
-                        for i, param in enumerate(t.params, start=1):
-                            self.add((node, RDF[f"_{i}"], self.add_type(param)))
-
-                    if self.with_labels:
-                        self.add((node, RDFS.label, Literal(str(t))))
-                else:
-                    if t._operator is Unit:
-                        node = TA.Unit
-                    else:
-                        node = self.language.namespace[t._operator.name]
-            else:
-                assert isinstance(t, TypeVariable)
+            node: Node
+            try:
+                node = self.uri(t)  # type: ignore
+            except ValueError:
                 node = BNode()
 
-                if self.with_labels:
-                    self.add((node, RDFS.label, Literal(str(t))))
+            if self.with_classes:
+                self.add((node, RDF.type, TA.Type))
 
-            self.type_nodes[t] = node
-            return node
+            if self.with_labels:
+                self.add((node, RDFS.label, Literal(t.text())))
+
+            if isinstance(t, TypeOperation) and t._operator.arity > 0 \
+                    and self.with_type_parameters:
+                self.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                for i, param in enumerate(t.params, start=1):
+                    self.add((node, RDF[f"_{i}"], self.add_type(param)))
+
+        self.type_nodes[t] = node
+        return node
 
     def add_expr(self, expr: Expr, root: Node,
             current: Node | None = None, intermediate: bool = False) -> Node:
@@ -431,10 +429,10 @@ class TransformationGraph(Graph):
     def parse_shortcuts(self, remove: bool = True) -> None:
         """
         For convenience, types and operators may be specified as string
-        literals in RDF using the `lang:type` and `lang:via` predicates. This
-        method automatically parses these strings and replaces them with
-        `ta:type` and `ta:via` predicates with the corresponding nodes as
-        object. Example:
+        literals in RDF using the `type` and `via` predicates in the language's
+        own namespace. This method automatically parses these strings and
+        replaces them with `ta:type` and `ta:via` predicates with the
+        corresponding nodes as object. Example:
 
             [] cct:type "R(Obj, Reg)".
 

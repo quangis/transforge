@@ -253,14 +253,14 @@ class TypeInstance(Type):
         return not (isinstance(self, TypeVariable) and self.unification)
 
     @abstractmethod
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         """
         Strict subtypes of this type.
         """
         return NotImplemented
 
     @abstractmethod
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         """
         Strict supertypes of this type.
         """
@@ -637,7 +637,7 @@ class TypeOperation(TypeInstance):
     def basic(self) -> bool:
         return self._operator.arity == 0
 
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         if recursive:
             raise NotImplementedError
         op = self._operator
@@ -646,17 +646,15 @@ class TypeOperation(TypeInstance):
         elif op is Bottom:
             pass
         elif op.arity == 0:
-            if op.children:
-                yield from (c() for c in op.children)
-            else:
-                yield Bottom()
+            # We skip the Bottom type
+            yield from (c() for c in op.children)
         else:
             for i, v, p in zip(count(), op.variance, self.params):
                 for q in (p.subtypes() if Variance.CO else p.supertypes()):
                     yield op(*(q if i == j else p
                         for j, p in enumerate(self.params)))
 
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         if recursive:
             raise NotImplementedError
         op = self._operator
@@ -664,11 +662,9 @@ class TypeOperation(TypeInstance):
             raise NotImplementedError
         elif op is Top:
             pass
-        elif op.arity == 0:
-            if op.parent:
-                yield op.parent()
-            else:
-                yield Top()
+        elif op.arity == 0 and op.parent:
+            # We skip the Top type
+            yield op.parent()
         else:
             for i, v, p in zip(count(), op.variance, self.params):
                 for q in (p.supertypes() if Variance.CO else p.subtypes()):
@@ -688,10 +684,10 @@ class TypeVariable(TypeInstance):
         self._constraints: set[Constraint] = set()
         self.origin = origin
 
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         raise RuntimeError
 
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeInstance]:
+    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         raise RuntimeError
 
     def check_constraints(self) -> None:
