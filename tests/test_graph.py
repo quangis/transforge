@@ -393,9 +393,9 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.add_vocabulary()
 
         expected = Graph()
-        expected.add((TEST.B, RDFS.subClassOf, TEST.A))
-        expected.add((TEST.C, RDFS.subClassOf, TEST.A))
-        expected.add((TEST.D, RDFS.subClassOf, TEST.C))
+        expected.add((TEST.B, RDFS.subClassOf, lang.uri(A)))
+        expected.add((TEST.C, RDFS.subClassOf, lang.uri(A)))
+        expected.add((TEST.D, RDFS.subClassOf, lang.uri(C)))
 
         self.assertIsomorphic(expected, actual)
 
@@ -540,8 +540,8 @@ class TestAlgebraRDF(unittest.TestCase):
         expected = graph_manual(
             s1=Step(type=TEST.A),
             s2=Step(TEST.f, input="s1", type=None),
-            s3=Step(TEST.f, input="s2", type=TEST["F-F-A"]),
-            s4=Step(TEST.f, input="s3", type=TEST["F-F-F-A"]),
+            s3=Step(TEST.f, input="s2", type=lang.uri(F(F(A)))),
+            s4=Step(TEST.f, input="s3", type=lang.uri(F(F(F(A))))),
         )
 
         actual = TransformationGraph(lang,
@@ -606,8 +606,8 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, TA.type, TEST["F-A"]))
-        expected.add((root, TA.via, TEST["f"]))
+        expected.add((root, TA.type, lang.uri(F(A))))
+        expected.add((root, TA.via, lang.uri(f)))
 
         self.assertIsomorphic(actual, expected)
 
@@ -671,5 +671,3 @@ class TestAlgebraRDF(unittest.TestCase):
             F(A, B): {F(B, B)},
             F(B, B): set(),
         }
-
-

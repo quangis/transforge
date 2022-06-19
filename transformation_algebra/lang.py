@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from itertools import groupby, count, chain
 from typing import Optional, Iterator, Any, TYPE_CHECKING
-from rdflib.namespace import ClosedNamespace
+from rdflib import URIRef
+from rdflib.namespace import Namespace, ClosedNamespace
 
 from transformation_algebra.type import Variance, \
     TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
@@ -15,8 +16,7 @@ from transformation_algebra.type import Variance, \
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
-if TYPE_CHECKING:
-    from rdflib import URIRef
+TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 # Map all types to their direct subtypes
 Taxonomy = dict[TypeOperation, set[TypeOperation]]
@@ -62,6 +62,26 @@ class Language(object):
             self._closed = True
 
         return self._namespace
+
+    def uri(self, value: Operator | TypeOperator | TypeOperation) -> URIRef:
+        if isinstance(value, Operator):
+            return self.namespace[value.name]
+        elif isinstance(value, TypeOperator):
+            if value is Unit:
+                return TA.Unit
+            elif value is Top:
+                return TA.Top
+            elif value is Bottom:
+                return TA.Bottom
+            elif value is Product:
+                return TA.Product
+            else:
+                return self.namespace[value.name]
+        elif value in self.canon:
+            return self.namespace[
+                value.text(sep="-", lparen="-", rparen="", prod="")]
+        else:
+            raise ValueError("non-canonical type")
 
     def generate_canon(self) -> set[TypeOperation]:
         canon: set[TypeOperation] = set()

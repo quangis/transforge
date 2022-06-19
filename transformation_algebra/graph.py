@@ -9,16 +9,15 @@ from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
     TypeOperator, Function, Product, Unit, Top, Bottom, TypeInstance
 from transformation_algebra.expr import \
     Operator, Expr, Operation, Application, Abstraction, Source
-from transformation_algebra.lang import Language
+from transformation_algebra.lang import Language, TA
 
 from itertools import chain, count
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
 
-from typing import Iterator, Iterable
+from typing import Iterator
 
-TA = Namespace("https://github.com/quangis/transformation-algebra#")
 TEST = Namespace("https://example.com/#")
 
 
@@ -70,7 +69,7 @@ class TransformationGraph(Graph):
         self.identifiers: Iterator[int] | None = None
 
         for t in self.language.canon:
-            self.type_nodes[t] = self.uri(t)
+            self.type_nodes[t] = self.language.uri(t)
 
         self.bind("", TA)
 
@@ -100,7 +99,8 @@ class TransformationGraph(Graph):
         for root in self.language.canon:
             op = root._operator
             if not list(root.supertypes()) and op.arity > 0:
-                self.add((self.type_nodes[root], RDFS.subClassOf, self.uri(op)))
+                self.add((self.type_nodes[root], RDFS.subClassOf,
+                    self.language.uri(op)))
 
         if self.with_transitive_closure:
             nodes = set(chain(
@@ -113,7 +113,7 @@ class TransformationGraph(Graph):
 
     def add_operators(self) -> None:
         for op in self.language.operators.values():
-            node = self.language.namespace[op.name]
+            node = self.language.uri(op)
 
             if self.with_classes:
                 self.add((node, RDF.type, TA.Operation))
@@ -122,24 +122,6 @@ class TransformationGraph(Graph):
                 self.add((node, RDFS.label, Literal(str(op.name))))
                 if op.description:
                     self.add((node, RDFS.comment, Literal(op.description)))
-
-    def uri(self, type: TypeOperator | TypeOperation) -> Node:
-        if isinstance(type, TypeOperator):
-            if type is Unit:
-                return TA.Unit
-            elif type is Top:
-                return TA.Top
-            elif type is Bottom:
-                return TA.Bottom
-            elif type is Product:
-                return TA.Product
-            else:
-                return self.language.namespace[type.name]
-        elif type in self.language.canon:
-            return self.language.namespace[
-                type.text(sep="-", lparen="-", rparen="", prod="")]
-        else:
-            raise ValueError("non-canonical type")
 
     def add_type(self, type: Type) -> Node:
         """
@@ -153,7 +135,7 @@ class TransformationGraph(Graph):
         except KeyError:
             node: Node
             try:
-                node = self.uri(t)  # type: ignore
+                node = self.language.uri(t)  # type: ignore
             except ValueError:
                 node = BNode()
 
@@ -165,7 +147,8 @@ class TransformationGraph(Graph):
 
             if isinstance(t, TypeOperation) and t._operator.arity > 0 \
                     and self.with_type_parameters:
-                self.add((node, RDFS.subClassOf, self.uri(t._operator)))
+                self.add((node, RDFS.subClassOf,
+                    self.language.uri(t._operator)))
                 for i, param in enumerate(t.params, start=1):
                     self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
