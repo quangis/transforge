@@ -5,21 +5,17 @@ types and operators. It also handles parsing expressions of the algebra.
 
 from __future__ import annotations
 
-from itertools import groupby, count, chain
+from itertools import groupby, chain
 from typing import Optional, Iterator, Any
 from rdflib import URIRef
 from rdflib.namespace import Namespace, ClosedNamespace
 
-from transformation_algebra.type import builtins, Product, Variance, \
+from transformation_algebra.type import builtins, Product, \
     TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
-
-# Map all types to their direct subtypes
-Taxonomy = dict[TypeOperation, set[TypeOperation]]
-
 
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
@@ -29,9 +25,7 @@ class Language(object):
         self.synonyms: dict[str, TypeAlias] = dict()
 
         self._canon: set[TypeOperation] = set()
-
         self._closed = False
-        self._taxonomy: Taxonomy | None = None
         self._namespace: LanguageNamespace | str | None = namespace
 
         if scope:
@@ -39,17 +33,16 @@ class Language(object):
 
     @property
     def canon(self) -> set[TypeOperation]:
+        """
+        The canonical types consist of all base types, plus those compound
+        types that have an explicit synonym, or that are subtypes or parameters
+        of types that do. These types are of special interest among the
+        potentially infinite number of types.
+        """
         if not self._canon:
             self._canon = self.generate_canon()
             self._closed = True
         return self._canon
-
-    @property
-    def taxonomy(self) -> Taxonomy:
-        if not self._taxonomy:
-            self._taxonomy = self.generate_taxonomy()
-            self._closed = True
-        return self._taxonomy
 
     @property
     def namespace(self) -> LanguageNamespace:
@@ -86,61 +79,6 @@ class Language(object):
                 if s not in canon:
                     stack.append(s)
         return canon
-
-    def generate_taxonomy(self) -> Taxonomy:
-        """
-        Generate a taxonomy of canonical types, mapping each of them to their
-        subtypes. The canonical types consist of all base types, plus those
-        compound types that have an explicit synonym, or that are subtypes or
-        parameters of types that do.
-
-        These types are of special interest among the potentially infinite
-        number of types.
-        """
-        taxonomy: dict[TypeOperation, set[TypeOperation]] = dict()
-
-        # Start with the taxonomy of base types
-        for op in sorted(self.types.values(), key=lambda op: op.depth):
-            if op.arity == 0:
-                t = op()
-                taxonomy[t] = taxonomy.get(t, set())
-                if op.parent:
-                    taxonomy[op.parent()].add(t)
-
-        # By sorting on nesting level, we get a guarantee that by the time we
-        # add a type of level n, we know all successor types of level n-1.
-        stack: list[TypeOperation] = sorted(
-            (s.instance() for s in self.synonyms.values() if s.canonical),
-            key=TypeInstance.nesting, reverse=True)
-        while stack:
-            t = stack.pop()
-            if t not in taxonomy:
-
-                # Any non-basic type that occurs as parameter of a canonical
-                # type must itself be canonical, and it must already in the
-                # taxonomy; if it is not, we handle it before going forward
-                for p in t.params:
-                    if p not in taxonomy:
-                        assert isinstance(p, TypeOperation)
-                        stack.append(t)
-                        stack.append(p)
-                        break
-                else:
-                    taxonomy[t] = set()
-                    for i, v, p in zip(count(), t._operator.variance, t.params):
-                        assert isinstance(p, TypeOperation)
-                        p_successors = taxonomy[p] if v is Variance.CO else (
-                            supertype
-                            for supertype, subtypes in taxonomy.items()
-                            if any(s.match(t) for s in subtypes))
-
-                        for p_succ in p_successors:
-                            q = t._operator(*(p_succ if i == j else p_orig
-                                for j, p_orig in enumerate(t.params)))
-                            taxonomy[t].add(q)
-                            stack.append(q)
-
-        return taxonomy
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
@@ -396,7 +334,7 @@ class LanguageNamespace(ClosedNamespace):
             lang.operators.keys(),
             lang.types.keys(),
             (t.text(sep="-", lparen="-", rparen="", prod="")
-                for t in lang.taxonomy)
+                for t in lang.canon)
         )
         rt = super().__new__(cls, uri, terms)
         cls.lang = lang
@@ -406,7 +344,7 @@ class LanguageNamespace(ClosedNamespace):
         if isinstance(value, (Operator, TypeOperator)):
             return super().term(value.name)
         elif isinstance(value, TypeOperation):
-            assert value in self.lang.taxonomy
+            assert value in self.lang.canon
             return super().term(value.text(sep="-", lparen="-", rparen="",
                 prod=""))
         else:

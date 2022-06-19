@@ -101,6 +101,12 @@ class TransformationGraph(Graph):
             if not list(root.supertypes()) and op.arity > 0:
                 self.add((self.type_nodes[root], RDFS.subClassOf,
                     self.language.uri(op)))
+        for alias in self.language.synonyms.values():
+            i = alias.instance()
+            op = i._operator
+            if op.arity > 0:
+                self.add((self.language.uri(i), RDFS.subClassOf,
+                    self.language.uri(op)))
 
         if self.with_transitive_closure:
             nodes = set(chain(
@@ -191,7 +197,7 @@ class TransformationGraph(Graph):
                 self.add((root, TA.input, current))
 
             if self.with_types and (self.with_noncanonical_types or
-                    expr.type in self.language.taxonomy):
+                    expr.type in self.language.canon):
 
                 type_node = self.add_type(expr.type)
                 self.add((current, TA.type, type_node))
@@ -218,7 +224,7 @@ class TransformationGraph(Graph):
 
             if (self.with_types
                     and (self.with_noncanonical_types or
-                        output_type in self.language.taxonomy)
+                        output_type in self.language.canon)
                     and (self.with_intermediate_types or not intermediate)):
 
                 type_node = self.add_type(output_type)
@@ -230,7 +236,7 @@ class TransformationGraph(Graph):
             if self.with_labels:
                 if ((self.with_intermediate_types or not intermediate)
                         and (self.with_noncanonical_types or
-                        output_type in self.language.taxonomy)):
+                        output_type in self.language.canon)):
                     type_str = str(output_type)
                 else:
                     type_str = f"{output_type} (non-canonical)"
