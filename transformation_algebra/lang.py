@@ -6,13 +6,12 @@ types and operators. It also handles parsing expressions of the algebra.
 from __future__ import annotations
 
 from itertools import groupby, count, chain
-from typing import Optional, Iterator, Any, TYPE_CHECKING
+from typing import Optional, Iterator, Any
 from rdflib import URIRef
 from rdflib.namespace import Namespace, ClosedNamespace
 
-from transformation_algebra.type import Variance, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
-    Unit, Top, Bottom, Product
+from transformation_algebra.type import builtins, Product, Variance, \
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -64,19 +63,8 @@ class Language(object):
         return self._namespace
 
     def uri(self, value: Operator | TypeOperator | TypeOperation) -> URIRef:
-        if isinstance(value, Operator):
-            return self.namespace[value.name]
-        elif isinstance(value, TypeOperator):
-            if value is Unit:
-                return TA.Unit
-            elif value is Top:
-                return TA.Top
-            elif value is Bottom:
-                return TA.Bottom
-            elif value is Product:
-                return TA.Product
-            else:
-                return self.namespace[value.name]
+        if isinstance(value, (Operator, TypeOperator)):
+            return (TA if value in builtins else self.namespace)[value.name]
         elif value in self.canon:
             return self.namespace[
                 value.text(sep="-", lparen="-", rparen="", prod="")]

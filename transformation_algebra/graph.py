@@ -5,10 +5,10 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.type import Type, TypeOperation, TypeVariable, \
-    TypeOperator, Function, Product, Unit, Top, Bottom, TypeInstance
+from transformation_algebra.type import Type, TypeOperation, \
+    Function, TypeInstance
 from transformation_algebra.expr import \
-    Operator, Expr, Operation, Application, Abstraction, Source
+    Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language, TA
 
 from itertools import chain, count

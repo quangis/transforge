@@ -1012,6 +1012,7 @@ Top = TypeOperator('Top')
 "A wildcard: fresh variable, unrelated to, and matchable with, anything else."
 _ = TypeSchema(lambda: TypeVariable(wildcard=True))
 
+builtins = (Unit, Top, Bottom, Product, Function)
 
 def with_parameters(
         *type_operators: TypeOperator | Callable[..., TypeOperation],
