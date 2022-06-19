@@ -8,67 +8,6 @@ from transformation_algebra.lang import Language
 
 class TestAlgebra(unittest.TestCase):
 
-    def test_taxonomy(self):
-        A = TypeOperator()
-        B = TypeOperator(supertype=A)
-        F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals())
-
-        actual = lang.taxonomy
-        expected = {
-            A(): {B()},
-            B(): set(),
-            F(A, A): {F(A, B), F(B, A)},
-            F(A, B): {F(B, B)},
-            F(B, A): {F(B, B)},
-            F(B, B): set()
-        }
-
-        self.assertEqual(expected, actual)
-
-    def test_complex_taxonomy(self):
-        A = TypeOperator()
-        B = TypeOperator(supertype=A)
-        C = TypeOperator(supertype=A)
-        F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals())
-
-        actual = lang.taxonomy
-        expected = {
-            A(): {B(), C()},
-            B(): set(),
-            C(): set(),
-            F(A, A): {F(A, B), F(A, C), F(B, A), F(C, A)},
-            F(A, B): {F(B, B), F(C, B)},
-            F(A, C): {F(B, C), F(C, C)},
-            F(B, A): {F(B, B), F(B, C)},
-            F(C, A): {F(C, B), F(C, C)},
-            F(B, B): set(),
-            F(B, C): set(),
-            F(C, B): set(),
-            F(C, C): set(),
-        }
-
-        self.assertEqual(expected, actual)
-
-    def test_taxonomy_with_parameterized_type_alias(self):
-        # See issue #73
-        A = TypeOperator()
-        B = TypeOperator(supertype=A)
-        F = TypeOperator(params=2)
-        G = TypeAlias(lambda x: F(x, B), A)
-        lang = Language(scope=locals())
-
-        actual = lang.taxonomy
-        expected = {
-            A(): {B()},
-            B(): set(),
-            F(A, B): {F(B, B)},
-            F(B, B): set(),
-        }
-
     def test_parse_inline_typing(self):
         A = TypeOperator()
         x = Operator(type=A)
