@@ -96,17 +96,14 @@ class TransformationGraph(Graph):
 
         # Connect top-level type nodes (i.e. compound type operators) to the
         # roots of their respective trees
-        for root in self.language.canon:
-            op = root._operator
-            if not list(root.supertypes()) and op.arity > 0:
-                self.add((self.type_nodes[root], RDFS.subClassOf,
-                    self.language.uri(op)))
-        for alias in self.language.synonyms.values():
-            i = alias.instance()
-            op = i._operator
-            if op.arity > 0:
-                self.add((self.language.uri(i), RDFS.subClassOf,
-                    self.language.uri(op)))
+        for t in self.language.canon:
+            if not any(s in self.language.canon for s in t.supertypes()):
+                op = t._operator
+                if op.arity > 0:
+                    self.add((self.language.uri(t), RDFS.subClassOf,
+                        self.language.uri(op)))
+                # self.add((self.language.uri(op), RDFS.subClassOf,
+                #     self.language.uri(Top)))
 
         if self.with_transitive_closure:
             nodes = set(chain(
