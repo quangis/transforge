@@ -581,9 +581,9 @@ class TestAlgebraRDF(unittest.TestCase):
         # Source (of the general type) that takes an expression output (of the
         # specific type) as input. See issue #81.
 
-        A = TypeOperator()
-        B = TypeOperator(supertype=A)
-        TypeOperator(supertype=B)
+        A = TypeOperator('A')
+        B = TypeOperator('B', supertype=A)
+        TypeOperator('C', supertype=B)
         f = Operator(type=lambda x: x ** x [x <= A])
         lang = Language(locals(), namespace=TEST)
 
@@ -677,7 +677,9 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
             A: {B},
-            F: {F(A, B)},
+            F: {F(A, A)},
+            F(A, A): {F(A, B), F(B, A)},
             F(A, B): {F(B, B)},
+            F(B, A): {F(B, B)}
         })
         self.assertIsomorphic(expected, actual)

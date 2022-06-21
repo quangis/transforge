@@ -623,41 +623,49 @@ class TypeOperation(TypeInstance):
     def basic(self) -> bool:
         return self._operator.arity == 0
 
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
+    def subtypes(self, inclusive: bool = False,
+            recursive: bool = False) -> Iterator[TypeOperation]:
         if recursive:
             raise NotImplementedError
         op = self._operator
         if op is Top:
-            raise NotImplementedError
+            raise RuntimeError("Cannot list all types.")
         elif op is Bottom:
             pass
         elif op.arity == 0:
-            # We skip the Bottom type
-            yield from (c() for c in op.children)
+            if op.children:
+                yield from (c() for c in op.children)
+            elif inclusive:
+                yield Bottom()
         else:
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
-                    for q in (p.subtypes() if Variance.CO else p.supertypes()):
+                    for q in (p.subtypes(inclusive) if Variance.CO else
+                            p.supertypes(inclusive)):
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
                     raise RuntimeError
 
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
+    def supertypes(self, inclusive: bool = False,
+            recursive: bool = False) -> Iterator[TypeOperation]:
         if recursive:
             raise NotImplementedError
         op = self._operator
         if op is Bottom:
-            raise NotImplementedError
+            raise RuntimeError("Cannot list all types.")
         elif op is Top:
             pass
-        elif op.arity == 0 and op.parent:
-            # We skip the Top type
-            yield op.parent()
+        elif op.arity == 0:
+            if op.parent:
+                yield op.parent()
+            elif inclusive:
+                yield Top()
         else:
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
-                    for q in (p.supertypes() if Variance.CO else p.subtypes()):
+                    for q in (p.supertypes(inclusive) if Variance.CO else
+                            p.subtypes(inclusive)):
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:

@@ -23,6 +23,7 @@ class Language(object):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
+        self.include_top_and_bottom: bool = False
 
         self._canon: set[TypeOperation] = set()
         self._closed = False
@@ -56,6 +57,8 @@ class Language(object):
         return self._namespace
 
     def uri(self, value: Operator | TypeOperator | TypeOperation) -> URIRef:
+        if isinstance(value, TypeOperation) and value._operator.arity == 0:
+            value = value._operator
         if isinstance(value, (Operator, TypeOperator)):
             return (TA if value in builtins else self.namespace)[value.name]
         elif value in self.canon:
@@ -65,17 +68,19 @@ class Language(object):
             raise ValueError("non-canonical type")
 
     def generate_canon(self) -> set[TypeOperation]:
+        incl = self.include_top_and_bottom
         canon: set[TypeOperation] = set()
-        # canon.update((Unit(), Top(), Bottom(), Product()))
-        canon.update((op() for op in self.types.values() if op.arity == 0))
 
-        # Canonicalize subtypes
+        # Start with base types and any compound type that has an alias
         stack: list[TypeOperation] = [s.instance()
             for s in self.synonyms.values() if s.canonical]
+        stack += [op() for op in self.types.values() if op.arity == 0]
+
+        # ... and make sure that sub+supertypes are included
         while stack:
             current = stack.pop()
             canon.add(current)
-            for s in current.subtypes():
+            for s in chain(current.subtypes(incl), current.supertypes(incl)):
                 if s not in canon:
                     stack.append(s)
         return canon
