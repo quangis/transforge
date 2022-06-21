@@ -252,20 +252,6 @@ class TypeInstance(Type):
     def normalized(self) -> bool:
         return not (isinstance(self, TypeVariable) and self.unification)
 
-    @abstractmethod
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
-        """
-        Strict subtypes of this type.
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
-        """
-        Strict supertypes of this type.
-        """
-        return NotImplemented
-
     def __str__(self):
         return self.text(with_constraints=True)
 
@@ -650,9 +636,12 @@ class TypeOperation(TypeInstance):
             yield from (c() for c in op.children)
         else:
             for i, v, p in zip(count(), op.variance, self.params):
-                for q in (p.subtypes() if Variance.CO else p.supertypes()):
-                    yield op(*(q if i == j else p
-                        for j, p in enumerate(self.params)))
+                if isinstance(p, TypeOperation):
+                    for q in (p.subtypes() if Variance.CO else p.supertypes()):
+                        yield op(*(q if i == j else p
+                            for j, p in enumerate(self.params)))
+                else:
+                    raise RuntimeError
 
     def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
         if recursive:
@@ -667,9 +656,12 @@ class TypeOperation(TypeInstance):
             yield op.parent()
         else:
             for i, v, p in zip(count(), op.variance, self.params):
-                for q in (p.supertypes() if Variance.CO else p.subtypes()):
-                    yield op(*(q if i == j else p
-                        for j, p in enumerate(self.params)))
+                if isinstance(p, TypeOperation):
+                    for q in (p.supertypes() if Variance.CO else p.subtypes()):
+                        yield op(*(q if i == j else p
+                            for j, p in enumerate(self.params)))
+                else:
+                    raise RuntimeError
 
 class TypeVariable(TypeInstance):
     """
@@ -683,12 +675,6 @@ class TypeVariable(TypeInstance):
         self.upper: Optional[TypeOperator] = None
         self._constraints: set[Constraint] = set()
         self.origin = origin
-
-    def subtypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
-        raise RuntimeError
-
-    def supertypes(self, recursive: bool = False) -> Iterator[TypeOperation]:
-        raise RuntimeError
 
     def check_constraints(self) -> None:
         for c in list(self._constraints):
