@@ -12,12 +12,12 @@ from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
 from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
-    SubtypeMismatch, TypeAlias, TypeOperation
+    SubtypeMismatch, TypeAlias, TypeOperation, Top, Bottom
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TEST, TransformationGraph
 
-from typing import Iterable
+from typing import Union
 
 class Step(object):
     """
@@ -86,16 +86,20 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
             g.add((nodes[j], TA.to, nodes[i]))
     return g
 
-def make_taxonomy(lang: Language,
-        d: dict[TypeOperator | TypeOperation, Iterable[TypeOperator | TypeOperation]]) -> Graph:
+
+TypeOp = Union[TypeOperator, TypeOperation]
+Types = Union[TypeOp, tuple[TypeOp]]
+
+def make_taxonomy(lang: Language, d: dict[Types, Types]) -> Graph:
     """
     Manually construct a taxonomy graph.
     """
     g = Graph()
 
-    for sup, subs in d.items():
-        for sub in subs:
-            g.add((lang.uri(sub), RDFS.subClassOf, lang.uri(sup)))
+    for sups, subs in d.items():
+        for sup in (sups if isinstance(sups, tuple) else (sups,)):
+            for sub in (subs if isinstance(subs, tuple) else (subs,)):
+                g.add((lang.uri(sub), RDFS.subClassOf, lang.uri(sup)))
 
     return g
 
@@ -383,8 +387,8 @@ class TestAlgebraRDF(unittest.TestCase):
 
         g = Graph()
         x, y = TypeVariable(), TypeVariable()
-        x.bind(A)
-        y.bind(A)
+        x.bind(A())
+        y.bind(A())
         n1 = BNode()
         g.add((n1, RDFS.subClassOf, TEST.F))
         g.add((n1, RDF._1, TEST.A))
@@ -629,16 +633,15 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST)
+        lang = Language(scope=locals(), namespace=TEST,
+            include_top_and_bottom=False)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
-            A: {B},
-            F: {F(A, A)},
-            F(A, A): {F(A, B), F(B, A)},
-            F(A, B): {F(B, B)},
-            F(B, A): {F(B, B)},
+            A: B,
+            F(A, A): (F(A, B), F(B, A)),
+            (F(B, A), F(A, B)): F(B, B)
         })
         self.assertIsomorphic(expected, actual)
 
@@ -648,38 +651,53 @@ class TestAlgebraRDF(unittest.TestCase):
         C = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST)
+        lang = Language(scope=locals(), namespace=TEST,
+            include_top_and_bottom=False)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
 
         expected = make_taxonomy(lang, {
-            A: {B, C},
-            F: {F(A, A)},
-            F(A, A): {F(A, B), F(A, C), F(B, A), F(C, A)},
-            F(A, B): {F(B, B), F(C, B)},
-            F(A, C): {F(B, C), F(C, C)},
-            F(B, A): {F(B, B), F(B, C)},
-            F(C, A): {F(C, B), F(C, C)},
+            A: (B, C),
+            F(A, A): (F(A, B), F(A, C), F(B, A), F(C, A)),
+            F(A, B): (F(B, B), F(C, B)),
+            F(A, C): (F(B, C), F(C, C)),
+            F(B, A): (F(B, B), F(B, C)),
+            F(C, A): (F(C, B), F(C, C)),
         })
 
         self.assertIsomorphic(expected, actual)
 
-    def test_taxonomy_with_parameterized_type_alias(self):
-        # See issue #73
+    def test_taxonomy_inclusive(self):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        G = TypeAlias(lambda x: F(x, B), A)
-        lang = Language(scope=locals(), namespace=TEST)
+        AA = TypeAlias(F(A, A))
+        lang = Language(scope=locals(), namespace=TEST,
+            include_top_and_bottom=True)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
-            A: {B},
-            F: {F(A, A)},
-            F(A, A): {F(A, B), F(B, A)},
-            F(A, B): {F(B, B)},
-            F(B, A): {F(B, B)}
+            Top: (A, F(Top, Top)),
+            A: B,
+            B: Bottom,
+            F(Top, Top):
+                (F(A, Top), F(Top, A), F(Bottom, Top), F(Top, Bottom)),
+            F(Top, A): (F(A, A), F(Top, B), F(Bottom, A)),
+            F(A, Top): (F(A, A), F(B, Top), F(A, Bottom)),
+            F(B, Top): (F(Bottom, Top), F(B, Bottom), F(B, A)),
+            F(Top, B): (F(Top, Bottom), F(Bottom, B), F(A, B)),
+            F(A, A): (F(A, B), F(B, A)),
+            F(A, B): (F(B, B), F(A, Bottom)),
+            F(B, A): (F(B, B), F(Bottom, A)),
+            F(A, Bottom): F(B, Bottom),
+            F(Bottom, A): F(Bottom, B),
+            F(B, B): (F(B, Bottom), F(Bottom, B)),
+            F(Top, Bottom): (F(A, Bottom), F(Bottom, Bottom)),
+            F(Bottom, Top): (F(Bottom, A), F(Bottom, Bottom)),
+            F(B, Bottom): F(Bottom, Bottom),
+            F(Bottom, B): F(Bottom, Bottom),
+            F(Bottom, Bottom): Bottom
         })
         self.assertIsomorphic(expected, actual)

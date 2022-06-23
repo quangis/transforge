@@ -2,7 +2,7 @@ import unittest
 
 from transformation_algebra.type import \
     Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
-    FunctionApplicationError, TypeMismatch, \
+    FunctionApplicationError, TypeMismatch, Top, Bottom, \
     ConstraintViolation, ConstrainFreeVariable, EliminationConstraint
 
 
@@ -441,6 +441,26 @@ class TestType(unittest.TestCase):
         g = TypeSchema(lambda x: x [A << x])
         self.assertEqual(str(f), "x [x << A]")
         self.assertEqual(str(g), "A")  # this subtype bound should be fixed
+
+    def test_inclusive_subtype(self):
+        A = TypeOperator('A')
+        F = TypeOperator('F', params=2)
+        self.assertEqual(
+            set(F(A, A).subtypes(inclusive=True)),
+            {F(Bottom, A), F(A, Bottom)}
+        )
+        self.assertEqual(
+            set(F(Bottom, A).subtypes(inclusive=True)),
+            {F(Bottom, Bottom)}
+        )
+        self.assertEqual(
+            set(F(Bottom, Bottom).subtypes(inclusive=True)),
+            {Bottom()}
+        )
+        self.assertEqual(
+            set(F(Top, Top).subtypes(inclusive=True)),
+            {F(Bottom, Top), F(Top, Bottom)}
+        )
 
 
 if __name__ == '__main__':

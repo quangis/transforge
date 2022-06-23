@@ -629,7 +629,7 @@ class TypeOperation(TypeInstance):
             raise NotImplementedError
         op = self._operator
         if op is Top:
-            raise RuntimeError("Cannot list all types.")
+            raise RuntimeError(f"Cannot list all subtypes of {self}")
         elif op is Bottom:
             pass
         elif op.arity == 0:
@@ -638,14 +638,30 @@ class TypeOperation(TypeInstance):
             elif inclusive:
                 yield Bottom()
         else:
+            res = False
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
-                    for q in (p.subtypes(inclusive) if Variance.CO else
-                            p.supertypes(inclusive)):
+                    succs: Iterable[TypeOperation]
+                    if v == Variance.CO:
+                        if p._operator is Top:
+                            succs = (Bottom(),)
+                        else:
+                            succs = p.subtypes(inclusive)
+                    elif v == Variance.CONTRA:
+                        if p._operator is Bottom:
+                            succs = (Top(),)
+                        else:
+                            succs = p.supertypes(inclusive)
+                    else:
+                        succs = ()
+                    for q in succs:
+                        res = True
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
                     raise RuntimeError
+            if not res and inclusive:
+                yield Bottom()
 
     def supertypes(self, inclusive: bool = False,
             recursive: bool = False) -> Iterator[TypeOperation]:
@@ -653,7 +669,7 @@ class TypeOperation(TypeInstance):
             raise NotImplementedError
         op = self._operator
         if op is Bottom:
-            raise RuntimeError("Cannot list all types.")
+            raise RuntimeError(f"Cannot list all supertypes of {self}")
         elif op is Top:
             pass
         elif op.arity == 0:
@@ -662,14 +678,30 @@ class TypeOperation(TypeInstance):
             elif inclusive:
                 yield Top()
         else:
+            res = False
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
-                    for q in (p.supertypes(inclusive) if Variance.CO else
-                            p.subtypes(inclusive)):
+                    succs: Iterable[TypeOperation]
+                    if v == Variance.CO:
+                        if p._operator is Bottom:
+                            succs = (Top(),)
+                        else:
+                            succs = p.supertypes(inclusive)
+                    elif v == Variance.CONTRA:
+                        if p._operator is Top:
+                            succs = (Bottom(),)
+                        else:
+                            succs = p.subtypes(inclusive)
+                    else:
+                        succs = ()
+                    for q in succs:
+                        res = True
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
                     raise RuntimeError
+            if not res and inclusive:
+                yield Top()
 
 class TypeVariable(TypeInstance):
     """

@@ -90,22 +90,16 @@ class TransformationGraph(Graph):
         """
         incl = self.language.include_top_and_bottom
 
-        # Add all canonical nodes and connect to their subtypes
+        # Add all canonical nodes and connect to their super & subtypes
         for t in self.language.canon:
             node = self.add_type(t)
             if t._operator is not Top:
                 for s in t.subtypes(incl):
                     self.add((self.add_type(s), RDFS.subClassOf, node))
 
-            # Connect roots of trees to the Top supertype & to their operator
-            if not any(s in self.language.canon for s in t.supertypes()):
-                op = t._operator
-                if op.arity > 0:
-                    self.add((self.language.uri(t), RDFS.subClassOf,
-                        self.language.uri(op)))
-                if incl:
-                    self.add((self.language.uri(op), RDFS.subClassOf,
-                        self.language.uri(Top)))
+            if t._operator is not Bottom:
+                for s in t.supertypes(incl):
+                    self.add((node, RDFS.subClassOf, self.add_type(s)))
 
         # Transitive closure
         if self.with_transitive_closure:
