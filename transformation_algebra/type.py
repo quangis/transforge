@@ -14,6 +14,19 @@ from typing import Optional, Iterator, Iterable, Callable
 from transformation_algebra.label import Labels
 
 
+class Direction(Enum):
+    UP = auto()
+    DOWN = auto()
+
+    def variant(self, variance: Variance) -> Direction:
+        if variance is Variance.CO:
+            return self
+        elif self is Direction.UP:
+            return Direction.DOWN
+        else:
+            return Direction.UP
+
+
 class Variance(Enum):
     """
     The variance of a type parameter indicates how subtype relations of
@@ -623,85 +636,63 @@ class TypeOperation(TypeInstance):
     def basic(self) -> bool:
         return self._operator.arity == 0
 
-    def subtypes(self, inclusive: bool = False,
-            recursive: bool = False) -> Iterator[TypeOperation]:
-        if recursive:
-            raise NotImplementedError
+    def successors(self, dir: Direction,
+            include_bottom: bool = False,
+            include_top: bool = False) -> Iterator[TypeOperation]:
+        """
+        Find successor types (ie. direct subtypes or supertypes of this type).
+        """
         op = self._operator
-        if op is Top:
-            raise RuntimeError(f"Cannot list all subtypes of {self}")
-        elif op is Bottom:
-            pass
+        if (op is Top and dir is Direction.DOWN) or \
+                (op is Bottom and dir is Direction.UP):
+            raise RuntimeError(f"Cannot list all {dir}-successors of {op}")
         elif op.arity == 0:
-            if op.children:
-                yield from (c() for c in op.children)
-            elif inclusive:
-                yield Bottom()
+            if dir is Direction.DOWN:
+                if op.children:
+                    yield from (c() for c in op.children)
+                elif include_bottom and op is not Bottom:
+                    yield Bottom()
+            else:
+                assert dir is Direction.UP
+                if op.parent:
+                    yield op.parent()
+                elif include_top and op is not Top:
+                    yield Top()
         else:
             res = False
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
                     succs: Iterable[TypeOperation]
-                    if v == Variance.CO:
-                        if p._operator is Top:
-                            succs = (Bottom(),)
-                        else:
-                            succs = p.subtypes(inclusive)
-                    elif v == Variance.CONTRA:
-                        if p._operator is Bottom:
-                            succs = (Top(),)
-                        else:
-                            succs = p.supertypes(inclusive)
+                    ndir = dir.variant(v)
+                    if p._operator is Top and ndir is Direction.DOWN and \
+                            include_bottom:
+                        succs = (Bottom(),)
+                    elif p._operator is Bottom and ndir is Direction.UP and \
+                            include_top:
+                        succs = (Top(),)
                     else:
-                        succs = ()
+                        succs = p.successors(ndir, include_top=include_top,
+                            include_bottom=include_bottom)
                     for q in succs:
                         res = True
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
-                    raise RuntimeError
-            if not res and inclusive:
-                yield Bottom()
+                    raise RuntimeError("encountered variable")
 
-    def supertypes(self, inclusive: bool = False,
-            recursive: bool = False) -> Iterator[TypeOperation]:
-        if recursive:
-            raise NotImplementedError
-        op = self._operator
-        if op is Bottom:
-            raise RuntimeError(f"Cannot list all supertypes of {self}")
-        elif op is Top:
-            pass
-        elif op.arity == 0:
-            if op.parent:
-                yield op.parent()
-            elif inclusive:
-                yield Top()
-        else:
-            res = False
-            for i, v, p in zip(count(), op.variance, self.params):
-                if isinstance(p, TypeOperation):
-                    succs: Iterable[TypeOperation]
-                    if v == Variance.CO:
-                        if p._operator is Bottom:
-                            succs = (Top(),)
-                        else:
-                            succs = p.supertypes(inclusive)
-                    elif v == Variance.CONTRA:
-                        if p._operator is Top:
-                            succs = (Bottom(),)
-                        else:
-                            succs = p.subtypes(inclusive)
-                    else:
-                        succs = ()
-                    for q in succs:
-                        res = True
-                        yield op(*(q if i == j else p
-                            for j, p in enumerate(self.params)))
-                else:
-                    raise RuntimeError
-            if not res and inclusive:
-                yield Top()
+            if not res:
+                if include_bottom and dir is Direction.DOWN:
+                    yield Bottom()
+                elif include_top and dir is Direction.UP:
+                    yield Top()
+
+    def subtypes(self, inclusive: bool = False) -> Iterator[TypeOperation]:
+        return self.successors(Direction.DOWN,
+            include_top=inclusive, include_bottom=inclusive)
+
+    def supertypes(self, inclusive: bool = False) -> Iterator[TypeOperation]:
+        return self.successors(Direction.UP,
+            include_top=inclusive, include_bottom=inclusive)
 
 class TypeVariable(TypeInstance):
     """
