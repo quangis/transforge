@@ -664,12 +664,10 @@ class TypeOperation(TypeInstance):
                 if isinstance(p, TypeOperation):
                     succs: Iterable[TypeOperation]
                     ndir = dir.variant(v)
-                    if p._operator is Top and ndir is Direction.DOWN and \
-                            include_bottom:
-                        succs = (Bottom(),)
-                    elif p._operator is Bottom and ndir is Direction.UP and \
-                            include_top:
-                        succs = (Top(),)
+                    if p._operator is Top and ndir is Direction.DOWN:
+                        succs = (Bottom(),) if include_bottom else ()
+                    elif p._operator is Bottom and ndir is Direction.UP:
+                        succs = (Top(),) if include_top else ()
                     else:
                         succs = p.successors(ndir, include_top=include_top,
                             include_bottom=include_bottom)
