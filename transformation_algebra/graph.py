@@ -427,7 +427,8 @@ class TransformationGraph(Graph):
         ns = self.language.namespace
         # TODO handle collections of types/operators
         for subj, obj in self[:ns.type:]:
-            type = self.language.parse_type(str(obj))
+            type = self.language.parse_type(str(obj)).concretize(
+                wildcard=Top)
             node = self.type_nodes[type]
             self.add((subj, TA.type, node))
 

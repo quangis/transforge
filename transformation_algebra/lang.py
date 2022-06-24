@@ -287,7 +287,7 @@ class Language(object):
                 else:
                     stack.append(None)
             elif token == "_":
-                stack.append(TypeVariable())
+                stack.append(TypeVariable(wildcard=True))
             elif token == "*":
                 t1 = stack.pop()
                 assert isinstance(t1, TypeInstance)

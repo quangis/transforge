@@ -4,7 +4,7 @@ import unittest
 from rdflib.term import BNode, Node, URIRef, Literal
 from rdflib.namespace import RDF
 
-from transformation_algebra.type import TypeOperator, Type, TypeAlias
+from transformation_algebra.type import TypeOperator, Type, TypeAlias, _
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
@@ -291,6 +291,26 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(lang, graph, Y, results={TEST.y})
         self.assertQuery(lang, graph, F(X), results={TEST.fx, TEST.fy})
         self.assertQuery(lang, graph, F(Y), results={TEST.fy})
+
+    def test_that_wildcards_are_captured(self):
+        # Test that using a wildcard in a query captures all types
+        X = TypeOperator()
+        Y = TypeOperator(supertype=X)
+        F = TypeOperator(params=2)
+        FFXYY, FYY = TypeAlias(F(F(X, Y), Y)), TypeAlias(F(Y, Y))
+        lang = Language(locals(), namespace=TEST, include_top=True)
+
+        graph = make_graph(lang, {
+            TEST.x: ~X,
+            TEST.y: ~Y,
+            TEST.ffx: ~F(F(X, Y), Y),
+            TEST.fy: ~F(Y, Y)
+        })
+
+        self.assertQuery(lang, graph, _, results={TEST.x, TEST.y, TEST.ffx,
+            TEST.fy})
+        self.assertQuery(lang, graph, F(_, _), results={TEST.ffx, TEST.fy})
+        self.assertQuery(lang, graph, F(F(_, _), _), results={TEST.ffx})
 
     def test_tree_unfold(self):
         # Test if the optional unfolding of trees happens.
