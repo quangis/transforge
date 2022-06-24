@@ -446,19 +446,19 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         F = TypeOperator('F', params=2)
         self.assertEqual(
-            set(F(A, A).subtypes(inclusive=True)),
+            F(A, A).subtypes(recursive=False),
             {F(Bottom, A), F(A, Bottom)}
         )
         self.assertEqual(
-            set(F(Bottom, A).subtypes(inclusive=True)),
+            F(Bottom, A).subtypes(recursive=False),
             {F(Bottom, Bottom)}
         )
         self.assertEqual(
-            set(F(Bottom, Bottom).subtypes(inclusive=True)),
+            F(Bottom, Bottom).subtypes(recursive=False),
             {Bottom()}
         )
         self.assertEqual(
-            set(F(Top, Top).subtypes(inclusive=True)),
+            F(Top, Top).subtypes(recursive=False),
             {F(Bottom, Top), F(Top, Bottom)}
         )
 

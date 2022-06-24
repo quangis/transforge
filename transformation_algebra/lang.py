@@ -11,7 +11,8 @@ from rdflib import URIRef
 from rdflib.namespace import Namespace, ClosedNamespace
 
 from transformation_algebra.type import builtins, Product, Top, Bottom, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias
+    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
+    Direction
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -20,11 +21,13 @@ TA = Namespace("https://github.com/quangis/transformation-algebra#")
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
             namespace: str | None = None,
-            include_top_and_bottom: bool = False):
+            include_top: bool = False,
+            include_bottom: bool = False):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
-        self.include_top_and_bottom: bool = include_top_and_bottom
+        self.include_top: bool = include_top
+        self.include_bottom: bool = include_bottom
 
         self._canon: set[TypeOperation] = set()
         self._closed = False
@@ -69,7 +72,6 @@ class Language(object):
             raise ValueError("non-canonical type")
 
     def generate_canon(self) -> set[TypeOperation]:
-        inc = self.include_top_and_bottom
         canon: set[TypeOperation] = set()
 
         # Start with base types and any compound type that has an alias
@@ -81,8 +83,12 @@ class Language(object):
         while stack:
             current = stack.pop()
             canon.add(current)
-            if current._operator not in (Top, Bottom):
-                for s in chain(current.subtypes(inc), current.supertypes(inc)):
+            if current._operator in (Top, Bottom):
+                continue
+            for d in (Direction.UP, Direction.DOWN):
+                for s in current.successors(d,
+                        include_top=self.include_top,
+                        include_bottom=self.include_bottom):
                     if s not in canon:
                         stack.append(s)
         return canon

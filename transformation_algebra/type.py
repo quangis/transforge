@@ -684,13 +684,30 @@ class TypeOperation(TypeInstance):
                 elif include_top and dir is Direction.UP:
                     yield Top()
 
-    def subtypes(self, inclusive: bool = False) -> Iterator[TypeOperation]:
-        return self.successors(Direction.DOWN,
-            include_top=inclusive, include_bottom=inclusive)
+    def _successors(self, dir: Direction, recursive: bool = True,
+            inclusive: bool = True) -> set[TypeOperation]:
+        result: set[TypeOperation] = set()
+        stack: list[TypeOperation] = [self]
+        while stack:
+            current = stack.pop()
+            for s in current.successors(Direction.DOWN,
+                    include_top=inclusive, include_bottom=inclusive):
+                if s not in result:
+                    result.add(s)
+                    stack.append(s)
+            if not recursive:
+                return result
+        return result
 
-    def supertypes(self, inclusive: bool = False) -> Iterator[TypeOperation]:
-        return self.successors(Direction.UP,
-            include_top=inclusive, include_bottom=inclusive)
+    def subtypes(self, recursive: bool = True,
+            inclusive: bool = True) -> set[TypeOperation]:
+        return self._successors(Direction.DOWN,
+            recursive=recursive, inclusive=inclusive)
+
+    def supertypes(self, recursive: bool = True,
+            inclusive: bool = True) -> set[TypeOperation]:
+        return self._successors(Direction.UP,
+            recursive=recursive, inclusive=inclusive)
 
 class TypeVariable(TypeInstance):
     """

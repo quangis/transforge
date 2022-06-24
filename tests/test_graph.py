@@ -633,8 +633,7 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST,
-            include_top_and_bottom=False)
+        lang = Language(scope=locals(), namespace=TEST)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -651,8 +650,7 @@ class TestAlgebraRDF(unittest.TestCase):
         C = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST,
-            include_top_and_bottom=False)
+        lang = Language(scope=locals(), namespace=TEST)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -668,13 +666,13 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(expected, actual)
 
-    def test_taxonomy_inclusive(self):
+    def test_taxonomy_including_top_bottom(self):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, A))
         lang = Language(scope=locals(), namespace=TEST,
-            include_top_and_bottom=True)
+            include_top=True, include_bottom=True)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -699,5 +697,29 @@ class TestAlgebraRDF(unittest.TestCase):
             F(B, Bottom): F(Bottom, Bottom),
             F(Bottom, B): F(Bottom, Bottom),
             F(Bottom, Bottom): Bottom
+        })
+        self.assertIsomorphic(expected, actual)
+
+    def test_taxonomy_including_only_top(self):
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        AA = TypeAlias(F(A, A))
+        lang = Language(scope=locals(), namespace=TEST,
+            include_top=True)
+
+        actual = TransformationGraph(lang, minimal=True)
+        actual.add_taxonomy()
+        expected = make_taxonomy(lang, {
+            Top: (A, F(Top, Top)),
+            A: B,
+            F(Top, Top): (F(A, Top), F(Top, A)),
+            F(Top, A): (F(A, A), F(Top, B)),
+            F(A, Top): (F(A, A), F(B, Top)),
+            F(B, Top): F(B, A),
+            F(Top, B): F(A, B),
+            F(A, A): (F(A, B), F(B, A)),
+            F(A, B): F(B, B),
+            F(B, A): F(B, B),
         })
         self.assertIsomorphic(expected, actual)

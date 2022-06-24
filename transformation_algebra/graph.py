@@ -6,7 +6,7 @@ parsed as RDF graphs.
 from __future__ import annotations
 
 from transformation_algebra.type import Type, TypeOperation, \
-    Function, TypeInstance, Top, Bottom
+    Function, TypeInstance, Top, Bottom, Direction
 from transformation_algebra.expr import \
     Expr, Operation, Application, Abstraction, Source
 from transformation_algebra.lang import Language, TA
@@ -88,17 +88,18 @@ class TransformationGraph(Graph):
         """
         Add a taxonomy of types.
         """
-        incl = self.language.include_top_and_bottom
+        kwargs = {"include_bottom": self.language.include_bottom,
+            "include_top": self.language.include_top}
 
         # Add all canonical nodes and connect to their super & subtypes
         for t in self.language.canon:
             node = self.add_type(t)
             if t._operator is not Top:
-                for s in t.subtypes(incl):
+                for s in t.successors(Direction.DOWN, **kwargs):
                     self.add((self.add_type(s), RDFS.subClassOf, node))
 
             if t._operator is not Bottom:
-                for s in t.supertypes(incl):
+                for s in t.successors(Direction.UP, **kwargs):
                     self.add((node, RDFS.subClassOf, self.add_type(s)))
 
         # Transitive closure
