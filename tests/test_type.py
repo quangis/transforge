@@ -462,6 +462,12 @@ class TestType(unittest.TestCase):
             {F(Bottom, Top), F(Top, Bottom)}
         )
 
+    def test_concretization(self):
+        F = TypeOperator('F', params=1)
+        G = TypeSchema(lambda x: F(x))
+        self.assertEqual(F(F(_)).concretize(wildcard=Top), F(F(Top)))
+        self.assertRaises(RuntimeError, Type.concretize, G)
+
 
 if __name__ == '__main__':
     unittest.main()
