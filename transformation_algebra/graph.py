@@ -210,6 +210,12 @@ class TransformationGraph(Graph):
 
             output_type = expr.type.output().normalize()
 
+            canonical = self.with_noncanonical_types or \
+                output_type in self.language.canon
+
+            essential = self.with_intermediate_types or \
+                not intermediate
+
             if self.with_operators:
                 op_node = self.language.namespace[expr.operator.name]
                 self.add((current, TA.via, op_node))
@@ -217,10 +223,7 @@ class TransformationGraph(Graph):
                 if self.with_membership:
                     self.add((root, TA.contains, op_node))
 
-            if (self.with_types
-                    and (self.with_noncanonical_types or
-                        output_type in self.language.canon)
-                    and (self.with_intermediate_types or not intermediate)):
+            if self.with_types and canonical and essential:
 
                 type_node = self.add_type(output_type)
                 self.add((current, TA.type, type_node))
@@ -229,12 +232,12 @@ class TransformationGraph(Graph):
                     self.add((root, TA.contains, type_node))
 
             if self.with_labels:
-                if ((self.with_intermediate_types or not intermediate)
-                        and (self.with_noncanonical_types or
-                        output_type in self.language.canon)):
-                    type_str = str(output_type)
+                if not canonical:
+                    type_str = f"noncanonical {output_type}"
+                elif not essential:
+                    type_str = f"hidden {output_type}"
                 else:
-                    type_str = f"{output_type} (non-canonical)"
+                    type_str = str(output_type)
 
                 self.add((current, RDFS.label, Literal(
                     f"{self.ref()}{type_str} via {expr.operator.name}")))
