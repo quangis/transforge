@@ -156,14 +156,14 @@ class Type(ABC):
     def instance(self) -> TypeInstance:
         return NotImplemented
 
-    def concretize(self, wildcard: Type | None = None) -> TypeInstance:
+    def concretize(self, replace: Type | None = None) -> TypeInstance:
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
-            return a._operator(*(p.concretize(wildcard) for p in a.params))
+            return a._operator(*(p.concretize(replace) for p in a.params))
         else:
             assert isinstance(a, TypeVariable)
-            if a.wildcard and wildcard:
-                return wildcard.instance()
+            if replace:
+                return replace.instance()
             else:
                 raise RuntimeError("encountered variable")
 
