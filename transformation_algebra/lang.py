@@ -106,6 +106,9 @@ class Language(object):
     def add(self, item: Operator | TypeOperator | TypeAlias,
             name: str | None = None):
 
+        if item in builtins:
+            return
+
         reserved = ("via", "type", "Unit", "Top", "Bottom",
             "Product", "Intersection", "Union")
 
