@@ -666,6 +666,24 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(expected, actual)
 
+    def test_complex_taxonomy_without_subtype(self):
+        # Make sure that only subtypes are included
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        AA = TypeAlias(F(A, B))
+        lang = Language(scope=locals(), namespace=TEST)
+
+        actual = TransformationGraph(lang, minimal=True)
+        actual.add_taxonomy()
+
+        expected = make_taxonomy(lang, {
+            A: B,
+            F(A, B): F(B, B),
+        })
+
+        self.assertIsomorphic(expected, actual)
+
     def test_taxonomy_including_top_bottom(self):
         A = TypeOperator()
         B = TypeOperator(supertype=A)

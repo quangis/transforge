@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra.type import TypeOperator, TypeAlias, \
-    SubtypeMismatch, _
+    SubtypeMismatch, _, Top
 from transformation_algebra.expr import Operator, Source
 from transformation_algebra.lang import Language
 
@@ -81,6 +81,15 @@ class TestAlgebra(unittest.TestCase):
             lang.parse("- : G(B)").match(~F(B, B))
         )
         self.assertRaises(RuntimeError, lang.parse, "- : G")
+
+    def test_canon(self):
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        AB = TypeAlias(F(A, B))
+        lang = Language(scope=locals(), include_top=True)
+        self.assertEqual(lang.canon, {Top(), A(), B(), F(A, B), F(B, B),
+            F(A, Top), F(B, Top), F(Top, B), F(Top, Top)})
 
 
 if __name__ == '__main__':

@@ -83,12 +83,17 @@ class Language(object):
             self.canon.add(current)
             if current._operator in (Top, Bottom):
                 continue
-            for d in (Direction.UP, Direction.DOWN):
-                for s in current.successors(d,
-                        include_top=self.include_top,
-                        include_bottom=self.include_bottom):
-                    if s not in self.canon:
-                        stack.append(s)
+            for s in current.successors(Direction.UP,
+                    include_family=False,
+                    include_top=self.include_top,
+                    include_bottom=self.include_bottom):
+                if s not in self.canon:
+                    stack.append(s)
+            for s in current.successors(Direction.DOWN,
+                    include_top=self.include_top,
+                    include_bottom=self.include_bottom):
+                if s not in self.canon:
+                    stack.append(s)
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """

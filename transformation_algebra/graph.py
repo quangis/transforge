@@ -96,11 +96,13 @@ class TransformationGraph(Graph):
             node = self.add_type(t)
             if t._operator is not Top:
                 for s in t.successors(Direction.DOWN, **kwargs):
-                    self.add((self.add_type(s), RDFS.subClassOf, node))
+                    if s in self.language.canon:
+                        self.add((self.add_type(s), RDFS.subClassOf, node))
 
             if t._operator is not Bottom:
                 for s in t.successors(Direction.UP, **kwargs):
-                    self.add((node, RDFS.subClassOf, self.add_type(s)))
+                    if s in self.language.canon:
+                        self.add((node, RDFS.subClassOf, self.add_type(s)))
 
         # Transitive closure
         if self.with_transitive_closure:

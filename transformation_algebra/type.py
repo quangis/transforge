@@ -647,6 +647,7 @@ class TypeOperation(TypeInstance):
         return self._operator.arity == 0
 
     def successors(self, dir: Direction,
+            include_family: bool = True,
             include_bottom: bool = False,
             include_top: bool = False) -> Iterator[TypeOperation]:
         """
@@ -658,13 +659,13 @@ class TypeOperation(TypeInstance):
             raise RuntimeError(f"Cannot list all {dir}-successors of {op}")
         elif op.arity == 0:
             if dir is Direction.DOWN:
-                if op.children:
+                if include_family and op.children:
                     yield from (c() for c in op.children)
                 elif include_bottom and op is not Bottom:
                     yield Bottom()
             else:
                 assert dir is Direction.UP
-                if op.parent:
+                if include_family and op.parent:
                     yield op.parent()
                 elif include_top and op is not Top:
                     yield Top()
@@ -679,7 +680,9 @@ class TypeOperation(TypeInstance):
                     elif p._operator is Bottom and ndir is Direction.UP:
                         succs = (Top(),) if include_top else ()
                     else:
-                        succs = p.successors(ndir, include_top=include_top,
+                        succs = p.successors(ndir,
+                            include_family=include_family,
+                            include_top=include_top,
                             include_bottom=include_bottom)
                     for q in succs:
                         res = True
