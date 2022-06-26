@@ -6,7 +6,7 @@ types and operators. It also handles parsing expressions of the algebra.
 from __future__ import annotations
 
 from itertools import groupby, chain
-from typing import Optional, Iterator, Any
+from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import Namespace, ClosedNamespace
 
@@ -22,32 +22,28 @@ class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
             namespace: str | None = None,
             include_top: bool = False,
-            include_bottom: bool = False):
-        self.operators: dict[str, Operator] = dict()
-        self.types: dict[str, TypeOperator] = dict()
-        self.synonyms: dict[str, TypeAlias] = dict()
-        self.include_top: bool = include_top
-        self.include_bottom: bool = include_bottom
-
-        self._canon: set[TypeOperation] = set()
-        self._closed = False
-        self._namespace: LanguageNamespace | str | None = namespace
-
-        if scope:
-            self.add_scope(scope)
-
-    @property
-    def canon(self) -> set[TypeOperation]:
+            include_bottom: bool = False,
+            canon: Iterable[TypeOperation] = ()):
         """
         The canonical types consist of all base types, plus those compound
         types that have an explicit synonym, or that are subtypes or parameters
         of types that do. These types are of special interest among the
         potentially infinite number of types.
         """
-        if not self._canon:
-            self._canon = self.generate_canon()
-            self._closed = True
-        return self._canon
+        self.operators: dict[str, Operator] = dict()
+        self.types: dict[str, TypeOperator] = dict()
+        self.synonyms: dict[str, TypeAlias] = dict()
+        self.include_top: bool = include_top
+        self.include_bottom: bool = include_bottom
+
+        self._closed = False
+        self._namespace: LanguageNamespace | str | None = namespace
+
+        if scope:
+            self.add_scope(scope)
+
+        self.canon: set[TypeOperation] = set(canon)
+        self.expand_canon()
 
     @property
     def namespace(self) -> LanguageNamespace:
@@ -71,27 +67,28 @@ class Language(object):
         else:
             raise ValueError("non-canonical type")
 
-    def generate_canon(self) -> set[TypeOperation]:
-        canon: set[TypeOperation] = set()
+    def expand_canon(self) -> None:
+        """
+        Expand the canonical types to include:
+        -   All base types.
+        -   All compound types that have an alias.
+        -   All subtypes and supertypes of canonical types.
+        """
 
-        # Start with base types and any compound type that has an alias
-        stack: list[TypeOperation] = [s.instance()
-            for s in self.synonyms.values() if s.canonical]
+        stack: list[TypeOperation] = list(self.canon)
+        stack += [s.instance() for s in self.synonyms.values() if s.canonical]
         stack += [op() for op in self.types.values() if op.arity == 0]
-
-        # ... and make sure that sub+supertypes are included
         while stack:
             current = stack.pop()
-            canon.add(current)
+            self.canon.add(current)
             if current._operator in (Top, Bottom):
                 continue
             for d in (Direction.UP, Direction.DOWN):
                 for s in current.successors(d,
                         include_top=self.include_top,
                         include_bottom=self.include_bottom):
-                    if s not in canon:
+                    if s not in self.canon:
                         stack.append(s)
-        return canon
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """
