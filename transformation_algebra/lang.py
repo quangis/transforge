@@ -43,11 +43,16 @@ class Language(object):
             self.add_scope(scope)
 
         self.canon: set[TypeOperation] = set()
-        for t in canon:
-            s = t.instance()
-            assert isinstance(s, TypeOperation)
-            self.canon.add(s)
-
+        if canon:
+            for t in canon:
+                if isinstance(t, TypeOperator):
+                    self.canon.add(t())
+                else:
+                    assert isinstance(t, TypeOperation)
+                    self.canon.add(t)
+        else:
+            self.canon = set(op()
+                for op in self.types.values() if op.arity == 0)
         self.expand_canon()
 
     @property
@@ -74,15 +79,12 @@ class Language(object):
 
     def expand_canon(self) -> None:
         """
-        Expand the canonical types to include:
-        -   All base types.
-        -   All compound types that have an alias.
-        -   All subtypes and supertypes of canonical types.
+        Expand the canonical types to include all subtypes of existing
+        canonical types. If appropriate, supertypes like `Top`, `F(Top)`,
+        etcetera, are also included.
         """
 
         stack: list[TypeOperation] = list(self.canon)
-        stack += [s.instance() for s in self.synonyms.values() if s.canonical]
-        stack += [op() for op in self.types.values() if op.arity == 0]
         while stack:
             current = stack.pop()
             self.canon.add(current)

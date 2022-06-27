@@ -837,47 +837,28 @@ class TypeAlias(Type):
     types.
     """
 
-    def __init__(self, alias: Type | Callable[..., TypeOperation], *args: Type,
-            canonical: bool = True, name: str | None = None):
+    def __init__(self, alias: Type | Callable[..., TypeOperation],
+            name: str | None = None):
 
         self.name = name
-        self.canonical = canonical
-        self.args = args
-        self.arity = len(args)
-        self.alias: TypeOperation | Callable[..., TypeOperation]
+        self.alias: Type | Callable[..., TypeOperation] = alias
+        self.arity = 0 if isinstance(alias, Type) else \
+            len(signature(alias).parameters)
 
-        if self.arity == 0:
-            assert isinstance(alias, Type)
-            alias = alias.instance()
-            assert isinstance(alias, TypeOperation)
-            self.alias = alias
-        else:
-            assert callable(alias) and \
-                self.arity == len(signature(alias).parameters)
-            self.alias = alias
+        if isinstance(alias, Type) and any(alias.instance().variables()):
+            raise RuntimeError("type alias must not contain variables")
 
-        if any(self.instance().variables()):
-            raise RuntimeError("Type alias must not contain variables.")
-
-    def instance(self) -> TypeOperation:
+    def instance(self) -> TypeInstance:
         if self.arity > 0:
-            assert callable(self.alias)
+            raise ValueError("type alias expects arguments")
             return self.alias(*self.args)
         else:
-            assert isinstance(self.alias, TypeOperation)
-            return self.alias
+            assert isinstance(self.alias, Type)
+            return self.alias.instance()
 
     def __call__(self, *args: Type) -> TypeOperation:
-        if len(args) == 0:
-            assert isinstance(self.alias, TypeOperation)
-            return self.alias
-        else:
-            assert callable(self.alias)
-            return self.alias(*args)
-
-            # TODO do we want this?
-            # for p, q in zip(args, self.args):
-            #     p.unify(q, subtype=True)
+        assert callable(self.alias)
+        return self.alias(*args)
 
 
 class Constraint(object):
