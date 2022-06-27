@@ -103,6 +103,12 @@ class TransformationGraph(Graph):
                 for s in t.successors(Direction.UP, **kwargs):
                     if s in self.language.canon:
                         self.add((node, RDFS.subClassOf, self.add_type(s)))
+                    else:
+                        for u in s.successors(Direction.UP,
+                                include_family=False, **kwargs):
+                            if u in self.language.canon:
+                                self.add((node, RDFS.subClassOf,
+                                    self.add_type(u)))
 
         # Transitive closure
         if self.with_transitive_closure:

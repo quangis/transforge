@@ -666,21 +666,30 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(expected, actual)
 
-    def test_complex_taxonomy_without_subtype(self):
-        # Make sure that only subtypes are included
+    def test_taxonomy_with_subtypes_connected(self):
+        # Make sure that, when expanding canonical types, only the subtypes are
+        # included, and that they are connected to the Top type properly
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         AA = TypeAlias(F(A, B))
-        lang = Language(scope=locals(), namespace=TEST)
+        lang = Language(scope=locals(), namespace=TEST, include_top=True)
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
 
         expected = make_taxonomy(lang, {
+            Top: (A, F(Top, Top)),
             A: B,
+            F(Top, Top): (F(Top, B), F(A, Top)),
+            F(Top, B): F(A, B),
+            F(A, Top): (F(A, B), F(B, Top)),
+            F(B, Top): F(B, B),
             F(A, B): F(B, B),
         })
+
+        expected.serialize('expected.ttl')
+        actual.serialize('actual.ttl')
 
         self.assertIsomorphic(expected, actual)
 
