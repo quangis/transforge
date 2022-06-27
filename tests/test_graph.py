@@ -548,11 +548,9 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = TypeOperator()
         F = TypeOperator(params=1)
-        FA = TypeAlias(F(A))
-        FFA = TypeAlias(F(F(A)))
-        FFFA = TypeAlias(F(F(F(A))))
         f = Operator(type=lambda x: x ** F(x))
-        lang = Language(locals(), namespace=TEST)
+        lang = Language(locals(), namespace=TEST,
+            canon={A, F(A), F(F(A)), F(F(F(A)))})
 
         expected = graph_manual(
             s1=Step(type=TEST.A),
@@ -612,8 +610,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         F = TypeOperator(params=1)
         f = Operator(type=lambda x: x ** x)
-        F_A = TypeAlias(F(A))
-        lang = Language(locals(), namespace=TEST)
+        lang = Language(locals(), namespace=TEST, canon={A, F(A)})
 
         root = BNode()
 
@@ -632,8 +629,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST)
+        lang = Language(scope=locals(), namespace=TEST, canon={A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -649,8 +645,7 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         C = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
-        lang = Language(scope=locals(), namespace=TEST)
+        lang = Language(scope=locals(), namespace=TEST, canon={A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -672,8 +667,8 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, B))
-        lang = Language(scope=locals(), namespace=TEST, include_top=True)
+        lang = Language(scope=locals(), namespace=TEST, include_top=True,
+            canon={A, F(A, B)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -688,18 +683,14 @@ class TestAlgebraRDF(unittest.TestCase):
             F(A, B): F(B, B),
         })
 
-        expected.serialize('expected.ttl')
-        actual.serialize('actual.ttl')
-
         self.assertIsomorphic(expected, actual)
 
     def test_taxonomy_including_top_bottom(self):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
         lang = Language(scope=locals(), namespace=TEST,
-            include_top=True, include_bottom=True)
+            include_top=True, include_bottom=True, canon={A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -731,9 +722,8 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        AA = TypeAlias(F(A, A))
         lang = Language(scope=locals(), namespace=TEST,
-            include_top=True)
+            include_top=True, canon={A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()

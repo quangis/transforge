@@ -277,8 +277,7 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=1)
-        FX, FY = TypeAlias(F(X)), TypeAlias(F(Y))
-        lang = Language(locals(), namespace=TEST)
+        lang = Language(locals(), namespace=TEST, canon={X, F(X)})
 
         graph = make_graph(lang, {
             TEST.x: ~X,
@@ -297,8 +296,8 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=2)
-        FFXYY, FYY = TypeAlias(F(F(X, Y), Y)), TypeAlias(F(Y, Y))
-        lang = Language(locals(), namespace=TEST, include_top=True)
+        lang = Language(locals(), namespace=TEST, include_top=True,
+            canon={X, F(F(X, Y), Y), F(Y, Y)})
 
         graph = make_graph(lang, {
             TEST.x: ~X,

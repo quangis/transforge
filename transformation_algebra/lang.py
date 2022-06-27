@@ -12,7 +12,7 @@ from rdflib.namespace import Namespace, ClosedNamespace
 
 from transformation_algebra.type import builtins, Product, Top, Bottom, \
     TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
-    Direction
+    Direction, Type
 from transformation_algebra.expr import \
     Operator, Expr, Application, Source
 
@@ -23,7 +23,7 @@ class Language(object):
             namespace: str | None = None,
             include_top: bool = False,
             include_bottom: bool = False,
-            canon: Iterable[TypeOperation] = ()):
+            canon: Iterable[TypeOperator | TypeOperation] = ()):
         """
         The canonical types consist of all base types, plus those compound
         types that have an explicit synonym, or that are subtypes or parameters
@@ -42,7 +42,12 @@ class Language(object):
         if scope:
             self.add_scope(scope)
 
-        self.canon: set[TypeOperation] = set(canon)
+        self.canon: set[TypeOperation] = set()
+        for t in canon:
+            s = t.instance()
+            assert isinstance(s, TypeOperation)
+            self.canon.add(s)
+
         self.expand_canon()
 
     @property
