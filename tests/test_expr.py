@@ -28,12 +28,12 @@ class TestAlgebra(TestCase):
         add = Operator(type=Int ** Int ** Int, name='add')
         add1 = Operator(
             type=Int ** Int,
-            define=lambda x: add(x, one),
+            body=lambda x: add(x, one),
             name='add1'
         )
         compose = Operator(
             type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
-            define=lambda f, g, x: f(g(x)),
+            body=lambda f, g, x: f(g(x)),
             name='compose'
         )
         a = compose(add1, add1, one)
@@ -60,9 +60,9 @@ class TestAlgebra(TestCase):
         x = Source(type=A)
         f = Operator(type=A ** A, name='f')
         g = Operator(type=A ** A, name='g',
-            define=lambda x: f(x))
+            body=lambda x: f(x))
         h = Operator(type=A ** A, name='h',
-            define=lambda x: g(x))
+            body=lambda x: g(x))
         self.assertTrue(f(x).match(f(x)))
         self.assertFalse(h(x).match(f(x)))
         self.assertTrue(g(x).primitive().match(f(x)))
@@ -76,7 +76,7 @@ class TestAlgebra(TestCase):
         A = TypeOperator('A')
         x = Source(type=A)
         f = Operator(type=lambda α: α ** α, name='f')
-        g = Operator(type=lambda α: α ** α, name='g', define=lambda x: f(x))
+        g = Operator(type=lambda α: α ** α, name='g', body=lambda x: f(x))
         self.assertTrue(g(x).primitive().type.match(A.instance()))
 
     def test_double_binding(self):
@@ -100,7 +100,7 @@ class TestAlgebra(TestCase):
         )
         app = Operator(type=lambda α, β, γ, τ:
             (α ** β ** γ) ** Map(τ, α) ** Map(τ, β) ** Map(τ, γ),
-            define=lambda f, x, y: select(eq, prod(f, x, y))
+            body=lambda f, x, y: select(eq, prod(f, x, y))
         )
         self.assertTrue(app(eq, data, data).primitive().match(
             select(eq, prod(eq, data, data))
@@ -112,24 +112,24 @@ class TestAlgebra(TestCase):
         self.assertRaisesChain(
             [DeclarationError, SubtypeMismatch],
             Operator.validate,
-            Operator(type=B ** B, define=lambda x: f(x))
+            Operator(type=B ** B, body=lambda x: f(x))
         )
-        Operator(type=A ** B, define=lambda x: f(x)).validate()
+        Operator(type=A ** B, body=lambda x: f(x)).validate()
 
     def test_tighter_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         g = Operator(name='g', type=lambda α: α ** B)
-        Operator(type=A ** B, define=lambda x: g(x)).validate()
-        Operator(type=B ** B, define=lambda x: g(x)).validate()
+        Operator(type=A ** B, body=lambda x: g(x)).validate()
+        Operator(type=B ** B, body=lambda x: g(x)).validate()
 
     def test_looser_declared_type_in_definition(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
-        Operator(type=lambda α: α ** B, define=lambda x: g(x)).validate()
+        Operator(type=lambda α: α ** B, body=lambda x: g(x)).validate()
         self.assertRaisesChain(
             [DeclarationError, DeclaredTypeTooGeneral],
             Operator.validate,
-            Operator(type=lambda α: α ** B, define=lambda x: f(x)))
+            Operator(type=lambda α: α ** B, body=lambda x: f(x)))
 
     def test_same_labels_unify(self):
         # See issue #10

@@ -28,12 +28,12 @@ class Operator(object):
             self,
             doc: Optional[str] = None,
             type: Type | Callable[..., TypeInstance] = _,
-            define: Optional[Callable[..., Expr]] = None,
+            body: Optional[Callable[..., Expr]] = None,
             name: Optional[str] = None):
         self._name = name
-        self.type = type if isinstance(type, Type) else TypeSchema(type)
         self.description = doc
-        self.definition = define  # a transformation may be non-primitive
+        self.type = type if isinstance(type, Type) else TypeSchema(type)
+        self.body = body  # a transformation may be non-primitive
         self.is_function = self.type.instance().operator == Function
 
         assert not self.description or isinstance(self.description, str)
@@ -102,7 +102,7 @@ class Operator(object):
 
             # If the operation is composite, check that its declared type is no
             # more general than the type we can infer from the definition
-            if self.definition:
+            if self.body:
                 type_decl = self.type.instance()
                 vars_decl = list(type_decl.variables())
                 type_infer = self.instance().primitive(unify=False).type
@@ -247,8 +247,8 @@ class Expr(ABC):
         expr = self.normalize(recursive=False)
 
         if isinstance(expr, Operation):
-            if expr.operator.definition:
-                expr_primitive = Abstraction(expr.operator.definition)
+            if expr.operator.body:
+                expr_primitive = Abstraction(expr.operator.body)
                 # The type of the original expression may be less general than
                 # that of the primitive expression, but not more general.
                 if unify:

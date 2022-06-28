@@ -200,7 +200,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = TypeOperator()
         f = Operator(type=A ** A)
-        g = Operator(type=A ** A, define=lambda x: f(f(x)))
+        g = Operator(type=A ** A, body=lambda x: f(f(x)))
         h = Operator(type=(A ** A) ** A ** A)
         alg = Language(locals(), namespace=TEST)
 
@@ -224,7 +224,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = TypeOperator()
         f = Operator(type=A ** A ** A)
-        g = Operator(type=A ** A ** A, define=lambda x, y: f(y, f(x, y)))
+        g = Operator(type=A ** A ** A, body=lambda x, y: f(y, f(x, y)))
         h = Operator(type=(A ** A ** A) ** A ** A ** A)
         alg = Language(locals(), namespace=TEST)
 
@@ -250,7 +250,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
-        id = Operator(type=A ** A, define=lambda x: x)
+        id = Operator(type=A ** A, body=lambda x: x)
         alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
@@ -270,7 +270,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         f = Operator(type=(A ** A) ** A)
         g = Operator(type=A ** A)
-        h = Operator(type=A ** A, define=lambda x: g(x))
+        h = Operator(type=A ** A, body=lambda x: g(x))
         alg = Language(locals(), namespace=TEST)
 
         self.assertIsomorphic(
@@ -341,7 +341,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         f = Operator(type=(A ** A ** A) ** A ** A)
         g = Operator(type=A ** A ** A)
-        h = Operator(type=A ** A ** A, define=lambda x: g(x))
+        h = Operator(type=A ** A ** A, body=lambda x: g(x))
         alg = Language(locals(), namespace=TEST)
 
         a = Source(type=A)
