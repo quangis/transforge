@@ -75,7 +75,7 @@ class Language(object):
             return self.namespace[
                 value.text(sep="-", lparen="-", rparen="", prod="")]
         else:
-            raise ValueError("non-canonical type")
+            raise ValueError(f"non-canonical type {value}")
 
     def expand_canon(self) -> None:
         """
