@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from rdflib.term import Node, URIRef, Variable
 from rdflib.namespace import RDF
-from rdflib.util import guess_format
 from itertools import count, chain
 from typing import Iterable
 from collections import deque, defaultdict
@@ -38,18 +37,14 @@ class TransformationQuery(object):
     input).
     """
 
-    def __init__(self, lang: Language, graph: TransformationGraph | str,
-            format: str = "turtle", with_noncanonical_types: bool = False,
+    def __init__(self, lang: Language, graph: TransformationGraph,
+            with_noncanonical_types: bool = False,
             unfold_tree: bool = False):
 
         self.lang = lang
 
         self.graph = TransformationGraph(language=lang)
-        if isinstance(graph, TransformationGraph):
-            self.graph += graph
-        else:
-            self.graph.parse(graph, format=format or guess_format(graph))
-        self.graph.parse_shortcuts()
+        self.graph += graph
 
         self.root = self.graph.value(predicate=RDF.type, object=TA.Task,
             any=False)

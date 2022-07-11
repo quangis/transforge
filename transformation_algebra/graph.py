@@ -13,6 +13,7 @@ from transformation_algebra.lang import Language, TA
 
 from itertools import chain, count
 from rdflib import Graph, Namespace, BNode, Literal
+from rdflib.util import guess_format
 from rdflib.term import Node
 from rdflib.namespace import RDF, RDFS
 
@@ -72,6 +73,14 @@ class TransformationGraph(Graph):
             self.type_nodes[t] = self.language.uri(t)
 
         self.bind("", TA)
+
+    @staticmethod
+    def from_rdf(path: str, *nargs,
+            format: str = "turtle", **kwargs) -> TransformationGraph:
+        g = TransformationGraph(*nargs, **kwargs)
+        g.parse(path, format=format or guess_format(path))
+        g.parse_shortcuts()
+        return g
 
     def ref(self) -> str:
         return f"{next(self.identifiers)}. " if self.identifiers else ""
