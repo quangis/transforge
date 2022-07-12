@@ -38,8 +38,9 @@ class TransformationQuery(object):
     """
 
     def __init__(self, lang: Language, graph: TransformationGraph,
-            with_noncanonical_types: bool = False,
-            unfold_tree: bool = False):
+            with_noncanonical_types: bool = False, by_io: bool = True,
+            by_types: bool = True, by_operators: bool = True,
+            by_chronology: bool = True, unfold_tree: bool = False):
 
         self.lang = lang
 
@@ -52,6 +53,10 @@ class TransformationQuery(object):
         if not self.root:
             raise ValueError(f"No {TA.Task.n3()} found in the graph.")
 
+        self.by_io = by_io
+        self.by_types = by_types
+        self.by_operators = by_operators
+        self.by_chronology = by_chronology
         self.unfold_tree = unfold_tree
 
         # Keep track of the type and operator of each step
@@ -111,11 +116,7 @@ class TransformationQuery(object):
 
         return var
 
-    def sparql(self,
-            by_io: bool = True,
-            by_types: bool = True,
-            by_operators: bool = True,
-            by_chronology: bool = True) -> str:
+    def sparql(self) -> str:
         """
         Obtain a SPARQL query.
         """
@@ -131,10 +132,10 @@ class TransformationQuery(object):
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
             "?workflow a :Transformation.",
-            self.io() if by_io else (),
-            self.operators() if by_operators else (),
-            self.types() if by_types else (),
-            self.chronology() if by_chronology else (),
+            self.io() if self.by_io else (),
+            self.operators() if self.by_operators else (),
+            self.types() if self.by_types else (),
+            self.chronology() if self.by_chronology else (),
             "} GROUP BY ?workflow"
         )
         return result

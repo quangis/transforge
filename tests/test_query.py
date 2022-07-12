@@ -11,7 +11,7 @@ from transformation_algebra.graph import TransformationGraph, TA, TEST
 from transformation_algebra.query import TransformationQuery
 
 
-def make_query(lang: Language, obj: tuple[Operator | Type | list]
+def make_query(lang: Language, obj: tuple[Operator | Type | list], **kwargs
         ) -> TransformationQuery:
     """
     Convenience method for constructing a query.
@@ -58,7 +58,7 @@ def make_query(lang: Language, obj: tuple[Operator | Type | list]
     g.add((root, TA.output, f(obj)))
     g.parse_shortcuts()
 
-    return TransformationQuery(lang, g)
+    return TransformationQuery(lang, g, **kwargs)
 
 
 def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> TransformationGraph:
@@ -82,10 +82,10 @@ class TestAlgebra(unittest.TestCase):
             results: set[Node] | None, **kwargs) -> None:
 
         query = q_obj if isinstance(q_obj, TransformationQuery) \
-            else make_query(lang, q_obj)
+            else make_query(lang, q_obj, **kwargs)
         self.assertEqual(
             results or set(),
-            set(r.workflow for r in graph.query(query.sparql(**kwargs)))
+            set(r.workflow for r in graph.query(query.sparql()))
         )
 
     def test_serial(self):
