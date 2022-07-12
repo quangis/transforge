@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from rdflib.term import Node, URIRef, Variable
 from rdflib.namespace import RDF
+from rdflib.graph import Graph
 from itertools import count, chain
 from typing import Iterable
 from collections import deque, defaultdict
@@ -115,6 +116,12 @@ class TransformationQuery(object):
             self.after[next_var].append(var)
 
         return var
+
+    def run(self, graph: Graph) -> set[Node]:
+        """
+        Find all workflows in a graph that match this query.
+        """
+        return set(r.workflow for r in graph.query(self.sparql()))
 
     def sparql(self) -> str:
         """
