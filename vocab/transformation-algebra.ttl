@@ -152,3 +152,15 @@
     rdfs:domain :Application;
     rdfs:range :Implementation;
     rdfs:comment "Links a specific usage of an implementation to the implementation in general.".
+
+:signature
+    a rdfs:Property;
+    rdfs:domain :Operation;
+    rdfs:range rdfs:Literal;
+    rdfs:comment "A textual representation of the type signature of an operation.".
+
+:expression
+    a rdfs:Property;
+    rdfs:domain wf:Workflow, :Transformation;
+    rdfs:range rdfs:Literal;
+    rdfs:comment "A textual representation of the transformation expression associated with a transformation. Must be parsable into a transformation graph.".

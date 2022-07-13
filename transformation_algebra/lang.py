@@ -118,8 +118,8 @@ class Language(object):
         if item in builtins:
             return
 
-        reserved = ("via", "type", "Unit", "Top", "Bottom",
-            "Product", "Intersection", "Union")
+        reserved = ("via", "type", "signature", "expression",
+            "Unit", "Top", "Bottom", "Product", "Intersection", "Union")
 
         if self._closed:
             raise RuntimeError("Cannot add to language after closing.")
@@ -355,7 +355,7 @@ class LanguageNamespace(ClosedNamespace):
 
     def __new__(cls, uri, lang: Language):
         terms = chain(
-            ("type", "via"),
+            ("type", "via", "signature", "expression"),
             lang.operators.keys(),
             lang.types.keys(),
             (t.text(sep="-", lparen="-", rparen="", prod="")

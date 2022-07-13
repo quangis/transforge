@@ -90,8 +90,13 @@ class TransformationGraph(Graph):
         Add the RDF vocabulary for describing expressions in terms of the types
         and operations defined for this transformation algebra.
         """
+        ns = self.language.namespace
         self.add_taxonomy()
         self.add_operators()
+        self.add((ns["signature"], RDFS.subPropertyOf, TA["signature"]))
+        self.add((ns["expression"], RDFS.subPropertyOf, TA["expression"]))
+        self.add((ns["type"], RDFS.subPropertyOf, TA["type"]))
+        self.add((ns["via"], RDFS.subPropertyOf, TA["via"]))
 
     def add_taxonomy(self) -> None:
         """
@@ -138,6 +143,8 @@ class TransformationGraph(Graph):
 
             if self.with_labels:
                 self.add((node, RDFS.label, Literal(str(op.name))))
+                self.add((node, self.language.namespace["signature"],
+                    Literal(str(op.type))))
                 if op.description:
                     self.add((node, RDFS.comment, Literal(op.description)))
 
