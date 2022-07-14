@@ -84,25 +84,25 @@ class Merger(cli.Application):
 class VocabBuilder(cli.Application):
     "Build vocabulary file for the transformation language"
 
-    language = cli.SwitchAttr(["-l", "--language"], argtype=lang,
+    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
 
-    format = cli.SwitchAttr(["-f", "--format"],
+    output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl")
 
     @cli.positional(cli.NonexistentPath)
     def main(self, output):
-        Path(output).parent.mkdir(parents=True, exist_ok=True)  # build path should exist
-
-        if self.format == "dot":
-            vocab = TransformationGraph(self.language, minimal=True, with_labels=True)
+        if self.output_format == "dot":
+            vocab = TransformationGraph(self.language, minimal=True,
+                with_labels=True)
             vocab.add_taxonomy()
             with open(output, 'w') as f:
                 rdf2dot(vocab, f)
         else:
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
-            vocab.serialize(str(output), format=self.format, encoding='utf-8')
+            vocab.serialize(str(output), format=self.output_format,
+                encoding='utf-8')
 
 
 @Tatool.subcommand("graph")
@@ -112,12 +112,12 @@ class TransformationGraphBuilder(cli.Application):
     algebra expressions for each individual use of a tool
     """
 
-    language = cli.SwitchAttr(["-l", "--language"], argtype=lang,
+    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
 
-    tools = cli.SwitchAttr(["--tools"], argtype=graph, mandatory=True,
+    tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
         help="RDF graph containing the tool ontology")
-    format = cli.SwitchAttr(["--format"],
+    output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl")
     blocked = cli.Flag(["--blocked"], default=False,
         help="Do not pass output type of one tool to the next")
@@ -126,7 +126,7 @@ class TransformationGraphBuilder(cli.Application):
 
     @cli.positional(cli.ExistingFile, cli.NonexistentPath)
     def main(self, wf_path, output_path):
-        visual = self.format == "dot"
+        visual = self.output_format == "dot"
 
         # Read input workflow graph
         wfg = Graph()
@@ -151,8 +151,8 @@ class TransformationGraphBuilder(cli.Application):
             ]
 
         # Build transformation graph
-        g = TransformationGraph(self.language, minimal=visual, with_labels=visual,
-            with_noncanonical_types=False,
+        g = TransformationGraph(self.language, minimal=visual,
+            with_labels=visual, with_noncanonical_types=False,
             with_intermediate_types=not self.opaque,
             passthrough=not self.blocked)
         step2expr = g.add_workflow(root, tool_apps, sources)
@@ -172,12 +172,12 @@ class TransformationGraphBuilder(cli.Application):
             # g.add((step2expr[wf.output], RDFS.comment, Literal("output")))
 
         # Produce output file
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         if visual:
             with open(output_path, 'w') as f:
                 rdf2dot(g, f)
         else:
-            g.serialize(str(output_path), format=self.format, encoding='utf-8')
+            g.serialize(str(output_path), format=self.output_format,
+                encoding='utf-8')
 
 
 class Task(NamedTuple):
@@ -194,11 +194,11 @@ class QueryRunner(cli.Application):
     given, just output the query instead.
     """
 
-    language = cli.SwitchAttr(["-l", "--language"], argtype=lang,
+    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
     output = cli.SwitchAttr(["-o", "--output"], cli.NonexistentPath,
         mandatory=True, help="Output file")
-    format = cli.SwitchAttr(["--format"], cli.Set("sparql", "csv"),
+    output_format = cli.SwitchAttr(["-t", "--to"], cli.Set("sparql", "csv"),
         default="csv", help="Output format")
     chronological = cli.Flag(["--chronological"],
         default=False, help="Take into account order")
@@ -269,7 +269,7 @@ class QueryRunner(cli.Application):
             ) for task_file in QUERY_FILE]
 
             # Summarize query results
-            if self.format == "sparql":
+            if self.output_format == "sparql":
                 with open(self.output, 'w', newline='') as h:
                     h.write("---\n")
                     for task in tasks:
@@ -280,7 +280,7 @@ class QueryRunner(cli.Application):
                         h.write(", ".join(t.n3() for t in task.expected))
                         h.write("\n---\n")
             else:
-                assert self.format == "csv"
+                assert self.output_format == "csv"
                 self.summarize(tasks)
 
 
