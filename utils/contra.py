@@ -10,9 +10,11 @@ from rdflib.term import Node, Literal  # type: ignore
 from rdflib.namespace import Namespace, RDF, RDFS  # type: ignore
 from rdflib.util import guess_format
 from rdflib.tools.rdf2dot import rdf2dot  # type: ignore
+from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from pathlib import Path
 from plumbum import cli  # type: ignore
 from itertools import chain
+from functools import partial
 from transformation_algebra import TransformationQuery, TransformationGraph, \
     TA, Language
 from typing import NamedTuple, Iterable
@@ -25,12 +27,8 @@ REPO = Namespace('https://example.com/#')
 
 
 def graph(url: str) -> Graph:
-    if url.startswith("http://") or url.startswith("https://"):
-        g = Graph(store='SPARQLStore')
-        g.open(url)
-    else:
-        g = Graph()
-        g.parse(url, format=guess_format(url))
+    g = Graph()
+    g.parse(url, format=guess_format(url))
     return g
 
 
@@ -204,8 +202,10 @@ class QueryRunner(cli.Application):
         default=False, help="Take into account order")
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
-    endpoint = cli.SwitchAttr(["--endpoint"], argtype=graph,
+    endpoint = cli.SwitchAttr(["--endpoint"],
         help="SPARQL endpoint to send queries to")
+    username = cli.SwitchAttr(["--username"], requires=["endpoint"])
+    password = cli.SwitchAttr(["--password"], requires=["endpoint"])
 
     def evaluate(self, path, **opts) -> Task:
         """
@@ -215,7 +215,7 @@ class QueryRunner(cli.Application):
         query = TransformationQuery(self.language, graph, **opts)
         return Task(name=path.stem, query=query,
             expected=set(graph.objects(query.root, TA.implementation)),
-            actual=(query.run(self.endpoint) if self.endpoint else set()))
+            actual=(query.run(self.graph) if self.graph else set()))
 
     def summarize(self, tasks: Iterable[Task]) -> None:
         """
@@ -262,11 +262,22 @@ class QueryRunner(cli.Application):
             self.help()
             return 1
         else:
+
+            if self.endpoint:
+                if self.username or self.password:
+                    auth = (self.username, self.password)
+                else:
+                    auth = None
+                store = SPARQLStore(query_endpoint=self.endpoint, auth=auth)
+                self.graph = Graph(store)
+            else:
+                self.graph = None
+
             # Parse tasks and optionally run associated queries
             tasks = [self.evaluate(task_file, by_io=True,
                 by_operators=False, by_types=not self.blackbox,
-                by_chronology=self.chronological and not self.blackbox,
-            ) for task_file in QUERY_FILE]
+                by_chronology=self.chronological and not self.blackbox)
+                for task_file in QUERY_FILE]
 
             # Summarize query results
             if self.output_format == "sparql":
