@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+"""
+Utility functions and command-line interface for common tasks.
+"""
 
 from __future__ import annotations
 
@@ -54,6 +56,8 @@ class Tatool(cli.Application):
     relevant to workflows annotated with tool descriptions in terms of a
     transformation language
     """
+
+    PROGNAME = "transformation_algebra"
 
     def main(self, *args):
         if args:
