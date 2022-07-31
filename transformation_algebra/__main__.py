@@ -1,3 +1,3 @@
-from transformation_algebra.tool import Tatool
+from transformation_algebra.util import CLI
 
-Tatool.run()
+CLI.run()

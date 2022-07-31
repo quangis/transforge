@@ -16,7 +16,6 @@ from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from pathlib import Path
 from plumbum import cli  # type: ignore
 from itertools import chain
-from functools import partial
 from transformation_algebra import TransformationQuery, TransformationGraph, \
     TA, Language
 from typing import NamedTuple, Iterable
@@ -50,7 +49,7 @@ def lang(path: str) -> Language:
     return languages[0]
 
 
-class Tatool(cli.Application):
+class CLI(cli.Application):
     """
     A utility to create RDFs, graph visualizations, queries and other files
     relevant to workflows annotated with tool descriptions in terms of a
@@ -68,7 +67,7 @@ class Tatool(cli.Application):
             return 1
 
 
-@Tatool.subcommand("merge")
+@CLI.subcommand("merge")
 class Merger(cli.Application):
     """
     Merge RDF graphs
@@ -82,7 +81,7 @@ class Merger(cli.Application):
         g.serialize(str(output), format='ttl', encoding='utf-8')
 
 
-@Tatool.subcommand("vocab")
+@CLI.subcommand("vocab")
 class VocabBuilder(cli.Application):
     "Build vocabulary file for the transformation language"
 
@@ -107,7 +106,7 @@ class VocabBuilder(cli.Application):
                 encoding='utf-8')
 
 
-@Tatool.subcommand("graph")
+@CLI.subcommand("graph")
 class TransformationGraphBuilder(cli.Application):
     """
     Generate transformation graphs for entire workflows, concatenating the
@@ -189,7 +188,7 @@ class Task(NamedTuple):
     actual: set[Node]
 
 
-@Tatool.subcommand("query")
+@CLI.subcommand("query")
 class QueryRunner(cli.Application):
     """
     Run transformation queries against a SPARQL endpoint. If no endpoint is
@@ -300,4 +299,4 @@ class QueryRunner(cli.Application):
 
 
 if __name__ == '__main__':
-    Tatool.run()
+    CLI.run()
