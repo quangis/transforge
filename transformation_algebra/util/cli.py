@@ -9,7 +9,6 @@ from rdflib import Graph  # type: ignore
 from rdflib.term import Node, Literal  # type: ignore
 from rdflib.namespace import RDF, RDFS  # type: ignore
 from rdflib.tools.rdf2dot import rdf2dot  # type: ignore
-from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from plumbum import cli  # type: ignore
 from itertools import chain
 from transformation_algebra import TransformationQuery, TransformationGraph, \
@@ -17,6 +16,7 @@ from transformation_algebra import TransformationQuery, TransformationGraph, \
 from typing import NamedTuple, Iterable
 
 from transformation_algebra.util import graph, lang, WF, TOOLS, REPO
+from transformation_algebra.util.store import WorkflowStore
 
 
 class CLI(cli.Application):
@@ -177,8 +177,7 @@ class QueryRunner(cli.Application):
         default=False, help="Only consider input and output of the workflows")
     endpoint = cli.SwitchAttr(["--endpoint"],
         help="SPARQL endpoint to send queries to")
-    username = cli.SwitchAttr(["--username"], requires=["endpoint"])
-    password = cli.SwitchAttr(["--password"], requires=["endpoint"])
+    credentials = cli.SwitchAttr(["--credentials"], requires=["endpoint"])
 
     def evaluate(self, path, **opts) -> Task:
         """
@@ -237,12 +236,12 @@ class QueryRunner(cli.Application):
         else:
 
             if self.endpoint:
-                if self.username or self.password:
-                    auth = (self.username, self.password)
+                if self.credentials:
+                    username, _, password = self.credentials.partition(":")
                 else:
-                    auth = None
-                store = SPARQLStore(query_endpoint=self.endpoint, auth=auth)
-                self.graph = Graph(store)
+                    username, password = None, None
+                self.graph = WorkflowStore.endpoint(self.endpoint,
+                    username=username, password=password)
             else:
                 self.graph = None
 
