@@ -4,12 +4,11 @@ Command-line interface for common tasks.
 
 from __future__ import annotations
 
-import sys
 import csv
-from rdflib import Graph  # type: ignore
-from rdflib.term import Node, Literal  # type: ignore
-from rdflib.namespace import RDF, RDFS  # type: ignore
-from rdflib.tools.rdf2dot import rdf2dot  # type: ignore
+from rdflib import Graph
+from rdflib.term import Node, Literal
+from rdflib.namespace import RDF, RDFS
+from rdflib.tools.rdf2dot import rdf2dot
 from plumbum import cli  # type: ignore
 from itertools import chain
 from transformation_algebra import TransformationQuery, TransformationGraph, \
@@ -92,7 +91,7 @@ class TransformationGraphBuilder(cli.Application):
     output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"))
 
-    output = cli.SwitchAttr(["-o", "--output"], default="-",
+    output = cli.SwitchAttr(["-o", "--output"], mandatory=True,
         help="file or SPARQL endpoint which to write to")
     force = cli.Flag(["-f", "--force"], default=False,
         help="overwrite existing files or graphs")
@@ -147,19 +146,13 @@ class TransformationGraphBuilder(cli.Application):
             for source in sources:
                 for comment in wfg.objects(source, RDFS.comment):
                     g.add((source, RDFS.comment, comment))
-            # g.add((step2expr[wf.output], RDFS.comment, Literal("output")))
 
         # Produce output file
-        if self.output == "-":
-            output_handle = sys.stdout
-        else:
-            output_handle = open(self.output, 'w')
         if visual:
-            rdf2dot(g, output_handle)
+            with open(self.output, 'w') as f:
+                rdf2dot(g, f)
         else:
-            g.serialize(output_handle, format=self.output_format,
-                encoding='utf-8')
-        output_handle.close()
+            g.serialize(self.output, format=self.output_format or "ttl")
 
 
 class Task(NamedTuple):
