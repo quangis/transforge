@@ -16,7 +16,7 @@ from transformation_algebra import TransformationQuery, TransformationGraph, \
 from typing import NamedTuple, Iterable
 
 from transformation_algebra.util import graph, lang, WF, TOOLS, REPO
-from transformation_algebra.util.store import WorkflowStore
+from transformation_algebra.util.store import TransformationStore
 
 
 def cred(s: str) -> tuple[str, str]:
@@ -169,7 +169,7 @@ class TransformationGraphBuilder(cli.Application):
 
         # Insert new graph into endpoint (overwriting old one if it exists)
         if self.endpoint:
-            ds = WorkflowStore(self.endpoint, cred=self.cred)
+            ds = TransformationStore(self.endpoint, cred=self.cred)
             ds.put(g)
 
 
@@ -259,7 +259,7 @@ class QueryRunner(cli.Application):
 
             if self.endpoint:
                 username, password = self.cred or (None, None)
-                self.graph = WorkflowStore(self.endpoint, cred=self.cred)
+                self.graph = TransformationStore(self.endpoint, cred=self.cred)
             else:
                 self.graph = None
 

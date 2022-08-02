@@ -1,6 +1,7 @@
 """
 Utility class for the workflow store.
 """
+# TODO: Is this the best way? Not better to use SPARQLWrapper?
 
 from __future__ import annotations
 
@@ -8,13 +9,12 @@ import urllib.request  # using urllib.request because rdflib uses it
 from http.client import HTTPResponse
 from urllib.parse import quote
 from urllib.request import urlopen, Request
-from transformation_algebra import TA
-from rdflib import Dataset, Graph, RDF
+from rdflib import Dataset, Graph
 from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
 from typing import Literal
 
 
-class WorkflowStore(Dataset):
+class TransformationStore(Dataset):
     def __init__(self, url: str,
             cred: tuple[str, str] | None = None,
             auth: Literal["NONE", "BASIC", "DIGEST"] | None = None,
