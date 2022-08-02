@@ -10,23 +10,23 @@ from http.client import HTTPResponse
 from urllib.parse import quote
 from urllib.request import urlopen, Request
 from rdflib import Dataset, Graph
-from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
+from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from typing import Literal
 
 
 class TransformationStore(Dataset):
     def __init__(self, url: str,
-            cred: tuple[str, str] | None = None,
-            auth: Literal["NONE", "BASIC", "DIGEST"] | None = None,
             graphstore_protocol: str = "/data",
-            sparql_query: str = "/query",
-            sparql_update: str = "/update"):
+            cred: tuple[str, str] | None = None,
+            auth: Literal["NONE", "BASIC", "DIGEST"] | None = None):
+        # sparql_query: str = "/query",
+        # sparql_update: str = "/update"):
 
         self.url = url
         self.graphstore_protocol = graphstore_protocol
 
         # While authorization can be passed to the `SPARQLStore` object, DIGEST
-        # authorization is only handled for `SPARQLUpdateStore`. To work around
+        # authorization is only handled for `SPARQLStore`. To work around
         # this, we add a custom opener to the `urllib.request` module that
         # SPARQLConnector is using under the hood. It seems we could also pull
         # the external dependency of SPARQLWrapper, mentioned in
@@ -51,7 +51,7 @@ class TransformationStore(Dataset):
             opener = urllib.request.build_opener(auth_handler)
             urllib.request.install_opener(opener)
 
-        store = SPARQLUpdateStore(url + sparql_query, url + sparql_update)
+        store = SPARQLStore(url)
         super().__init__(store)
 
     def put(self, g: Graph) -> HTTPResponse:
