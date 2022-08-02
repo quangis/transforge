@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import csv
 from rdflib import Graph
-from rdflib.term import Node, Literal
+from rdflib.term import Node, Literal, URIRef
 from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
 from plumbum import cli  # type: ignore
@@ -17,6 +17,11 @@ from typing import NamedTuple, Iterable
 
 from transformation_algebra.util import graph, lang, WF, TOOLS, REPO
 from transformation_algebra.util.store import WorkflowStore
+
+
+def cred(s: str) -> tuple[str, str]:
+    username, _, password = s.partition(":")
+    return username, password
 
 
 class CLI(cli.Application):
@@ -88,11 +93,15 @@ class TransformationGraphBuilder(cli.Application):
     tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
         help="RDF graph containing the tool ontology")
 
+    output = cli.SwitchAttr(["-o", "--output"],
+        help="file which to write to")
     output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "json-ld", "dot"))
+        cli.Set("rdf", "ttl", "json-ld", "dot"), requires=["-o"])
 
-    output = cli.SwitchAttr(["-o", "--output"], mandatory=True,
-        help="file or SPARQL endpoint which to write to")
+    endpoint = cli.SwitchAttr(["-e", "--endpoint"],
+        help="SPARQL endpoint which to send the graph to")
+    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-e"])
+
     force = cli.Flag(["-f", "--force"], default=False,
         help="overwrite existing files or graphs")
 
@@ -104,11 +113,14 @@ class TransformationGraphBuilder(cli.Application):
     @cli.positional(cli.ExistingFile)
     def main(self, wf_path):
         visual = self.output_format == "dot"
+        if visual:
+            assert not self.endpoint
 
         # Read input workflow graph
         wfg = Graph()
         wfg.parse(wf_path, format='ttl')
         root = wfg.value(None, RDF.type, WF.Workflow, any=False)
+        assert isinstance(root, URIRef)
         sources = set(wfg.objects(root, WF.source))
         tool_apps: dict[Node, tuple[str, list[Node]]] = {}
         for step in wfg.objects(root, WF.edge):
@@ -132,6 +144,7 @@ class TransformationGraphBuilder(cli.Application):
             with_labels=visual, with_noncanonical_types=False,
             with_intermediate_types=not self.opaque,
             passthrough=not self.blocked)
+        g.base = root
         step2expr = g.add_workflow(root, tool_apps, sources)
 
         # Annotate the expression nodes that correspond with output nodes of a
@@ -153,6 +166,11 @@ class TransformationGraphBuilder(cli.Application):
                 rdf2dot(g, f)
         else:
             g.serialize(self.output, format=self.output_format or "ttl")
+
+        # Insert new graph into endpoint (overwriting old one if it exists)
+        if self.endpoint:
+            ds = WorkflowStore(self.endpoint, cred=self.cred)
+            ds.put(g)
 
 
 class Task(NamedTuple):
@@ -179,9 +197,9 @@ class QueryRunner(cli.Application):
         default=False, help="Take into account order")
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
-    endpoint = cli.SwitchAttr(["--endpoint"],
+    endpoint = cli.SwitchAttr(["-e", "--endpoint"],
         help="SPARQL endpoint to send queries to")
-    credentials = cli.SwitchAttr(["--credentials"], requires=["endpoint"])
+    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-e"])
 
     def evaluate(self, path, **opts) -> Task:
         """
@@ -240,12 +258,8 @@ class QueryRunner(cli.Application):
         else:
 
             if self.endpoint:
-                if self.credentials:
-                    username, _, password = self.credentials.partition(":")
-                else:
-                    username, password = None, None
-                self.graph = WorkflowStore.endpoint(self.endpoint,
-                    username=username, password=password)
+                username, password = self.cred or (None, None)
+                self.graph = WorkflowStore(self.endpoint, cred=self.cred)
             else:
                 self.graph = None
 
