@@ -4,6 +4,7 @@ Command-line interface for common tasks.
 
 from __future__ import annotations
 
+import sys
 import csv
 from rdflib import Graph  # type: ignore
 from rdflib.term import Node, Literal  # type: ignore
@@ -85,18 +86,24 @@ class TransformationGraphBuilder(cli.Application):
 
     language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
-
     tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
         help="RDF graph containing the tool ontology")
+
     output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl")
+        cli.Set("rdf", "ttl", "json-ld", "dot"))
+
+    output = cli.SwitchAttr(["-o", "--output"], default="-",
+        help="file or SPARQL endpoint which to write to")
+    force = cli.Flag(["-f", "--force"], default=False,
+        help="overwrite existing files or graphs")
+
     blocked = cli.Flag(["--blocked"], default=False,
         help="Do not pass output type of one tool to the next")
     opaque = cli.Flag(["--opaque"], default=False,
         help="Do not annotate types internal to the tools")
 
-    @cli.positional(cli.ExistingFile, cli.NonexistentPath)
-    def main(self, wf_path, output_path):
+    @cli.positional(cli.ExistingFile)
+    def main(self, wf_path):
         visual = self.output_format == "dot"
 
         # Read input workflow graph
@@ -143,12 +150,16 @@ class TransformationGraphBuilder(cli.Application):
             # g.add((step2expr[wf.output], RDFS.comment, Literal("output")))
 
         # Produce output file
-        if visual:
-            with open(output_path, 'w') as f:
-                rdf2dot(g, f)
+        if self.output == "-":
+            output_handle = sys.stdout
         else:
-            g.serialize(str(output_path), format=self.output_format,
+            output_handle = open(self.output, 'w')
+        if visual:
+            rdf2dot(g, output_handle)
+        else:
+            g.serialize(output_handle, format=self.output_format,
                 encoding='utf-8')
+        output_handle.close()
 
 
 class Task(NamedTuple):
