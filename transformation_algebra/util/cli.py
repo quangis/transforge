@@ -24,7 +24,25 @@ def cred(s: str) -> tuple[str, str]:
     return username, password
 
 
-class ServerApplication(cli.Application):
+class Application(cli.Application):
+    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
+        mandatory=True, help="Transformation language on which to operate")
+
+
+class WithTools:
+    tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
+        help="RDF graph containing the tool ontology")
+
+
+class WithRDF:
+    output = cli.SwitchAttr(["-o", "--output"],
+        help="file which to write to")
+    output_format = cli.SwitchAttr(["-t", "--to"],
+        cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl",
+        requires=["-o"])
+
+
+class WithServer:
     backend = cli.SwitchAttr(["-b", "--backend"],
         cli.Set("fuseki", "marklogic"))
     server = cli.SwitchAttr(["-s", "--server"],
@@ -65,16 +83,8 @@ class Merger(cli.Application):
 
 
 @CLI.subcommand("vocab")
-class VocabBuilder(ServerApplication):
+class VocabBuilder(Application, WithRDF, WithServer):
     "Build vocabulary file for the transformation language"
-
-    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
-        mandatory=True, help="Transformation language on which to operate")
-
-    output = cli.SwitchAttr(["-o", "--output"],
-        help="file which to write to")
-    output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl")
 
     @cli.positional(cli.NonexistentPath)
     def main(self):
@@ -98,30 +108,11 @@ class VocabBuilder(ServerApplication):
 
 
 @CLI.subcommand("graph")
-class TransformationGraphBuilder(cli.Application):
+class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     """
     Generate transformation graphs for entire workflows, concatenating the
     algebra expressions for each individual use of a tool
     """
-
-    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
-        mandatory=True, help="Transformation language on which to operate")
-    tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
-        help="RDF graph containing the tool ontology")
-
-    output = cli.SwitchAttr(["-o", "--output"],
-        help="file which to write to")
-    output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "json-ld", "dot"), requires=["-o"])
-
-    backend = cli.SwitchAttr(["-b", "--backend"],
-        cli.Set("fuseki", "marklogic"))
-    server = cli.SwitchAttr(["-s", "--server"],
-        help="server to which to send the graph to", requires=["-b"])
-    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
-
-    force = cli.Flag(["-f", "--force"], default=False,
-        help="overwrite existing files or graphs")
 
     blocked = cli.Flag(["--blocked"], default=False,
         help="Do not pass output type of one tool to the next")
@@ -200,28 +191,21 @@ class Task(NamedTuple):
 
 
 @CLI.subcommand("query")
-class QueryRunner(cli.Application):
+class QueryRunner(Application, WithServer):
     """
     Run transformation queries against a SPARQL endpoint. If no endpoint is
     given, just output the query instead.
     """
 
-    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
-        mandatory=True, help="Transformation language on which to operate")
     output = cli.SwitchAttr(["-o", "--output"], cli.NonexistentPath,
         mandatory=True, help="Output file")
     output_format = cli.SwitchAttr(["-t", "--to"], cli.Set("sparql", "csv"),
         default="csv", help="Output format")
+
     chronological = cli.Flag(["--chronological"],
         default=False, help="Take into account order")
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
-
-    backend = cli.SwitchAttr(["-b", "--backend"],
-        cli.Set("fuseki", "marklogic"))
-    server = cli.SwitchAttr(["-s", "--server"],
-        help="server to which to send the graph to", requires=["-b"])
-    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
 
     def evaluate(self, path, **opts) -> Task:
         """
