@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import urllib.request  # using urllib.request because rdflib uses it
 from http.client import HTTPResponse
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 from rdflib import Dataset, Graph
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
@@ -15,15 +15,16 @@ from typing import Literal
 
 
 class TransformationStore(Dataset):
-    def __init__(self, url: str,
-            graphstore_protocol: str = "/data",
+    def __init__(self,
+            url_gsp: str,
+            url_sparql: str,
             cred: tuple[str, str] | None = None,
             auth: Literal["NONE", "BASIC", "DIGEST"] | None = None):
-        # sparql_query: str = "/query",
-        # sparql_update: str = "/update"):
 
-        self.url = url
-        self.graphstore_protocol = graphstore_protocol
+        url = urlparse(url_gsp)
+        self.host = f"{url.scheme}://{url.netloc}"
+        self.url_gsp = url_gsp
+        self.url_sparql = url_sparql
 
         # While authorization can be passed to the `SPARQLStore` object, DIGEST
         # authorization is only handled for `SPARQLStore`. To work around
@@ -41,7 +42,7 @@ class TransformationStore(Dataset):
             username, password = cred or (None, None)
             assert username and password
             passmgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-            passmgr.add_password(None, url, username, password)
+            passmgr.add_password(None, self.host, username, password)
             auth_handler: urllib.request.BaseHandler
             if auth == "DIGEST":
                 auth_handler = urllib.request.HTTPDigestAuthHandler(passmgr)
@@ -51,8 +52,18 @@ class TransformationStore(Dataset):
             opener = urllib.request.build_opener(auth_handler)
             urllib.request.install_opener(opener)
 
-        store = SPARQLStore(url)
+        store = SPARQLStore(url_sparql)
         super().__init__(store)
+
+    @staticmethod
+    def backend(backend: str, *nargs, **kwargs) -> TransformationStore:
+        backend = backend.lower()
+        if backend == "fuseki":
+            return Fuseki(*nargs, **kwargs)
+        elif backend == "marklogic":
+            return MarkLogic(*nargs, **kwargs)
+        else:
+            raise RuntimeError
 
     def put(self, g: Graph) -> HTTPResponse:
         """
@@ -63,9 +74,26 @@ class TransformationStore(Dataset):
 
         assert g.base
         r = Request(
-            f"{self.url}{self.graphstore_protocol}?graph={quote(str(g.base))}",
+            f"{self.url_gsp}?graph={quote(str(g.base))}",
             method='PUT',
             headers={"Content-Type": "text/turtle"},
             data=g.serialize(format="ttl", encoding="utf-8")
         )
         return urlopen(r)
+
+
+class MarkLogic(TransformationStore):
+    # cf. <https://docs.marklogic.com/guide/semantics/REST>
+    def __init__(self, url: str, **kwargs):
+        super().__init__(
+            url_gsp=url + "/v1/graphs",
+            url_sparql=url + "/v1/graphs/sparql",
+            **kwargs)
+
+
+class Fuseki(TransformationStore):
+    def __init__(self, url: str, **kwargs):
+        super().__init__(
+            url_gsp=url + "/data",
+            url_sparql=url + "/query"
+        )

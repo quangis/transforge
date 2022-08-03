@@ -98,9 +98,11 @@ class TransformationGraphBuilder(cli.Application):
     output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"), requires=["-o"])
 
-    endpoint = cli.SwitchAttr(["-e", "--endpoint"],
-        help="SPARQL endpoint which to send the graph to")
-    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-e"])
+    backend = cli.SwitchAttr(["-b", "--backend"],
+        cli.Set("fuseki", "marklogic"))
+    server = cli.SwitchAttr(["-s", "--server"],
+        help="server to which to send the graph to", requires=["-b"])
+    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
 
     force = cli.Flag(["-f", "--force"], default=False,
         help="overwrite existing files or graphs")
@@ -167,9 +169,10 @@ class TransformationGraphBuilder(cli.Application):
         else:
             g.serialize(self.output, format=self.output_format or "ttl")
 
-        # Insert new graph into endpoint (overwriting old one if it exists)
-        if self.endpoint:
-            ds = TransformationStore(self.endpoint, cred=self.cred)
+        # Insert new graph into server (overwriting old one if it exists)
+        if self.server:
+            ds = TransformationStore.backend(self.backend,
+                self.server, cred=self.cred)
             ds.put(g)
 
 
@@ -197,9 +200,12 @@ class QueryRunner(cli.Application):
         default=False, help="Take into account order")
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
-    endpoint = cli.SwitchAttr(["-e", "--endpoint"],
-        help="SPARQL endpoint to send queries to")
-    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-e"])
+
+    backend = cli.SwitchAttr(["-b", "--backend"],
+        cli.Set("fuseki", "marklogic"))
+    server = cli.SwitchAttr(["-s", "--server"],
+        help="server to which to send the graph to", requires=["-b"])
+    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
 
     def evaluate(self, path, **opts) -> Task:
         """
@@ -257,9 +263,10 @@ class QueryRunner(cli.Application):
             return 1
         else:
 
-            if self.endpoint:
+            if self.server:
                 username, password = self.cred or (None, None)
-                self.graph = TransformationStore(self.endpoint, cred=self.cred)
+                self.graph = TransformationStore(self.backend, self.server,
+                    cred=self.cred)
             else:
                 self.graph = None
 
