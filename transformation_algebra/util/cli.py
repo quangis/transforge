@@ -35,11 +35,20 @@ class WithTools:
 
 
 class WithRDF:
-    output = cli.SwitchAttr(["-o", "--output"],
+    output_path = cli.SwitchAttr(["-o", "--output"],
         help="file which to write to")
     output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl",
         requires=["-o"])
+
+    def maybe_output(self, g: Graph):
+        # Produce output file
+        if self.output_path:
+            if self.output_format == "dot":
+                with open(self.output_path, 'w') as f:
+                    rdf2dot(g, f)
+            else:
+                g.serialize(self.output_path, format=self.output_format)
 
 
 class WithServer:
@@ -48,6 +57,13 @@ class WithServer:
     server = cli.SwitchAttr(["-s", "--server"],
         help="server to which to send the graph to", requires=["-b"])
     cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
+
+    def maybe_upload(self, g: Graph):
+        # Insert new graph into server (overwriting old one if it exists)
+        if self.server:
+            ds = TransformationStore.backend(self.backend,
+                self.server, cred=self.cred)
+            ds.put(g)
 
 
 class CLI(cli.Application):
@@ -86,25 +102,17 @@ class Merger(cli.Application):
 class VocabBuilder(Application, WithRDF, WithServer):
     "Build vocabulary file for the transformation language"
 
-    @cli.positional(cli.NonexistentPath)
     def main(self):
         if self.output_format == "dot":
             vocab = TransformationGraph(self.language, minimal=True,
                 with_labels=True)
             vocab.add_taxonomy()
-            with open(self.output, 'w') as f:
-                rdf2dot(vocab, f)
         else:
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
-            vocab.base = self.language.namespace
-            if self.output:
-                vocab.serialize(str(self.output), format=self.output_format,
-                    encoding='utf-8')
-            elif self.server:
-                server = TransformationStore.backend(self.backend, self.server,
-                    cred=self.cred or (None, None))
-                server.put(vocab)
+        vocab.base = self.language.namespace
+        self.maybe_output(vocab)
+        self.maybe_upload(vocab)
 
 
 @CLI.subcommand("graph")
@@ -169,18 +177,8 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 for comment in wfg.objects(source, RDFS.comment):
                     g.add((source, RDFS.comment, comment))
 
-        # Produce output file
-        if visual:
-            with open(self.output, 'w') as f:
-                rdf2dot(g, f)
-        else:
-            g.serialize(self.output, format=self.output_format or "ttl")
-
-        # Insert new graph into server (overwriting old one if it exists)
-        if self.server:
-            ds = TransformationStore.backend(self.backend,
-                self.server, cred=self.cred)
-            ds.put(g)
+        self.maybe_output(g)
+        self.maybe_upload(g)
 
 
 class Task(NamedTuple):
