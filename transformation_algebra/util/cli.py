@@ -24,6 +24,14 @@ def cred(s: str) -> tuple[str, str]:
     return username, password
 
 
+class ServerApplication(cli.Application):
+    backend = cli.SwitchAttr(["-b", "--backend"],
+        cli.Set("fuseki", "marklogic"))
+    server = cli.SwitchAttr(["-s", "--server"],
+        help="server to which to send the graph to", requires=["-b"])
+    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
+
+
 class CLI(cli.Application):
     """
     A utility to create RDFs, graph visualizations, queries and other files
@@ -57,28 +65,36 @@ class Merger(cli.Application):
 
 
 @CLI.subcommand("vocab")
-class VocabBuilder(cli.Application):
+class VocabBuilder(ServerApplication):
     "Build vocabulary file for the transformation language"
 
     language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
 
+    output = cli.SwitchAttr(["-o", "--output"],
+        help="file which to write to")
     output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl")
 
     @cli.positional(cli.NonexistentPath)
-    def main(self, output):
+    def main(self):
         if self.output_format == "dot":
             vocab = TransformationGraph(self.language, minimal=True,
                 with_labels=True)
             vocab.add_taxonomy()
-            with open(output, 'w') as f:
+            with open(self.output, 'w') as f:
                 rdf2dot(vocab, f)
         else:
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
-            vocab.serialize(str(output), format=self.output_format,
-                encoding='utf-8')
+            vocab.base = self.language.namespace
+            if self.output:
+                vocab.serialize(str(self.output), format=self.output_format,
+                    encoding='utf-8')
+            elif self.server:
+                server = TransformationStore.backend(self.backend, self.server,
+                    cred=self.cred or (None, None))
+                server.put(vocab)
 
 
 @CLI.subcommand("graph")
