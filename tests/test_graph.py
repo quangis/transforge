@@ -398,7 +398,7 @@ class TestAlgebraRDF(unittest.TestCase):
             g
         )
 
-    def test_vocabulary(self):
+    def test_taxonomy(self):
         # Test that subtype relations are encoded in the vocabulary
         A = TypeOperator()
         B = TypeOperator(supertype=A)
@@ -407,7 +407,7 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         actual = TransformationGraph(lang, minimal=True)
-        actual.add_vocabulary()
+        actual.add_taxonomy()
 
         expected = Graph()
         expected.add((TEST.B, RDFS.subClassOf, lang.uri(A)))
