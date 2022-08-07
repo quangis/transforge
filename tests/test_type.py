@@ -3,7 +3,8 @@ import unittest
 from transformation_algebra.type import \
     Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
     FunctionApplicationError, TypeMismatch, Top, Bottom, \
-    ConstraintViolation, ConstrainFreeVariable, EliminationConstraint
+    ConstraintViolation, ConstrainFreeVariable, EliminationConstraint, \
+    Direction
 
 
 Ω = TypeOperator('Ω')
@@ -446,19 +447,19 @@ class TestType(unittest.TestCase):
         A = TypeOperator('A')
         F = TypeOperator('F', params=2)
         self.assertEqual(
-            F(A, A).subtypes(recursive=False),
+            set(F(A, A).successors(Direction.DOWN, include_bottom=True)),
             {F(Bottom, A), F(A, Bottom)}
         )
         self.assertEqual(
-            F(Bottom, A).subtypes(recursive=False),
+            set(F(Bottom, A).successors(Direction.DOWN, include_bottom=True)),
             {F(Bottom, Bottom)}
         )
         self.assertEqual(
-            F(Bottom, Bottom).subtypes(recursive=False),
+            set(F(Bottom, Bottom).successors(Direction.DOWN, include_bottom=True)),
             {Bottom()}
         )
         self.assertEqual(
-            F(Top, Top).subtypes(recursive=False),
+            set(F(Top, Top).successors(Direction.DOWN, include_bottom=True)),
             {F(Bottom, Top), F(Top, Bottom)}
         )
 

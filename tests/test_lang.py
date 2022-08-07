@@ -4,6 +4,7 @@ from transformation_algebra.type import TypeOperator, TypeAlias, \
     SubtypeMismatch, _, Top
 from transformation_algebra.expr import Operator, Source
 from transformation_algebra.lang import Language
+from collections import defaultdict
 
 
 class TestAlgebra(unittest.TestCase):
@@ -89,6 +90,43 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals(), include_top=True, canon={A, F(A, B)})
         self.assertEqual(lang.canon, {Top(), A(), B(), F(A, B), F(B, B),
             F(A, Top), F(B, Top), F(Top, B), F(Top, Top)})
+
+    def test_subtypes_and_supertypes(self):
+        # Make sure that direct subtypes and supertypes are available for
+        # canonical nodes, and mirroring eachother
+
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        F = TypeOperator(params=2)
+        lang = Language(scope=locals(), include_top=True,
+            canon={A, F(A, B)})
+
+        tree = {
+            Top: [A, F(Top, Top)],
+            A: [B],
+            F(Top, Top): [F(Top, B), F(A, Top)],
+            F(Top, B): [F(A, B)],
+            F(A, Top): [F(A, B), F(B, Top)],
+            F(B, Top): [F(B, B)],
+            F(A, B): [F(B, B)],
+        }
+
+        subtypes = defaultdict(set)
+        supertypes = defaultdict(set)
+        for parent, children in tree.items():
+            parent = parent.instance()
+            for child in children:
+                child = child.instance()
+                subtypes[parent].add(child)
+                supertypes[child].add(parent)
+
+        for s, expected in subtypes.items():
+            with self.subTest(subtype_of=s):
+                self.assertEqual(set(lang.subtypes(s)), expected)
+
+        for s, expected in supertypes.items():
+            with self.subTest(supertype_of=s):
+                self.assertEqual(set(lang.supertypes(s)), expected)
 
 
 if __name__ == '__main__':
