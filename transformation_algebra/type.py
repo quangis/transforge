@@ -647,7 +647,7 @@ class TypeOperation(TypeInstance):
         return self._operator.arity == 0
 
     def successors(self, dir: Direction,
-            include_family: bool = True,
+            include_custom: bool = True,
             include_bottom: bool = False,
             include_top: bool = False) -> Iterator[TypeOperation]:
         """
@@ -659,13 +659,13 @@ class TypeOperation(TypeInstance):
             raise RuntimeError(f"Cannot list all {dir}-successors of {op}")
         elif op.arity == 0:
             if dir is Direction.DOWN:
-                if include_family and op.children:
+                if include_custom and op.children:
                     yield from (c() for c in op.children)
                 elif include_bottom and op is not Bottom:
                     yield Bottom()
             else:
                 assert dir is Direction.UP
-                if include_family and op.parent:
+                if include_custom and op.parent:
                     yield op.parent()
                 elif include_top and op is not Top:
                     yield Top()
@@ -681,7 +681,7 @@ class TypeOperation(TypeInstance):
                         succs = (Top(),) if include_top else ()
                     else:
                         succs = p.successors(ndir,
-                            include_family=include_family,
+                            include_custom=include_custom,
                             include_top=include_top,
                             include_bottom=include_bottom)
                     for q in succs:
@@ -696,31 +696,6 @@ class TypeOperation(TypeInstance):
                     yield Bottom()
                 elif include_top and dir is Direction.UP:
                     yield Top()
-
-    def _successors(self, dir: Direction, recursive: bool = True,
-            inclusive: bool = True) -> set[TypeOperation]:
-        result: set[TypeOperation] = set()
-        stack: list[TypeOperation] = [self]
-        while stack:
-            current = stack.pop()
-            for s in current.successors(Direction.DOWN,
-                    include_top=inclusive, include_bottom=inclusive):
-                if s not in result:
-                    result.add(s)
-                    stack.append(s)
-            if not recursive:
-                return result
-        return result
-
-    def subtypes(self, recursive: bool = True,
-            inclusive: bool = True) -> set[TypeOperation]:
-        return self._successors(Direction.DOWN,
-            recursive=recursive, inclusive=inclusive)
-
-    def supertypes(self, recursive: bool = True,
-            inclusive: bool = True) -> set[TypeOperation]:
-        return self._successors(Direction.UP,
-            recursive=recursive, inclusive=inclusive)
 
 class TypeVariable(TypeInstance):
     """

@@ -41,6 +41,7 @@ class TransformationGraph(Graph):
             with_classes: bool | None = None,
             with_transitive_closure: bool | None = None,
             with_noncanonical_types: bool | None = None,
+            with_supertypes: bool | None = None,
             passthrough: bool = True,
             *nargs, **kwargs):
 
@@ -53,6 +54,7 @@ class TransformationGraph(Graph):
         self.passthrough = passthrough
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
+        self.with_supertypes = default(with_supertypes)
         self.with_intermediate_types = default(with_intermediate_types,
             self.with_types)
         self.with_labels = default(with_labels)
@@ -102,27 +104,19 @@ class TransformationGraph(Graph):
         """
         Add a taxonomy of types.
         """
-        kwargs = {"include_bottom": self.language.include_bottom,
-            "include_top": self.language.include_top}
+
+        self.language.expand_canon()
 
         # Add all canonical nodes and connect to their super & subtypes
         for t in self.language.canon:
             node = self.add_type(t)
             if t._operator is not Top:
-                for s in t.successors(Direction.DOWN, **kwargs):
-                    if s in self.language.canon:
-                        self.add((self.add_type(s), RDFS.subClassOf, node))
+                for s in self.language.subtypes(t):
+                    self.add((self.add_type(s), RDFS.subClassOf, node))
 
             if t._operator is not Bottom:
-                for s in t.successors(Direction.UP, **kwargs):
-                    if s in self.language.canon:
-                        self.add((node, RDFS.subClassOf, self.add_type(s)))
-                    else:
-                        for u in s.successors(Direction.UP,
-                                include_family=False, **kwargs):
-                            if u in self.language.canon:
-                                self.add((node, RDFS.subClassOf,
-                                    self.add_type(u)))
+                for s in self.language.supertypes(t):
+                    self.add((node, RDFS.subClassOf, self.add_type(s)))
 
         # Transitive closure
         if self.with_transitive_closure:
