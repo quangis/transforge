@@ -104,57 +104,38 @@ class Language(object):
                     stack.append(s)
 
     def successors(self, d: Direction, t: TypeOperation,
-            transitive: bool, noncanonical: bool) -> Iterator[TypeOperation]:
+            transitive: bool) -> Iterator[TypeOperation]:
+        """
+        Find canonical successor types of `t`.
+        """
+        assert t in self.canon
 
-        successors = list(t.successors(d,
-            include_top=self.include_top or noncanonical,
-            include_bottom=self.include_bottom or noncanonical))
-
-        successors_skip = list(t.successors(d, include_custom=False,
-            include_top=self.include_top, include_bottom=self.include_bottom))
-
-        # For supertypes, it might be the case that a type that is
-        # noncanonical has a canonical supertype, e.g. A is a supertype of
-        # B, with F(B) canonical, then F(Top) is canonical but F(A) is not
-        # if d == Direction.UP:
-        #     assert not noncanonical
-        #     yield from self.__lineage(d, t, transitive, noncanonical)
-        # if not canonical_successors and d == Direction.UP:
-        #     canonical_successors = [
-        #         s for s in t.successors(d,
-        #             include_custom=False,
-        #             include_top=self.include_top or noncanonical,
-        #             include_bottom=self.include_bottom or noncanonical)
-        #     ]
-        # else:
-
-        if noncanonical or not any(s in self.canon for s in successors):
-            successors = successors_skip
-
-        for s in successors:
-            if noncanonical or s in self.canon:
+        for s in t.successors(d,
+                include_top=self.include_top,
+                include_bottom=self.include_bottom,
+                universe=self.types.values()):
+            if s in self.canon:
                 yield s
                 if transitive:
-                    yield from self.successors(d, s, True, noncanonical)
+                    yield from self.successors(d, s, True)
+            # It might be the case that a type that is noncanonical has a
+            # canonical supertype, e.g. A is a supertype of B, with F(B)
+            # canonical, then F(Top) is canonical but F(A) is not
+            else:
+                for u in s.successors(d,
+                        include_top=self.include_top,
+                        include_bottom=self.include_bottom,
+                        universe=self.types.values()):
+                    if u in self.canon:
+                        yield u
 
-    def subtypes(self, t: TypeOperation, transitive: bool = False,
-            with_noncanonical_types: bool = False) \
-            -> Iterator[TypeOperation]:
-        "Find the canonical subtypes"
-        # if t._operator is Top:
-        #     assert not with_noncanonical_types, \
-        #         "infinite noncanonical types are a subtype of Top"
-        return self.successors(Direction.DOWN, t, transitive,
-            with_noncanonical_types)
+    def subtypes(self, t: TypeOperation,
+            transitive: bool = False) -> Iterator[TypeOperation]:
+        return self.successors(Direction.DOWN, t, transitive)
 
-    def supertypes(self, t: TypeOperation, transitive: bool = False,
-            with_noncanonical_types: bool = False) -> Iterator[TypeOperation]:
-        "Find the canonical supertypes"
-        # if t._operator is Bottom:
-        #     assert not with_noncanonical_types, \
-        #         "infinite noncanonical types are a supertype of Bottom"
-        return self.successors(Direction.UP, t, transitive,
-            with_noncanonical_types)
+    def supertypes(self, t: TypeOperation,
+            transitive: bool = False) -> Iterator[TypeOperation]:
+        return self.successors(Direction.UP, t, transitive)
 
     def add_scope(self, scope: dict[str, Any]) -> None:
         """

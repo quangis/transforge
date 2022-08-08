@@ -245,6 +245,28 @@ class TypeOperator(Type):
             bool(self.parent and self.parent.subtype(other))
         )
 
+    def floor(self) -> Iterator[TypeOperation]:
+        if self.arity == 0:
+            if self.children:
+                yield from chain(c.floor() for c in self.children)
+            else:
+                yield TypeOperation(self)
+        else:
+            yield TypeOperation(self, *(
+                Bottom() if v == Variance.CO else Top() for v in self.variance
+            ))
+
+    def ceiling(self) -> Iterator[TypeOperation]:
+        if self.arity == 0:
+            if self.parent:
+                yield from self.parent.ceiling()
+            else:
+                yield TypeOperation(self)
+        else:
+            yield TypeOperation(self, *(
+                Top() if v == Variance.CO else Bottom() for v in self.variance
+            ))
+
     def normalize(self) -> TypeInstance:
         return self.instance()
 
@@ -649,49 +671,61 @@ class TypeOperation(TypeInstance):
     def successors(self, dir: Direction,
             include_custom: bool = True,
             include_bottom: bool = False,
-            include_top: bool = False) -> Iterator[TypeOperation]:
+            include_top: bool = False,
+            universe: Iterable[TypeOperator] | None = None) \
+            -> Iterator[TypeOperation]:
         """
         Find successor types (ie. direct subtypes or supertypes of this type).
+
+        The universe consists of the types that you can get to by travelling
+        down from the Top or up from the Bottom. However, if there is a
+        parameterized type present, this results in infinite types when
+        travelling recursively.
         """
         op = self._operator
-        if (op is Top and dir is Direction.DOWN) or \
-                (op is Bottom and dir is Direction.UP):
-            raise RuntimeError(f"Cannot list all {dir}-successors of {op}")
+
+        if universe is None and op in (Top, Bottom):
+            raise RuntimeError(f"Cannot list all successors of {op} in {dir}")
         elif op.arity == 0:
             if dir is Direction.DOWN:
-                if include_custom and op.children:
+                if op is Top:
+                    if universe:
+                        for t in universe:
+                            yield from t.ceiling()
+                    elif include_bottom:
+                        yield Bottom()
+                elif include_custom and op.children:
                     yield from (c() for c in op.children)
                 elif include_bottom and op is not Bottom:
                     yield Bottom()
             else:
                 assert dir is Direction.UP
-                if include_custom and op.parent:
+                if op is Bottom:
+                    if universe:
+                        for t in universe:
+                            yield from t.floor()
+                    elif include_top:
+                        yield Top()
+                elif include_custom and op.parent:
                     yield op.parent()
                 elif include_top and op is not Top:
                     yield Top()
         else:
-            res = False
+            empty = True
             for i, v, p in zip(count(), op.variance, self.params):
                 if isinstance(p, TypeOperation):
-                    succs: Iterable[TypeOperation]
-                    ndir = dir.variant(v)
-                    if p._operator is Top and ndir is Direction.DOWN:
-                        succs = (Bottom(),) if include_bottom else ()
-                    elif p._operator is Bottom and ndir is Direction.UP:
-                        succs = (Top(),) if include_top else ()
-                    else:
-                        succs = p.successors(ndir,
+                    for q in p.successors(dir.variant(v),
                             include_custom=include_custom,
                             include_top=include_top,
-                            include_bottom=include_bottom)
-                    for q in succs:
-                        res = True
+                            include_bottom=include_bottom,
+                            universe=universe or ()):
+                        empty = False
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
                     raise RuntimeError("encountered variable")
 
-            if not res:
+            if empty:
                 if include_bottom and dir is Direction.DOWN:
                     yield Bottom()
                 elif include_top and dir is Direction.UP:
