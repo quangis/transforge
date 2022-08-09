@@ -73,6 +73,10 @@ class TransformationGraph(Graph):
 
         self.bind("", TA)
 
+        # types that are connected to all sub cq. supertypes
+        self.subtyped: set[TypeOperation] = set()
+        self.supertyped: set[TypeOperation] = set()
+
     @staticmethod
     def from_rdf(path: str, *nargs,
             format: str = "turtle", **kwargs) -> TransformationGraph:
@@ -97,17 +101,23 @@ class TransformationGraph(Graph):
         self.add((ns["type"], RDFS.subPropertyOf, TA["type"]))
         self.add((ns["via"], RDFS.subPropertyOf, TA["via"]))
 
-    def add_supertypes(self, t: TypeOperation) -> None:
-        node = self.language.uri(t)
-        for s in self.language.supertypes(t):
-            self.add((node, RDFS.subClassOf, self.language.uri(s)))
-            self.add_supertypes(s)
+    def add_supertypes(self, t: TypeOperation, recursive: bool = False) -> None:
+        if t not in self.supertyped:
+            ref = self.language.uri(t)
+            for s in self.language.supertypes(t):
+                self.add((ref, RDFS.subClassOf, self.language.uri(s)))
+                if recursive:
+                    self.add_supertypes(s)
+            self.supertyped.add(t)
 
-    def add_subtypes(self, t: TypeOperation) -> None:
-        node = self.language.uri(t)
-        for s in self.language.subtypes(t):
-            self.add((self.language.uri(s), RDFS.subClassOf, node))
-            self.add_subtypes(s)
+    def add_subtypes(self, t: TypeOperation, recursive: bool = False) -> None:
+        if t not in self.subtyped:
+            ref = self.language.uri(t)
+            for s in self.language.subtypes(t):
+                self.add((self.language.uri(s), RDFS.subClassOf, ref))
+                if recursive:
+                    self.add_subtypes(s)
+            self.subtyped.add(t)
 
     def add_taxonomy(self) -> None:
         """
@@ -117,18 +127,14 @@ class TransformationGraph(Graph):
         self.language.expand_canon()
         for t in self.language.canon:
             self.add_type(t)
-            self.add_subtypes(t)  # TODO inefficient; only add when necessary
+            self.add_subtypes(t)
             self.add_supertypes(t)
 
-        # Transitive closure
         if self.with_transitive_closure:
-            nodes = set(chain(
-                (self.type_nodes[t] for t in self.language.canon),
-                (self.language.namespace[op] for op in self.language.types)
-            ))
-            for node in nodes:
-                for desc in self.transitive_subjects(RDFS.subClassOf, node):
-                    self.add((desc, RDFS.subClassOf, node))
+            for t in self.language.canon:
+                ref = self.language.uri(t)
+                for sub in self.transitive_subjects(RDFS.subClassOf, ref):
+                    self.add((sub, RDFS.subClassOf, ref))
 
     def add_operators(self) -> None:
         for op in self.language.operators.values():
