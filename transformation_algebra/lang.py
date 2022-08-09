@@ -128,6 +128,8 @@ class Language(object):
                         universe=self.types.values()):
                     if u in self.canon:
                         yield u
+                        if transitive:
+                            yield from self.successors(d, u, True)
 
     def subtypes(self, t: TypeOperation,
             transitive: bool = False) -> Iterator[TypeOperation]:
