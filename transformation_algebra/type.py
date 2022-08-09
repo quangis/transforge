@@ -672,7 +672,7 @@ class TypeOperation(TypeInstance):
             include_custom: bool = True,
             include_bottom: bool = False,
             include_top: bool = False,
-            universe: Iterable[TypeOperator] | None = None) \
+            universe: Iterable[TypeOperator] = ()) \
             -> Iterator[TypeOperation]:
         """
         Find successor types (ie. direct subtypes or supertypes of this type).
@@ -684,9 +684,7 @@ class TypeOperation(TypeInstance):
         """
         op = self._operator
 
-        if universe is None and op in (Top, Bottom):
-            raise RuntimeError(f"Cannot list all successors of {op} in {dir}")
-        elif op.arity == 0:
+        if op.arity == 0:
             if dir is Direction.DOWN:
                 if op is Top:
                     if universe:
@@ -718,7 +716,7 @@ class TypeOperation(TypeInstance):
                             include_custom=include_custom,
                             include_top=include_top,
                             include_bottom=include_bottom,
-                            universe=universe or ()):
+                            universe=universe):
                         empty = False
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
