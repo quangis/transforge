@@ -89,8 +89,6 @@ class Language(object):
         while stack:
             current = stack.pop()
             self.canon.add(current)
-            # if current._operator in (Top, Bottom):
-            #     continue
             for s in current.successors(Direction.UP,
                     include_custom=False,
                     include_top=self.include_top,

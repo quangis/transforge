@@ -248,7 +248,8 @@ class TypeOperator(Type):
     def floor(self) -> Iterator[TypeOperation]:
         if self.arity == 0:
             if self.children:
-                yield from chain(c.floor() for c in self.children)
+                yield from chain.from_iterable(c.floor()
+                    for c in self.children)
             else:
                 yield TypeOperation(self)
         else:

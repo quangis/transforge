@@ -119,7 +119,7 @@ class TransformationGraph(Graph):
 
         self.language.expand_canon()
         for t in self.language.canon:
-            self.add_subtypes(t)  # TODO inefficient
+            self.add_subtypes(t)  # TODO inefficient; only add when necessary
             self.add_supertypes(t)
 
         # Transitive closure
