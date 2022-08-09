@@ -190,7 +190,7 @@ class TestType(unittest.TestCase):
         # that its parameters is exactly A: that might be too general a bound.
         f = TypeSchema(lambda x: x ** x [x <= Z(A)])
         result = f.apply(TypeVariable())
-        self.assertEqual(result.operator, Z)
+        self.assertEqual(result._operator, Z)
         self.assertIsInstance(result.params[0], TypeVariable)
 
     def test_multiple_bounds(self):

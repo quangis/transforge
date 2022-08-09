@@ -143,12 +143,13 @@ class Type(ABC):
 
         if isinstance(f, TypeOperation) and f._operator == Function:
             x.unify(f.params[0], subtype=True)
-            f.params[0].fix(prefer_lower=False)
+            left, right = f.params
+            left.fix(prefer_lower=False)
             # f.fix()
-            if f.params[1].operator == Function:
-                return f.params[1]
+            if isinstance(right, TypeOperation) and right._operator == Function:
+                return right
             else:
-                return f.params[1].fix()
+                return right.fix()
         else:
             raise FunctionApplicationError(f, x)
 
@@ -609,7 +610,7 @@ class TypeInstance(Type):
         ftypes = [t.follow() for t in types]
         if not ftypes:
             return None
-        operators = [t.operator for t in ftypes]
+        operators = [t._operator for t in ftypes if isinstance(t, TypeOperation)]
         operator = operators[0]
 
         if operator is None or not all(o == operator for o in operators):
@@ -631,10 +632,6 @@ class TypeInstance(Type):
             return self.params[1].output()
         else:
             return self
-
-    @property
-    def operator(self) -> Optional[TypeOperator]:
-        return self._operator if isinstance(self, TypeOperation) else None
 
 
 class TypeOperation(TypeInstance):

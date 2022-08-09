@@ -300,7 +300,8 @@ class TransformationGraph(Graph):
             # internal operation. All inputs to `f` should be made inputs to
             # this operation also.
             current_internal = None
-            if expr.x.type.operator == Function:
+            if isinstance(expr.x.type, TypeOperation) and \
+                    expr.x.type._operator == Function:
                 internal = BNode()
                 current_internal = internal
                 self.add((f, TA.internal, internal))
