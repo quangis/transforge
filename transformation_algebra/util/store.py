@@ -9,7 +9,7 @@ import urllib.request  # using urllib.request because rdflib uses it
 from http.client import HTTPResponse
 from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
-from rdflib import Dataset, Graph
+from rdflib import Dataset, Graph, URIRef
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from typing import Literal
 
@@ -72,14 +72,30 @@ class TransformationStore(Dataset):
         # cf. <https://www.w3.org/TR/sparql11-http-rdf-update/#http-put>
         # TODO may throw errors etc
 
-        assert g.base
-        r = Request(
-            f"{self.url_gsp}?graph={quote(str(g.base))}",
-            method='PUT',
+        if g.base:
+            url = f"{self.url_gsp}?graph={quote(str(g.base))}"
+        else:
+            url = f"{self.url_gsp}?default"
+
+        return urlopen(Request(
+            url, method='PUT',
             headers={"Content-Type": "text/turtle"},
             data=g.serialize(format="ttl", encoding="utf-8")
-        )
-        return urlopen(r)
+        ))
+
+    def get(self, uri: URIRef | str) -> Graph:
+        g = Graph()
+        g.parse(f"{self.url_gsp}?graph={quote(str(uri))}")
+        return g
+        # url = f"{self.url_gsp}?graph={quote(str(uri))}"
+        # resp = urlopen(Request(
+        #     url, method='GET',
+        #     headers={"Accept": "text/turtle; charset=utf-8"},
+        # ))
+        # data = resp.read()
+        # g = Graph()
+        # g.parse(data=data, format="ttl")
+        # return g
 
 
 class MarkLogic(TransformationStore):
