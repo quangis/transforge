@@ -89,8 +89,8 @@ class Language(object):
         while stack:
             current = stack.pop()
             self.canon.add(current)
-            if current._operator in (Top, Bottom):
-                continue
+            # if current._operator in (Top, Bottom):
+            #     continue
             for s in current.successors(Direction.UP,
                     include_custom=False,
                     include_top=self.include_top,
@@ -108,7 +108,7 @@ class Language(object):
         """
         Find canonical successor types of `t`.
         """
-        assert t in self.canon
+        assert t in self.canon, f"{t} is not canonical"
 
         for s in t.successors(d,
                 include_top=self.include_top,

@@ -100,23 +100,27 @@ class TransformationGraph(Graph):
         self.add((ns["type"], RDFS.subPropertyOf, TA["type"]))
         self.add((ns["via"], RDFS.subPropertyOf, TA["via"]))
 
+    def add_supertypes(self, t: TypeOperation) -> None:
+        node = self.add_type(t)
+        for s in self.language.supertypes(t):
+            self.add((node, RDFS.subClassOf, self.add_type(s)))
+            self.add_supertypes(s)
+
+    def add_subtypes(self, t: TypeOperation) -> None:
+        node = self.add_type(t)
+        for s in self.language.subtypes(t):
+            self.add((self.add_type(s), RDFS.subClassOf, node))
+            self.add_subtypes(s)
+
     def add_taxonomy(self) -> None:
         """
         Add a taxonomy of types.
         """
 
         self.language.expand_canon()
-
-        # Add all canonical nodes and connect to their super & subtypes
         for t in self.language.canon:
-            node = self.add_type(t)
-            if t._operator is not Top:
-                for s in self.language.subtypes(t):
-                    self.add((self.add_type(s), RDFS.subClassOf, node))
-
-            if t._operator is not Bottom:
-                for s in self.language.supertypes(t):
-                    self.add((node, RDFS.subClassOf, self.add_type(s)))
+            self.add_subtypes(t)  # TODO inefficient
+            self.add_supertypes(t)
 
         # Transitive closure
         if self.with_transitive_closure:
