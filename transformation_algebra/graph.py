@@ -166,10 +166,10 @@ class TransformationGraph(Graph):
             if self.with_labels:
                 self.add((node, RDFS.label, Literal(t.text())))
 
-            if isinstance(t, TypeOperation) and t._operator.arity > 0 \
+            if isinstance(t, TypeOperation) and t.operator.arity > 0 \
                     and self.with_type_parameters:
                 self.add((node, RDFS.subClassOf,
-                    self.language.uri(t._operator)))
+                    self.language.uri(t.operator)))
                 for i, param in enumerate(t.params, start=1):
                     self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
@@ -301,7 +301,7 @@ class TransformationGraph(Graph):
             # this operation also.
             current_internal = None
             if isinstance(expr.x.type, TypeOperation) and \
-                    expr.x.type._operator == Function:
+                    expr.x.type.operator == Function:
                 internal = BNode()
                 current_internal = internal
                 self.add((f, TA.internal, internal))

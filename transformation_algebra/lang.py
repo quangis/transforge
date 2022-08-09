@@ -67,8 +67,8 @@ class Language(object):
         return self._namespace
 
     def uri(self, value: Operator | TypeOperator | TypeOperation) -> URIRef:
-        if isinstance(value, TypeOperation) and value._operator.arity == 0:
-            value = value._operator
+        if isinstance(value, TypeOperation) and value.operator.arity == 0:
+            value = value.operator
         if isinstance(value, (Operator, TypeOperator)):
             return (TA if value in builtins else self.namespace)[value.name]
         elif value in self.canon:
