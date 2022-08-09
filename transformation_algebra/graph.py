@@ -71,9 +71,6 @@ class TransformationGraph(Graph):
 
         self.identifiers: Iterator[int] | None = None
 
-        for t in self.language.canon:
-            self.type_nodes[t] = self.language.uri(t)
-
         self.bind("", TA)
 
     @staticmethod
@@ -101,15 +98,15 @@ class TransformationGraph(Graph):
         self.add((ns["via"], RDFS.subPropertyOf, TA["via"]))
 
     def add_supertypes(self, t: TypeOperation) -> None:
-        node = self.add_type(t)
+        node = self.language.uri(t)
         for s in self.language.supertypes(t):
-            self.add((node, RDFS.subClassOf, self.add_type(s)))
+            self.add((node, RDFS.subClassOf, self.language.uri(s)))
             self.add_supertypes(s)
 
     def add_subtypes(self, t: TypeOperation) -> None:
-        node = self.add_type(t)
+        node = self.language.uri(t)
         for s in self.language.subtypes(t):
-            self.add((self.add_type(s), RDFS.subClassOf, node))
+            self.add((self.language.uri(s), RDFS.subClassOf, node))
             self.add_subtypes(s)
 
     def add_taxonomy(self) -> None:
@@ -119,6 +116,7 @@ class TransformationGraph(Graph):
 
         self.language.expand_canon()
         for t in self.language.canon:
+            self.add_type(t)
             self.add_subtypes(t)  # TODO inefficient; only add when necessary
             self.add_supertypes(t)
 
@@ -175,7 +173,12 @@ class TransformationGraph(Graph):
                 for i, param in enumerate(t.params, start=1):
                     self.add((node, RDF[f"_{i}"], self.add_type(param)))
 
+            if self.with_supertypes and t in self.language.canon:
+                assert isinstance(t, TypeOperation)
+                self.add_supertypes(t)
+
         self.type_nodes[t] = node
+
         return node
 
     def add_expr(self, expr: Expr, root: Node,
@@ -224,7 +227,7 @@ class TransformationGraph(Graph):
 
             if self.with_labels:
                 self.add((current, RDFS.label,
-                    Literal(f"{self.ref()}{expr.type}")))
+                    Literal(f"{self.ref()}{expr.type} from source")))
 
         elif isinstance(expr, Operation):
             # assert not expr.operator.definition, \
@@ -452,8 +455,9 @@ class TransformationGraph(Graph):
         ns = self.language.namespace
         # TODO handle collections of types/operators
         for subj, obj in self[:ns.type:]:
-            type = self.language.parse_type(str(obj)).concretize(Top)
-            node = self.type_nodes[type]
+            t = self.language.parse_type(str(obj)).concretize(Top)
+            assert t in self.language.canon and isinstance(t, TypeOperation)
+            node = self.language.uri(t)
             self.add((subj, TA.type, node))
 
         for subj, obj in self[:ns.via:]:

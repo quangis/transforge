@@ -625,7 +625,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         self.assertIsomorphic(actual, expected)
 
-    def test_taxonomy(self):
+    def test_taxonomy2(self):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)

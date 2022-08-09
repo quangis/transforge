@@ -138,12 +138,13 @@ class TransformationQuery(object):
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
+            "GRAPH ?workflow {",
             "?workflow a :Transformation.",
             self.io() if self.by_io else (),
             self.operators() if self.by_operators else (),
             self.types() if self.by_types else (),
             self.chronology() if self.by_chronology else (),
-            "} GROUP BY ?workflow"
+            "}} GROUP BY ?workflow"
         )
         return result
 
@@ -151,7 +152,7 @@ class TransformationQuery(object):
         """
         Conditions for matching on the bag of types used in a query.
         """
-        return [f"?workflow :contains/rdfs:subClassOf {tp.n3()}."
+        return [f"?workflow :contains/rdfs:subClassOf* {tp.n3()}."
             for tp in set(self.type.values())]
 
     def operators(self) -> Iterable[str]:
@@ -170,7 +171,7 @@ class TransformationQuery(object):
             result.append(f"?workflow :output ?output{i}.")
             for tp in self.graph.objects(output, TA.type):
                 assert isinstance(tp, URIRef)
-                result.append(f"?output{i} :type/rdfs:subClassOf {tp.n3()}.")
+                result.append(f"?output{i} :type/rdfs:subClassOf* {tp.n3()}.")
         for i, input in enumerate(self.graph.objects(self.root, TA.input)):
             result.append(f"?workflow :input ?input{i}.")
             for tp in self.graph.objects(input, TA.type):
@@ -229,7 +230,7 @@ class TransformationQuery(object):
             if operator := self.operator.get(current):
                 result.append(f"{current.n3()} :via {operator.n3()}.")
             if type := self.type.get(current):
-                result.append(f"{current.n3()} :type/rdfs:subClassOf {type.n3()}.")
+                result.append(f"{current.n3()} :type/rdfs:subClassOf* {type.n3()}.")
             visited.add(current)
 
             # Add successors to queue

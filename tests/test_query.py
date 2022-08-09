@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from rdflib import Dataset
 from rdflib.term import BNode, Node, URIRef, Literal
 from rdflib.namespace import RDF
 
-from transformation_algebra.type import TypeOperator, Type, TypeAlias, _
+from transformation_algebra.type import TypeOperator, Type, _
 from transformation_algebra.expr import Operator, Expr
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
@@ -61,17 +62,19 @@ def make_query(lang: Language, obj: tuple[Operator | Type | list], **kwargs
     return TransformationQuery(lang, g, **kwargs)
 
 
-def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> TransformationGraph:
+def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> Dataset:
     """
-    Convenience method for constructing a graph containing workflows.
+    Convenience method for constructing a dataset containing workflow graphs.
     """
-    graph = TransformationGraph(lang)
-    graph.add_vocabulary()
+    ds = Dataset()
     for wfnode, content in workflows.items():
+        graph = TransformationGraph(lang)
         e = graph.add_expr(content, wfnode)
         graph.add((wfnode, RDF.type, TA.Transformation))
         graph.add((wfnode, TA.output, e))
-    return graph
+        g = ds.add_graph(wfnode)
+        g += graph
+    return ds
 
 
 class TestAlgebra(unittest.TestCase):
@@ -450,7 +453,7 @@ class TestAlgebra(unittest.TestCase):
 
         # Repeat a couple of times to make it more likely that the bug, if
         # present, is caught
-        for _ in range(10):
+        for _anything in range(10):
             graph = TransformationGraph(lang)
             root = BNode()
             A, B, C = BNode(), BNode(), BNode()
