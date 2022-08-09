@@ -107,8 +107,9 @@ class TransformationGraph(Graph):
             for s in self.language.supertypes(t):
                 self.add((ref, RDFS.subClassOf, self.language.uri(s)))
                 if recursive:
-                    self.add_supertypes(s)
-            self.supertyped.add(t)
+                    self.add_supertypes(s, recursive=True)
+            if recursive:
+                self.supertyped.add(t)
 
     def add_subtypes(self, t: TypeOperation, recursive: bool = False) -> None:
         if t not in self.subtyped:
@@ -116,8 +117,9 @@ class TransformationGraph(Graph):
             for s in self.language.subtypes(t):
                 self.add((self.language.uri(s), RDFS.subClassOf, ref))
                 if recursive:
-                    self.add_subtypes(s)
-            self.subtyped.add(t)
+                    self.add_subtypes(s, recursive=True)
+            if recursive:
+                self.subtyped.add(t)
 
     def add_taxonomy(self) -> None:
         """
@@ -181,7 +183,7 @@ class TransformationGraph(Graph):
 
             if self.with_supertypes and t in self.language.canon:
                 assert isinstance(t, TypeOperation)
-                self.add_supertypes(t)
+                self.add_supertypes(t, recursive=True)
 
         self.type_nodes[t] = node
 
