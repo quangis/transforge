@@ -110,6 +110,6 @@ class MarkLogic(TransformationStore):
 class Fuseki(TransformationStore):
     def __init__(self, url: str, **kwargs):
         super().__init__(
-            url_gsp=url + "/data",
-            url_sparql=url + "/query"
+            url_gsp=url.rstrip("/") + "/data",
+            url_sparql=url.rstrip("/") + "/query"
         )
