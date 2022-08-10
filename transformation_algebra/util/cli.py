@@ -5,7 +5,7 @@ Command-line interface for common tasks.
 from __future__ import annotations
 
 import csv
-from rdflib import Graph
+from rdflib import Graph, Dataset
 from rdflib.term import Node, Literal, URIRef
 from rdflib.namespace import RDF, RDFS
 from rdflib.tools.rdf2dot import rdf2dot
@@ -38,17 +38,30 @@ class WithRDF:
     output_path = cli.SwitchAttr(["-o", "--output"],
         help="file which to write to")
     output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "json-ld", "dot"), default="ttl",
+        cli.Set("rdf", "ttl", "trig", "json-ld", "dot"), default="trig",
         requires=["-o"])
 
-    def maybe_output(self, g: Graph):
+    def maybe_output(self, *graphs: Graph):
+        result: Graph
+        if len(graphs) == 1:
+            result = graphs[0]
+        elif self.output_format == "trig":
+            result = Dataset()
+            for g in graphs:
+                subgraph = result.graph(g.base)
+                subgraph += g
+        else:
+            g = Graph()
+            for g in graphs:
+                result += g
+
         # Produce output file
         if self.output_path:
             if self.output_format == "dot":
                 with open(self.output_path, 'w') as f:
-                    rdf2dot(g, f)
+                    rdf2dot(result, f)
             else:
-                g.serialize(self.output_path, format=self.output_format)
+                result.serialize(self.output_path, format=self.output_format)
 
 
 class WithServer:
@@ -58,12 +71,13 @@ class WithServer:
         help="server to which to send the graph to", requires=["-b"])
     cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
 
-    def maybe_upload(self, g: Graph):
+    def maybe_upload(self, *graphs: Graph):
         # Insert new graph into server (overwriting old one if it exists)
         if self.server:
             ds = TransformationStore.backend(self.backend,
                 self.server, cred=self.cred)
-            ds.put(g)
+            for g in graphs:
+                ds.put(g)
 
 
 class CLI(cli.Application):
@@ -128,60 +142,65 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         help="Do not annotate types internal to the tools")
 
     @cli.positional(cli.ExistingFile)
-    def main(self, wf_path):
+    def main(self, *wf_paths):
         visual = self.output_format == "dot"
         if visual:
             assert not self.endpoint
 
-        # Read input workflow graph
-        wfg = Graph()
-        wfg.parse(wf_path, format='ttl')
-        root = wfg.value(None, RDF.type, WF.Workflow, any=False)
-        assert isinstance(root, URIRef)
-        sources = set(wfg.objects(root, WF.source))
-        tool_apps: dict[Node, tuple[str, list[Node]]] = {}
-        for step in wfg.objects(root, WF.edge):
-            out = wfg.value(step, WF.output, any=False)
+        results: list[Graph] = []
 
-            # Find expression for the tool associated with this application
-            tool = wfg.value(
-                step, WF.applicationOf, any=False)
-            assert tool, "workflow has an edge without a tool"
-            expr = self.tools.value(
-                tool, self.language.namespace.expression, any=False)
-            assert expr, f"{tool} has no algebra expression"
-
-            tool_apps[out] = expr, [node
-                for pred in (WF.input1, WF.input2, WF.input3)
-                if (node := wfg.value(step, pred))
-            ]
-
-        # Build transformation graph
-        g = TransformationGraph(self.language, minimal=visual,
-            with_labels=visual, with_noncanonical_types=False,
-            with_intermediate_types=not self.opaque,
-            passthrough=not self.blocked)
-        g.base = root
-        step2expr = g.add_workflow(root, tool_apps, sources)
-
-        # Annotate the expression nodes that correspond with output nodes of a
-        # tool with said tool
-        # TODO incorporate this into add_workflow
-        if visual:
+        for wf_path in wf_paths:
+            # Read input workflow graph
+            wfg = Graph()
+            wfg.parse(wf_path, format='ttl')
+            root = wfg.value(None, RDF.type, WF.Workflow, any=False)
+            assert isinstance(root, URIRef)
+            sources = set(wfg.objects(root, WF.source))
+            tool_apps: dict[Node, tuple[str, list[Node]]] = {}
             for step in wfg.objects(root, WF.edge):
                 out = wfg.value(step, WF.output, any=False)
-                tool = wfg.value(step, WF.applicationOf, any=False)
-                g.add((step2expr[out], RDFS.comment, Literal(
-                    "using " + tool[len(TOOLS):])))
-            for source in sources:
-                for comment in wfg.objects(source, RDFS.comment):
-                    g.add((source, RDFS.comment, comment))
 
-        # Add original workflow
-        g += wfg
+                # Find expression for the tool associated with this application
+                tool = wfg.value(
+                    step, WF.applicationOf, any=False)
+                assert tool, "workflow has an edge without a tool"
+                expr = self.tools.value(
+                    tool, self.language.namespace.expression, any=False)
+                assert expr, f"{tool} has no algebra expression"
 
-        self.maybe_output(g)
-        self.maybe_upload(g)
+                tool_apps[out] = expr, [node
+                    for pred in (WF.input1, WF.input2, WF.input3)
+                    if (node := wfg.value(step, pred))
+                ]
+
+            # Build transformation graph
+            g = TransformationGraph(self.language, minimal=visual,
+                with_labels=visual, with_noncanonical_types=False,
+                with_intermediate_types=not self.opaque,
+                passthrough=not self.blocked)
+            g.base = root
+            step2expr = g.add_workflow(root, tool_apps, sources)
+
+            # Annotate the expression nodes that correspond with output nodes
+            # of a tool with said tool
+            # TODO incorporate this into add_workflow
+            if visual:
+                for step in wfg.objects(root, WF.edge):
+                    out = wfg.value(step, WF.output, any=False)
+                    tool = wfg.value(step, WF.applicationOf, any=False)
+                    g.add((step2expr[out], RDFS.comment, Literal(
+                        "using " + tool[len(TOOLS):])))
+                for source in sources:
+                    for comment in wfg.objects(source, RDFS.comment):
+                        g.add((source, RDFS.comment, comment))
+
+            # Add original workflow
+            g += wfg
+
+            results.append(g)
+
+        self.maybe_output(*results)
+        self.maybe_upload(*results)
 
 
 class Task(NamedTuple):
