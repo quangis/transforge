@@ -79,8 +79,8 @@ class TransformationStore(Dataset):
 
         return urlopen(Request(
             url, method='PUT',
-            headers={"Content-Type": "text/turtle"},
-            data=g.serialize(format="ttl", encoding="utf-8")
+            headers={"Content-Type": "application/rdf+xml"},
+            data=g.serialize(format="xml", encoding="utf-8")
         ))
 
     def get(self, uri: URIRef | str) -> Graph:
