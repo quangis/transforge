@@ -177,6 +177,9 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 for comment in wfg.objects(source, RDFS.comment):
                     g.add((source, RDFS.comment, comment))
 
+        # Add original workflow
+        g += wfg
+
         self.maybe_output(g)
         self.maybe_upload(g)
 
