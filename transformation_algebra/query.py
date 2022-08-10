@@ -176,7 +176,7 @@ class TransformationQuery(object):
             result.append(f"?workflow :input ?input{i}.")
             for tp in self.graph.objects(input, TA.type):
                 assert isinstance(tp, URIRef)
-                result.append(f"?input{i} :type/rdfs:subClassOf {tp.n3()}.")
+                result.append(f"?input{i} :type/rdfs:subClassOf* {tp.n3()}.")
         return result
 
     def chronology(self) -> Iterable[str]:
