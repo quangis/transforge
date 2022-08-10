@@ -48,12 +48,21 @@ class WithRDF:
         elif self.output_format == "trig":
             result = Dataset()
             for g in graphs:
-                subgraph = result.graph(g.base)
+                subgraph = result.graph(g.base, g.base)
                 subgraph += g
         else:
             g = Graph()
             for g in graphs:
                 result += g
+
+        result.bind("ta", TA)
+        result.bind("wf", WF)
+        result.bind("tools", TOOLS)
+        result.bind("repo", REPO)
+
+        lang = self.language  # type: ignore
+        if lang.prefix:
+            result.bind(lang.prefix, lang.namespace)
 
         # Produce output file
         if self.output_path:

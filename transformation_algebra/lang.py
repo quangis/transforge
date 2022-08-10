@@ -20,7 +20,7 @@ TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
-            namespace: str | None = None,
+            namespace: tuple[str, str] | str | None = None,
             include_top: bool = False,
             include_bottom: bool = False,
             canon: Iterable[TypeOperator | TypeOperation] = ()):
@@ -37,7 +37,12 @@ class Language(object):
         self.include_bottom: bool = include_bottom
 
         self._closed = False
-        self._namespace: LanguageNamespace | str | None = namespace
+        self.prefix: None | str = None
+        self._namespace: LanguageNamespace | str | None = None
+        if isinstance(namespace, tuple):
+            self.prefix, self._namespace = namespace
+        elif isinstance(namespace, str):
+            self._namespace = namespace
 
         if scope:
             self.add_scope(scope)
