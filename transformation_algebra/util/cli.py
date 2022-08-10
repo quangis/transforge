@@ -137,20 +137,6 @@ class CLI(cli.Application):
             return 1
 
 
-@CLI.subcommand("merge")
-class Merger(cli.Application):
-    """
-    Merge RDF graphs
-    """
-
-    @cli.positional(cli.NonexistentPath, cli.ExistingFile)
-    def main(self, output, *inputs):
-        g = Graph()
-        for i in inputs:
-            g.parse(str(i))
-        g.serialize(str(output), format='ttl', encoding='utf-8')
-
-
 @CLI.subcommand("vocab")
 class VocabBuilder(Application, WithRDF, WithServer):
     "Build vocabulary file for the transformation language"
