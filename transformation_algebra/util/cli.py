@@ -5,18 +5,48 @@ Command-line interface for common tasks.
 from __future__ import annotations
 
 import csv
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+from itertools import chain
+
 from rdflib import Graph, Dataset
 from rdflib.term import Node, Literal, URIRef
 from rdflib.namespace import RDF, RDFS
+from rdflib.util import guess_format
 from rdflib.tools.rdf2dot import rdf2dot
 from plumbum import cli  # type: ignore
-from itertools import chain
 from transformation_algebra import TransformationQuery, TransformationGraph, \
-    TA
+    TA, Language
+from transformation_algebra.util import WF, TOOLS, REPO
+from transformation_algebra.util.store import TransformationStore
 from typing import NamedTuple, Iterable
 
-from transformation_algebra.util import graph, lang, WF, TOOLS, REPO
-from transformation_algebra.util.store import TransformationStore
+
+def graph(url: str) -> Graph:
+    g = Graph()
+    g.parse(url, format=guess_format(url))
+    return g
+
+
+def lang(path_or_module: str) -> Language:
+    """
+    Import a transformation language from a Python module containing one.
+    """
+    try:
+        module = __import__(path_or_module)
+    except ModuleNotFoundError:
+        name = Path(path_or_module).stem
+        loader = importlib.machinery.SourceFileLoader(name, path_or_module)
+        spec = importlib.util.spec_from_loader(name, loader)
+        assert spec
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+    finally:
+        languages = [lang for obj in dir(module)
+            if isinstance(lang := getattr(module, obj), Language)]
+        assert len(languages) == 1
+        return languages[0]
 
 
 def cred(s: str) -> tuple[str, str]:
