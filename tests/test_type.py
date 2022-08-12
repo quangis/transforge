@@ -469,6 +469,29 @@ class TestType(unittest.TestCase):
         self.assertEqual(F(F(_)).concretize(replace=Top), F(F(Top)))
         self.assertEqual(G.concretize(replace=Top), F(Top))
 
+    @unittest.skip("see issue #79")
+    def test_intersection_type_order_is_irrelevant(self):
+        A, B, C = (TypeOperator() for _ in range(3))
+        self.assertMatch(A & B & C, C & B & A, subtype=False)
+
+    @unittest.skip("see issue #79")
+    def test_intersection_type_subtype(self):
+        A, B, C = (TypeOperator() for _ in range(3))
+        F = TypeOperator(params=1)
+        self.assertMatch(A & B & C, B, subtype=True)
+        self.assertMatch(A & B & C, A & B, subtype=True)
+        self.assertMatch(A & B & C, A & C, subtype=True)
+        self.assertMatch(F(A & B & C), F(A), subtype=True)
+        self.assertNotMatch(A, A & B, subtype=True)
+        self.assertNotMatch(F(A), F(A & B), subtype=True)
+        self.assertNotMatch(F(A) & F(B), F(A & B), subtype=True)
+
+    @unittest.skip("see issue #79")
+    def test_empty_intersection(self):
+        A, B, C = (TypeOperator() for _ in range(3))
+        F = TypeOperator(params=1)
+        G = TypeOperator(params=1)
+        self.assertMatch(F(A) & G(A), Bottom)
 
 if __name__ == '__main__':
     unittest.main()
