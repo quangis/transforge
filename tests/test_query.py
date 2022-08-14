@@ -86,10 +86,10 @@ class TestAlgebra(unittest.TestCase):
 
         query = q_obj if isinstance(q_obj, TransformationQuery) \
             else make_query(lang, q_obj, **kwargs)
-        self.assertEqual(
-            results or set(),
-            set(r.workflow for r in graph.query(query.sparql()))
-        )
+
+        expected = results or set()
+        actual = set(r.workflow for r in graph.query(query.sparql()))
+        self.assertEqual(expected, actual)
 
     def test_serial(self):
         # Ensure that we can query for types/operations that occur in sequence

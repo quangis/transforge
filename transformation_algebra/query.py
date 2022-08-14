@@ -11,7 +11,7 @@ from rdflib.term import Node, URIRef, Variable
 from rdflib.namespace import RDF
 from rdflib.graph import Graph
 from itertools import count, chain
-from typing import Iterable
+from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
 from transformation_algebra.lang import Language
@@ -61,27 +61,28 @@ class TransformationQuery(object):
         self.unfold_tree = unfold_tree
 
         # Keep track of the type and operator of each step
-        self.type: dict[Variable, URIRef] = dict()
-        self.operator: dict[Variable, URIRef] = dict()
+        self.type: dict[Variable, list[Node]] = dict()
+        self.operator: dict[Variable, list[Node]] = dict()
 
         # A surjective mapping, associating variables with the step nodes of
         # the graph on which the query is based.
         self.steps: dict[Variable, Node] = dict()
 
-        self.before: dict[Variable, list[Variable]] = defaultdict(list)
-        self.after: dict[Variable, list[Variable]] = defaultdict(list)
+        # In the other direction, if we don't unfold the graph into a tree,
+        # there is a 1:1 mapping between variables and step nodes. Otherwise,
+        # we will get a new variable for every time we encounter that step.
+        self.generator = iter(Variable(f"_{i}") for i in count())
+        self.variables: dict[Node, Variable] | None = \
+            None if self.unfold_tree else dict()
 
         # Assign variables to the outputs of the transformation
         self.outputs: list[Variable] = []
 
-        # If we don't unfold the graph into a tree, there is a 1:1 mapping
-        # between variables and step nodes. Otherwise, we will get a new
-        # variable for every time we encounter that step.
-        self.variables: dict[Node, Variable] | None = \
-            None if self.unfold_tree else dict()
+        # Connections between the variables
+        self.before: dict[Variable, list[Variable]] = defaultdict(list)
+        self.after: dict[Variable, list[Variable]] = defaultdict(list)
 
-        self.generator = iter(Variable(f"_{i}") for i in count())
-
+        # Traverse the graph
         for node in self.graph.objects(self.root, TA.output):
             self.outputs.append(self.assign_variables(node))
 
@@ -104,11 +105,8 @@ class TransformationQuery(object):
 
         assert var not in self.steps or self.steps[var] == node
         self.steps[var] = node
-
-        if tp := self.graph.value(node, TA.type, any=False):
-            self.type[var] = tp
-        if op := self.graph.value(node, TA.via, any=False):
-            self.operator[var] = op
+        self.type[var] = list(self.graph.objects(node, TA.type))
+        self.operator[var] = list(self.graph.objects(node, TA.via))
 
         for next_node in self.graph.objects(node, TA["from"]):
             next_var = self.assign_variables(next_node, path + [node])
@@ -148,35 +146,41 @@ class TransformationQuery(object):
         )
         return result
 
-    def types(self) -> Iterable[str]:
+    def types(self) -> Iterator[str]:
         """
         Conditions for matching on the bag of types used in a query.
         """
-        return [f"?workflow :contains/rdfs:subClassOf* {tp.n3()}."
-            for tp in set(self.type.values())]
 
-    def operators(self) -> Iterable[str]:
+        for type in set(chain.from_iterable(self.type.values())):
+            assert isinstance(type, URIRef)
+            yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
+
+    def operators(self) -> Iterator[str]:
         """
         Conditions for matching on the bag of operators.
         """
-        return [f"?workflow :contains {op.n3()}."
-            for op in set(self.operator.values())]
+        for operator in set(chain.from_iterable(self.operator.values())):
+            assert isinstance(operator, URIRef)
+            yield f"?workflow :contains {operator.n3()}."
 
     def io(self) -> Iterable[str]:
         """
         Conditions for matching on input and outputs of the query.
         """
         result = []
+
         for i, output in enumerate(self.graph.objects(self.root, TA.output)):
             result.append(f"?workflow :output ?output{i}.")
             for tp in self.graph.objects(output, TA.type):
                 assert isinstance(tp, URIRef)
                 result.append(f"?output{i} :type/rdfs:subClassOf* {tp.n3()}.")
+
         for i, input in enumerate(self.graph.objects(self.root, TA.input)):
             result.append(f"?workflow :input ?input{i}.")
             for tp in self.graph.objects(input, TA.type):
                 assert isinstance(tp, URIRef)
                 result.append(f"?input{i} :type/rdfs:subClassOf* {tp.n3()}.")
+
         return result
 
     def chronology(self) -> Iterable[str]:
@@ -227,9 +231,11 @@ class TransformationQuery(object):
                     result.append(f"{current.n3()} :to+ {c.n3()}.")
 
             # Write operator/type properties of this step
-            if operator := self.operator.get(current):
+            for operator in self.operator.get(current, ()):
+                assert isinstance(operator, URIRef)
                 result.append(f"{current.n3()} :via {operator.n3()}.")
-            if type := self.type.get(current):
+            for type in self.type.get(current, ()):
+                assert isinstance(type, URIRef)
                 result.append(f"{current.n3()} :type/rdfs:subClassOf* {type.n3()}.")
             visited.add(current)
 
