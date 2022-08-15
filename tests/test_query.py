@@ -11,55 +11,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
 from transformation_algebra.query import TransformationQuery
 
-
-def make_query(lang: Language, obj: tuple[Operator | Type | list], **kwargs
-        ) -> TransformationQuery:
-    """
-    Convenience method for constructing a query.
-
-    An object like this like this:
-
-        (C, b2c, [(B, a2b, [A])])
-
-    … gets turned into the following RDF graph:
-
-        @prefix : <https://github.com/quangis/transformation-algebra#>.
-        @prefix from: <https://github.com/quangis/transformation-algebra#from>.
-        @prefix type: <https://example.com/#type>.
-        @prefix via: <https://example.com/#operator>.
-        [] a :Task; :output
-            [ type: "C"; via: "b2c"; from:
-                [ type: "B"; via: "a2b"; from:
-                    [ type: "A" ]]].
-
-    … which serves as the basis for a TransformationQuery.
-    """
-    ns = lang.namespace
-    g = TransformationGraph(lang)
-    root = BNode()
-    g.add((root, RDF.type, TA.Task))
-
-    def f(current: tuple[Operator | Type | list] | Type | Operator) -> Node:
-        if isinstance(current, (Type, Operator)):
-            return f((current,))
-        else:
-            node = BNode()
-            for aspect in current:
-                if isinstance(aspect, Type):
-                    g.add((node, ns.type, Literal(str(aspect))))
-                elif isinstance(aspect, Operator):
-                    g.add((node, ns.via, Literal(str(aspect))))
-                else:
-                    assert isinstance(aspect, list)
-                    for pre in aspect:
-                        pnode = f(pre)
-                        g.add((node, TA["from"], pnode))
-            return node
-
-    g.add((root, TA.output, f(obj)))
-    g.parse_shortcuts()
-
-    return TransformationQuery(lang, g, **kwargs)
+make_query = TransformationQuery.from_list
 
 
 def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> Dataset:
@@ -81,7 +33,7 @@ class TestAlgebra(unittest.TestCase):
 
     def assertQuery(self, lang: Language,
             graph: TransformationGraph,
-            q_obj: TransformationQuery | tuple[Type | Operator | list],
+            q_obj: TransformationQuery | list[Type | Operator | list],
             results: set[Node] | None, **kwargs) -> None:
 
         query = q_obj if isinstance(q_obj, TransformationQuery) \
@@ -100,15 +52,15 @@ class TestAlgebra(unittest.TestCase):
 
         graph = make_graph(lang, {TEST.wf1: b2c(a2b(~A))})
 
-        self.assertQuery(lang, graph, (b2c, C, [a2b, B, [A]]),
+        self.assertQuery(lang, graph, [C, b2c, [a2b, B, [A]]],
             results={TEST.wf1})
-        self.assertQuery(lang, graph, (C, [(B, [A])]),
+        self.assertQuery(lang, graph, [C, [B, [A]]],
             results={TEST.wf1})
-        self.assertQuery(lang, graph, (b2c, [a2b]),
+        self.assertQuery(lang, graph, [b2c, [a2b]],
             results={TEST.wf1})
-        self.assertQuery(lang, graph, (a2b, C, [(b2c, B, [A])]),
+        self.assertQuery(lang, graph, [a2b, C, [b2c, B, [A]]],
             results=None)
-        self.assertQuery(lang, graph, (b2c, B, [(a2b, C, [A])]),
+        self.assertQuery(lang, graph, [b2c, B, [a2b, C, [A]]],
             results=None)
 
     def test_serial_skip(self):
@@ -123,17 +75,17 @@ class TestAlgebra(unittest.TestCase):
 
         graph = make_graph(alg, {TEST.wf1: c2d(b2c(a2b(~A)))})
 
-        self.assertQuery(alg, graph, (D, [A]),
+        self.assertQuery(alg, graph, [D, [A]],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (c2d, [a2b]),
+        self.assertQuery(alg, graph, [c2d, [a2b]],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (c2d, [(b2c, [a2b])]),
+        self.assertQuery(alg, graph, [c2d, [b2c, [a2b]]],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (D, [(b2c, [A])]),
+        self.assertQuery(alg, graph, [D, [b2c, [A]]],
             results={TEST.wf1})
-        self.assertQuery(alg, graph, (D, [(b2c, A)]),
+        self.assertQuery(alg, graph, [D, [b2c, A]],
             results=None)
-        self.assertQuery(alg, graph, (D, [(B, [(a2b, [A])])]),
+        self.assertQuery(alg, graph, [D, [B, [a2b, [A]]]],
             results={TEST.wf1})
 
     def test_parallel(self):
@@ -149,13 +101,13 @@ class TestAlgebra(unittest.TestCase):
             TEST.wf2: bc2d(a2b(~A), b2c(~B))
         })
 
-        self.assertQuery(alg, graph, (D, bc2d, [B, C]),
+        self.assertQuery(alg, graph, [D, bc2d, [B], [C]],
             results={TEST.wf1, TEST.wf2})
-        self.assertQuery(alg, graph, (D, bc2d, [B, C, a2b, b2c]),
+        self.assertQuery(alg, graph, [D, bc2d, [B], [C], [a2b], [b2c]],
             results={TEST.wf2})
-        self.assertQuery(alg, graph, (D, bc2d, [(B, [a2b]), (C, [b2c])]),
+        self.assertQuery(alg, graph, [D, bc2d, [B, [a2b]], [C, [b2c]]],
             results={TEST.wf2})
-        self.assertQuery(alg, graph, (D, bc2d, [A, B]),
+        self.assertQuery(alg, graph, [D, bc2d, [A], [B]],
             results={TEST.wf2})
 
     # Commented out because choice support will be reimplemented later
@@ -199,15 +151,15 @@ class TestAlgebra(unittest.TestCase):
         })
 
         # Test that a query for direct output really only captures that
-        self.assertQuery(lang, graph, (C, a2b), results=set())
+        self.assertQuery(lang, graph, [C, a2b], results=set())
 
         # Test that a query for indirect output also captures direct output
-        self.assertQuery(lang, graph, (C, [a2b]), results={TEST.wf1})
-        self.assertQuery(lang, graph, (C, [b2c]), results={TEST.wf1})
+        self.assertQuery(lang, graph, [C, [a2b]], results={TEST.wf1})
+        self.assertQuery(lang, graph, [C, [b2c]], results={TEST.wf1})
 
         # Test that a query that skips the result type may still capture it
-        self.assertQuery(lang, graph, ([C],), results={TEST.wf1})
-        self.assertQuery(lang, graph, ([A],), results={TEST.wf1, TEST.wf2})
+        self.assertQuery(lang, graph, [[C]], results={TEST.wf1})
+        self.assertQuery(lang, graph, [[A]], results={TEST.wf1, TEST.wf2})
 
     # def test_multiple_usage_of_units(self):
     #     # The same unit may be used multiple times, so simply assigning a
@@ -258,19 +210,19 @@ class TestAlgebra(unittest.TestCase):
         })
 
         self.assertQuery(lang, graph,
-            (B,), by_io=False, by_chronology=False,
+            [B], by_io=False, by_chronology=False,
             results={TEST.wf1, TEST.wf2}
         )
         self.assertQuery(lang, graph,
-            (B,), by_io=True, by_chronology=False,
+            [B], by_io=True, by_chronology=False,
             results={TEST.wf1}
         )
         self.assertQuery(lang, graph,
-            (C, [(A, [B])]), by_io=True, by_chronology=False,
+            [C, [A, [B]]], by_io=True, by_chronology=False,
             results={TEST.wf2}
         )
         self.assertQuery(lang, graph,
-            (C, [(A, [B])]), by_io=True, by_chronology=True,
+            [C, [A, [B]]], by_io=True, by_chronology=True,
             results={}
         )
 
@@ -289,10 +241,10 @@ class TestAlgebra(unittest.TestCase):
             TEST.fy: ~F(Y)
         })
 
-        self.assertQuery(lang, graph, X, results={TEST.x, TEST.y})
-        self.assertQuery(lang, graph, Y, results={TEST.y})
-        self.assertQuery(lang, graph, F(X), results={TEST.fx, TEST.fy})
-        self.assertQuery(lang, graph, F(Y), results={TEST.fy})
+        self.assertQuery(lang, graph, [X], results={TEST.x, TEST.y})
+        self.assertQuery(lang, graph, [Y], results={TEST.y})
+        self.assertQuery(lang, graph, [F(X)], results={TEST.fx, TEST.fy})
+        self.assertQuery(lang, graph, [F(Y)], results={TEST.fy})
 
     def test_that_wildcards_are_captured(self):
         # Test that using a wildcard in a query captures all types
@@ -309,10 +261,10 @@ class TestAlgebra(unittest.TestCase):
             TEST.fy: ~F(Y, Y)
         })
 
-        self.assertQuery(lang, graph, _, results={TEST.x, TEST.y, TEST.ffx,
+        self.assertQuery(lang, graph, [_], results={TEST.x, TEST.y, TEST.ffx,
             TEST.fy})
-        self.assertQuery(lang, graph, F(_, _), results={TEST.ffx, TEST.fy})
-        self.assertQuery(lang, graph, F(F(_, _), _), results={TEST.ffx})
+        self.assertQuery(lang, graph, [F(_, _)], results={TEST.ffx, TEST.fy})
+        self.assertQuery(lang, graph, [F(F(_, _), _)], results={TEST.ffx})
 
     def test_tree_unfold(self):
         # Test if the optional unfolding of trees happens.
@@ -358,8 +310,8 @@ class TestAlgebra(unittest.TestCase):
             TEST.wf1: ~A,
             TEST.wf2: f(~A),
         })
-        self.assertQuery(lang, graph, (A,), results={TEST.wf1, TEST.wf2})
-        self.assertQuery(lang, graph, (A, [A]), results={TEST.wf2})
+        self.assertQuery(lang, graph, [A], results={TEST.wf1, TEST.wf2})
+        self.assertQuery(lang, graph, [A, [A]], results={TEST.wf2})
 
     # # def test_that_sources_with_nonnormalized_type_get_type_in_graph(self):
     # #     # There was an issue where the type of a source would not be saved in

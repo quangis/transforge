@@ -100,7 +100,7 @@ class TransformationQuery(object):
             self.outputs.append(self.assign_variables(node))
 
     @staticmethod
-    def make(lang: Language,
+    def from_list(lang: Language,
             aspects: list[Operator | TypeOperator | TypeOperation | list],
             *nargs, **kwargs) -> TransformationQuery:
         """
@@ -150,7 +150,11 @@ class TransformationQuery(object):
                     f(predecessor, a)
             return node
 
-        g.add((root, TA.output, f(BNode(), aspects)))
+        output = BNode()
+        for a in aspects:
+            f(output, a)
+
+        g.add((root, TA.output, output))
 
         return TransformationQuery(lang, g, *nargs, **kwargs)
 
