@@ -20,7 +20,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
 
 
-def union(prefix: str, subjects: Iterable[Node]) -> str:
+def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
     """
     Convenience: produce a union of objects in a SPARQL constraint.
     """
@@ -29,11 +29,9 @@ def union(prefix: str, subjects: Iterable[Node]) -> str:
         assert isinstance(s, URIRef)
         statements.append(f"{prefix} {s.n3()}.")
     if len(statements) > 1:
-        return f"{{{' } UNION { '.join(statements)}}}"
+        yield f"{{{' } UNION { '.join(statements)}}}"
     elif len(statements) == 1:
-        return statements[0]
-    else:
-        return ""
+        yield statements[0]
 
 
 class TransformationQuery(object):
@@ -259,20 +257,19 @@ class TransformationQuery(object):
         Conditions for matching on input and outputs of the query.
         """
         for output in self.graph.objects(self.root, TA.output):
-            yield union("?workflow :output/:type/rdfs:subClassOf*",
+            yield from union("?workflow :output/:type/rdfs:subClassOf*",
                 self.graph.objects(output, TA.type))
 
         for input in self.graph.objects(self.root, TA.input):
-            yield union("?workflow :input/:type/rdfs:subClassOf*",
+            yield from union("?workflow :input/:type/rdfs:subClassOf*",
                 self.graph.objects(input, TA.type))
 
-    def chronology(self) -> Iterable[str]:
+    def chronology(self) -> Iterator[str]:
         """
         Conditions for matching the specific order of a query.
         """
         # We can assume at this point that there will not be any cycles
 
-        result: list[str] = []
         visited: set[Variable] = set()
         waiting: list[Variable] = list(self.outputs)
         processing: deque[Variable] = deque()
@@ -299,7 +296,7 @@ class TransformationQuery(object):
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
-                result.append(f"?workflow :output {current.n3()}.")
+                yield f"?workflow :output {current.n3()}."
 
             # Write connections to previous nodes (ie ones that come after)
             for c in self.after[current]:
@@ -310,20 +307,15 @@ class TransformationQuery(object):
                 # all
                 if not self.operator.get(c) and (not self.type.get(c) or (
                         self.operator.get(current) and not self.type.get(current))):
-                    result.append(f"{current.n3()} :to* {c.n3()}.")
+                    yield f"{current.n3()} :to* {c.n3()}."
                 else:
-                    result.append(f"{current.n3()} :to+ {c.n3()}.")
+                    yield f"{current.n3()} :to+ {c.n3()}."
 
             # Write operator/type properties of this step
-            operator_stmts = union(f"{current.n3()} :via",
+            yield from union(f"{current.n3()} :via",
                 self.operator.get(current, ()))
-            if operator_stmts:
-                result.append(operator_stmts)
-
-            type_stmts = union(f"{current.n3()} :type/rdfs:subClassOf*",
+            yield from union(f"{current.n3()} :type/rdfs:subClassOf*",
                 self.type.get(current, ()))
-            if type_stmts:
-                result.append(type_stmts)
 
             visited.add(current)
 
@@ -331,5 +323,3 @@ class TransformationQuery(object):
             for b in self.before[current]:
                 if b not in visited:
                     waiting.append(b)
-
-        return result
