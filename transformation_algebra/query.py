@@ -17,6 +17,17 @@ from collections import deque, defaultdict
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
 
+
+def _union(statements: Iterable[str]) -> str | None:
+    statements = list(statements)
+    if len(statements) > 1:
+        return f"{{{' } UNION { '.join(statements)}}}"
+    elif len(statements) == 1:
+        return statements[0]
+    else:
+        return None
+
+
 class TransformationQuery(object):
     """
     A transformation can be used to query other transformations: it should then
@@ -213,6 +224,7 @@ class TransformationQuery(object):
             if current in visited:
                 continue
 
+            # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
                 result.append(f"?workflow :output {current.n3()}.")
@@ -231,12 +243,16 @@ class TransformationQuery(object):
                     result.append(f"{current.n3()} :to+ {c.n3()}.")
 
             # Write operator/type properties of this step
-            for operator in self.operator.get(current, ()):
-                assert isinstance(operator, URIRef)
-                result.append(f"{current.n3()} :via {operator.n3()}.")
-            for type in self.type.get(current, ()):
-                assert isinstance(type, URIRef)
-                result.append(f"{current.n3()} :type/rdfs:subClassOf* {type.n3()}.")
+            if operator_stmts := _union(
+                    f"{current.n3()} :via {operator.n3()}."  # type: ignore
+                    for operator in self.operator.get(current, ())):
+                result.append(operator_stmts)
+
+            if type_stmts := _union(
+                    f"{current.n3()} :type/rdfs:subClassOf* {type.n3()}."  # type: ignore
+                    for type in self.type.get(current, ())):
+                result.append(type_stmts)
+
             visited.add(current)
 
             # Add successors to queue
