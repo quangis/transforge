@@ -7,13 +7,15 @@ specified order.
 
 from __future__ import annotations
 
-from rdflib.term import Node, URIRef, Variable
+from rdflib.term import Node, URIRef, Variable, BNode
 from rdflib.namespace import RDF
 from rdflib.graph import Graph
 from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
+from transformation_algebra.type import TypeOperator, TypeOperation
+from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
 
@@ -96,6 +98,61 @@ class TransformationQuery(object):
         # Traverse the graph
         for node in self.graph.objects(self.root, TA.output):
             self.outputs.append(self.assign_variables(node))
+
+    @staticmethod
+    def make(lang: Language,
+            aspects: list[Operator | TypeOperator | TypeOperation | list],
+            *nargs, **kwargs) -> TransformationQuery:
+        """
+        Alternative constructor for making a query. By default, a query is
+        created based on an `rdflib.Graph`, but that can be verbose. This is a
+        quicker convenience method that constructs the graph from a nested list
+        where each nesting level refers to a preceding step. For example, an
+        object like the following:
+
+            [D, cb2d_option1, cb2d_option2, [B, a2b, [A]], [C]]
+
+        … gets turned into a `TransformationQuery` based on a graph like this:
+
+            @base <https://language.namespace/>
+            @prefix : <https://github.com/quangis/transformation-algebra#>
+            [] a :Task; :output [
+                :type <D>;
+                :via <cb2d_option1>, <cb2d_option2>;
+                :from [
+                    :type <B>;
+                    :via <a2b>;
+                    :from [
+                        :type <A>
+                    ]
+                ], [
+                    :type <C>
+                ]
+            ].
+
+        Should the query not be based on a tree, only the standard constructor
+        will be useful.
+        """
+        g = TransformationGraph(lang)
+        root = BNode()
+        g.add((root, RDF.type, TA.Task))
+
+        def f(node, aspect) -> Node:
+            if isinstance(aspect, (TypeOperation, TypeOperator)):
+                g.add((node, TA.type, lang.uri(aspect)))
+            elif isinstance(aspect, Operator):
+                g.add((node, TA.via, lang.uri(aspect)))
+            else:
+                assert isinstance(aspect, list)
+                predecessor = BNode()
+                g.add((node, TA["from"], predecessor))
+                for a in aspect:
+                    f(predecessor, a)
+            return node
+
+        g.add((root, TA.output, f(BNode(), aspects)))
+
+        return TransformationQuery(lang, g, *nargs, **kwargs)
 
     def assign_variables(self, node: Node, path: list[Node] = []) -> Variable:
         """
