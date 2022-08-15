@@ -97,7 +97,8 @@ class Type(ABC):
                 raise ValueError("Indexing notation only accepts constraints.")
         return self.instance()
 
-    def __lshift__(self, other: Type | Iterable[Type]) -> EliminationConstraint:
+    def __lshift__(self,
+            other: Type | Iterable[Type]) -> EliminationConstraint:
         """
         Abuse of Python's notation to write elimination constraints using the
         `<<` operator. Example:
@@ -112,7 +113,8 @@ class Type(ABC):
         """
         Write strict subtype constraints using the `<` operator.
         """
-        return SubtypeConstraint(self.instance(), other.instance(), strict=True)
+        return SubtypeConstraint(self.instance(), other.instance(),
+            strict=True)
 
     def __le__(self, other: Type) -> SubtypeConstraint:
         """
@@ -169,6 +171,7 @@ class Type(ABC):
             return Top()
         else:
             raise RuntimeError("encountered variable")
+
 
 class TypeSchema(Type):
     """
@@ -729,6 +732,7 @@ class TypeOperation(TypeInstance):
                 elif include_top and dir is Direction.UP:
                     yield Top()
 
+
 class TypeVariable(TypeInstance):
     """
     A type variable. This is not a schematic variable — it is instantiated!
@@ -1002,8 +1006,7 @@ class EliminationConstraint(Constraint):
         # number_before = len(self.alternatives)
         self.alternatives = [t for t in self.alternatives
             if self.reference.match(t, subtype=True, accept_wildcard=True)
-            is not False
-        ]
+            is not False]
         # number_after = len(self.alternatives)
 
         # Every time alternatives are narrowed, see if there's a commonality
@@ -1046,6 +1049,7 @@ Top = TypeOperator('Top')
 _ = TypeSchema(lambda: TypeVariable(wildcard=True))
 
 builtins = (Unit, Top, Bottom, Product, Function)
+
 
 def with_parameters(
         *type_operators: TypeOperator | Callable[..., TypeOperation],

@@ -12,10 +12,8 @@ from inspect import signature
 from typing import Optional, Callable, Iterator
 
 from transformation_algebra.label import Labels
-from transformation_algebra.type import (
-    Type, TypeVariable, TypeSchema, TypeInstance, Function, _, TypingError,
-    TypeOperation
-)
+from transformation_algebra.type import (Type, TypeVariable, TypeSchema,
+    TypeInstance, Function, _, TypingError, TypeOperation)
 
 
 class Operator(object):
@@ -38,7 +36,8 @@ class Operator(object):
         self.body = body  # a transformation may be non-primitive
 
         t = self.type.instance()
-        self.is_function = isinstance(t, TypeOperation) and t.operator == Function
+        self.is_function = (isinstance(t, TypeOperation) and
+            t.operator == Function)
 
         assert not self.description or isinstance(self.description, str)
 

@@ -5,13 +5,13 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.type import Type, TypeOperation, \
-    Function, TypeInstance, Top, Bottom, Direction
-from transformation_algebra.expr import \
-    Expr, Operation, Application, Abstraction, Source
+from transformation_algebra.type import (Type, TypeOperation, Function,
+    TypeInstance)
+from transformation_algebra.expr import (Expr, Operation, Application,
+    Abstraction, Source)
 from transformation_algebra.lang import Language, TA
 
-from itertools import chain, count
+from itertools import count
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.util import guess_format
 from rdflib.term import Node
@@ -310,7 +310,7 @@ class TransformationGraph(Graph):
             current_internal = None
             if isinstance(expr.x.type, TypeOperation) and \
                     expr.x.type.operator == Function:
-                internal = BNode()
+                internal: Node = BNode()
                 current_internal = internal
                 self.add((f, TA.internal, internal))
 
