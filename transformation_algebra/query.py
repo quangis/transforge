@@ -14,7 +14,7 @@ from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
-from transformation_algebra.type import TypeOperator, TypeOperation
+from transformation_algebra.type import Type, TypeOperator, TypeOperation
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
@@ -100,8 +100,7 @@ class TransformationQuery(object):
             self.outputs.append(self.assign_variables(node))
 
     @staticmethod
-    def from_list(lang: Language,
-            aspects: list[Operator | TypeOperator | TypeOperation | list],
+    def from_list(lang: Language, aspects: list[Operator | Type | list],
             *nargs, **kwargs) -> TransformationQuery:
         """
         Alternative constructor for making a query. By default, a query is
@@ -138,8 +137,8 @@ class TransformationQuery(object):
         g.add((root, RDF.type, TA.Task))
 
         def f(node, aspect) -> Node:
-            if isinstance(aspect, (TypeOperation, TypeOperator)):
-                g.add((node, TA.type, lang.uri(aspect)))
+            if isinstance(aspect, Type):
+                g.add((node, TA.type, lang.uri(aspect.concretize())))
             elif isinstance(aspect, Operator):
                 g.add((node, TA.via, lang.uri(aspect)))
             else:

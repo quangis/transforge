@@ -466,8 +466,8 @@ class TestType(unittest.TestCase):
     def test_concretization(self):
         F = TypeOperator('F', params=1)
         G = TypeSchema(lambda x: F(x))
-        self.assertEqual(F(F(_)).concretize(replace=Top), F(F(Top)))
-        self.assertEqual(G.concretize(replace=Top), F(Top))
+        self.assertEqual(F(F(_)).concretize(), F(F(Top)))
+        self.assertRaises(RuntimeError, G.concretize)
 
     @unittest.skip("see issue #79")
     def test_intersection_type_order_is_irrelevant(self):

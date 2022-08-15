@@ -464,7 +464,7 @@ class TransformationGraph(Graph):
         ns = self.language.namespace
         # TODO handle collections of types/operators
         for subj, obj in self[:ns.type:]:
-            t = self.language.parse_type(str(obj)).concretize(Top)
+            t = self.language.parse_type(str(obj)).concretize()
             assert t in self.language.canon and isinstance(t, TypeOperation)
             node = self.language.uri(t)
             self.add((subj, TA.type, node))
