@@ -143,7 +143,7 @@ class TransformationQuery(object):
 
         def f(node, aspect) -> Node:
             if isinstance(aspect, Type):
-                g.add((node, TA.type, lang.uri(aspect.concretize())))
+                g.add((node, TA.type, lang.uri(aspect)))
             elif isinstance(aspect, Operator):
                 g.add((node, TA.via, lang.uri(aspect)))
             else:

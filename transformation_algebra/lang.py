@@ -10,11 +10,11 @@ from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import Namespace, ClosedNamespace
 
-from transformation_algebra.type import builtins, Product, Top, Bottom, \
-    TypeOperator, TypeInstance, TypeVariable, TypeOperation, TypeAlias, \
-    Direction, Type
-from transformation_algebra.expr import \
-    Operator, Expr, Application, Source
+from transformation_algebra.type import (
+    builtins, Product, TypeOperator, TypeInstance, TypeVariable, TypeOperation,
+    TypeAlias, Direction, Type, TypeSchema)
+from transformation_algebra.expr import (
+    Operator, Expr, Application, Source)
 
 TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
@@ -71,16 +71,29 @@ class Language(object):
 
         return self._namespace
 
-    def uri(self, value: Operator | TypeOperator | TypeOperation) -> URIRef:
-        if isinstance(value, TypeOperation) and value.operator.arity == 0:
-            value = value.operator
-        if isinstance(value, (Operator, TypeOperator)):
-            return (TA if value in builtins else self.namespace)[value.name]
-        elif value in self.canon:
+    def uri(self, x: Operator | Type) -> URIRef:
+        """
+        Convert an operator or a canonical type to its associated URI.
+        """
+
+        # concretize `F(_)` to `F(Top)`
+        if ((isinstance(x, TypeOperation) and any(x.variables()))
+                or isinstance(x, (TypeVariable, TypeSchema))):
+            x = x.concretize()
+
+        # handle base (type) operators
+        if isinstance(x, TypeOperation) and x.operator.arity == 0:
+            x = x.operator
+        if isinstance(x, (Operator, TypeOperator)):
+            return (TA if x in builtins else self.namespace)[x.name]
+
+        # handle compound operators
+        if x in self.canon:
+            assert isinstance(x, TypeOperation)
             return self.namespace[
-                value.text(sep="-", lparen="-", rparen="", prod="")]
+                x.text(sep="-", lparen="-", rparen="", prod="")]
         else:
-            raise ValueError(f"non-canonical type {value}")
+            raise ValueError(f"non-canonical type {x}")
 
     def expand_canon(self) -> None:
         """

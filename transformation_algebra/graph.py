@@ -455,23 +455,21 @@ class TransformationGraph(Graph):
         replaces them with `ta:type` and `ta:via` predicates with the
         corresponding nodes as object. Example:
 
-            [] cct:type "R(Obj, Reg)".
+            [] lang:type "F(A, _)".
 
         Becomes:
 
-            [] ta:type cct:R-Obj-Reg.
+            [] ta:type lang:F-A-Top.
         """
         ns = self.language.namespace
-        # TODO handle collections of types/operators
+
         for subj, obj in self[:ns.type:]:
-            t = self.language.parse_type(str(obj)).concretize()
-            assert t in self.language.canon and isinstance(t, TypeOperation)
-            node = self.language.uri(t)
-            self.add((subj, TA.type, node))
+            t = self.language.parse_type(str(obj))
+            self.add((subj, TA.type, self.language.uri(t)))
 
         for subj, obj in self[:ns.via:]:
             operator = self.language.parse_operator(str(obj))
-            self.add((subj, TA.via, ns[operator.name]))
+            self.add((subj, TA.via, self.language.uri(operator)))
 
         if remove:
             self.remove((None, ns.type, None))
