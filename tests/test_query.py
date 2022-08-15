@@ -240,9 +240,6 @@ class TestAlgebra(unittest.TestCase):
             TEST.wf3: ~A
         })
 
-        print(TransformationQuery.from_list(lang, [A,
-            B]).sparql())
-
         self.assertQuery(lang, workflows, [A],
             results={TEST.wf3})
         self.assertQuery(lang, workflows, [B],

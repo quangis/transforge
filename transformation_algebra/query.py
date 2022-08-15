@@ -14,20 +14,26 @@ from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
-from transformation_algebra.type import Type, TypeOperator, TypeOperation
+from transformation_algebra.type import Type
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TransformationGraph
 
 
-def _union(statements: Iterable[str]) -> str | None:
-    statements = list(statements)
+def union(prefix: str, subjects: Iterable[Node]) -> str:
+    """
+    Convenience: produce a union of objects in a SPARQL constraint.
+    """
+    statements = []
+    for s in subjects:
+        assert isinstance(s, URIRef)
+        statements.append(f"{prefix} {s.n3()}.")
     if len(statements) > 1:
         return f"{{{' } UNION { '.join(statements)}}}"
     elif len(statements) == 1:
         return statements[0]
     else:
-        return None
+        return ""
 
 
 class TransformationQuery(object):
@@ -88,7 +94,8 @@ class TransformationQuery(object):
         self.variables: dict[Node, Variable] | None = \
             None if self.unfold_tree else dict()
 
-        # Assign variables to the outputs of the transformation
+        # Assigned variables to the outputs and inputs of the transformation
+        self.inputs: list[Variable] = []
         self.outputs: list[Variable] = []
 
         # Connections between the variables
@@ -222,37 +229,42 @@ class TransformationQuery(object):
         Conditions for matching on the bag of types used in a query.
         """
 
-        for type in set(chain.from_iterable(self.type.values())):
-            assert isinstance(type, URIRef)
+        # Only the types that *definitely* occur
+        types: set[URIRef] = set()
+        for type_choice in self.type.values():
+            if len(type_choice) == 1:
+                assert isinstance(type_choice[0], URIRef)
+                types.add(type_choice[0])
+
+        for type in types:
             yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
 
     def operators(self) -> Iterator[str]:
         """
         Conditions for matching on the bag of operators.
         """
-        for operator in set(chain.from_iterable(self.operator.values())):
-            assert isinstance(operator, URIRef)
+
+        # Only the operators that *definitely* occur
+        operators: set[URIRef] = set()
+        for operator_choice in self.operator.values():
+            if len(operator_choice) == 1:
+                assert isinstance(operator_choice[0], URIRef)
+                operators.add(operator_choice[0])
+
+        for operator in operators:
             yield f"?workflow :contains {operator.n3()}."
 
-    def io(self) -> Iterable[str]:
+    def io(self) -> Iterator[str]:
         """
         Conditions for matching on input and outputs of the query.
         """
-        result = []
+        for output in self.graph.objects(self.root, TA.output):
+            yield union("?workflow :output/:type/rdfs:subClassOf*",
+                self.graph.objects(output, TA.type))
 
-        for i, output in enumerate(self.graph.objects(self.root, TA.output)):
-            result.append(f"?workflow :output ?output{i}.")
-            for tp in self.graph.objects(output, TA.type):
-                assert isinstance(tp, URIRef)
-                result.append(f"?output{i} :type/rdfs:subClassOf* {tp.n3()}.")
-
-        for i, input in enumerate(self.graph.objects(self.root, TA.input)):
-            result.append(f"?workflow :input ?input{i}.")
-            for tp in self.graph.objects(input, TA.type):
-                assert isinstance(tp, URIRef)
-                result.append(f"?input{i} :type/rdfs:subClassOf* {tp.n3()}.")
-
-        return result
+        for input in self.graph.objects(self.root, TA.input):
+            yield union("?workflow :input/:type/rdfs:subClassOf*",
+                self.graph.objects(input, TA.type))
 
     def chronology(self) -> Iterable[str]:
         """
@@ -303,14 +315,14 @@ class TransformationQuery(object):
                     result.append(f"{current.n3()} :to+ {c.n3()}.")
 
             # Write operator/type properties of this step
-            if operator_stmts := _union(
-                    f"{current.n3()} :via {operator.n3()}."  # type: ignore
-                    for operator in self.operator.get(current, ())):
+            operator_stmts = union(f"{current.n3()} :via",
+                self.operator.get(current, ()))
+            if operator_stmts:
                 result.append(operator_stmts)
 
-            if type_stmts := _union(
-                    f"{current.n3()} :type/rdfs:subClassOf* {type.n3()}."  # type: ignore
-                    for type in self.type.get(current, ())):
+            type_stmts = union(f"{current.n3()} :type/rdfs:subClassOf*",
+                self.type.get(current, ()))
+            if type_stmts:
                 result.append(type_stmts)
 
             visited.add(current)
