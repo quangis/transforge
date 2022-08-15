@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from rdflib import Dataset
-from rdflib.term import BNode, Node, URIRef, Literal
+from rdflib.term import BNode, Node, URIRef
 from rdflib.namespace import RDF
 
 from transformation_algebra.type import TypeOperator, Type, _
@@ -225,6 +225,36 @@ class TestAlgebra(unittest.TestCase):
             [C, [A, [B]]], by_io=True, by_chronology=True,
             results={}
         )
+
+    def test_multiple_options_accept_union(self):
+        # Test that a query for two types/operators finds either one of them.
+        # cf #77
+        A, B = TypeOperator(), TypeOperator()
+        a2b_option1 = Operator(type=A ** B)
+        a2b_option2 = Operator(type=A ** B)
+        lang = Language(locals(), namespace=TEST)
+
+        workflows = make_graph(lang, {
+            TEST.wf1: a2b_option1(~A),
+            TEST.wf2: a2b_option2(~A),
+            TEST.wf3: ~A
+        })
+
+        print(TransformationQuery.from_list(lang, [A,
+            B]).sparql())
+
+        self.assertQuery(lang, workflows, [A],
+            results={TEST.wf3})
+        self.assertQuery(lang, workflows, [B],
+            results={TEST.wf1, TEST.wf2})
+        self.assertQuery(lang, workflows, [A, B],
+            results={TEST.wf1, TEST.wf2, TEST.wf3})
+        self.assertQuery(lang, workflows, [a2b_option1],
+            results={TEST.wf1})
+        self.assertQuery(lang, workflows, [a2b_option2],
+            results={TEST.wf2})
+        self.assertQuery(lang, workflows, [a2b_option1, a2b_option2],
+            results={TEST.wf1, TEST.wf2})
 
     def test_that_supertypes_are_captured(self):
         # Test that using a supertype in a query would still return a workflow
@@ -471,7 +501,6 @@ class TestAlgebra(unittest.TestCase):
         graph.add((B, TA["from"], C))
         graph.add((C, TA["from"], A))
         self.assertRaises(Exception, TransformationQuery, lang, graph)
-
 
 if __name__ == '__main__':
     unittest.main()
