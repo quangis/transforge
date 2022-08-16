@@ -6,7 +6,7 @@ from rdflib.term import BNode, Node, URIRef
 from rdflib.namespace import RDF
 
 from transformation_algebra.type import TypeOperator, Type, _
-from transformation_algebra.expr import Operator, Expr
+from transformation_algebra.expr import Operator, Expr, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST
 from transformation_algebra.query import TransformationQuery
@@ -50,7 +50,7 @@ class TestAlgebra(unittest.TestCase):
         b2c = Operator(type=B ** C)
         lang = Language(locals(), namespace=TEST)
 
-        graph = make_graph(lang, {TEST.wf1: b2c(a2b(~A))})
+        graph = make_graph(lang, {TEST.wf1: b2c(a2b(Source(A)))})
 
         self.assertQuery(lang, graph, [C, b2c, [a2b, B, [A]]],
             results={TEST.wf1})
@@ -73,7 +73,7 @@ class TestAlgebra(unittest.TestCase):
         c2d = Operator(type=C ** D)
         alg = Language(locals(), namespace=TEST)
 
-        graph = make_graph(alg, {TEST.wf1: c2d(b2c(a2b(~A)))})
+        graph = make_graph(alg, {TEST.wf1: c2d(b2c(a2b(Source(A))))})
 
         self.assertQuery(alg, graph, [D, [A]],
             results={TEST.wf1})
@@ -97,8 +97,8 @@ class TestAlgebra(unittest.TestCase):
         alg = Language(locals(), namespace=TEST)
 
         graph = make_graph(alg, {
-            TEST.wf1: bc2d(~B, ~C),
-            TEST.wf2: bc2d(a2b(~A), b2c(~B))
+            TEST.wf1: bc2d(Source(B), Source(C)),
+            TEST.wf2: bc2d(a2b(Source(A)), b2c(Source(B)))
         })
 
         self.assertQuery(alg, graph, [D, bc2d, [B], [C]],
@@ -146,8 +146,8 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
-            TEST.wf1: b2c(a2b(~A)),
-            TEST.wf2: ~A
+            TEST.wf1: b2c(a2b(Source(A))),
+            TEST.wf2: Source(A)
         })
 
         # Test that a query for direct output really only captures that
@@ -205,8 +205,8 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
-            TEST.wf1: a2b(~A),
-            TEST.wf2: b2c(a2b(~A))
+            TEST.wf1: a2b(Source(A)),
+            TEST.wf2: b2c(a2b(Source(A)))
         })
 
         self.assertQuery(lang, graph,
@@ -235,9 +235,9 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         workflows = make_graph(lang, {
-            TEST.wf1: a2b_option1(~A),
-            TEST.wf2: a2b_option2(~A),
-            TEST.wf3: ~A
+            TEST.wf1: a2b_option1(Source(A)),
+            TEST.wf2: a2b_option2(Source(A)),
+            TEST.wf3: Source(A)
         })
 
         self.assertQuery(lang, workflows, [A],
@@ -262,10 +262,10 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals(), namespace=TEST, canon={X, F(X)})
 
         graph = make_graph(lang, {
-            TEST.x: ~X,
-            TEST.y: ~Y,
-            TEST.fx: ~F(X),
-            TEST.fy: ~F(Y)
+            TEST.x: Source(X),
+            TEST.y: Source(Y),
+            TEST.fx: Source(F(X)),
+            TEST.fy: Source(F(Y))
         })
 
         self.assertQuery(lang, graph, [X], results={TEST.x, TEST.y})
@@ -282,10 +282,10 @@ class TestAlgebra(unittest.TestCase):
             canon={X, F(F(X, Y), Y), F(Y, Y)})
 
         graph = make_graph(lang, {
-            TEST.x: ~X,
-            TEST.y: ~Y,
-            TEST.ffx: ~F(F(X, Y), Y),
-            TEST.fy: ~F(Y, Y)
+            TEST.x: Source(X),
+            TEST.y: Source(Y),
+            TEST.ffx: Source(F(F(X, Y), Y)),
+            TEST.fy: Source(F(Y, Y))
         })
 
         self.assertQuery(lang, graph, [_], results={TEST.x, TEST.y, TEST.ffx,
@@ -306,7 +306,7 @@ class TestAlgebra(unittest.TestCase):
 
         # Workflow graph
         wfgraph = make_graph(lang, {
-            TEST.wf1: bc2a(d2b(~D), d2c(~D)),
+            TEST.wf1: bc2a(d2b(Source(D)), d2c(Source(D))),
         })
 
         # Query graph
@@ -334,8 +334,8 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         graph = make_graph(lang, {
-            TEST.wf1: ~A,
-            TEST.wf2: f(~A),
+            TEST.wf1: Source(A),
+            TEST.wf2: f(Source(A)),
         })
         self.assertQuery(lang, graph, [A], results={TEST.wf1, TEST.wf2})
         self.assertQuery(lang, graph, [A, [A]], results={TEST.wf2})

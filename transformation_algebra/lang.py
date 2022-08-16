@@ -260,14 +260,6 @@ class Language(object):
             elif token == ";":
                 stack.clear()
                 stack.append(None)
-            # `~A` notation is deprecated. Use `- : A` instead.
-            elif token == "~":
-                previous = stack.pop()
-                t = self.parse_type(tokens)
-                current_: Expr = Source(type=t)
-                if previous:
-                    current_ = Application(previous, current_)
-                stack.append(current_)
             else:
                 current: Optional[Expr]
                 if token == "-":

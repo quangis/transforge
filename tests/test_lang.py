@@ -46,10 +46,10 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=A ** F(A) ** A)
         lang = Language(scope=locals())
         self.assertTrue(
-            lang.parse("- : A").match(~A)
+            lang.parse("- : A").match(Source(A))
         )
         self.assertTrue(
-            lang.parse("f (- : A) (- : F(A))").match(f(~A, ~F(A)))
+            lang.parse("f (- : A) (- : F(A))").match(f(Source(A), Source(F(A))))
         )
 
     def test_parse_tuple(self):
@@ -68,7 +68,7 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(lang.parse_type("F((A * A), (A))").match(F(A * A, A)))
         self.assertTrue(lang.parse_type("F((A), (A * A))").match(F(A, A * A)))
 
-        self.assertTrue(lang.parse("- : (A * A)").match(~(A * A)))
+        self.assertTrue(lang.parse("- : (A * A)").match(Source(A * A)))
         self.assertRaises(RuntimeError, lang.parse, "- : A * A")
 
     def test_parameterized_type_alias(self):
@@ -79,7 +79,7 @@ class TestAlgebra(unittest.TestCase):
         G = TypeAlias(lambda x: F(x, B), A)
         lang = Language(scope=locals())
         self.assertTrue(
-            lang.parse("- : G(B)").match(~F(B, B))
+            lang.parse("- : G(B)").match(Source(F(B, B)))
         )
         self.assertRaises(RuntimeError, lang.parse, "- : G")
 

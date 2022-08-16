@@ -450,8 +450,8 @@ class TestAlgebraRDF(unittest.TestCase):
         actual1 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual1.add_workflow(root, {
-            TEST.sourceA: ("~A", []),
-            TEST.sourceA1: ("~A1", []),
+            TEST.sourceA: ("-: A", []),
+            TEST.sourceA1: ("-: A1", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceA1])
         })
 
@@ -459,8 +459,8 @@ class TestAlgebraRDF(unittest.TestCase):
         actual2 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual2.add_workflow(root, {
-            TEST.sourceA: ("~A", []),
-            TEST.sourceA1: ("~A1", []),
+            TEST.sourceA: ("-: A", []),
+            TEST.sourceA1: ("-: A1", []),
             TEST.app: ("f 1 2", [TEST.sourceA1, TEST.sourceA])
         })
 
@@ -468,8 +468,8 @@ class TestAlgebraRDF(unittest.TestCase):
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         self.assertRaises(SubtypeMismatch, actual3.add_workflow, root, {
-            TEST.sourceA: ("~A", []),
-            TEST.sourceB: ("~B", []),
+            TEST.sourceA: ("-: A", []),
+            TEST.sourceB: ("-: B", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
         })
 
@@ -484,7 +484,7 @@ class TestAlgebraRDF(unittest.TestCase):
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
         actual.add_workflow(root, {
-            TEST.step1: ("~A1", []),
+            TEST.step1: ("-: A1", []),
             TEST.step2: ("f 1 2", [TEST.step1, TEST.step1])
         })
 
@@ -503,7 +503,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         actual.add_workflow(root, {
-            TEST.step1: ("~A", []),
+            TEST.step1: ("-: A", []),
             TEST.step2: ("f 1", [TEST.step1])
         })
 
@@ -518,7 +518,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # Types should work between tools, not just inside tools. Say that we
         # have a function f : x ** x | x << Ratio and a tool T that implements
         # that function. We then write the algebra expression for T as
-        # f(~Ratio), but that should mean that `f` still produces a subtype of
+        # f(-: Ratio), but that should mean that `f` still produces a subtype of
         # Ratio if presented with a subtype of Ratio. See issue #72.
 
         A = TypeOperator()
@@ -531,7 +531,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         actual.add_workflow(root, {
-            TEST.step1: ("~B", []),
+            TEST.step1: ("-: B", []),
             TEST.step2: ("f(1: A)", [TEST.step1])
         })
 
@@ -568,7 +568,7 @@ class TestAlgebraRDF(unittest.TestCase):
 
         root = BNode()
         actual.add_workflow(root, {
-            TEST.step1: ("f (f (~A))", []),
+            TEST.step1: ("f (f (-: A))", []),
             TEST.step2: ("f (1: F(F(_)))", [TEST.step1])
         })
 

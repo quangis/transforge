@@ -363,10 +363,6 @@ class Variable(Expr):
         self.bound = expr
 
 
-# Patch for using `~A` as a shortcut for 'an anonymous source of type A'
-Type.__invert__ = lambda self: Source(type=self)
-
-
 # Errors #####################################################################
 
 class DeclarationError(Exception):
