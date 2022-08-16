@@ -64,6 +64,7 @@ class TransformationQuery(object):
 
         self.graph = TransformationGraph(language=lang)
         self.graph += graph
+        self.graph.parse_shortcuts()
 
         self.root = self.graph.value(predicate=RDF.type, object=TA.Task,
             any=False)

@@ -72,6 +72,8 @@ class TransformationGraph(Graph):
         self.identifiers: Iterator[int] | None = None
 
         self.bind("", TA)
+        if self.language.prefix and self.language.namespace:
+            self.bind(self.language.prefix, self.language.namespace)
 
         # types that are connected to all sub cq. supertypes
         self.subtyped: set[TypeOperation] = set()
