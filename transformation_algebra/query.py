@@ -55,7 +55,7 @@ class TransformationQuery(object):
     input).
     """
 
-    def __init__(self, lang: Language, graph: TransformationGraph,
+    def __init__(self, lang: Language, graph: Graph,
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
             by_chronology: bool = True, unfold_tree: bool = False):
