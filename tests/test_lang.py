@@ -26,6 +26,10 @@ class TestAlgebra(unittest.TestCase):
 
         lang.parse("f(1 : A) : FA", Source())
 
+    def test_concretizable_wildcard(self):
+        lang = Language()
+        self.assertEqual(lang.parse_type("_").concretize(), Top())
+
     def test_type_synonyms_no_variables(self):
         F = TypeOperator(params=1)
         self.assertRaises(RuntimeError, TypeAlias, F(_))
