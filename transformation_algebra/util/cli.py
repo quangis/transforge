@@ -10,16 +10,16 @@ import importlib.util
 from pathlib import Path
 from itertools import chain
 
-from rdflib import Graph, Dataset
-from rdflib.term import Node, Literal, URIRef
-from rdflib.namespace import RDF, RDFS
-from rdflib.util import guess_format
-from rdflib.tools.rdf2dot import rdf2dot
 from plumbum import cli  # type: ignore
-from transformation_algebra import TransformationQuery, TransformationGraph, \
-    TA, Language
-from transformation_algebra.util import WF, TOOLS, REPO
+from rdflib import Graph
+from rdflib.term import Node, Literal, URIRef
+from rdflib.util import guess_format
+from transformation_algebra.lang import Language
+from transformation_algebra.graph import TransformationGraph
+from transformation_algebra.query import TransformationQuery
+from transformation_algebra.namespace import TA, WF, RDF, RDFS, TOOLS, REPO
 from transformation_algebra.util.store import TransformationStore
+from transformation_algebra.util.write import to_store, to_file
 from typing import NamedTuple, Iterable
 
 
@@ -71,37 +71,6 @@ class WithRDF:
         cli.Set("rdf", "ttl", "trig", "json-ld", "dot"), default="trig",
         requires=["-o"])
 
-    def maybe_output(self, *graphs: Graph):
-        result: Graph
-        if len(graphs) == 1:
-            result = graphs[0]
-        elif self.output_format == "trig":
-            result = Dataset()
-            for g in graphs:
-                subgraph = result.graph(g.base, g.base)
-                subgraph += g
-        else:
-            g = Graph()
-            for g in graphs:
-                result += g
-
-        result.bind("ta", TA)
-        result.bind("wf", WF)
-        result.bind("tools", TOOLS)
-        result.bind("repo", REPO)
-
-        lang = self.language  # type: ignore
-        if lang.prefix:
-            result.bind(lang.prefix, lang.namespace)
-
-        # Produce output file
-        if self.output_path:
-            if self.output_format == "dot":
-                with open(self.output_path, 'w') as f:
-                    rdf2dot(result, f)
-            else:
-                result.serialize(self.output_path, format=self.output_format)
-
 
 class WithServer:
     backend = cli.SwitchAttr(["-b", "--backend"],
@@ -109,14 +78,6 @@ class WithServer:
     server = cli.SwitchAttr(["-s", "--server"],
         help="server to which to send the graph to", requires=["-b"])
     cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
-
-    def maybe_upload(self, *graphs: Graph):
-        # Insert new graph into server (overwriting old one if it exists)
-        if self.server:
-            ds = TransformationStore.backend(self.backend,
-                self.server, cred=self.cred)
-            for g in graphs:
-                ds.put(g)
 
 
 class CLI(cli.Application):
@@ -150,8 +111,13 @@ class VocabBuilder(Application, WithRDF, WithServer):
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
         vocab.base = self.language.namespace
-        self.maybe_output(vocab)
-        self.maybe_upload(vocab)
+
+        if self.server:
+            to_store(vocab, backend=self.backend, url=self.server,
+                cred=self.cred)
+
+        if self.output_path:
+            to_file(vocab, path=self.output_path, format=self.output_format)
 
 
 @CLI.subcommand("graph")
@@ -224,8 +190,11 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
             results.append(g)
 
-        self.maybe_output(*results)
-        self.maybe_upload(*results)
+        if self.server:
+            to_store(*results, backend=self.backend, url=self.server,
+                cred=self.cred)
+        if self.output_path:
+            to_file(*results, path=self.output_path, format=self.output_format)
 
 
 class Task(NamedTuple):

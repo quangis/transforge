@@ -5,11 +5,12 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
+from transformation_algebra.namespace import TA
 from transformation_algebra.type import (Type, TypeOperation, Function,
     TypeInstance)
 from transformation_algebra.expr import (Expr, Operation, Application,
     Abstraction, Source)
-from transformation_algebra.lang import Language, TA
+from transformation_algebra.lang import Language
 
 from itertools import count
 from rdflib import Graph, Namespace, BNode, Literal

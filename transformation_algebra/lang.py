@@ -8,14 +8,13 @@ from __future__ import annotations
 from itertools import groupby, chain
 from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
-from rdflib.namespace import Namespace, ClosedNamespace
+from rdflib.namespace import ClosedNamespace
 
+from transformation_algebra.namespace import TA
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
     TypeSchema)
 from transformation_algebra.expr import Operator, Expr, Application, Source
-
-TA = Namespace("https://github.com/quangis/transformation-algebra#")
 
 
 class Language(object):

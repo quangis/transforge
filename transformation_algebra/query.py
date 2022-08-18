@@ -8,16 +8,16 @@ specified order.
 from __future__ import annotations
 
 from rdflib.term import Node, URIRef, Variable, BNode
-from rdflib.namespace import RDF
 from rdflib.graph import Graph
 from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
+from transformation_algebra.namespace import RDF, TA
 from transformation_algebra.type import Type
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TA, TransformationGraph
+from transformation_algebra.graph import TransformationGraph
 
 
 def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
