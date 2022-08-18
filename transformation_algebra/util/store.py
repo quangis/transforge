@@ -87,7 +87,7 @@ class TransformationStore(Dataset):
         url = f"{self.url_gsp}?graph={quote(str(uri))}"
         resp = urlopen(Request(
             url, method='GET',
-            headers={"Accept": "text/application/rdf+xml; charset=utf-8"},
+            headers={"Accept": "application/rdf+xml; charset=utf-8"},
         ))
         data = resp.read()
         g = Graph()
