@@ -84,18 +84,15 @@ class TransformationStore(Dataset):
         ))
 
     def get(self, uri: URIRef | str) -> Graph:
+        url = f"{self.url_gsp}?graph={quote(str(uri))}"
+        resp = urlopen(Request(
+            url, method='GET',
+            headers={"Accept": "text/application/rdf+xml; charset=utf-8"},
+        ))
+        data = resp.read()
         g = Graph()
-        g.parse(f"{self.url_gsp}?graph={quote(str(uri))}")
+        g.parse(data=data, format="xml")
         return g
-        # url = f"{self.url_gsp}?graph={quote(str(uri))}"
-        # resp = urlopen(Request(
-        #     url, method='GET',
-        #     headers={"Accept": "text/turtle; charset=utf-8"},
-        # ))
-        # data = resp.read()
-        # g = Graph()
-        # g.parse(data=data, format="ttl")
-        # return g
 
 
 class MarkLogic(TransformationStore):
