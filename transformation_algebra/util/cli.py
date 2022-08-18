@@ -19,7 +19,7 @@ from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.query import TransformationQuery
 from transformation_algebra.namespace import TA, REPO
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.util.write import (to_store, to_file,
+from transformation_algebra.util.common import (to_store, to_file,
     build)
 from typing import NamedTuple, Iterable
 
