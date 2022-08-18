@@ -12,14 +12,15 @@ from itertools import chain
 
 from plumbum import cli  # type: ignore
 from rdflib import Graph
-from rdflib.term import Node, Literal, URIRef
+from rdflib.term import Node
 from rdflib.util import guess_format
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.query import TransformationQuery
-from transformation_algebra.namespace import TA, WF, RDF, RDFS, TOOLS, REPO
+from transformation_algebra.namespace import TA, REPO
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.util.write import to_store, to_file
+from transformation_algebra.util.write import (to_store, to_file,
+    build)
 from typing import NamedTuple, Iterable
 
 
@@ -135,61 +136,18 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     @cli.positional(cli.ExistingFile)
     def main(self, *wf_paths):
         visual = self.output_format == "dot"
-        if visual:
-            assert not self.endpoint
-
-        results: list[Graph] = []
-
-        for wf_path in wf_paths:
-            # Read input workflow graph
-            wfg = Graph()
-            wfg.parse(wf_path, format='ttl')
-            root = wfg.value(None, RDF.type, WF.Workflow, any=False)
-            assert isinstance(root, URIRef)
-            sources = set(wfg.objects(root, WF.source))
-            tool_apps: dict[Node, tuple[str, list[Node]]] = {}
-            for step in wfg.objects(root, WF.edge):
-                out = wfg.value(step, WF.output, any=False)
-
-                # Find expression for the tool associated with this application
-                tool = wfg.value(
-                    step, WF.applicationOf, any=False)
-                assert tool, "workflow has an edge without a tool"
-                expr = self.tools.value(
-                    tool, self.language.namespace.expression, any=False)
-                assert expr, f"{tool} has no algebra expression"
-
-                tool_apps[out] = expr, [node
-                    for pred in (WF.input1, WF.input2, WF.input3)
-                    if (node := wfg.value(step, pred))
-                ]
-
-            # Build transformation graph
-            g = TransformationGraph(self.language, minimal=visual,
-                with_labels=visual, with_noncanonical_types=False,
+        results: list[Graph] = [
+            build(
+                workflow=graph(wf_path),
+                tools=self.tools,
+                language=self.language,
+                minimal=visual,
+                with_labels=visual,
+                with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
-            g.base = root
-            step2expr = g.add_workflow(root, tool_apps, sources)
-
-            # Annotate the expression nodes that correspond with output nodes
-            # of a tool with said tool
-            # TODO incorporate this into add_workflow
-            if visual:
-                for step in wfg.objects(root, WF.edge):
-                    out = wfg.value(step, WF.output, any=False)
-                    tool = wfg.value(step, WF.applicationOf, any=False)
-                    g.add((step2expr[out], RDFS.comment, Literal(
-                        "using " + tool[len(TOOLS):])))
-                for source in sources:
-                    for comment in wfg.objects(source, RDFS.comment):
-                        g.add((source, RDFS.comment, comment))
-
-            # Add original workflow
-            g += wfg
-
-            results.append(g)
-
+            for wf_path in wf_paths
+        ]
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
                 cred=self.cred)

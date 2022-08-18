@@ -4,9 +4,11 @@ Utility functions for common tasks.
 
 from __future__ import annotations
 from rdflib import Graph, Dataset
+from rdflib.term import Node, URIRef, Literal
 from rdflib.util import guess_format
 from rdflib.tools.rdf2dot import rdf2dot
-from transformation_algebra.namespace import TA, WF, TOOLS, REPO
+from transformation_algebra.namespace import TA, WF, TOOLS, REPO, RDF, RDFS
+from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
 
@@ -56,3 +58,49 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
         else:
             result.serialize(path,
                 format=format or guess_format(path))
+
+
+def build(language: Language, tools: Graph, workflow: Graph, **kwargs) -> Graph:
+
+    g = Graph()
+    root = workflow.value(None, RDF.type, WF.Workflow, any=False)
+    assert isinstance(root, URIRef)
+    sources = set(workflow.objects(root, WF.source))
+    tool_apps: dict[Node, tuple[str, list[Node]]] = {}
+    for step in workflow.objects(root, WF.edge):
+        out = workflow.value(step, WF.output, any=False)
+
+        # Find expression for the tool associated with this application
+        tool = workflow.value(
+            step, WF.applicationOf, any=False)
+        assert tool, "workflow has an edge without a tool"
+        expr = tools.value(
+            tool, language.namespace.expression, any=False)
+        assert expr, f"{tool} has no algebra expression"
+
+        tool_apps[out] = expr, [node
+            for pred in (WF.input1, WF.input2, WF.input3)
+            if (node := workflow.value(step, pred))
+        ]
+
+    # Build transformation graph
+    g = TransformationGraph(language)
+    g.base = root
+    step2expr = g.add_workflow(root, tool_apps, sources)
+
+    # Annotate the expression nodes that correspond with output nodes
+    # of a tool with said tool
+    # TODO incorporate this into add_workflow
+    if kwargs.get('with_labels'):
+        for step in workflow.objects(root, WF.edge):
+            out = workflow.value(step, WF.output, any=False)
+            tool = workflow.value(step, WF.applicationOf, any=False)
+            g.add((step2expr[out], RDFS.comment, Literal(
+                "using " + tool[len(TOOLS):])))
+        for source in sources:
+            for comment in workflow.objects(source, RDFS.comment):
+                g.add((source, RDFS.comment, comment))
+
+    # Add original workflow
+    g += workflow
+    return g
