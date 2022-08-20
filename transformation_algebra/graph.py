@@ -5,7 +5,7 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.namespace import TA
+from transformation_algebra.namespace import TA, RDF, RDFS
 from transformation_algebra.type import (Type, TypeOperation, Function,
     TypeInstance)
 from transformation_algebra.expr import (Expr, Operation, Application,
@@ -15,8 +15,7 @@ from transformation_algebra.lang import Language
 from itertools import count
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.util import guess_format
-from rdflib.term import Node
-from rdflib.namespace import RDF, RDFS
+from rdflib.term import Node, URIRef
 
 from typing import Iterator
 
@@ -51,6 +50,7 @@ class TransformationGraph(Graph):
         def default(switch: bool | None, inherit: bool = not minimal) -> bool:
             return inherit if switch is None else switch
 
+        self.uri: URIRef | None = None
         self.language = language
         self.passthrough = passthrough
         self.with_operators = default(with_operators)
@@ -357,7 +357,7 @@ class TransformationGraph(Graph):
 
         return current
 
-    def add_workflow(self, root: Node,
+    def add_workflow(self, root: URIRef,
             tool_apps: dict[Node, tuple[str, list[Node]]],
             sources: set[Node] = set()) -> dict[Node, Node]:
         """
@@ -442,8 +442,9 @@ class TransformationGraph(Graph):
         if self.with_output:
             self.add((root, TA.output, result_node))
 
-        if self.with_classes:
-            self.add((root, RDF.type, TA.Transformation))
+        assert not self.uri
+        self.uri = root
+        self.add((root, RDF.type, TA.Transformation))
 
         self.identifiers = None  # reset the identifiers
 

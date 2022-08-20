@@ -10,8 +10,12 @@ from http.client import HTTPResponse
 from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 from rdflib import Dataset, Graph, URIRef
+from rdflib.term import Node
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from typing import Literal
+
+from transformation_algebra.graph import TransformationGraph
+from transformation_algebra.query import TransformationQuery
 
 
 class TransformationStore(Dataset):
@@ -65,15 +69,18 @@ class TransformationStore(Dataset):
         else:
             raise RuntimeError
 
-    def put(self, g: Graph) -> HTTPResponse:
+    def query(self, query: TransformationQuery) -> set[Node]:
+        return set(r.workflow for r in self.store.query(query.sparql()))
+
+    def put(self, g: TransformationGraph) -> HTTPResponse:
         """
         Remove old graph (if any) and insert given one in its place.
         """
         # cf. <https://www.w3.org/TR/sparql11-http-rdf-update/#http-put>
         # TODO may throw errors etc
 
-        if g.base:
-            url = f"{self.url_gsp}?graph={quote(str(g.base))}"
+        if g.uri:
+            url = f"{self.url_gsp}?graph={quote(str(g.uri))}"
         else:
             url = f"{self.url_gsp}?default"
 

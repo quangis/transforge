@@ -62,15 +62,14 @@ class TransformationQuery(object):
 
         self.lang = lang
 
-        self.graph = TransformationGraph(language=lang)
-        self.graph += graph
-        self.graph.parse_shortcuts()
-
-        self.root = self.graph.value(predicate=RDF.type, object=TA.Task,
-            any=False)
+        self.root = graph.value(predicate=RDF.type, object=TA.Task, any=False)
 
         if not self.root:
             raise ValueError(f"No {TA.Task.n3()} found in the graph.")
+
+        self.graph = TransformationGraph(language=lang)
+        self.graph += graph
+        self.graph.parse_shortcuts()
 
         self.by_io = by_io
         self.by_types = by_types
@@ -209,6 +208,7 @@ class TransformationQuery(object):
             ))
 
         result = sparql(
+            f"BASE <{self.lang.namespace}>",
             "PREFIX : <https://github.com/quangis/transformation-algebra#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",

@@ -20,7 +20,7 @@ from transformation_algebra.query import TransformationQuery
 from transformation_algebra.namespace import TA, REPO
 from transformation_algebra.util.store import TransformationStore
 from transformation_algebra.util.common import (to_store, to_file,
-    build)
+    build_transformation)
 from typing import NamedTuple, Iterable
 
 
@@ -137,7 +137,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     def main(self, *wf_paths):
         visual = self.output_format == "dot"
         results: list[Graph] = [
-            build(
+            build_transformation(
                 workflow=graph(wf_path),
                 tools=self.tools,
                 language=self.language,
@@ -236,11 +236,10 @@ class QueryRunner(Application, WithServer):
         else:
 
             if self.server:
-                username, password = self.cred or (None, None)
-                self.graph = TransformationStore(self.backend, self.server,
+                self.store = TransformationStore(self.backend, self.server,
                     cred=self.cred)
             else:
-                self.graph = None
+                self.store = None
 
             # Parse tasks and optionally run associated queries
             tasks = [self.evaluate(task_file, by_io=True,

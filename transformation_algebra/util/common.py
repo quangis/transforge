@@ -3,6 +3,7 @@ Utility functions for common tasks.
 """
 
 from __future__ import annotations
+from pathlib import Path
 from rdflib import Graph, Dataset
 from rdflib.term import Node, URIRef, Literal
 from rdflib.util import guess_format
@@ -11,6 +12,13 @@ from transformation_algebra.namespace import TA, WF, TOOLS, REPO, RDF, RDFS
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
+
+
+def graph(url: str | Path, format: str | None = None) -> Graph:
+    url = str(url)
+    g = Graph()
+    g.parse(url, format=format or guess_format(url))
+    return g
 
 
 def to_store(*graphs: Graph, **kwargs):
@@ -60,7 +68,8 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
                 format=format or guess_format(path))
 
 
-def build(language: Language, tools: Graph, workflow: Graph, **kwargs) -> Graph:
+def build_transformation(language: Language, tools: Graph, workflow: Graph,
+        **kwargs) -> TransformationGraph:
 
     g = Graph()
     root = workflow.value(None, RDF.type, WF.Workflow, any=False)
@@ -85,7 +94,6 @@ def build(language: Language, tools: Graph, workflow: Graph, **kwargs) -> Graph:
 
     # Build transformation graph
     g = TransformationGraph(language)
-    g.base = root
     step2expr = g.add_workflow(root, tool_apps, sources)
 
     # Annotate the expression nodes that correspond with output nodes
