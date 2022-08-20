@@ -444,7 +444,9 @@ class TransformationGraph(Graph):
 
         assert not self.uri
         self.uri = root
-        self.add((root, RDF.type, TA.Transformation))
+
+        if self.with_classes:
+            self.add((root, RDF.type, TA.Transformation))
 
         self.identifiers = None  # reset the identifiers
 
