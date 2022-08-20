@@ -8,7 +8,7 @@ from rdflib import Graph, Dataset
 from rdflib.term import Node, URIRef, Literal
 from rdflib.util import guess_format
 from rdflib.tools.rdf2dot import rdf2dot
-from transformation_algebra.namespace import TA, WF, TOOLS, REPO, RDF, RDFS
+from transformation_algebra.namespace import TA, WF, TOOLS, EX, RDF, RDFS
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
@@ -51,7 +51,7 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
     result.bind("ta", TA)
     result.bind("wf", WF)
     result.bind("tools", TOOLS)
-    result.bind("repo", REPO)
+    result.bind("ex", EX)
 
     for g in graphs:
         if isinstance(g, TransformationGraph):

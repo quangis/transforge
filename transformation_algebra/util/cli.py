@@ -17,7 +17,7 @@ from rdflib.util import guess_format
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.query import TransformationQuery
-from transformation_algebra.namespace import TA, REPO
+from transformation_algebra.namespace import TA, EX
 from transformation_algebra.util.store import TransformationStore
 from transformation_algebra.util.common import (to_store, to_file,
     build_transformation)
@@ -199,7 +199,7 @@ class QueryRunner(Application, WithServer):
             (t.expected for t in tasks)))
 
         header = ["Task", "Precision", "Recall"] + sorted([
-            str(wf)[len(REPO):] for wf in workflows])
+            str(wf)[len(EX):] for wf in workflows])
 
         with open(self.output, 'w', newline='') as h:
             n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
@@ -214,7 +214,7 @@ class QueryRunner(Application, WithServer):
                         s += "?"
                     elif (wf in actual) ^ (wf in expected):
                         s += "⨯"
-                    result[str(wf)[len(REPO):]] = s
+                    result[str(wf)[len(EX):]] = s
                 n_fpos += len(actual - expected)
                 n_fneg += len(expected - actual)
                 n_tpos += len(actual.intersection(expected))
