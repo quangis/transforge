@@ -93,7 +93,7 @@ def build_transformation(language: Language, tools: Graph, workflow: Graph,
         ]
 
     # Build transformation graph
-    g = TransformationGraph(language)
+    g = TransformationGraph(language, **kwargs)
     step2expr = g.add_workflow(root, tool_apps, sources)
 
     # Annotate the expression nodes that correspond with output nodes
