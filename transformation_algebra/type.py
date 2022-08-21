@@ -159,7 +159,7 @@ class Type(ABC):
     def instance(self) -> TypeInstance:
         return NotImplemented
 
-    def concretize(self, replace: bool = True) -> TypeOperation:
+    def concretize(self, replace: bool = False) -> TypeOperation:
         """
         Make sure that this type contains no variables. Replace every wildcard
         variable with the catch-all `Top` type.
@@ -167,7 +167,7 @@ class Type(ABC):
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
             return a.operator(*(p.concretize(replace) for p in a.params))
-        elif isinstance(a, TypeVariable) and replace and a.wildcard:
+        elif isinstance(a, TypeVariable) and (replace or a.wildcard):
             return Top()
         else:
             raise RuntimeError("encountered variable")
