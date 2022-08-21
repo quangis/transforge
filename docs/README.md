@@ -2,27 +2,30 @@
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
-A transformation language is used to describe *processes*, like those that 
-underlie workflows or tools, as abstract *transformations between types*. These 
-types do not necessarily denote a concrete data structure, and expressions may 
-be independent from any particular implementation. The goal is merely to 
-capture some properties that are deemed *conceptually* relevant, in order to 
-provide *procedural metadata*.
+A transformation language is used to describe *processes*, like the ones 
+implicit in workflows or software tools, as *transformations between 
+types*. These types do not necessarily denote a concrete data structure, 
+and the descriptions may be independent from any particular 
+implementation. The goal is only to capture some properties that are 
+deemed *conceptually* relevant, as a form of *procedural metadata*.
 
-The `transformation-algebra` library facilitates defining a transformation 
-language and parsing its expressions.
+The `transformation-algebra` library facilitates defining a 
+transformation language and parsing its expressions into semantic 
+graphs. It is written in pure Python with few dependencies.
 
-In order to reason about about transformations, it also implements a [type 
-inference](https://en.wikipedia.org/wiki/Type_inference) module in Python, 
-which accommodates both [subtype-](https://en.wikipedia.org/wiki/Subtyping) and 
+In order to reason about about transformations, it also implements a 
+[type inference](https://en.wikipedia.org/wiki/Type_inference) module, 
+which accommodates both 
+[subtype-](https://en.wikipedia.org/wiki/Subtyping) and 
 [parametric](https://en.wikipedia.org/wiki/Parametric_polymorphism) 
 polymorphism.
 
-Finally, transformation expressions can be turned into transformation graphs. 
-Such graphs can be serialized into 
+Expressions of a transformation language can be turned into 
+transformation graphs. Such graphs can be serialized into 
 [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework), or 
-converted to [SPARQL](https://en.wikipedia.org/wiki/SPARQL) queries and matched 
-against other graphs. This enables flexible searching through processes.
+converted to [SPARQL](https://en.wikipedia.org/wiki/SPARQL) queries and 
+matched against other graphs. This enables flexible searching through 
+processes.
 
 **The library is still in development. Interfaces might change without 
 warning.**
