@@ -214,12 +214,15 @@ class TransformationQuery(object):
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
             "GRAPH ?workflow {",
+            "{SELECT ?workflow WHERE {",
             "?workflow a :Transformation.",
-            self.io() if self.by_io else (),
             self.operators() if self.by_operators else (),
             self.types() if self.by_types else (),
+            "} GROUP BY ?workflow}",
+            self.io() if self.by_io else (),
             self.chronology() if self.by_chronology else (),
-            "}} GROUP BY ?workflow"
+            "}",
+            "} GROUP BY ?workflow"
         )
         return result
 
@@ -236,7 +239,17 @@ class TransformationQuery(object):
                 types.add(type_choice[0])
 
         for type in types:
-            yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
+            # yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
+            yield f"{next(self.generator).n3()} {next(self.generator).n3()} {type.n3()}."
+
+        # Also include union types. TODO this is temporary until #79 is
+        # resolved; see also:
+        # https://github.com/quangis/transformation-algebra/issues/77#issuecomment-1215064807
+        for type_choice in self.type.values():
+            if len([t for t in type_choice if t not in types]) >= 2:
+                yield from union(
+                    f"{next(self.generator).n3()} {next(self.generator).n3()}",
+                    type_choice)
 
     def operators(self) -> Iterator[str]:
         """
