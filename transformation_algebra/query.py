@@ -191,12 +191,6 @@ class TransformationQuery(object):
 
         return var
 
-    def run(self, graph: Graph) -> set[Node]:
-        """
-        Find all workflows in a graph that match this query.
-        """
-        return set(r.workflow for r in graph.query(self.sparql()))
-
     def sparql(self) -> str:
         """
         Obtain a SPARQL query.
@@ -307,6 +301,9 @@ class TransformationQuery(object):
             if current in visited:
                 continue
 
+            # afters = " ".join(a.n3() for a in self.after[current])
+            # yield f"{{SELECT DISTINCT {current.n3()} {afters} WHERE {{"
+
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
@@ -331,6 +328,23 @@ class TransformationQuery(object):
                 self.operator.get(current, ()))
             yield from union(f"{current.n3()} :type/rdfs:subClassOf*",
                 self.type.get(current, ()))
+
+            # Make sure as early as possible that there is no earlier on the
+            # same branch
+            # for c in self.after[current]:
+            #     types = self.type.get(current) or []
+            #     if not len(types) == 1:
+            #         continue
+            #     between = next(self.generator)
+            #     yield "FILTER NOT EXISTS {"
+            #     yield f"{current.n3()} ^:to+ {between.n3()}."
+            #     yield f"{c.n3()} :to* {between.n3()}."
+            #     for t in types:
+            #         yield f"{between.n3()} :type/rdfs:subClassOf* {t.n3()}."
+            #     yield "}"
+
+            # Make sure we don't check the same node
+            # yield "}}"
 
             visited.add(current)
 
