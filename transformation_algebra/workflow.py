@@ -27,6 +27,14 @@ class Workflow(object):
 
     @property
     @abstractmethod
+    def root(self) -> URIRef:
+        """
+        The identifier of the workflow itself.
+        """
+        return NotImplemented
+
+    @property
+    @abstractmethod
     def sources(self) -> set[Node]:
         """
         Resources that represent source data of the workflow.
@@ -89,10 +97,14 @@ class WorkflowDict(Workflow):
     def __init__(self, root: URIRef,
             tool_apps: dict[Node, tuple[str, list[Node]]],
             sources: set[Node] = set()):
-        self.root = root
+        self._root = root
         self._sources = sources
         self._tool_outputs = set(tool_apps.keys())
         self._tool_apps = tool_apps
+
+    @property
+    def root(self) -> URIRef:
+        return self._root
 
     @property
     def sources(self) -> set[Node]:
@@ -125,7 +137,7 @@ class WorkflowGraph(Graph, Workflow):
         super().__init__(*nargs, **kwargs)
 
     @property
-    def root(self) -> Node:
+    def root(self) -> URIRef:
         root = self.value(None, RDF.type, WF.Workflow, any=False)
         if not root:
             raise RuntimeError("there must be exactly 1 Workflow in the graph")

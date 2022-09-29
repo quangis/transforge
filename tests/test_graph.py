@@ -16,6 +16,7 @@ from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
 from transformation_algebra.expr import Expr, Operator, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TEST, TransformationGraph
+from transformation_algebra.workflow import WorkflowDict
 
 from typing import Union
 
@@ -425,9 +426,9 @@ class TestAlgebraRDF(unittest.TestCase):
         root = BNode()
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        actual.add_workflow(root,
+        actual.add_workflow(WorkflowDict(root,
             {BNode(): ("f (1: A)", [TEST.source])},
-            {TEST.source})
+            {TEST.source}))
 
         expected = graph_manual(
             x=Step(type=TEST.A, origin=TEST.source),
@@ -449,29 +450,29 @@ class TestAlgebraRDF(unittest.TestCase):
         # 1
         actual1 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        actual1.add_workflow(root, {
+        actual1.add_workflow(WorkflowDict(root, {
             TEST.sourceA: ("-: A", []),
             TEST.sourceA1: ("-: A1", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceA1])
-        })
+        }))
 
         # 2
         actual2 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        actual2.add_workflow(root, {
+        actual2.add_workflow(WorkflowDict(root, {
             TEST.sourceA: ("-: A", []),
             TEST.sourceA1: ("-: A1", []),
             TEST.app: ("f 1 2", [TEST.sourceA1, TEST.sourceA])
-        })
+        }))
 
         # Mismatch
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        self.assertRaises(SubtypeMismatch, actual3.add_workflow, root, {
+        self.assertRaises(SubtypeMismatch, actual3.add_workflow, WorkflowDict(root, {
             TEST.sourceA: ("-: A", []),
             TEST.sourceB: ("-: B", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
-        })
+        }))
 
     def test_reuse_sources(self):
         # Test that the same source can be reused.
@@ -483,10 +484,10 @@ class TestAlgebraRDF(unittest.TestCase):
         root = BNode()
         actual = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        actual.add_workflow(root, {
+        actual.add_workflow(WorkflowDict(root, {
             TEST.step1: ("-: A1", []),
             TEST.step2: ("f 1 2", [TEST.step1, TEST.step1])
-        })
+        }))
 
     def test_unify_type_when_attaching_source(self):
         # Expressions that have a variable type, but are incorporated in a
@@ -502,10 +503,10 @@ class TestAlgebraRDF(unittest.TestCase):
             minimal=True, with_types=True, with_operators=True)
 
         root = BNode()
-        actual.add_workflow(root, {
+        actual.add_workflow(WorkflowDict(root, {
             TEST.step1: ("-: A", []),
             TEST.step2: ("f 1", [TEST.step1])
-        })
+        }))
 
         expected = graph_manual(
             source=Step(type=TEST.A),
@@ -530,10 +531,10 @@ class TestAlgebraRDF(unittest.TestCase):
             minimal=True, with_types=True, with_operators=True)
 
         root = BNode()
-        actual.add_workflow(root, {
+        actual.add_workflow(WorkflowDict(root, {
             TEST.step1: ("-: B", []),
             TEST.step2: ("f(1: A)", [TEST.step1])
-        })
+        }))
 
         expected = graph_manual(
             source=Step(type=TEST.B),
@@ -567,10 +568,10 @@ class TestAlgebraRDF(unittest.TestCase):
         expected += actual
 
         root = BNode()
-        actual.add_workflow(root, {
+        actual.add_workflow(WorkflowDict(root, {
             TEST.step1: ("f (f (-: A))", []),
             TEST.step2: ("f (1: F(F(_)))", [TEST.step1])
-        })
+        }))
 
         self.assertIsomorphic(actual, expected)
 
@@ -599,10 +600,10 @@ class TestAlgebraRDF(unittest.TestCase):
         actual = TransformationGraph(lang, passthrough=False,
             minimal=True, with_operators=True, with_types=True)
         root = BNode()
-        actual.add_workflow(root, {
+        actual.add_workflow(WorkflowDict(root, {
             TEST.tool1: ("f (1: B)", [TEST.src1]),
             TEST.tool2: ("f (1: A)", [TEST.tool1])
-        }, {TEST.src1})
+        }, {TEST.src1}))
 
         self.assertIsomorphic(actual, expected)
 

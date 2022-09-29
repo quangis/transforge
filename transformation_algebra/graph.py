@@ -11,6 +11,7 @@ from transformation_algebra.type import (Type, TypeOperation, Function,
 from transformation_algebra.expr import (Expr, Operation, Application,
     Abstraction, Source)
 from transformation_algebra.lang import Language
+from transformation_algebra.workflow import Workflow
 
 from itertools import count
 from rdflib import Graph, Namespace, BNode, Literal
@@ -357,9 +358,7 @@ class TransformationGraph(Graph):
 
         return current
 
-    def add_workflow(self, root: URIRef,
-            tool_apps: dict[Node, tuple[str, list[Node]]],
-            sources: set[Node] = set()) -> dict[Node, Node]:
+    def add_workflow(self, wf: Workflow) -> dict[Node, Node]:
         """
         Convert a workflow to a full transformation graph by converting its
         individual workflow steps to representations of expressions in RDF.
@@ -374,15 +373,6 @@ class TransformationGraph(Graph):
 
         self.identifiers = count(start=1)
 
-        # One of the steps must be 'last': it represents the tool application
-        # that finally produces the output and so isn't an input to another.
-        all_inputs = set(i for _, inputs in tool_apps.values() for i in inputs)
-        try:
-            final_tool_app, = [app for app in tool_apps.keys()
-                if app not in all_inputs]
-        except ValueError:
-            raise RuntimeError("must have exactly one final tool application")
-
         # 1. Construct expressions for each wfnode step (source or tool
         # application), possibly using expressions from previous steps
         exprs: dict[Node, Expr] = dict()
@@ -391,23 +381,23 @@ class TransformationGraph(Graph):
         # the expressions they are derived from (which may be more specific)
         indirection: dict[Source, Expr] = dict()
 
-        for source in sources:
+        for source in wf.sources:
             exprs[source] = Source()
 
         def wfnode2expr(wfnode: Node) -> Expr:
             try:
                 return exprs[wfnode]
             except KeyError:
-                tool_description, input_nodes = tool_apps[wfnode]
+                input_nodes = list(wf.inputs(wfnode))
                 input_exprs = [wfnode2expr(n) for n in input_nodes]
                 if not self.passthrough:
                     for i in range(len(input_exprs)):
-                        if input_nodes[i] not in sources:
+                        if input_nodes[i] not in wf.sources:
                             e = input_exprs[i]
                             s = input_exprs[i] = Source()
                             indirection[s] = e
-                exprs[wfnode] = expr = self.language.parse(tool_description,
-                    *input_exprs)
+                exprs[wfnode] = expr = self.language.parse(
+                    wf.expression(wfnode), *input_exprs)
                 return expr
 
         # 2. Convert individual transformation expressions to nodes and add
@@ -419,34 +409,34 @@ class TransformationGraph(Graph):
             try:
                 tfmnode = self.expr_nodes[expr]
             except KeyError:
-                if wfnode not in sources:
-                    for input_wfnode in tool_apps[wfnode][1]:
+                if wfnode not in wf.sources:
+                    for input_wfnode in wf.inputs(wfnode):
                         # Running this has the side effect that the wfnode for
                         # every input will already have been added
                         wfnode2tfmnode(input_wfnode)
-                self.expr_nodes[expr] = tfmnode = self.add_expr(expr, root)
+                self.expr_nodes[expr] = tfmnode = self.add_expr(expr, wf.root)
             return tfmnode
 
-        result_node = wfnode2tfmnode(final_tool_app)
+        result_node = wfnode2tfmnode(wf.target())
 
         # If passthrough is disabled, connections between the outputs of one
         # tool and the inputs of the next are not established; do that now
         for source_expr, ref_expr in indirection.items():
-            src_tfmnode = self.add_expr(source_expr, root)
+            src_tfmnode = self.add_expr(source_expr, wf.root)
             ref_tfmnode = self.expr_nodes[ref_expr]
             self.add((ref_tfmnode, TA.to, src_tfmnode))
 
-        for source in sources:
+        for source in wf.sources:
             self.add((wfnode2tfmnode(source), TA.origin, source))
 
         if self.with_output:
-            self.add((root, TA.output, result_node))
+            self.add((wf.root, TA.output, result_node))
 
         assert not self.uri
-        self.uri = root
+        self.uri = wf.root
 
         if self.with_classes:
-            self.add((root, RDF.type, TA.Transformation))
+            self.add((wf.root, RDF.type, TA.Transformation))
 
         self.identifiers = None  # reset the identifiers
 
