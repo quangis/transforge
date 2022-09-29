@@ -233,8 +233,8 @@ class TransformationQuery(object):
                 types.add(type_choice[0])
 
         for type in types:
-            # yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
-            yield f"{next(self.generator).n3()} {next(self.generator).n3()} {type.n3()}."
+            yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
+            # yield f"{next(self.generator).n3()} {next(self.generator).n3()} {type.n3()}."
 
         # Also include union types. TODO this is temporary until #79 is
         # resolved; see also:
