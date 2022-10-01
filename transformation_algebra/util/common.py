@@ -72,8 +72,7 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
 def build_transformation(language: Language, tools: Graph, workflow: Graph,
         **kwargs) -> TransformationGraph:
 
-    wf = WorkflowGraph(language, tools)
-    wf += workflow
+    wf = WorkflowGraph(language, workflow, tools)
 
     # Build transformation graph
     g = TransformationGraph(language, **kwargs)

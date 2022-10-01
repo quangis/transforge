@@ -7,7 +7,7 @@ implementations.
 from __future__ import annotations
 
 from rdflib import Graph
-from rdflib.term import Node, URIRef
+from rdflib.term import Node, URIRef, Literal
 from abc import ABCMeta, abstractmethod
 from typing import Iterator
 
@@ -50,25 +50,24 @@ class Workflow(object):
         return NotImplemented
 
     @abstractmethod
-    def inputs(self, app_or_output: Node) -> Iterator[Node]:
+    def inputs(self, resource: Node) -> Iterator[Node]:
         """
-        Maps tool applications (or their output resources) to the resources
-        that they take as input.
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def tool(self, app_or_output: Node) -> Node:
-        """
-        The tool associated with a tool application (or its output).
+        Find the input resources that were used to obtain an output resource.
         """
         return NotImplemented
 
     @abstractmethod
-    def expression(self, tool_or_app_or_output: Node) -> str:
+    def tool(self, resource: Node) -> URIRef:
+        """
+        Find the tool that was applied to obtain an output resource.
+        """
+        return NotImplemented
+
+    @abstractmethod
+    def expression(self, tool_or_resource: Node) -> str:
         """
         Expression of a transformation language that is associated with a tool
-        (or tool application, or the output of a tool application).
+        (or the resource output by an application of such a tool).
         """
         return NotImplemented
 
@@ -79,8 +78,8 @@ class Workflow(object):
 
         # One of the tool applications must be 'last': it represents the one
         # that finally produces the output and so isn't an input to any other.
-        targets = self.tool_outputs
-        targets -= set(x for o in self.tool_outputs for x in self.inputs(o))
+        targets = self.tool_outputs \
+            - set(x for o in self.tool_outputs for x in self.inputs(o))
         if len(targets) == 1:
             target, = targets
             return target
@@ -130,68 +129,67 @@ class WorkflowGraph(Graph, Workflow):
     vocabulary.
     """
 
-    def __init__(self, language: Language, *nargs, tools: Graph | None = None,
-            **kwargs):
+    def __init__(self, language: Language, workflow: Graph, tools: Graph):
+        super().__init__()
+        self += workflow
         self.language = language
-        self.tools = tools or self
-        super().__init__(*nargs, **kwargs)
+        self.tools = tools
+
+        root = self.value(None, RDF.type, WF.Workflow, any=False)
+        if root:
+            self._root = root
+        else:
+            raise RuntimeError("there must be exactly 1 Workflow in the graph")
+
+        self._sources = set(self.objects(self.root, WF.source))
+        self._tool_outputs = set()
+        self._app_for = dict()
+
+        for tool_app in self.objects(root, WF.edge):
+            tool_output = self.value(tool_app, WF.output, any=False)
+            assert tool_output is not None
+            self._tool_outputs.add(tool_output)
+            self._app_for[tool_output] = tool_app
 
     @property
     def root(self) -> URIRef:
-        root = self.value(None, RDF.type, WF.Workflow, any=False)
-        if not root:
-            raise RuntimeError("there must be exactly 1 Workflow in the graph")
-        return root
+        return self._root
 
     @property
     def sources(self) -> set[Node]:
-        if not hasattr(self, '_sources'):
-            self._sources = set(self.objects(self.root, WF.source))
         return self._sources
 
     @property
     def tool_outputs(self) -> set[Node]:
-        if not hasattr(self, '_tool_outputs'):
-            self._tool_outputs = set(
-                self.value(tool_app, WF.output, any=False)
-                for tool_app in self.objects(self.root, WF.edge)
-            )
         return self._tool_outputs
 
     def inputs(self, resource: Node) -> Iterator[Node]:
-        assert resource in self.tool_outputs
-        tool_app = self.value(predicate=WF.output, object=resource, any=False)
-        for predicate in (WF.input1, WF.input2, WF.input3):
-            input = self.value(tool_app, predicate, any=False)
-            if input:
-                assert input in self.tool_outputs or input in self.sources
-                yield input
+        for p in (WF.input1, WF.input2, WF.input3):
+            input_resource = self.value(self._app_for[resource], p, any=False)
+            if input_resource:
+                assert (input_resource in self.tool_outputs
+                    or input_resource in self.sources)
+                yield input_resource
 
-    def tool(self, app_or_output: Node) -> URIRef:
-        if app_or_output in self.tool_outputs:
-            tool_app = self.tool_app(app_or_output)
-        else:
-            tool_app = app_or_output
-        tool = self.value(tool_app, WF.applicationOf, any=False)
+    def tool(self, resource: Node) -> URIRef:
+        app = self._app_for[resource]
+        tool = self.value(app, WF.applicationOf, any=False)
+
         if not tool:
-            raise RuntimeError(f"{tool_app} has no associated tool")
+            raise RuntimeError(f"{app} has no associated tool")
         assert isinstance(tool, URIRef)
         return tool
 
-    def expression(self, tool_or_app_or_output: Node) -> str:
-        tool = self.tool(tool_or_app_or_output)
+    def expression(self, tool_or_resource: Node) -> str:
+        if tool_or_resource in self.tool_outputs:
+            tool = self.tool(tool_or_resource)
+        else:
+            assert isinstance(tool_or_resource, URIRef)
+            tool = tool_or_resource
+
         expr = self.tools.value(tool, self.language.namespace.expression,
             any=False)
         if not expr:
             raise RuntimeError(f"{tool} has no algebra expression")
+        assert isinstance(expr, Literal)
         return str(expr)
-
-    def tool_app(self, resource: Node) -> Node:
-        """
-        Find the tool application node associated with an output node.
-        """
-        assert resource in self.tool_outputs
-        tool_app = self.value(predicate=WF.output, object=resource, any=False)
-        if not tool_app:
-            raise RuntimeError(f"{resource} is not output to any tool app")
-        return tool_app

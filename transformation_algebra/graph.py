@@ -360,21 +360,14 @@ class TransformationGraph(Graph):
 
     def add_workflow(self, wf: Workflow) -> dict[Node, Node]:
         """
-        Convert a workflow to a full transformation graph by converting its
-        individual workflow steps to representations of expressions in RDF.
-        Return a mapping between tool application/source nodes and their
-        expression nodes.
-
-        A workflow consists of a dictionary of transformation expressions for
-        each step (e.g. application of a tool), paired with the inputs to those
-        expressions. Every input must be either a source node or a node for the
-        output of another step.
+        Convert a `Workflow` to a full transformation graph by converting its
+        individual workflow steps (source data and tool applications) to
+        representations of expressions in RDF.
         """
-
         self.identifiers = count(start=1)
 
-        # 1. Construct expressions for each wfnode step (source or tool
-        # application), possibly using expressions from previous steps
+        # 1. Construct expressions for each workflow resource (source data or
+        # tool output), possibly using expressions from previous steps
         exprs: dict[Node, Expr] = dict()
 
         # If passthrough is disabled, we record connections between sources and
@@ -388,6 +381,7 @@ class TransformationGraph(Graph):
             try:
                 return exprs[wfnode]
             except KeyError:
+                assert wfnode in wf.tool_outputs
                 input_nodes = list(wf.inputs(wfnode))
                 input_exprs = [wfnode2expr(n) for n in input_nodes]
                 if not self.passthrough:
