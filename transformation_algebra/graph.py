@@ -377,6 +377,10 @@ class TransformationGraph(Graph):
         for source in wf.sources:
             exprs[source] = Source()
 
+            if self.with_labels and isinstance(wf, Graph):
+                for comment in wf.objects(source, RDFS.comment):
+                    self.add((source, RDFS.comment, comment))
+
         def wfnode2expr(wfnode: Node) -> Expr:
             try:
                 return exprs[wfnode]
@@ -409,6 +413,10 @@ class TransformationGraph(Graph):
                         # every input will already have been added
                         wfnode2tfmnode(input_wfnode)
                 self.expr_nodes[expr] = tfmnode = self.add_expr(expr, wf.root)
+
+                if self.with_labels:
+                    tool = wf.tool(wfnode)
+                    self.add((wfnode, RDFS.comment, Literal(f"using {tool}")))
             return tfmnode
 
         result_node = wfnode2tfmnode(wf.target())
@@ -449,7 +457,7 @@ class TransformationGraph(Graph):
 
         Becomes:
 
-            [] ta:type lang:F-A-Top.
+r           [] ta:type lang:F-A-Top.
         """
         ns = self.language.namespace
 

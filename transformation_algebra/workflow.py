@@ -129,12 +129,16 @@ class WorkflowGraph(Graph, Workflow):
     vocabulary.
     """
 
-    def __init__(self, language: Language, workflow: Graph, tools: Graph):
+    def __init__(self, language: Language, tools: Graph | None = None,
+            workflow: Graph | None = None):
         super().__init__()
-        self += workflow
         self.language = language
-        self.tools = tools
+        self.tools = tools or self
+        if workflow:
+            self += workflow
+            self.refresh()
 
+    def refresh(self) -> None:
         root = self.value(None, RDF.type, WF.Workflow, any=False)
         if root:
             self._root = root

@@ -72,25 +72,9 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
 def build_transformation(language: Language, tools: Graph, workflow: Graph,
         **kwargs) -> TransformationGraph:
 
-    wf = WorkflowGraph(language, workflow, tools)
-
-    # Build transformation graph
+    wf = WorkflowGraph(language, tools, workflow)
     g = TransformationGraph(language, **kwargs)
-    step2expr = g.add_workflow(wf)
-
-    # Annotate the expression nodes that correspond with output nodes
-    # of a tool with said tool
-    # TODO incorporate this into add_workflow
-    if kwargs.get('with_labels'):
-        for step in workflow.objects(wf.root, WF.edge):
-            out = workflow.value(step, WF.output, any=False)
-            tool = workflow.value(step, WF.applicationOf, any=False)
-            g.add((step2expr[out], RDFS.comment, Literal(
-                "using " + tool[len(TOOLS):])))
-        for source in wf.sources:
-            for comment in workflow.objects(source, RDFS.comment):
-                g.add((source, RDFS.comment, comment))
-
+    g.add_workflow(wf)
     # Add original workflow
     g += workflow
     return g
