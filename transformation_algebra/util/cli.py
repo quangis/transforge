@@ -18,16 +18,10 @@ from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.query import TransformationQuery
 from transformation_algebra.namespace import TA, EX
+from transformation_algebra.workflow import WorkflowGraph
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.util.common import (to_store, to_file,
-    build_transformation)
+from transformation_algebra.util.common import (to_store, to_file)
 from typing import NamedTuple, Iterable
-
-
-def graph(url: str) -> Graph:
-    g = Graph()
-    g.parse(url, format=guess_format(url))
-    return g
 
 
 def lang(path_or_module: str) -> Language:
@@ -136,18 +130,24 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     @cli.positional(cli.ExistingFile)
     def main(self, *wf_paths):
         visual = self.output_format == "dot"
-        results: list[Graph] = [
-            build_transformation(
-                workflow=graph(wf_path),
-                tools=self.tools,
-                language=self.language,
+        results: list[Graph] = []
+
+        for wf_path in wf_paths:
+
+            wf = WorkflowGraph(self.language, self.tools)
+            wf.parse(wf_path, format=guess_format(wf_path))
+            wf.refresh()
+
+            tg = TransformationGraph(self.language,
                 minimal=visual,
                 with_labels=visual,
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
-            for wf_path in wf_paths
-        ]
+            tg.add_workflow(wf)
+
+            results.add(wf + tg)
+
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
                 cred=self.cred)

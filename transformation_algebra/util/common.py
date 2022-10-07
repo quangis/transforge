@@ -5,14 +5,11 @@ Utility functions for common tasks.
 from __future__ import annotations
 from pathlib import Path
 from rdflib import Graph, Dataset
-from rdflib.term import Literal
 from rdflib.util import guess_format
 from rdflib.tools.rdf2dot import rdf2dot
-from transformation_algebra.namespace import TA, WF, TOOLS, EX, RDFS
-from transformation_algebra.lang import Language
+from transformation_algebra.namespace import TA, WF, TOOLS, EX
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.workflow import WorkflowGraph
 
 
 def graph(url: str | Path, format: str | None = None) -> Graph:
@@ -67,14 +64,3 @@ def to_file(*graphs: Graph, path: str, format: str | None = None):
         else:
             result.serialize(path,
                 format=format or guess_format(path))
-
-
-def build_transformation(language: Language, tools: Graph, workflow: Graph,
-        **kwargs) -> TransformationGraph:
-
-    wf = WorkflowGraph(language, tools, workflow)
-    g = TransformationGraph(language, **kwargs)
-    g.add_workflow(wf)
-    # Add original workflow
-    g += workflow
-    return g
