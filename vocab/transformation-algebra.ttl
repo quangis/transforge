@@ -49,12 +49,6 @@
     rdfs:subClassOf :Concept;
     rdfs:comment "Data produced by some internal process for which the structure is unknown. For example, when an operation *g* is passed as a parameter to some other operation *f*, the data produced by *g* within *f* may be preprocessed by unknown internals.".
 
-:origin
-    a rdf:Property;
-    rdfs:comment "Identifies the node that represents the data source of an input concept.";
-    rdfs:domain :SourceConcept;
-    rdfs:range wf:Resource.
-
 :to
     a rdf:Property;
     owl:inverseOf :from;
@@ -135,23 +129,23 @@
 :Implementation
     a rdfs:Class;
     rdfs:superClassOf wf:Workflow, gis:Tool;
-    rdfs:comment "A concrete implementation of a conceptual transformation.".
+    rdfs:comment "A tool, which is concrete implementation of a conceptual transformation.".
 
 :Application
     a rdfs:Class;
-    rdfs:comment "A specific usage of an concrete implementation.".
+    rdfs:comment "An application of a tool, which is a specific usage of an implementation.".
 
-:application
+:origin
     a rdfs:Property;
     rdfs:domain :Concept;
-    rdfs:range :Application;
-    rdfs:comment "A conceptual step may be realized by some application.".
+    rdfs:range :Application, wf:Resource;
+    rdfs:comment "Any input concept is supported by some source data, and any conceptual step is linked to w an application of a concrete tool".
 
-:using
+:applies
     a rdfs:Property; rfds:subPropertyOf wf:applicationOf;
     rdfs:domain :Application;
     rdfs:range :Implementation;
-    rdfs:comment "Links a specific usage of an implementation to the implementation in general.".
+    rdfs:comment "Links a specific tool application to the tool it applies.".
 
 :signature
     a rdfs:Property;

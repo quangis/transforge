@@ -36,6 +36,7 @@ class TransformationGraph(Graph):
             with_intermediate_types: bool | None = None,
             with_output: bool | None = None,
             with_inputs: bool | None = None,
+            with_workflow_origin: bool | None = None,
             with_membership: bool | None = None,
             with_type_parameters: bool | None = None,
             with_labels: bool | None = None,
@@ -67,6 +68,7 @@ class TransformationGraph(Graph):
         self.with_classes = default(with_classes)
         self.with_transitive_closure = default(with_transitive_closure)
         self.with_noncanonical_types = default(with_noncanonical_types)
+        self.with_workflow_origin = default(with_workflow_origin)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -228,8 +230,8 @@ class TransformationGraph(Graph):
             if self.with_inputs:
                 self.add((root, TA.input, current))
 
-            if self.with_types and (self.with_noncanonical_types or
-                    expr.type in self.language.canon):
+            if self.with_types and (self.with_noncanonical_types
+                    or expr.type in self.language.canon):
 
                 type_node = self.add_type(expr.type)
                 self.add((current, TA.type, type_node))
@@ -417,6 +419,10 @@ class TransformationGraph(Graph):
                 if self.with_labels:
                     tool = wf.tool(wfnode)
                     self.add((wfnode, RDFS.comment, Literal(f"using {tool}")))
+
+                if self.with_workflow_origin:
+                    self.add((tfmnode, TA["origin"], wfnode))
+
             return tfmnode
 
         result_node = wfnode2tfmnode(wf.target())
@@ -457,7 +463,7 @@ class TransformationGraph(Graph):
 
         Becomes:
 
-r           [] ta:type lang:F-A-Top.
+            [] ta:type lang:F-A-Top.
         """
         ns = self.language.namespace
 
