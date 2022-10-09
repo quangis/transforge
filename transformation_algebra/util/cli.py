@@ -129,7 +129,6 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
     expressions = cli.SwitchAttr(["-e", "--expression"], list=True,
         help="Provide an expression to add to the graph.")
-
     blocked = cli.Flag(["--blocked"], default=False,
         help="Do not pass output type of one tool to the next")
     opaque = cli.Flag(["--opaque"], default=False,
@@ -137,13 +136,10 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
     @cli.positional(cli.ExistingFile)
     def main(self, *wf_paths):
-        visual = self.output_format == "dot"
         results: list[Graph] = []
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
-                minimal=visual,
-                with_labels=visual,
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
@@ -156,17 +152,11 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
             wf.refresh()
 
             tg = TransformationGraph(self.language,
-                minimal=visual,
-                with_labels=visual,
-                with_workflow_origin=not visual,
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
             tg.add_workflow(wf)
-
-            if not visual:
-                tg += wf
-
+            tg += wf
             results.append(tg)
 
         if self.server:

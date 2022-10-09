@@ -1,5 +1,6 @@
 import rdflib
 from rdflib import Namespace
+from rdflib.term import URIRef
 
 TA = Namespace('https://github.com/quangis/transformation-algebra#')
 WF = Namespace('http://geographicknowledge.de/vocab/Workflow.rdf#')
@@ -9,3 +10,14 @@ TOOLS = Namespace(
 EX = Namespace('https://example.com/#')
 RDF = rdflib.RDF
 RDFS = rdflib.RDFS
+
+
+def shorten(uri: URIRef) -> str:
+    """
+    Return the part after the last #, or if that is empty, after the last /.
+    """
+    s = str(uri)
+    last = "#".join(s.split("#")[-1:])
+    if last == s:
+        last = "#".join(s.split("/")[-1:])
+    return last

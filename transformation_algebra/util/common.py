@@ -29,38 +29,37 @@ def to_store(*graphs: Graph, **kwargs):
         ds.put(g)
 
 
-def to_file(*graphs: Graph, path: str, format: str | None = None):
+def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
     """
     Convenience method to write one or more graphs to the given file.
     """
-    result: Graph
-    if len(graphs) == 1:
-        result = graphs[0]
-    elif format == "trig":
-        result = Dataset()
-        for g in graphs:
-            subgraph = result.graph(g.base, g.base)
-            subgraph += g
+    if format == "dot":
+        for g1 in graphs:
+            print(g1.visualize())
     else:
-        g = Graph()
-        for g in graphs:
-            result += g
-
-    result.bind("ta", TA)
-    result.bind("wf", WF)
-    result.bind("tools", TOOLS)
-    result.bind("ex", EX)
-
-    for g in graphs:
-        if isinstance(g, TransformationGraph):
-            if g.language.prefix:
-                result.bind(g.language.prefix, g.language.namespace)
-
-    # Produce output file
-    if path:
-        if format == "dot":
-            with open(path, 'w') as f:
-                rdf2dot(result, f)
+        result: Graph
+        if len(graphs) == 1:
+            result = graphs[0]
+        elif format == "trig":
+            result = Dataset()
+            for g in graphs:
+                subgraph = result.graph(g.base, g.base)
+                subgraph += g
         else:
+            for g in graphs:
+                result += g
+
+        result.bind("ta", TA)
+        result.bind("wf", WF)
+        result.bind("tools", TOOLS)
+        result.bind("ex", EX)
+
+        for g in graphs:
+            if isinstance(g, TransformationGraph):
+                if g.language.prefix:
+                    result.bind(g.language.prefix, g.language.namespace)
+
+        # Produce output file
+        if path:
             result.serialize(path,
                 format=format or guess_format(path))
