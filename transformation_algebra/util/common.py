@@ -12,10 +12,10 @@ from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
 
 
-def graph(url: str | Path, format: str | None = None) -> Graph:
-    url = str(url)
+def graph(*urls: str | Path, format: str | None = None) -> Graph:
     g = Graph()
-    g.parse(url, format=format or guess_format(url))
+    for url in urls:
+        g.parse(str(url), format=format or guess_format(url))
     return g
 
 

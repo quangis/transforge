@@ -55,8 +55,13 @@ class Application(cli.Application):
 
 
 class WithTools:
-    tools = cli.SwitchAttr(["-T", "--tools"], argtype=graph, mandatory=True,
-        help="RDF graph containing the tool ontology")
+    @cli.switch(["-T", "--tools"], list=True, argtype=str,
+        help="RDF graph(s) containing the tool ontology")
+    def _tools(self, urls: list[str]) -> Graph:
+        self.tools = Graph()
+        for url in urls:
+            self.tools.parse(url, format=guess_format(url))
+        return self.tools
 
 
 class WithRDF:
@@ -122,6 +127,9 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     algebra expressions for each individual use of a tool
     """
 
+    expressions = cli.SwitchAttr(["-e", "--expression"], list=True,
+        help="Provide an expression to add to the graph.")
+
     blocked = cli.Flag(["--blocked"], default=False,
         help="Do not pass output type of one tool to the next")
     opaque = cli.Flag(["--opaque"], default=False,
@@ -132,8 +140,17 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         visual = self.output_format == "dot"
         results: list[Graph] = []
 
-        for wf_path in wf_paths:
+        for i, expr in enumerate(self.expressions):
+            tg = TransformationGraph(self.language,
+                minimal=visual,
+                with_labels=visual,
+                with_noncanonical_types=False,
+                with_intermediate_types=not self.opaque,
+                passthrough=not self.blocked)
+            tg.add_expr(self.language.parse(expr), EX[f"expr{i}"])
+            results.append(tg)
 
+        for wf_path in wf_paths:
             wf = WorkflowGraph(self.language, self.tools)
             wf.parse(wf_path, format=guess_format(wf_path))
             wf.refresh()
@@ -146,7 +163,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 passthrough=not self.blocked)
             tg.add_workflow(wf)
 
-            results.add(wf + tg)
+            results.append(wf + tg)
 
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
