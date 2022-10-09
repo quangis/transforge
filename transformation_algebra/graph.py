@@ -528,8 +528,8 @@ class TransformationGraph(Graph):
                     for x in self.subjects(TA.internal, c):
                         h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                 else:
-                    assert type
-                    typelabel = self.value(type, RDFS.label, any=False)
+                    typelabel = self.value(type, RDFS.label, any=False) \
+                        if type else "non-canonical type"
                     op = self.value(c, TA.via, any=False)
                     h.write(f"\t\t{c} [ label=< {typelabel}<br/>via {shorten(op)} > ];\n")
             h.write("\t}\n")
