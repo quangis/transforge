@@ -35,7 +35,7 @@ def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
     """
     if format == "dot":
         for g1 in graphs:
-            print(g1.visualize())
+            g1.visualize()
     else:
         result: Graph
         if len(graphs) == 1:

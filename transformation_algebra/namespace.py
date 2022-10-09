@@ -19,5 +19,5 @@ def shorten(uri: URIRef) -> str:
     s = str(uri)
     last = "#".join(s.split("#")[-1:])
     if last == s:
-        last = "#".join(s.split("/")[-1:])
+        last = "/".join(s.split("/")[-1:])
     return last
