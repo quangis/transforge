@@ -389,10 +389,6 @@ class TransformationGraph(Graph):
         for source in wf.sources:
             exprs[source] = Source()
 
-            if self.with_labels and isinstance(wf, Graph):
-                for comment in wf.objects(source, RDFS.comment):
-                    self.add((source, RDFS.comment, comment))
-
         def wfnode2expr(wfnode: Node) -> Expr:
             try:
                 return exprs[wfnode]
@@ -427,10 +423,6 @@ class TransformationGraph(Graph):
 
                 self.expr_nodes[expr] = tfmnode = self.add_expr(expr, wf.root,
                     origin=wfnode)
-
-                if self.with_labels and wfnode not in wf.sources:
-                    tool = wf.tool(wfnode)
-                    self.add((tfmnode, RDFS.comment, Literal(f"using {tool}")))
 
             return tfmnode
 
@@ -513,12 +505,13 @@ class TransformationGraph(Graph):
 
         # Input concepts
         for c in concepts_in:
-            typelabel = self.value(c, RDFS.label, any=False)
+            type = self.value(c, TA.type, any=False)
+            typelabel = self.value(type, RDFS.label, any=False)
             origin = self.value(c, TA.origin, any=False)
             datalabel = self.value(origin, RDFS.label, any=False)
             h.write(f"\tsubgraph cluster{c} {{\n")
             h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
-            h.write(f"\t\t{c} [ shape=none, label=< {typelabel} > ];\n")
+            h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
             h.write("\t}\n")
 
         # Transformed concepts
@@ -529,7 +522,16 @@ class TransformationGraph(Graph):
             h.write(f"\t\tlabel=<<i>{shorten(tool)}</i>>;\n")
             for c in tfm_concepts:
                 label = self.value(c, RDFS.label, any=False)
-                h.write(f"\t\t{c} [ label=< {label} > ];\n")
+                type = self.value(c, TA.type, any=False)
+                if "internal" in label:
+                    h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
+                    for x in self.subjects(TA.internal, c):
+                        h.write(f"\t\t{x} -> {c} [style=dashed];\n")
+                else:
+                    assert type
+                    typelabel = self.value(type, RDFS.label, any=False)
+                    op = self.value(c, TA.via, any=False)
+                    h.write(f"\t\t{c} [ label=< {typelabel}<br/>via {shorten(op)} > ];\n")
             h.write("\t}\n")
 
         # Connect all the nodes
