@@ -33,10 +33,10 @@ def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
     """
     Convenience method to write one or more graphs to the given file.
     """
-    handle = stdout
     if format == "dot":
-        for g1 in graphs:
-            g1.visualize(handle)
+        with open(path, 'w') as f:
+            for g in graphs:
+                g.visualize(f)
     else:
         result: Graph
         if len(graphs) == 1:
@@ -61,6 +61,4 @@ def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
                     result.bind(g.language.prefix, g.language.namespace)
 
         # Produce output file
-        if path:
-            result.serialize(path,
-                format=format or guess_format(path))
+        result.serialize(path, format=format or guess_format(path))
