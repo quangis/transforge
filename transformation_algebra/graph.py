@@ -414,11 +414,12 @@ class TransformationGraph(Graph):
                         # Running this has the side effect that the wfnode for
                         # every input will already have been added
                         wfnode2tfmnode(input_wfnode)
+
                 self.expr_nodes[expr] = tfmnode = self.add_expr(expr, wf.root)
 
-                if self.with_labels:
+                if self.with_labels and wfnode not in wf.sources:
                     tool = wf.tool(wfnode)
-                    self.add((wfnode, RDFS.comment, Literal(f"using {tool}")))
+                    self.add((tfmnode, RDFS.comment, Literal(f"using {tool}")))
 
                 if self.with_workflow_origin:
                     self.add((tfmnode, TA["origin"], wfnode))

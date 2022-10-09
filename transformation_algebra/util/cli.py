@@ -158,12 +158,16 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
             tg = TransformationGraph(self.language,
                 minimal=visual,
                 with_labels=visual,
+                with_workflow_origin=not visual,
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
             tg.add_workflow(wf)
 
-            results.append(wf + tg)
+            if not visual:
+                tg += wf
+
+            results.append(tg)
 
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
