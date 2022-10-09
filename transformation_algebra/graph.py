@@ -507,20 +507,26 @@ class TransformationGraph(Graph):
             app2concepts[app].add(c)
 
         h.write("digraph G {\n")
+        h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>")
         h.write("\tcompound=true;\n")
         h.write("\tnode [shape=rectangle];\n")
 
+        # Input concepts
         for c in concepts_in:
-            label = self.value(c, RDFS.label, any=False)
+            typelabel = self.value(c, RDFS.label, any=False)
+            origin = self.value(c, TA.origin, any=False)
+            datalabel = self.value(origin, RDFS.label, any=False)
             h.write(f"\tsubgraph cluster{c} {{\n")
-            h.write(f"\t\t{c} [ label=< {label} > ];\n")
+            h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
+            h.write(f"\t\t{c} [ shape=none, label=< {typelabel} > ];\n")
             h.write("\t}\n")
 
+        # Transformed concepts
         for wf_out, tfm_concepts in app2concepts.items():
             wf_app = self.value(None, WF.output, wf_out, any=False)
             tool = self.value(wf_app, WF.applicationOf, any=False)
-            h.write(f"\tsubgraph cluster_{wf_app} {{\n")
-            h.write(f"\t\tlabel=\"{shorten(tool)}\";\n")
+            h.write(f"\tsubgraph cluster{wf_app} {{\n")
+            h.write(f"\t\tlabel=<<i>{shorten(tool)}</i>>;\n")
             for c in tfm_concepts:
                 label = self.value(c, RDFS.label, any=False)
                 h.write(f"\t\t{c} [ label=< {label} > ];\n")
@@ -528,6 +534,9 @@ class TransformationGraph(Graph):
 
         # Connect all the nodes
         for node1, node2 in self.subject_objects(TA["to"]):
-            h.write(f"\t{node1} -> {node2} ;\n")
+            if node1 in concepts_in:
+                h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
+            else:
+                h.write(f"\t{node1} -> {node2} ;\n")
 
-        h.write("}")
+        h.write("}\n\n")

@@ -3,10 +3,10 @@ Utility functions for common tasks.
 """
 
 from __future__ import annotations
+from sys import stdout
 from pathlib import Path
 from rdflib import Graph, Dataset
 from rdflib.util import guess_format
-from rdflib.tools.rdf2dot import rdf2dot
 from transformation_algebra.namespace import TA, WF, TOOLS, EX
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.util.store import TransformationStore
@@ -33,9 +33,10 @@ def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
     """
     Convenience method to write one or more graphs to the given file.
     """
+    handle = stdout
     if format == "dot":
         for g1 in graphs:
-            g1.visualize()
+            g1.visualize(handle)
     else:
         result: Graph
         if len(graphs) == 1:
