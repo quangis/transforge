@@ -517,7 +517,7 @@ class TransformationGraph(Graph):
                 typelabel = escape(self.value(type, RDFS.label, any=False))
                 datalabel = escape(self.value(origin, RDFS.label, any=False))
                 h.write(f"\tsubgraph cluster{c} {{\n")
-                h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
+                h.write(f"\t\tlabel=<<u><i>{datalabel or origin}</i></u>>;\n")
                 h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
                 h.write("\t}\n")
 
