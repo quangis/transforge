@@ -535,10 +535,18 @@ class TransformationGraph(Graph):
                         for x in self.subjects(TA.internal, c):
                             h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                     else:
-                        typelabel = escape(self.value(type, RDFS.label, any=False)) \
-                            if type else "non-canonical type"
-                        op = escape(self.value(c, TA.via, any=False))
-                        h.write(f"\t\t{c} [label=< {typelabel}<br/>via {shorten(op)} >];\n")
+                        via = self.value(c, TA.via, any=False)
+                        assert via
+                        op = shorten(escape(via))
+                        if type:
+                            typelabel = escape(self.value(type, RDFS.label, any=False))
+                            h.write(f"\t\t{c} [label=<{typelabel}<br/>via {op}>];\n")
+                        else:
+                            # If no type is found, then this must have been a
+                            # non-canonical type. We use the label on the
+                            # resource as a fallback and make it red
+                            errorlabel = escape(label).replace(' via ', '<br/>via ')
+                            h.write(f"\t\t{c} [label=<<font color=\"red\">{errorlabel}</font>>];\n")
                 h.write("\t}\n")
 
             # Connect all the nodes
