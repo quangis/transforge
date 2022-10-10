@@ -13,6 +13,7 @@ from transformation_algebra.expr import (Expr, Operation, Application,
 from transformation_algebra.lang import Language
 from transformation_algebra.workflow import Workflow
 
+from io import StringIO
 from sys import stdout
 from itertools import count
 from collections import defaultdict
@@ -480,7 +481,7 @@ class TransformationGraph(Graph):
             self.remove((None, ns.type, None))
             self.remove((None, ns.via, None))
 
-    def visualize(self, h=stdout) -> None:
+    def visualize(self, path: str | None) -> str | None:
         """
         Produce a GraphViz visualization of the concept graph, with subgraphs
         for every tool application.
@@ -498,47 +499,56 @@ class TransformationGraph(Graph):
             app = self.value(c, TA.origin, any=False)
             app2concepts[app].add(c)
 
-        h.write("digraph G {\n")
-        h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>")
-        h.write("\tcompound=true;\n")
-        h.write("\tnode [shape=rectangle];\n")
+        h = open(path, 'w', encoding="utf-8") if path else StringIO()
+        try:
+            h.write("digraph G {\n")
+            h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>")
+            h.write("\tcompound=true;\n")
+            h.write("\tnode [shape=rectangle];\n")
 
-        # Input concepts
-        for c in concepts_in:
-            type = self.value(c, TA.type, any=False)
-            typelabel = self.value(type, RDFS.label, any=False)
-            origin = self.value(c, TA.origin, any=False)
-            datalabel = self.value(origin, RDFS.label, any=False)
-            h.write(f"\tsubgraph cluster{c} {{\n")
-            h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
-            h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
-            h.write("\t}\n")
-
-        # Transformed concepts
-        for wf_out, tfm_concepts in app2concepts.items():
-            wf_app = self.value(None, WF.output, wf_out, any=False)
-            tool = self.value(wf_app, WF.applicationOf, any=False)
-            h.write(f"\tsubgraph cluster{wf_app} {{\n")
-            h.write(f"\t\tlabel=<<i>{shorten(tool)}</i>>;\n")
-            for c in tfm_concepts:
-                label = self.value(c, RDFS.label, any=False)
+            # Input concepts
+            for c in concepts_in:
                 type = self.value(c, TA.type, any=False)
-                if "internal" in label:
-                    h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
-                    for x in self.subjects(TA.internal, c):
-                        h.write(f"\t\t{x} -> {c} [style=dashed];\n")
+                typelabel = self.value(type, RDFS.label, any=False)
+                origin = self.value(c, TA.origin, any=False)
+                datalabel = self.value(origin, RDFS.label, any=False)
+                h.write(f"\tsubgraph cluster{c} {{\n")
+                h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
+                h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
+                h.write("\t}\n")
+
+            # Transformed concepts
+            for wf_out, tfm_concepts in app2concepts.items():
+                wf_app = self.value(None, WF.output, wf_out, any=False)
+                tool = self.value(wf_app, WF.applicationOf, any=False)
+                h.write(f"\tsubgraph cluster{wf_app} {{\n")
+                h.write(f"\t\tlabel=<<i>{shorten(tool)}</i>>;\n")
+                for c in tfm_concepts:
+                    label = self.value(c, RDFS.label, any=False)
+                    type = self.value(c, TA.type, any=False)
+                    if "internal" in label:
+                        h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
+                        for x in self.subjects(TA.internal, c):
+                            h.write(f"\t\t{x} -> {c} [style=dashed];\n")
+                    else:
+                        typelabel = self.value(type, RDFS.label, any=False) \
+                            if type else "non-canonical type"
+                        op = self.value(c, TA.via, any=False)
+                        h.write(f"\t\t{c} [ label=< {typelabel}<br/>via {shorten(op)} > ];\n")
+                h.write("\t}\n")
+
+            # Connect all the nodes
+            for node1, node2 in self.subject_objects(TA["to"]):
+                if node1 in concepts_in:
+                    h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
                 else:
-                    typelabel = self.value(type, RDFS.label, any=False) \
-                        if type else "non-canonical type"
-                    op = self.value(c, TA.via, any=False)
-                    h.write(f"\t\t{c} [ label=< {typelabel}<br/>via {shorten(op)} > ];\n")
-            h.write("\t}\n")
+                    h.write(f"\t{node1} -> {node2} ;\n")
 
-        # Connect all the nodes
-        for node1, node2 in self.subject_objects(TA["to"]):
-            if node1 in concepts_in:
-                h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
-            else:
-                h.write(f"\t{node1} -> {node2} ;\n")
+            h.write("}\n\n")
+        finally:
+            h.close()
 
-        h.write("}\n\n")
+        if isinstance(h, StringIO):
+            return h.getvalue()
+        else:
+            return None

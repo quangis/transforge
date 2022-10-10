@@ -34,9 +34,8 @@ def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
     Convenience method to write one or more graphs to the given file.
     """
     if format == "dot":
-        with open(path, 'w') as f:
-            for g in graphs:
-                g.visualize(f)
+        for i, g in enumerate(graphs):
+            g.visualize(path + (str(i) if i > 1 else ""))
     else:
         result: Graph
         if len(graphs) == 1:
