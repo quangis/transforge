@@ -531,7 +531,7 @@ class TransformationGraph(Graph):
                             # non-canonical type. We use the label on the
                             # resource as a fallback and make it red
                             errorlabel = escape(label).replace(' via ', '<br/>via ')
-                            h.write(f"\t\t{c} [label=<<font color=\"red\">{errorlabel}</font>>];\n")
+                            h.write(f"\t\t{c} [label=<<font color=\"red\">non-canonical<br/>{errorlabel}</font>>];\n")
                 h.write("\t}\n")
 
             # Connect all the nodes
