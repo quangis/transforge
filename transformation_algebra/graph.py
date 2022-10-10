@@ -80,8 +80,6 @@ class TransformationGraph(Graph):
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
-        self.identifiers: Iterator[int] | None = None
-
         self.bind("", TA)
         if self.language.prefix and self.language.namespace:
             self.bind(self.language.prefix, self.language.namespace)
@@ -97,9 +95,6 @@ class TransformationGraph(Graph):
         g.parse(path, format=format or guess_format(path))
         g.parse_shortcuts()
         return g
-
-    def ref(self) -> str:
-        return f"{next(self.identifiers)}. " if self.identifiers else ""
 
     def add_vocabulary(self) -> None:
         """
@@ -249,7 +244,7 @@ class TransformationGraph(Graph):
 
             if self.with_labels:
                 self.add((current, RDFS.label,
-                    Literal(f"{self.ref()}{expr.type} from source")))
+                    Literal(f"{expr.type} from source")))
 
         elif isinstance(expr, Operation):
             # assert not expr.operator.definition, \
@@ -279,15 +274,8 @@ class TransformationGraph(Graph):
                     self.add((root, TA.contains, type_node))
 
             if self.with_labels:
-                if not canonical:
-                    type_str = f"noncanonical {output_type}"
-                elif not essential:
-                    type_str = f"hidden {output_type}"
-                else:
-                    type_str = str(output_type)
-
                 self.add((current, RDFS.label, Literal(
-                    f"{self.ref()}{type_str} via {expr.operator.name}")))
+                    f"{output_type} via {expr.operator.name}")))
 
         else:
             assert isinstance(expr, Application)
@@ -381,8 +369,6 @@ class TransformationGraph(Graph):
         individual workflow steps (source data and tool applications) to
         representations of expressions in RDF.
         """
-        self.identifiers = count(start=1)
-
         # 1. Construct expressions for each workflow resource (source data or
         # tool output), possibly using expressions from previous steps
         exprs: dict[Node, Expr] = dict()
@@ -452,8 +438,6 @@ class TransformationGraph(Graph):
         if self.with_classes:
             self.add((wf.root, RDF.type, TA.Transformation))
 
-        self.identifiers = None  # reset the identifiers
-
         return {wfnode: self.expr_nodes[expr]
             for wfnode, expr in exprs.items()}
 
@@ -493,6 +477,7 @@ class TransformationGraph(Graph):
         # `rdflib`'s `rdf2dot` is useful, but produces output that is too messy
         # for complex graphs
 
+        # TODO maybe use a dedicated graph library for this
         # TODO separate from WF.output
         concepts_in: set[Node] = set(self.objects(self.uri, TA.input))
         concepts_app: set[Node] = set(self.objects(None, TA.to))
