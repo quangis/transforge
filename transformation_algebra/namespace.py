@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import rdflib
 from rdflib import Namespace
 from rdflib.term import URIRef
@@ -12,7 +14,7 @@ RDF = rdflib.RDF
 RDFS = rdflib.RDFS
 
 
-def shorten(uri: URIRef) -> str:
+def shorten(uri: URIRef | str) -> str:
     """
     Return the part after the last #, or if that is empty, after the last /.
     """
@@ -20,4 +22,4 @@ def shorten(uri: URIRef) -> str:
     last = "#".join(s.split("#")[-1:])
     if last == s:
         last = "/".join(s.split("/")[-1:])
-    return last
+    return last or s
