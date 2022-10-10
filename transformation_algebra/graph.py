@@ -13,8 +13,8 @@ from transformation_algebra.expr import (Expr, Operation, Application,
 from transformation_algebra.lang import Language
 from transformation_algebra.workflow import Workflow
 
+import html
 from io import StringIO
-from sys import stdout
 from itertools import count
 from collections import defaultdict
 from rdflib import Graph, Namespace, BNode, Literal
@@ -24,6 +24,10 @@ from rdflib.term import Node, URIRef
 from typing import Iterator
 
 TEST = Namespace("https://example.com/#")
+
+
+def escape(string: Literal) -> str:
+    return html.escape(str(string))
 
 
 class TransformationGraph(Graph):
@@ -502,16 +506,16 @@ class TransformationGraph(Graph):
         h = open(path, 'w', encoding="utf-8") if path else StringIO()
         try:
             h.write("digraph G {\n")
-            h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>")
+            h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>;\n")
             h.write("\tcompound=true;\n")
             h.write("\tnode [shape=rectangle];\n")
 
             # Input concepts
             for c in concepts_in:
                 type = self.value(c, TA.type, any=False)
-                typelabel = self.value(type, RDFS.label, any=False)
                 origin = self.value(c, TA.origin, any=False)
-                datalabel = self.value(origin, RDFS.label, any=False)
+                typelabel = escape(self.value(type, RDFS.label, any=False))
+                datalabel = escape(self.value(origin, RDFS.label, any=False))
                 h.write(f"\tsubgraph cluster{c} {{\n")
                 h.write(f"\t\tlabel=<<i>{datalabel or origin}</i>>;\n")
                 h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
@@ -531,10 +535,10 @@ class TransformationGraph(Graph):
                         for x in self.subjects(TA.internal, c):
                             h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                     else:
-                        typelabel = self.value(type, RDFS.label, any=False) \
+                        typelabel = escape(self.value(type, RDFS.label, any=False)) \
                             if type else "non-canonical type"
-                        op = self.value(c, TA.via, any=False)
-                        h.write(f"\t\t{c} [ label=< {typelabel}<br/>via {shorten(op)} > ];\n")
+                        op = escape(self.value(c, TA.via, any=False))
+                        h.write(f"\t\t{c} [label=< {typelabel}<br/>via {shorten(op)} >];\n")
                 h.write("\t}\n")
 
             # Connect all the nodes
@@ -542,7 +546,7 @@ class TransformationGraph(Graph):
                 if node1 in concepts_in:
                     h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
                 else:
-                    h.write(f"\t{node1} -> {node2} ;\n")
+                    h.write(f"\t{node1} -> {node2};\n")
 
             h.write("}\n\n")
         finally:
