@@ -503,15 +503,16 @@ class TransformationGraph(Graph):
                 datalabel = escape(self.value(origin, RDFS.label, any=False))
                 h.write(f"\tsubgraph cluster{c} {{\n")
                 h.write(f"\t\tlabel=<<u><i>{datalabel or origin}</i></u>>;\n")
-                h.write(f"\t\t{c} [ shape=none, label=< {typelabel}> ];\n")
+                h.write(f"\t\t{c} [shape=none, label=<{typelabel}> ];\n")
                 h.write("\t}\n")
 
             # Transformed concepts
             for wf_out, tfm_concepts in app2concepts.items():
+                datalabel = escape(self.value(wf_out, RDFS.label, any=False))
                 wf_app = self.value(None, WF.output, wf_out, any=False)
                 tool = self.value(wf_app, WF.applicationOf, any=False)
                 h.write(f"\tsubgraph cluster{wf_app} {{\n")
-                h.write(f"\t\tlabel=<<i>{shorten(tool)}</i>>;\n")
+                h.write(f"\t\tlabel=<<b>{shorten(tool)}</b><br/><i>{datalabel}</i>>;\n")
                 for c in tfm_concepts:
                     label = self.value(c, RDFS.label, any=False)
                     type = self.value(c, TA.type, any=False)
