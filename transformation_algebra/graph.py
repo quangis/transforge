@@ -15,13 +15,11 @@ from transformation_algebra.workflow import Workflow
 
 import html
 from io import StringIO
-from itertools import count
+from itertools import chain
 from collections import defaultdict
 from rdflib import Graph, Namespace, BNode, Literal
 from rdflib.util import guess_format
 from rdflib.term import Node, URIRef
-
-from typing import Iterator
 
 TEST = Namespace("https://example.com/#")
 
@@ -230,9 +228,6 @@ class TransformationGraph(Graph):
             # used multiple times, especially if passthrough is disabled
             self.expr_nodes[expr] = current
 
-            if self.with_inputs:
-                self.add((root, TA.input, current))
-
             if self.with_types and (self.with_noncanonical_types
                     or expr.type in self.language.canon):
 
@@ -426,8 +421,11 @@ class TransformationGraph(Graph):
             ref_tfmnode = self.expr_nodes[ref_expr]
             self.add((ref_tfmnode, TA.to, src_tfmnode))
 
-        for source in wf.sources:
-            self.add((wfnode2tfmnode(source), TA.origin, source))
+        if self.with_inputs:
+            for wfnode in wf.sources:
+                tfmnode = wfnode2tfmnode(wfnode)
+                self.add((wf.root, TA.input, tfmnode))
+                # self.add((tfmnode, TA.origin, wfnode))
 
         if self.with_output:
             self.add((wf.root, TA.output, result_node))
@@ -481,10 +479,12 @@ class TransformationGraph(Graph):
         # TODO separate from WF.output
         concepts_in: set[Node] = set(self.objects(self.uri, TA.input))
         concepts_app: set[Node] = set(self.objects(None, TA.to))
+        concepts_in_internal: set[Node] = set(x for x in self.subjects(TA.to)
+            if x not in concepts_in)
 
         # Map tool applications to constituent concepts.
         app2concepts: dict[Node | None, set[Node]] = defaultdict(set)
-        for c in concepts_app:
+        for c in chain(concepts_app, concepts_in_internal):
             app = self.value(c, TA.origin, any=False)
             app2concepts[app].add(c)
 
@@ -506,7 +506,7 @@ class TransformationGraph(Graph):
                 h.write(f"\t\t{c} [shape=none, label=<{typelabel}> ];\n")
                 h.write("\t}\n")
 
-            # Transformed concepts
+            # Transformed concepts and internal input concepts
             for wf_out, tfm_concepts in app2concepts.items():
                 datalabel = escape(self.value(wf_out, RDFS.label, any=False))
                 wf_app = self.value(None, WF.output, wf_out, any=False)
@@ -522,11 +522,13 @@ class TransformationGraph(Graph):
                             h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                     else:
                         via = self.value(c, TA.via, any=False)
-                        assert via
                         op = shorten(escape(via))
                         if type:
                             typelabel = escape(self.value(type, RDFS.label, any=False))
-                            h.write(f"\t\t{c} [label=<{typelabel}<br/>via {op}>];\n")
+                            if via:
+                                h.write(f"\t\t{c} [label=<{typelabel}<br/>via {op}>];\n")
+                            else:
+                                h.write(f"\t\t{c} [label=<{typelabel}>];\n")
                         else:
                             # If no type is found, then this must have been a
                             # non-canonical type. We use the label on the
