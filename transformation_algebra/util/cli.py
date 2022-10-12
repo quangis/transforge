@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import importlib.machinery
 import importlib.util
+from sys import stderr
 from pathlib import Path
 from itertools import chain
 
@@ -137,6 +138,10 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     @cli.positional(cli.ExistingFile)
     def main(self, *wf_paths):
         results: list[Graph] = []
+
+        if not (wf_paths or self.expressions):
+            print("Error: missing expression or workflow graph", file=stderr)
+            return 1
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
