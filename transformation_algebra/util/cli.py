@@ -66,7 +66,7 @@ class WithTools:
 
 class WithRDF:
     output_path = cli.SwitchAttr(["-o", "--output"],
-        help="file which to write to")
+        help="file which to write to, or - for stdout")
     output_format = cli.SwitchAttr(["-t", "--to"],
         cli.Set("rdf", "ttl", "trig", "json-ld", "dot"), default="trig",
         requires=["-o"])
@@ -163,7 +163,9 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
             to_store(*results, backend=self.backend, url=self.server,
                 cred=self.cred)
         if self.output_path:
-            to_file(*results, path=self.output_path, format=self.output_format)
+            path = self.output_path
+            path = None if path == "-" else path
+            to_file(*results, path=path, format=self.output_format)
 
 
 class Task(NamedTuple):

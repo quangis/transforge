@@ -29,35 +29,44 @@ def to_store(*graphs: Graph, **kwargs):
         ds.put(g)
 
 
-def to_file(*graphs: TransformationGraph, path: str, format: str | None = None):
+def to_file(*graphs: TransformationGraph, path: str | None,
+        format: str | None = None):
     """
     Convenience method to write one or more graphs to the given file.
     """
+    result: str | None
     if format == "dot":
-        for i, g in enumerate(graphs):
-            g.visualize(path + (str(i) if i > 1 else ""))
-    else:
-        result: Graph
         if len(graphs) == 1:
-            result = graphs[0]
+            result = graphs[0].visualize(path)
+        else:
+            raise RuntimeError("there must be exactly one graph")
+    else:
+        all_g: Graph
+        if len(graphs) == 1:
+            all_g = graphs[0]
         elif format == "trig":
-            result = Dataset()
+            all_g = Dataset()
             for g in graphs:
-                subgraph = result.graph(g.base, g.base)
+                subgraph = all_g.graph(g.base, g.base)
                 subgraph += g
         else:
             for g in graphs:
-                result += g
+                all_g += g
 
-        result.bind("ta", TA)
-        result.bind("wf", WF)
-        result.bind("tools", TOOLS)
-        result.bind("ex", EX)
+        all_g.bind("ta", TA)
+        all_g.bind("wf", WF)
+        all_g.bind("tools", TOOLS)
+        all_g.bind("ex", EX)
 
         for g in graphs:
             if isinstance(g, TransformationGraph):
                 if g.language.prefix:
-                    result.bind(g.language.prefix, g.language.namespace)
+                    all_g.bind(g.language.prefix, g.language.namespace)
 
-        # Produce output file
-        result.serialize(path, format=format or guess_format(path))
+        if path:
+            all_g.serialize(path, format=format or guess_format(path))
+        else:
+            result = all_g.serialize(format=format or guess_format(path))
+
+    if not path:
+        print(result)

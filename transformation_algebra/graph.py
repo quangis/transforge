@@ -545,10 +545,11 @@ class TransformationGraph(Graph):
                     h.write(f"\t{node1} -> {node2};\n")
 
             h.write("}\n\n")
+
+            if isinstance(h, StringIO):
+                return h.getvalue()
+            else:
+                return None
+
         finally:
             h.close()
-
-        if isinstance(h, StringIO):
-            return h.getvalue()
-        else:
-            return None
