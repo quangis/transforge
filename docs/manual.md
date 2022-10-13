@@ -1,8 +1,8 @@
 # Table of contents
 
 1.  [Types](#types)
-2.  [Expressions](#expressions)
-3.  [Querying](#querying)
+2.  [Expressions](#language-and-expressions)
+3.  [Querying](#graphs-and-queries)
 
 # Types
 
@@ -11,19 +11,19 @@ operators. Each of those operators should be given a *type signature* to
 indicate what sort of concepts it transforms between. Before defining a 
 transformation language, we should therefore understand how types work.
 
-## Subtype polymorphism
+### Subtype polymorphism
 
 The `TypeOperator` class is used to declare *base types*. These can be thought 
 of as atomic concepts, such as the real numbers:
 
     >>> import transformation_algebra as ta
-    >>> Real = ta.TypeOperator('Real')
+    >>> Real = ct.TypeOperator('Real')
 
 Base types may have sub- and supertypes. For instance, an integer is also 
 automatically a real number, but not necessarily a natural number:
 
-    >>> Int = ta.TypeOperator('Int', supertype=Real)
-    >>> Nat = ta.TypeOperator('Nat', supertype=Int)
+    >>> Int = ct.TypeOperator('Int', supertype=Real)
+    >>> Nat = ct.TypeOperator('Nat', supertype=Int)
     >>> Int.subtype(Real)
     True
     >>> Int.subtype(Nat)
@@ -33,7 +33,7 @@ automatically a real number, but not necessarily a natural number:
 represent the type of sets of integers. This would automatically be a subtype 
 of `Set(Real)`.
 
-    >>> Set = ta.TypeOperator('Set', params=1)
+    >>> Set = ct.TypeOperator('Set', params=1)
     >>> Set(Int).subtype(Set(Real))
     True
 
@@ -58,7 +58,7 @@ the type was inappropriate, an error:
         Real <= Int
 
 
-## Parametric polymorphism
+### Parametric polymorphism
 
 Our types are *polymorphic* in that any type is also a representative of any of 
 its supertypes. That is, an operator that expects an argument of type `Nat ** 
@@ -66,7 +66,8 @@ Nat` would also accept `Int ** Nat` or `Nat ** Real`. We additionally allow
 *parametric polymorphism* by means of the `TypeSchema` class, which represents 
 all types that can be obtained by substituting its type variables:
 
-    >>> compose = ta.TypeSchema(lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ))
+    >>> compose = ct.TypeSchema(lambda α, β, γ:
+            (β ** γ) ** (α ** β) ** (α ** γ))
     >>> compose.apply(f).apply(g)
     Int ** Real
 
@@ -77,7 +78,7 @@ the type schema is used somewhere, the schematic variables are automatically
 instantiated with *concrete* variables.
 
 
-## Constraints
+### Constraints
 
 Often, variables in a schema cannot be just *any* type. We can abuse indexing 
 notation (`x [...]`) to *constrain* a type. A constraint can be a *subtype* 
@@ -103,13 +104,13 @@ and supertype of *anything*. It must be explicitly imported:
 Typeclass constraints and wildcards can often aid in inference, figuring out 
 interdependencies between types:
 
-    >>> Map = ta.TypeOperator('Map', params=2)
+    >>> Map = ct.TypeOperator('Map', params=2)
     >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
     >>> f.apply(Set(Int))
     Int
 
 
-## Type inference
+### Type inference
 
 In the presence of subtypes, type inference can be less than straightforward. 
 Consider that, when you apply a function of type `τ ** τ ** τ` to an argument 
@@ -137,10 +138,10 @@ into your language. In this case, we also no longer need to provide a name for
 the types: it will be filled automatically. A very simple language, containing 
 two types and one operator, could look as follows:
 
-    >>> Int = ta.TypeOperator()
-    >>> Nat = ta.TypeOperator(supertype=Int)
-    >>> add = ta.Operator(type=lambda α: α ** α ** α [α <= Int])
-    >>> lang = ta.Language(scope=locals())
+    >>> Int = ct.TypeOperator()
+    >>> Nat = ct.TypeOperator(supertype=Int)
+    >>> add = ct.Operator(type=lambda α: α ** α ** α [α <= Int])
+    >>> lang = ct.Language(scope=locals())
 
 We can immediately parse expressions of this language using the `.parse()` 
 method. For example, the following expression adds some unspecified input of 
@@ -164,18 +165,18 @@ We can also get a representation of its sub-expressions:
      └─╼ - : Int
 
 
-## Composite operators
+### Composite operators
 
 It is possible to define *composite* transformations: transformations that are 
 derived from other, simpler ones. This should not necessarily be thought of as 
 providing an *implementation*: it merely represents a decomposition into more 
 primitive conceptual building blocks.
 
-    >>> add1 = ta.Operator(
+    >>> add1 = ct.Operator(
             type=Int ** Int,
-            define=lambda x: add(x, ta.Source(Int))
+            define=lambda x: add(x, ct.Source(Int))
         )
-    >>> compose = Operation(
+    >>> compose = ct.Operation(
             type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
             define=lambda f, g, x: f(g(x))
         )
@@ -196,7 +197,7 @@ expression using `.primitive()`:
      └─╼ - : Nat
 
 
-# Graphs and queries {#queries}
+# Graphs and queries
 
 Beyond *expressing* transformations, an additional goal of the library is to 
 enable *querying* them for their constituent operations and data types.
@@ -215,7 +216,7 @@ case the process is more involved; for now, consult the source code.
 In practical terms, to obtain a graph representation of the previous 
 expression, you may do:
 
-    >>> g = ta.TransformationGraph()
+    >>> g = ct.TransformationGraph()
     >>> g.add_expr(expr)
     >>> g.serialize("graph.ttl", format="ttl")
 
