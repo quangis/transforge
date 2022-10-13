@@ -24,7 +24,7 @@ from rdflib.term import Node, URIRef
 TEST = Namespace("https://example.com/#")
 
 
-def escape(string: Literal) -> str:
+def escape(string: Literal | str | None) -> str:
     return html.escape(str(string))
 
 
@@ -478,7 +478,8 @@ class TransformationGraph(Graph):
         # TODO maybe use a dedicated graph library for this
         # TODO separate from WF.output
         concepts_in: set[Node] = set(self.objects(self.uri, TA.input))
-        concepts_app: set[Node] = set(self.objects(None, TA.to))
+        concepts_app: set[Node] = set(self.objects(None, TA.to)).union(
+            self.objects(self.uri, TA.output))
         concepts_in_internal: set[Node] = set(x for x in self.subjects(TA.to)
             if x not in concepts_in)
 
@@ -512,7 +513,10 @@ class TransformationGraph(Graph):
                 wf_app = self.value(None, WF.output, wf_out, any=False)
                 tool = self.value(wf_app, WF.applicationOf, any=False)
                 h.write(f"\tsubgraph cluster{wf_app} {{\n")
-                h.write(f"\t\tlabel=<<b>{shorten(tool)}</b><br/><i>{datalabel}</i>>;\n")
+                if tool:
+                    h.write(f"\t\tlabel=<<b>{shorten(tool)}</b><br/><i>{datalabel}</i>>;\n")
+                else:
+                    h.write("\t\tlabel=<<b>anonymous tool</b>>;\n")
                 for c in tfm_concepts:
                     label = self.value(c, RDFS.label, any=False)
                     type = self.value(c, TA.type, any=False)

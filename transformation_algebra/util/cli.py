@@ -148,7 +148,9 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
-            tg.add_expr(self.language.parse(expr), EX[f"expr{i}"])
+            tg.uri = root = EX[f"expr{i}"]
+            e = tg.add_expr(self.language.parse(expr), root)
+            tg.add((root, TA.output, e))
             results.append(tg)
 
         for wf_path in wf_paths:
