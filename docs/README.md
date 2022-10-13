@@ -34,9 +34,6 @@ warning.**
 ### Usage
 
 This package was developed for the [CCT](https://github.com/quangis/cct) 
-algebra for geographical information, which may act as an example. We provide a 
-cursory user's guide below.
+algebra for geographical information, which may act as an example. You 
+can find a cursory user's guide [here](manual.md).
 
--   [Types](01%20Types.md)
--   [Expressions](02%20Expressions.md)
--   [Querying](03%20Querying.md)

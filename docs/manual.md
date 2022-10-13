@@ -1,3 +1,9 @@
+# Table of contents
+
+1.  [Types](#types)
+2.  [Expressions](#expressions)
+3.  [Querying](#querying)
+
 # Types
 
 An expression of a transformation language is composed of user-defined semantic 
@@ -118,3 +124,101 @@ possible.
 This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]` rather than 
 just `A ** A ** A`: while the two are identical in what types they *accept*, 
 the former can produce an *output type* that is more specific than `A`.
+
+
+# Language and expressions
+
+Now that we have a feeling for types, we can declare operators using the 
+`Operator` class, and give a type signature to each. A transformation language 
+`Language` is a collection of such types and operators.
+
+For convenience, you can simply incorporate all types and operators in scope 
+into your language. In this case, we also no longer need to provide a name for 
+the types: it will be filled automatically. A very simple language, containing 
+two types and one operator, could look as follows:
+
+    >>> Int = ta.TypeOperator()
+    >>> Nat = ta.TypeOperator(supertype=Int)
+    >>> add = ta.Operator(type=lambda α: α ** α ** α [α <= Int])
+    >>> lang = ta.Language(scope=locals())
+
+We can immediately parse expressions of this language using the `.parse()` 
+method. For example, the following expression adds some unspecified input of 
+type `Nat` (written `- : Nat`) to another input of type `Int`.
+
+    >>> expr = lang.parse("add (- : Nat) (- : Int)")
+
+If the result typechecks, which it does, we obtain an `Expr` object. We can 
+inspect its inferred type:
+
+    >>> expr.type
+    Int
+
+We can also get a representation of its sub-expressions:
+
+    >>> print(expr.tree())
+    Int
+     ├─Int ** Int
+     │  ├─╼ add : Int ** Int ** Int
+     │  └─╼ - : Nat
+     └─╼ - : Int
+
+
+## Composite operators
+
+It is possible to define *composite* transformations: transformations that are 
+derived from other, simpler ones. This should not necessarily be thought of as 
+providing an *implementation*: it merely represents a decomposition into more 
+primitive conceptual building blocks.
+
+    >>> add1 = ta.Operator(
+            type=Int ** Int,
+            define=lambda x: add(x, ta.Source(Int))
+        )
+    >>> compose = Operation(
+            type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
+            define=lambda f, g, x: f(g(x))
+        )
+
+When we use such composite operations, we can derive the underlying primitive 
+expression using `.primitive()`:
+
+    >>> expr = lang.parse("compose add1 add1 (-: Nat)")
+    >>> print(expr.primitive().tree())
+    Int
+     ├─Int ** Int
+     │  ├─╼ add : Int ** Int ** Int
+     │  └─Int
+     │     ├─Int ** Int
+     │     │  ├─╼ add : Int ** Int ** Int
+     │     │  └─╼ - : Int
+     │     └─╼ - : Int
+     └─╼ - : Nat
+
+
+# Graphs and queries {#queries}
+
+Beyond *expressing* transformations, an additional goal of the library is to 
+enable *querying* them for their constituent operations and data types.
+
+To turn an expression into a searchable structure, we convert it to an RDF 
+graph. Every data source and every operation applied to it becomes a node, 
+representing the type of data that is conceptualized at that particular step in 
+the transformation. Chains of nodes are thus obtained that are easily subjected 
+to queries along the lines of: 'find me a transformation containing operations 
+`f` and `g` that, somewhere downstream, combine into data of type `t`'.
+
+The process is straightforward when operations only take data as input. 
+However, expressions in an algebra may also take other operations, in which 
+case the process is more involved; for now, consult the source code.
+
+In practical terms, to obtain a graph representation of the previous 
+expression, you may do:
+
+    >>> g = ta.TransformationGraph()
+    >>> g.add_expr(expr)
+    >>> g.serialize("graph.ttl", format="ttl")
+
+These graphs can be queried via constructs from the [SPARQL 1.1 
+specification](https://www.w3.org/TR/sparql11-query/).
+
