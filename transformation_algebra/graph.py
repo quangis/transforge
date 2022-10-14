@@ -522,8 +522,9 @@ class TransformationGraph(Graph):
                     type = self.value(c, TA.type, any=False)
                     if "internal" in label:
                         h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
-                        for x in self.subjects(TA.internal, c):
-                            h.write(f"\t\t{x} -> {c} [style=dashed];\n")
+                        # Show which node is internal to which
+                        # for x in self.subjects(TA.internal, c):
+                        #     h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                     else:
                         via = self.value(c, TA.via, any=False)
                         op = shorten(escape(via))
