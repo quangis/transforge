@@ -1,70 +1,165 @@
 # Table of contents
 
-1.  [Types](#types)
-2.  [Expressions](#language-and-expressions)
-3.  [Querying](#graphs-and-queries)
+1.  [Introduction](#introduction)
+2.  [Types](#types)
+3.  [Expressions](#language-and-expressions)
+4.  [Querying](#graphs-and-queries)
 
-# Types
 
-An expression of a transformation language is composed of user-defined semantic 
-operators. Each of those operators should be given a *type signature* to 
-indicate what sort of concepts it transforms between. Before defining a 
-transformation language, we should therefore understand how types work.
+# Introduction
+
+`transformation_algebra` is a Python library that allows you to define a 
+language for semantically describing tools or procedures as 
+*transformations between concepts*. When you connect several such 
+procedures into a *workflow*, the library can construct an RDF graph for 
+you that describes it as a whole, automatically inferring the specific 
+concept type at every step.
+
+Throughout this manual, we will use a simplified version of the [core 
+concept transformations of geographical information][cct] as a recurring 
+example, as it was the motivating use case for the library. However, you 
+can apply it to any other domain.
+
+To create a transformation language, you declare transformation 
+operators: the atomic steps with which more complex procedures are 
+described. For example, if you have a tool for selecting the nearest 
+object, you can describe it in terms of operators like `minimum` and 
+`distance`. Alternatively, you could declare a monolithic operator 
+`select_nearest_object` that describes the entire tool 'atomically'. The 
+amount of detail you go into is entirely up to you, because the 
+operators don't necessarily specify anything about *implementation*: 
+they instead represent *conceptual* steps at whatever level of 
+granularity is suitable for your purpose.
+
+[^1]: Just as with transformation operators, type operators don't 
+    necessarily correspond to concrete data types --- they only capture 
+    some important conceptual properties. That is, when a procedure 
+    involves a `Ratio` concept, that also covers `Object`s that happen 
+    to have a `Ratio` property.
+
+The names of the operators should provide a hint to their intended 
+semantics. However, they have no formal content besides their *type 
+signature*. This signature indicates what sort of concepts it 
+transforms. For instance, the `distance` transformation might transform 
+two *objects* to a *value*. Such concepts are represented with *type 
+operators*. So, before defining a transformation language, we should 
+understand how these work. Let's start by importing the library:
+
+    >>> import transformation_algebra as ct
+
+Base type operators can be thought of as atomic concepts. In our case, 
+that could be an *object* or an *ordinal value*. They are declared using 
+the `TypeOperator` class:
+
+    >>> Obj = ct.TypeOperator()
+    >>> Ord = ct.TypeOperator()
+
+*Compound* type operators take other types as parameters. For example, 
+`C(Obj)` could represent the type of collections of objects:
+
+    >>> C = ct.TypeOperator(params=1)
+
+A `Function` is a special compound type, and it's quite an important 
+one: it describes a transformation from one type to another. For 
+convenience, the right-associative infix operator `**` has been 
+overloaded to act as a function arrow. When we apply a function to an 
+input, we get its output, or, if the input type was inappropriate, an 
+error:
+
+    >>> (Ord ** Obj).apply(Ord)
+    Obj
+    >>> (Ord ** Obj).apply(Obj)
+    Type mismatch.
+
+We will revisit types at a later point. For now, we know enough to be 
+able to make our first transformation language, called `sl`, containing 
+the operators `minimum` and `distance`. We already mentioned that a 
+`distance` operator would maybe take two objects and output a value.^[2] 
+Transformation operators are declared using the `Operator` class, so we 
+would end up with:
+
+    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
+
+[^2]: A function that takes multiple arguments can be 
+    [rewritten][w:currying] to a sequence of functions.
+
+The `minimum` operator could take a set of objects, along with a 
+transformation that associates an object with an ordinal value, and 
+outputs the smallest object:
+
+    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+
+The `Language` class bundles up our types and operators into a 
+transformation language. For convenience, you can simply incorporate all 
+types and operators in local scope:
+
+    >>> sl = ct.Language(scope=locals())
+
+Now that we have an object that represents the `sl` language, we can use 
+its `.parse()` method to parse combinations of operators. Such 
+expressions may also contain numbers or dashes `-` to indicate source 
+concepts. The notation `expression : type` is used to explicitly 
+indicate the type of a sub-expression. For example, the following 
+expression represents a concept transformation that selects, from an 
+unspecified set of objects, the object that is nearest to some 
+unspecified object.
+
+    >>> expr = sl.parse("minimum (distance (- : Obj)) (- : C(Obj))")
+
+If the result typechecks, which it does, we obtain an `Expr` object. We 
+can inspect its inferred type and get a representation of its 
+sub-expressions:
+
+    >>> print(expr.tree())
+    Obj
+     ├─C(Obj) → Obj
+     │  ├─╼ minimum : (Obj → Ord) → C(Obj) → Obj
+     │  └─Obj → Ord
+     │     ├─╼ distance : Obj → Obj → Ord
+     │     └─╼ - : Obj
+     └─╼ - : C(Obj)
+
+* * *
+
+# Polymorphism
 
 ### Subtype polymorphism
 
-The `TypeOperator` class is used to declare *base types*. These can be thought 
-of as atomic concepts, such as the real numbers:
+Base types may have sub- and supertypes. For instance, an ratio-scaled 
+quality is also an ordinal value, but not vice versa:
 
-    >>> import transformation_algebra as ta
-    >>> Real = ct.TypeOperator('Real')
-
-Base types may have sub- and supertypes. For instance, an integer is also 
-automatically a real number, but not necessarily a natural number:
-
-    >>> Int = ct.TypeOperator('Int', supertype=Real)
-    >>> Nat = ct.TypeOperator('Nat', supertype=Int)
-    >>> Int.subtype(Real)
+    >>> Ord = ct.TypeOperator(supertype=Qlt)
+    >>> Ratio = ct.TypeOperator(supertype=Ord)
+    >>> Ratio.subtype(Ord)
     True
-    >>> Int.subtype(Nat)
+    >>> Ord.subtype(Ratio)
     False
 
-*Compound types* take other types as parameters. For example, `Set(Int)` could 
-represent the type of sets of integers. This would automatically be a subtype 
-of `Set(Real)`.
+This automatically extends to compound types:
 
-    >>> Set = ct.TypeOperator('Set', params=1)
-    >>> Set(Int).subtype(Set(Real))
+    >>> C(Ratio).subtype(C(Ord))
     True
 
-A `Function` is a special compound type, and it's quite an important one: it 
-describes a transformation. For convenience, the right-associative infix 
-operator `**` has been overloaded to act as a function arrow. (Note that a 
-function that takes multiple arguments can be 
-[rewritten](https://en.wikipedia.org/wiki/Currying) to a sequence of 
-functions.)
+An operator may take another operator as an argument. An operator that 
+takes
 
-    >>> f = Real ** Real
-    >>> g = Int ** Nat
+Functional types, too, may be representative of any of its 
 
-When we apply a function type to an input type, we get its output type, or, if 
-the type was inappropriate, an error:
+These types are *polymorphic* in that any type is also a representative 
+of any of its supertypes. That is, an operator that expects an argument 
+of type `Ord ** Ord` would also accept `Qlt ** Ord` or `Ord ** Ratio`.
 
-    >>> f.apply(Int)
-    Real
-    >>> g.apply(Real)
-    ...
-    Subtype mismatch. Could not satisfy:
-        Real <= Int
 
+    >>> ((Ord ** Ord) ** Qlt).apply(Qlt ** Ord)
+    Qlt
+    >>> ((Ord ** Ord) ** Qlt).apply(Ord ** Ratio)
+    Qlt
 
 ### Parametric polymorphism
 
-Our types are *polymorphic* in that any type is also a representative of any of 
-its supertypes. That is, an operator that expects an argument of type `Nat ** 
-Nat` would also accept `Int ** Nat` or `Nat ** Real`. We additionally allow 
-*parametric polymorphism* by means of the `TypeSchema` class, which represents 
-all types that can be obtained by substituting its type variables:
+We additionally allow *parametric polymorphism* by means of the 
+`TypeSchema` class, which represents all types that can be obtained by 
+substituting its type variables:
 
     >>> compose = ct.TypeSchema(lambda α, β, γ:
             (β ** γ) ** (α ** β) ** (α ** γ))
@@ -129,41 +224,6 @@ the former can produce an *output type* that is more specific than `A`.
 
 # Language and expressions
 
-Now that we have a feeling for types, we can declare operators using the 
-`Operator` class, and give a type signature to each. A transformation language 
-`Language` is a collection of such types and operators.
-
-For convenience, you can simply incorporate all types and operators in scope 
-into your language. In this case, we also no longer need to provide a name for 
-the types: it will be filled automatically. A very simple language, containing 
-two types and one operator, could look as follows:
-
-    >>> Int = ct.TypeOperator()
-    >>> Nat = ct.TypeOperator(supertype=Int)
-    >>> add = ct.Operator(type=lambda α: α ** α ** α [α <= Int])
-    >>> lang = ct.Language(scope=locals())
-
-We can immediately parse expressions of this language using the `.parse()` 
-method. For example, the following expression adds some unspecified input of 
-type `Nat` (written `- : Nat`) to another input of type `Int`.
-
-    >>> expr = lang.parse("add (- : Nat) (- : Int)")
-
-If the result typechecks, which it does, we obtain an `Expr` object. We can 
-inspect its inferred type:
-
-    >>> expr.type
-    Int
-
-We can also get a representation of its sub-expressions:
-
-    >>> print(expr.tree())
-    Int
-     ├─Int ** Int
-     │  ├─╼ add : Int ** Int ** Int
-     │  └─╼ - : Nat
-     └─╼ - : Int
-
 
 ### Composite operators
 
@@ -223,3 +283,6 @@ expression, you may do:
 These graphs can be queried via constructs from the [SPARQL 1.1 
 specification](https://www.w3.org/TR/sparql11-query/).
 
+
+[cct]: https://github.com/quangis/cct
+[w:currying]: https://en.wikipedia.org/wiki/Currying
