@@ -10,7 +10,7 @@ from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
 
-from transformation_algebra.namespace import TA
+from transformation_algebra.namespace import TA, EX
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
     TypeSchema)
@@ -62,7 +62,7 @@ class Language(object):
     @property
     def namespace(self) -> LanguageNamespace:
         if self._namespace is None:
-            raise RuntimeError("No associated namespace.")
+            self._namespace = LanguageNamespace(EX, self)
         elif not isinstance(self._namespace, LanguageNamespace):
             assert isinstance(self._namespace, str)
             self._namespace = LanguageNamespace(self._namespace, self)
