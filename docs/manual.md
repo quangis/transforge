@@ -146,7 +146,7 @@ looks something like this:
     python -m transformation_algebra graph \
         -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
 
-![resource/tg.svg][A visualization of the transformation graph.]
+![A visualization of the transformation graph.](resource/tg.svg)
 
 This graph represents what happens 'inside' the workflow. Of course, the 
 example is trivial: there is only one tool, and each operator has a very 
