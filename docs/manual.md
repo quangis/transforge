@@ -146,9 +146,11 @@ looks something like this:
     python -m transformation_algebra graph \
         -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
 
-<img align="center"
+<p align="center" width="100%">
+<img
     src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg.svg"
     alt="A visualization of the transformation graph.">
+</p>
 
 This graph represents what happens 'inside' the workflow. 
 Chronologically, the distance is an ordinal value that has to be 
