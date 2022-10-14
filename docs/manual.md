@@ -146,9 +146,13 @@ looks something like this:
     python -m transformation_algebra graph \
         -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
 
+<p align="center">
 ![A visualization of the transformation graph.](resource/tg.svg)
+</p>
 
-This graph represents what happens 'inside' the workflow. Of course, the 
+This graph represents what happens 'inside' the workflow. 
+Chronologically, the distance is an ordinal value that has to be 
+considered *before* taking the minimum, which produced. Of course, the 
 example is trivial: there is only one tool, and each operator has a very 
 specific signature. In what follows, we will go into more advanced 
 features.
@@ -157,6 +161,12 @@ features.
     the command-line interface works. You can also interface with Python 
     directly; checking out the source code for the command-line 
     interface should give you a headstart.
+
+[^4]: You might notice that there is a dashed node before the distance. 
+    This is due to the fact that `distance` was an argument to another 
+    transformation, so it may internally use information that was passed 
+    to `minimum`, which indeed it does: `distance` needs to know about 
+    the incident location as well as the hospital locations.
 
 * * *
 
