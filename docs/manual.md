@@ -152,12 +152,11 @@ looks something like this:
     alt="A visualization of the transformation graph.">
 </p>
 
-This graph represents what happens 'inside' the workflow. 
+This graph represents what happens 'inside' the workflow.[^4] 
 Chronologically, the distance is an ordinal value that has to be 
-considered *before* taking the minimum, which produced. Of course, the 
-example is trivial: there is only one tool, and each operator has a very 
-specific signature. In what follows, we will go into more advanced 
-features.
+considered *before* taking the minimum. Of course, the example is 
+trivial: there is only one tool, and each operator has a very specific 
+signature. In what follows, we will go into more advanced features.
 
 [^3]: Run `python -m transformation_algebra -h` for information on how 
     the command-line interface works. You can also interface with Python 
