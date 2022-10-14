@@ -22,14 +22,14 @@ can apply it to any other domain.
 
 To create a transformation language, you declare transformation 
 operators: the atomic steps with which more complex procedures are 
-described. For example, if you have a tool for selecting the nearest 
-object, you can describe it in terms of operators like `minimum` and 
-`distance`. Alternatively, you could declare a monolithic operator 
-`select_nearest_object` that describes the entire tool 'atomically'. The 
-amount of detail you go into is entirely up to you, because the 
-operators don't necessarily specify anything about *implementation*: 
-they instead represent *conceptual* steps at whatever level of 
-granularity is suitable for your purpose.
+described. For example, if you have a `NearObject` tool for selecting 
+the nearest object, you could describe it in terms of operators like 
+`minimum` and `distance`. Alternatively, you could declare a monolithic 
+operator `select_nearest_object` that describes the entire tool 
+'atomically'. The amount of detail you go into is entirely up to you, 
+because the operators don't necessarily specify anything about 
+*implementation*: they instead represent *conceptual* steps at whatever 
+level of granularity is suitable for your purpose.
 
 [^1]: Just as with transformation operators, type operators don't 
     necessarily correspond to concrete data types --- they only capture 
@@ -74,20 +74,17 @@ error:
 We will revisit types at a later point. For now, we know enough to be 
 able to make our first transformation language, called `sl`, containing 
 the operators `minimum` and `distance`. We already mentioned that a 
-`distance` operator would maybe take two objects and output a value.^[2] 
-Transformation operators are declared using the `Operator` class, so we 
-would end up with:
+`distance` operator would maybe take two objects and output a value.[^2] 
+The `minimum` operator could take a set of objects, along with a 
+transformation that associates an object with an ordinal value, and 
+outputs the smallest object. Transformation operators are declared using 
+the `Operator` class, so we would end up with:
 
     >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
+    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
 
 [^2]: A function that takes multiple arguments can be 
     [rewritten][w:currying] to a sequence of functions.
-
-The `minimum` operator could take a set of objects, along with a 
-transformation that associates an object with an ordinal value, and 
-outputs the smallest object:
-
-    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
 
 The `Language` class bundles up our types and operators into a 
 transformation language. For convenience, you can simply incorporate all 
@@ -119,7 +116,51 @@ sub-expressions:
      │     └─╼ - : Obj
      └─╼ - : C(Obj)
 
+It is now time to construct a simple workflow. We will use RDF for that, 
+using [Turtle][w:ttl] syntax and the [Workflow][wf] vocabulary. First, 
+we describe the `NearObject` tool:
+
+    @prefix : <http://example.com/#>.
+    :NearObject
+        :expression "minimum (distance (1: Obj)) (2: C(Obj))".
+
+Now, our workflow will use this tool to find the nearest hospital:
+
+    @prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
+
+    :SimpleWorkflow a wf:Workflow;
+        wf:source _:hospitals, _:incident;
+        wf:edge [
+            wf:applicationOf :NearObject;
+            wf:input1 _:incident;
+            wf:input2 _:hospitals;
+            wf:output _:nearest_hospital
+        ].
+
+Save the transformation language into [`sl.py`](resource/sl.py), and the 
+workflow and tool description into [`wf.ttl`](resource/wf.ttl). We can 
+now use `transformation_algebra`'s command-line interface[^3] to 
+construct a transformation graph for our workflow. What we get back 
+looks something like this:
+
+    python -m transformation_algebra graph \
+        -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
+
+![resource/tg.svg][A visualization of the transformation graph.]
+
+This graph represents what happens 'inside' the workflow. Of course, the 
+example is trivial: there is only one tool, and each operator has a very 
+specific signature. In what follows, we will go into more advanced 
+features.
+
+[^3]: Run `python -m transformation_algebra -h` for information on how 
+    the command-line interface works. You can also interface with Python 
+    directly; checking out the source code for the command-line 
+    interface should give you a headstart.
+
 * * *
+
+What follows is work-in-progress.
 
 # Polymorphism
 
@@ -285,4 +326,6 @@ specification](https://www.w3.org/TR/sparql11-query/).
 
 
 [cct]: https://github.com/quangis/cct
+[wf]: http://geographicknowledge.de/vocab/Workflow.rdf#
+[w:ttl]: https://en.wikipedia.org/wiki/Turtle_(syntax)
 [w:currying]: https://en.wikipedia.org/wiki/Currying

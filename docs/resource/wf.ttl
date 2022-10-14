@@ -1,0 +1,19 @@
+@prefix : <https://example.com/#>.
+@prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+:NearObject
+    :expression "minimum (distance (1: Obj)) (2: C(Obj))".
+
+<https://example.com/wf> a wf:Workflow;
+    wf:source _:hospitals, _:incident;
+    wf:edge [
+        wf:applicationOf :NearObject;
+        wf:input1 _:incident;
+        wf:input2 _:hospitals;
+        wf:output _:nearest_hospital
+    ].
+
+_:incident rdfs:label "Incident".
+_:hospitals rdfs:label "Hospitals".
+_:nearest_hospital rdfs:label "Nearest hospital".
