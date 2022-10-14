@@ -158,7 +158,7 @@ class Expr(ABC):
         elif isinstance(self, Source):
             with_type = False
             with_parentheses = False
-            result = f"~{self.type.text()}"
+            result = f"- : {self.type.text()}"
         elif isinstance(self, Application):
             parens = not isinstance(self.f, Application)
             result = f"{self.f.text(labels, with_parentheses=parens)} "\
