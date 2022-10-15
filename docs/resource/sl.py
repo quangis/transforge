@@ -7,4 +7,4 @@ C = ct.TypeOperator(params=1)
 distance = ct.Operator(type=Obj ** Obj ** Ord)
 minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
 
-lang = ct.Language(scope=locals(), canon={Obj, Ord, C(Obj)})
+sl = ct.Language(scope=locals(), canon={Obj, Ord, C(Obj)})
