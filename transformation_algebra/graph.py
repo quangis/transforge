@@ -425,7 +425,6 @@ class TransformationGraph(Graph):
             for wfnode in wf.sources:
                 tfmnode = wfnode2tfmnode(wfnode)
                 self.add((wf.root, TA.input, tfmnode))
-                # self.add((tfmnode, TA.origin, wfnode))
 
         if self.with_output:
             self.add((wf.root, TA.output, result_node))

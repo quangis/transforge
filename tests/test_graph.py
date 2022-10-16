@@ -431,7 +431,7 @@ class TestAlgebraRDF(unittest.TestCase):
             {TEST.source}))
 
         expected = graph_manual(
-            x=Step(type=TEST.A, origin=TEST.source),
+            x=Step(type=TEST.A),
             f=Step(via=TEST.f, input="x", type=TEST.B),
         )
 
@@ -591,7 +591,7 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         expected = graph_manual(
-            s1=Step(type=TEST.B, origin=TEST.src1),
+            s1=Step(type=TEST.B),
             s2=Step(TEST.f, input="s1", type=TEST.B),
             s3=Step(type=TEST.A, input="s2"),
             s4=Step(TEST.f, input="s3", type=TEST.A),
@@ -604,6 +604,26 @@ class TestAlgebraRDF(unittest.TestCase):
             TEST.tool1: ("f (1: B)", [TEST.src1]),
             TEST.tool2: ("f (1: A)", [TEST.tool1])
         }, {TEST.src1}))
+
+        self.assertIsomorphic(actual, expected)
+
+    def test_workflow_origins(self):
+        A = TypeOperator('A')
+        f = Operator(type=lambda x: x ** x)
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            s1=Step(type=TEST.A, origin=TEST.src),
+            s2=Step(TEST.f, input="s1", type=TEST.A, origin=TEST.tool),
+        )
+
+        actual = TransformationGraph(lang, passthrough=False,
+            minimal=True, with_operators=True, with_types=True,
+            with_workflow_origin=True)
+        root = BNode()
+        actual.add_workflow(WorkflowDict(root, {
+            TEST.tool: ("f (1: A)", [TEST.src]),
+        }, {TEST.src}))
 
         self.assertIsomorphic(actual, expected)
 
