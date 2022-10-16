@@ -13,7 +13,7 @@ from rdflib.namespace import ClosedNamespace
 from transformation_algebra.namespace import TA, EX
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
-    TypeSchema)
+    TypeSchema, Top)
 from transformation_algebra.expr import Operator, Expr, Application, Source
 
 
@@ -343,7 +343,7 @@ class Language(object):
                 else:
                     stack.append(None)
             elif token == "_":
-                stack.append(TypeVariable(wildcard=True))
+                stack.append(Top())
             elif token == "*":
                 t1 = stack.pop()
                 assert isinstance(t1, TypeInstance)
