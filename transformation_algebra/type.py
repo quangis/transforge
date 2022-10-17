@@ -496,7 +496,9 @@ class TypeInstance(Type):
         b = other.follow()
 
         if isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
-            if a.basic:
+            if subtype and (a.operator is Bottom or b.operator is Top):
+                return True
+            elif a.basic:
                 return a.operator == b.operator or \
                     (subtype and a.operator.subtype(b.operator))
             elif a.operator != b.operator:
@@ -513,6 +515,8 @@ class TypeInstance(Type):
                         result = None
                 return result
         elif isinstance(a, TypeOperation) and isinstance(b, TypeVariable):
+            if subtype and a.operator is Bottom:
+                return True
             if (b.upper or b.lower) and not a.basic:
                 return False
             if b.upper and b.upper.subtype(a.operator, strict=True):
@@ -522,6 +526,8 @@ class TypeInstance(Type):
             if accept_wildcard and b.wildcard:
                 return True
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
+            if subtype and b.operator is Top:
+                return True
             if (a.upper or a.lower) and not b.basic:
                 return False
             if a.lower and b.operator.subtype(a.lower, strict=True):
@@ -555,7 +561,9 @@ class TypeInstance(Type):
             if not skip_wildcard or not (a.wildcard and b.wildcard):
                 a.bind(b)
         elif isinstance(a, TypeOperation) and isinstance(b, TypeOperation):
-            if a.basic:
+            if a.operator is Bottom or b.operator is Top:
+                return
+            elif a.basic:
                 if skip_basic:
                     pass
                 elif subtype and not a.operator.subtype(b.operator):
@@ -574,7 +582,9 @@ class TypeInstance(Type):
             else:
                 raise TypeMismatch(a, b)
         elif isinstance(a, TypeVariable) and isinstance(b, TypeOperation):
-            if a in b:
+            if b.operator is Top:
+                return
+            elif a in b:
                 raise RecursiveType(a, b)
             elif b.basic:
                 if skip_basic or (skip_wildcard and a.wildcard):
@@ -592,7 +602,9 @@ class TypeInstance(Type):
                     a.bind(b)
         else:
             assert isinstance(a, TypeOperation) and isinstance(b, TypeVariable)
-            if b in a:
+            if a.operator is Bottom:
+                return
+            elif b in a:
                 raise RecursiveType(b, a)
             elif a.basic:
                 if skip_basic or (skip_wildcard and b.wildcard):
@@ -801,12 +813,16 @@ class TypeVariable(TypeInstance):
         Constrain this variable to be a basic type with the given type as lower
         bound.
         """
+        if new is Top:
+            self.bind(Top())
+            return
+
         a = self.follow()
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
-        if upper.subtype(new, True):  # fail when lower bound higher than upper
+        if upper.subtype(new, True):  # fail when lower bound exceeds upper
             raise SubtypeMismatch(new, upper)
-        elif not new.subtype(upper):  # make sure that new type is in same line
+        elif not new.subtype(upper):  # new type must be in same 'family line'
             raise SubtypeMismatch(new, upper)
         elif new.subtype(lower, True):  # ignore lower bound lower than current
             pass
@@ -824,6 +840,10 @@ class TypeVariable(TypeInstance):
         upper bound.
         """
         # symmetric to `above`
+        if new is Bottom:
+            self.bind(Bottom())
+            return
+
         a = self.follow()
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
