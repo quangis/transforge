@@ -469,6 +469,11 @@ class TestType(unittest.TestCase):
         self.assertEqual(F(F(_)).concretize(), F(F(Top)))
         self.assertRaises(RuntimeError, G.concretize)
 
+    def test_top_type_is_usable_as_a_function(self):
+        # cf. <https://github.com/quangis/transformation-algebra/issues/100>
+        F = TypeOperator()
+        self.apply(Top, F, result=Top)
+
     @unittest.skip("see issue #79")
     def test_intersection_type_order_is_irrelevant(self):
         A, B, C = (TypeOperator() for _ in range(3))

@@ -152,6 +152,8 @@ class Type(ABC):
                 return right
             else:
                 return right.fix()
+        elif isinstance(f, TypeOperation) and f.operator == Top:
+            return Top()
         else:
             raise FunctionApplicationError(f, x)
 
