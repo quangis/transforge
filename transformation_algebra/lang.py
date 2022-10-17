@@ -75,10 +75,10 @@ class Language(object):
         Convert an operator or a canonical type to its associated URI.
         """
 
-        # concretize `F(_)` to `F(Top)`
-        if ((isinstance(x, TypeOperation) and any(x.variables()))
+        # concretize `F(x)` to `F(Top)` for unconstrained variables
+        if ((isinstance(x, TypeOperation) and any(x.variables(indirect=False)))
                 or isinstance(x, (TypeVariable, TypeSchema))):
-            x = x.concretize()
+            x = x.concretize(replace=True)
 
         # handle base (type) operators
         if isinstance(x, TypeOperation) and x.operator.arity == 0:

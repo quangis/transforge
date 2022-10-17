@@ -164,16 +164,18 @@ class Type(ABC):
     def concretize(self, replace: bool = False) -> TypeOperation:
         """
         Make sure that this type contains no variables. Replace wildcard
-        variables with the catch-all `Top` type, and optionally other variables
-        too.
+        variables with the catch-all `Top` type, and optionally other
+        unconstrained variables too.
         """
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
             return a.operator(*(p.concretize(replace) for p in a.params))
-        elif isinstance(a, TypeVariable) and (replace or a.wildcard):
+        elif isinstance(a, TypeVariable) and (replace or a.wildcard) \
+                and not a._constraints:
             return Top()
         else:
-            raise RuntimeError("encountered variable")
+            raise RuntimeError(
+                "encountered a variable, but expected concrete type")
 
 
 class TypeSchema(Type):
