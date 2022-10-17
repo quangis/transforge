@@ -1,7 +1,7 @@
 import unittest
 
 from transformation_algebra.type import TypeOperator, TypeAlias, \
-    SubtypeMismatch, _, Top
+    SubtypeMismatch, _, Top, TypeVariable
 from transformation_algebra.expr import Operator, Source
 from transformation_algebra.lang import Language
 from collections import defaultdict
@@ -26,9 +26,17 @@ class TestAlgebra(unittest.TestCase):
 
         lang.parse("f(1 : A) : FA", Source())
 
-    def test_concretizable_wildcard(self):
+    def test_concretizable_parsed_wildcard(self):
+        # Wildcards sometimes need to be concretized to catch-all `Top` types,
+        # specifically in queries. Sometimes, they should just be left as
+        # variables, specifically in full expressions.
+        # We could do this automatically (make `parse_type` do the
+        # concretization while `parse_expr` wouldn't), but I think being
+        # explicit probably makes for fewer surprises
+        # cf <https://github.com/quangis/transformation-algebra/issues/108>
         lang = Language()
-        self.assertEqual(lang.parse_type("_").concretize(), Top())
+        self.assertEqual(type(lang.parse_type("_")), TypeVariable)
+        self.assertEqual(lang.parse_type("_").concretize(replace=True), Top())
 
     def test_type_synonyms_no_variables(self):
         F = TypeOperator(params=1)

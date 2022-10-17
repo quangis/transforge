@@ -343,7 +343,7 @@ class Language(object):
                 else:
                     stack.append(None)
             elif token == "_":
-                stack.append(Top())
+                stack.append(TypeVariable())
             elif token == "*":
                 t1 = stack.pop()
                 assert isinstance(t1, TypeInstance)

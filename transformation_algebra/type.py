@@ -163,8 +163,9 @@ class Type(ABC):
 
     def concretize(self, replace: bool = False) -> TypeOperation:
         """
-        Make sure that this type contains no variables. Replace every wildcard
-        variable with the catch-all `Top` type.
+        Make sure that this type contains no variables. Replace wildcard
+        variables with the catch-all `Top` type, and optionally other variables
+        too.
         """
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
