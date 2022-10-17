@@ -474,6 +474,16 @@ class TestType(unittest.TestCase):
         F = TypeOperator()
         self.apply(Top, F, result=Top)
 
+    def test_top_and_bottom(self):
+        # cf. <https://github.com/quangis/transformation-algebra/issues/107>
+        F = TypeOperator()
+        self.assertTrue(F().match(Top(), subtype=True))
+        self.assertTrue(Bottom().match(F(), subtype=True))
+        self.assertFalse(F().match(Bottom(), subtype=True))
+        self.assertFalse(Top().match(F(), subtype=True))
+        self.assertTrue(Top().match(Top(), subtype=True))
+        self.assertTrue(Bottom().match(Bottom(), subtype=True))
+
     @unittest.skip("see issue #79")
     def test_intersection_type_order_is_irrelevant(self):
         A, B, C = (TypeOperator() for _ in range(3))
