@@ -483,6 +483,19 @@ class TestType(unittest.TestCase):
         self.assertTrue(Top().match(Top(), subtype=True))
         self.assertTrue(Bottom().match(Bottom(), subtype=True))
 
+    def test_top_and_bottom_apply_in_compound_types(self):
+        # cf. <https://github.com/quangis/transformation-algebra/issues/108>
+        A = TypeOperator()
+        F = TypeOperator(params=1)
+
+        f = A ** A
+        self.apply(f, Bottom, result=A)
+        self.apply(f, Top, result=Exception)
+
+        g = F(A) ** A
+        self.apply(g, F(Bottom), result=A)
+        self.apply(g, F(Top), result=Exception)
+
     def test_top_and_bottom_apply(self):
         # cf. <https://github.com/quangis/transformation-algebra/issues/107>
         A = TypeOperator()

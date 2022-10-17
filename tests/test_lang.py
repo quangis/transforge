@@ -132,6 +132,19 @@ class TestAlgebra(unittest.TestCase):
             with self.subTest(supertype_of=s):
                 self.assertEqual(set(lang.supertypes(s)), expected)
 
+    def test_wildcard_parsing_does_not_cause_subtyping_errors(self):
+        # Test that a parsed `_` does not cause subtype errors once it is
+        # applied to a function.
+        # cf. <https://github.com/quangis/transformation-algebra/issues/108>
+        # The test uses a compound type because the issue does not arise with a
+        # simple type. My guess is that is due to interactions with the `:`
+        # operator that causes a subtype unification.
+        A = TypeOperator()
+        F = TypeOperator(params=1)
+        f = Operator(type=F(A) ** A)
+        lang = Language(scope=locals())
+        lang.parse("f (-: F(_))")
+
 
 if __name__ == '__main__':
     unittest.main()
