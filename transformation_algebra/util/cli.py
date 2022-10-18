@@ -136,6 +136,8 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         help="Do not pass output type of one tool to the next")
     opaque = cli.Flag(["--opaque"], default=False,
         help="Do not annotate types internal to the tools")
+    skip_error = cli.Flag(["--skip-error"], default=False,
+        help="Skip failed transformation graphs instead of exiting")
 
     @cli.positional(cli.ExistingFile)
     def main(self, *wf_paths):
@@ -170,9 +172,17 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 with_noncanonical_types=False,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
-            tg.add_workflow(wf)
-            tg += wf
-            results.append(tg)
+
+            try:
+                tg.add_workflow(wf)
+            except Exception as e:
+                if self.skip_on_error:
+                    print(f"Skipping {wf_path}:", e, file=stderr)
+                else:
+                    raise
+            else:
+                tg += wf
+                results.append(tg)
 
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
