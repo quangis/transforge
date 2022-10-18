@@ -15,7 +15,7 @@ from glob import glob
 
 from plumbum import cli  # type: ignore
 from rdflib import Graph
-from rdflib.term import Node
+from rdflib.term import Node, Literal
 from rdflib.util import guess_format
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
@@ -207,8 +207,8 @@ class QueryRunner(Application, WithServer):
     given, just output the query instead.
     """
 
-    output = cli.SwitchAttr(["-o", "--output"], cli.NonexistentPath,
-        mandatory=True, help="Output file")
+    output_path = cli.SwitchAttr(["-o", "--output"], cli.NonexistentPath,
+        help="Output file")
     output_format = cli.SwitchAttr(["-t", "--to"], cli.Set("sparql", "csv"),
         default="csv", help="Output format")
 
@@ -217,16 +217,27 @@ class QueryRunner(Application, WithServer):
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
 
-    def evaluate(self, path, **opts) -> Task:
+    def evaluate(self, path, **opts) -> Graph:
         """
         Parse and run a single task.
         """
-        graph = Graph()
-        graph.parse(path)
-        query = TransformationQuery(self.language, graph, **opts)
-        return Task(name=path.stem, query=query,
-            expected=set(graph.objects(query.root, TA.implementation)),
-            actual=(query.run(self.graph) if self.graph else set()))
+        in_graph = Graph()
+        in_graph.parse(path)
+        query = TransformationQuery(self.language, in_graph, **opts)
+
+        # expected = set(graph.objects(query.root, TA.implementation))
+        actual = query.run(self.store) if self.store else set()
+        sparql = query.sparql()
+
+        out_graph = query.graph
+        out_graph.add((query.root, TA.sparql, Literal(sparql)))
+        for match in actual:
+            out_graph.add((query.root, TA.match, match))
+        return out_graph
+
+        # return Task(name=path.stem, query=query,
+        #     expected=set(graph.objects(query.root, TA.implementation)),
+        #     actual=(query.run(self.graph) if self.graph else set()))
 
     def summarize(self, tasks: Iterable[Task]) -> None:
         """
@@ -286,20 +297,28 @@ class QueryRunner(Application, WithServer):
                 by_chronology=self.chronological and not self.blackbox)
                 for task_file in QUERY_FILE]
 
-            # Summarize query results
-            if self.output_format == "sparql":
-                with open(self.output, 'w', newline='') as h:
-                    h.write("---\n")
-                    for task in tasks:
-                        h.write(task.query.sparql())
-                        h.write("\n\nActual: ")
-                        h.write(", ".join(t.n3() for t in task.actual))
-                        h.write("\nExpected: ")
-                        h.write(", ".join(t.n3() for t in task.expected))
-                        h.write("\n---\n")
-            else:
-                assert self.output_format == "csv"
-                self.summarize(tasks)
+            for t in tasks:
+                print(t.serialize(format="ttl"))
+
+            # if self.output_path:
+            #     path = self.output_path
+            #     path = None if path == "-" else path
+            #     to_file(*tasks, path=path, format="ttl")
+
+            # # Summarize query results
+            # if self.output_format == "sparql":
+            #     with open(self.output, 'w', newline='') as h:
+            #         h.write("---\n")
+            #         for task in tasks:
+            #             h.write(task.query.sparql())
+            #             h.write("\n\nActual: ")
+            #             h.write(", ".join(t.n3() for t in task.actual))
+            #             h.write("\nExpected: ")
+            #             h.write(", ".join(t.n3() for t in task.expected))
+            #             h.write("\n---\n")
+            # else:
+            #     assert self.output_format == "csv"
+            #     self.summarize(tasks)
 
 
 if __name__ == '__main__':
