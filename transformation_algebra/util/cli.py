@@ -5,11 +5,13 @@ Command-line interface for common tasks.
 from __future__ import annotations
 
 import csv
+import platform
 import importlib.machinery
 import importlib.util
 from sys import stderr
 from pathlib import Path
 from itertools import chain
+from glob import glob
 
 from plumbum import cli  # type: ignore
 from rdflib import Graph
@@ -142,6 +144,12 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         if not (wf_paths or self.expressions):
             print("Error: missing expression or workflow graph", file=stderr)
             return 1
+
+        # Windows does not interpret asterisks as globs, so we do that manually
+        if platform.system() == 'Windows':
+            wf_paths = [globbed
+                for original in wf_paths.copy()
+                for globbed in glob(original)]
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
