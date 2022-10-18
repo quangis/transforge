@@ -87,14 +87,6 @@ class TransformationGraph(Graph):
         self.subtyped: set[TypeOperation] = set()
         self.supertyped: set[TypeOperation] = set()
 
-    @staticmethod
-    def from_rdf(path: str, *nargs,
-            format: str = "turtle", **kwargs) -> TransformationGraph:
-        g = TransformationGraph(*nargs, **kwargs)
-        g.parse(path, format=format or guess_format(path))
-        g.parse_shortcuts()
-        return g
-
     def add_vocabulary(self) -> None:
         """
         Add the RDF vocabulary for describing expressions in terms of the types

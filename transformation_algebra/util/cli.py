@@ -221,7 +221,8 @@ class QueryRunner(Application, WithServer):
         """
         Parse and run a single task.
         """
-        graph = TransformationGraph.from_rdf(path, self.language)
+        graph = Graph()
+        graph.parse(path)
         query = TransformationQuery(self.language, graph, **opts)
         return Task(name=path.stem, query=query,
             expected=set(graph.objects(query.root, TA.implementation)),
