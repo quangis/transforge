@@ -14,6 +14,7 @@ from transformation_algebra.lang import Language
 from transformation_algebra.workflow import Workflow
 
 import html
+from pathlib import Path
 from io import StringIO
 from itertools import chain
 from collections import defaultdict
@@ -466,7 +467,7 @@ class TransformationGraph(Graph):
             self.remove((None, ns.type, None))
             self.remove((None, ns.via, None))
 
-    def visualize(self, path: str | None) -> str | None:
+    def visualize(self, path: Path | str | None) -> str | None:
         """
         Produce a GraphViz visualization of the concept graph, with subgraphs
         for every tool application.
