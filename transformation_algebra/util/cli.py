@@ -140,17 +140,17 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         help="Skip failed transformation graphs instead of exiting")
 
     @cli.positional(cli.ExistingFile)
-    def main(self, *wf_paths):
+    def main(self, *WORKFLOW_FILE):
         results: list[Graph] = []
 
-        if not (wf_paths or self.expressions):
+        if not (WORKFLOW_FILE or self.expressions):
             print("Error: missing expression or workflow graph", file=stderr)
             return 1
 
         # Windows does not interpret asterisks as globs, so we do that manually
         if platform.system() == 'Windows':
-            wf_paths = [globbed
-                for original in wf_paths.copy()
+            WORKFLOW_FILE = [globbed
+                for original in WORKFLOW_FILE.copy()
                 for globbed in glob(original)]
 
         for i, expr in enumerate(self.expressions):
@@ -163,7 +163,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
             tg.add((root, TA.output, e))
             results.append(tg)
 
-        for wf_path in wf_paths:
+        for wf_path in WORKFLOW_FILE:
             wf = WorkflowGraph(self.language, self.tools)
             wf.parse(wf_path, format=guess_format(wf_path))
             wf.refresh()
