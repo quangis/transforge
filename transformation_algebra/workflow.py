@@ -88,6 +88,20 @@ class Workflow(object):
         else:
             raise RuntimeError("must have exactly one final tool application")
 
+    @staticmethod
+    def from_rdf(self, language: Language, graph: Graph) -> Workflow:
+        """
+        Construct a workflow from an RDF graph. At the moment, only workflow
+        graphs described with the `WF` vocabulary are supported.
+        """
+        if graph.value(None, RDF.type, WF.Workflow):
+            g = WorkflowGraph(language)
+            g += graph
+            g.refresh()
+            return g
+        else:
+            raise RuntimeError("did not recognize workflow graph")
+
 
 class WorkflowDict(Workflow):
     """
