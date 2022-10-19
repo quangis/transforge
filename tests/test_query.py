@@ -408,11 +408,11 @@ class TestAlgebra(unittest.TestCase):
         result = list(query.chronology())
         self.assertIn(result, [
             ['?workflow :output ?_0.', '?workflow :output ?_1.',
-            '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
+            '?_0 :from* ?_2.', '?_1 :from* ?_2.'],
             ['?workflow :output ?_0.', '?workflow :output ?_1.',
-            '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
+            '?_0 :from* ?_2.', '?_1 :from* ?_2.'],
             ['?workflow :output ?_0.', '?workflow :output ?_2.',
-            '?_1 :to* ?_0.', '?_1 :to* ?_2.'],
+            '?_0 :from* ?_1.', '?_2 :from* ?_1.'],
         ])
 
     def test_sensible_order(self):
@@ -444,12 +444,12 @@ class TestAlgebra(unittest.TestCase):
             query = TransformationQuery(lang, graph, unfold_tree=False)
             result = list(query.chronology())
             self.assertIn(result, [
-                ['?workflow :output ?_0.', '?_1 :to* ?_0.',
-                 '?_2 :to* ?_0.', '?_2 :to* ?_1.'],
-                ['?workflow :output ?_0.', '?_1 :to* ?_0.',
-                 '?_2 :to* ?_1.', '?_2 :to* ?_0.'],
-                ['?workflow :output ?_0.', '?_2 :to* ?_0.',
-                 '?_1 :to* ?_0.', '?_1 :to* ?_2.'],
+                ['?workflow :output ?_0.', '?_0 :from* ?_1.',
+                 '?_0 :from* ?_2.', '?_1 :from* ?_2.'],
+                ['?workflow :output ?_0.', '?_0 :from* ?_1.',
+                 '?_1 :from* ?_2.', '?_0 :from* ?_2.'],
+                ['?workflow :output ?_0.', '?_0 :from* ?_2.',
+                 '?_0 :from* ?_1.', '?_2 :from* ?_1.'],
             ])
 
     def test_cycles(self):

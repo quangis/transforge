@@ -84,7 +84,7 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
             g.add((nodes[i], TA.type, step.type))
 
         for j in step.inputs:
-            g.add((nodes[j], TA.to, nodes[i]))
+            g.add((nodes[i], TA["from"], nodes[j]))
     return g
 
 

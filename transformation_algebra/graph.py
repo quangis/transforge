@@ -19,7 +19,6 @@ from io import StringIO
 from itertools import chain
 from collections import defaultdict
 from rdflib import Graph, Namespace, BNode, Literal
-from rdflib.util import guess_format
 from rdflib.term import Node, URIRef
 
 TEST = Namespace("https://example.com/#")
@@ -317,11 +316,11 @@ class TransformationGraph(Graph):
                 else:
                     x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                         origin=origin)
-                    self.add((internal, TA.to, x))
+                    self.add((x, TA["from"], internal))
             else:
                 x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                     origin=origin)
-            self.add((x, TA.to, f))
+            self.add((f, TA["from"], x))
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
@@ -329,20 +328,20 @@ class TransformationGraph(Graph):
             # used by the inner one. See issues #37 and #41.
             if current_internal:
                 for internal in self.objects(x, TA.internal):
-                    self.add((current_internal, TA.to, internal))
+                    self.add((internal, TA["from"], current_internal))
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
             for internal in self.objects(f, TA.internal):
                 if internal != current_internal:
-                    self.add((x, TA.to, internal))
+                    self.add((internal, TA["from"], x))
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
-                for f_input in self.subjects(TA.to, f):
+                for f_input in self.objects(f, TA["from"]):
                     if x != f_input:
-                        self.add((f_input, TA.to, current_internal))
+                        self.add((current_internal, TA["from"], f_input))
 
                 if origin and self.with_workflow_origin:
                     self.add((current_internal, TA["origin"], origin))
@@ -412,7 +411,7 @@ class TransformationGraph(Graph):
         for source_expr, ref_expr in indirection.items():
             src_tfmnode = self.add_expr(source_expr, wf.root)
             ref_tfmnode = self.expr_nodes[ref_expr]
-            self.add((ref_tfmnode, TA.to, src_tfmnode))
+            self.add((src_tfmnode, TA["from"], ref_tfmnode))
 
         if self.with_inputs:
             for wfnode in wf.sources:
@@ -470,9 +469,10 @@ class TransformationGraph(Graph):
         # TODO maybe use a dedicated graph library for this
         # TODO separate from WF.output
         concepts_in: set[Node] = set(self.objects(self.uri, TA.input))
-        concepts_app: set[Node] = set(self.objects(None, TA.to)).union(
+        concepts_app: set[Node] = set(self.subjects(TA["from"])).union(
             self.objects(self.uri, TA.output))
-        concepts_in_internal: set[Node] = set(x for x in self.subjects(TA.to)
+        concepts_in_internal: set[Node] = set(x
+            for x in self.objects(None, TA["from"])
             if x not in concepts_in)
 
         # Map tool applications to constituent concepts.
@@ -535,7 +535,7 @@ class TransformationGraph(Graph):
                 h.write("\t}\n")
 
             # Connect all the nodes
-            for node1, node2 in self.subject_objects(TA["to"]):
+            for node2, node1 in self.subject_objects(TA["from"]):
                 if node1 in concepts_in:
                     h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
                 else:

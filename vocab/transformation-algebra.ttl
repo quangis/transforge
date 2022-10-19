@@ -49,18 +49,19 @@
     rdfs:subClassOf :Concept;
     rdfs:comment "Data produced by some internal process for which the structure is unknown. For example, when an operation *g* is passed as a parameter to some other operation *f*, the data produced by *g* within *f* may be preprocessed by unknown internals.".
 
-:to
-    a rdf:Property;
-    owl:inverseOf :from;
-    rdfs:comment "Connects an input concept to a transformed concept.";
-    rdfs:domain :Concept;
-    rdfs:range :TransformedConcept.
-
 :from
     a rdf:Property;
     owl:inverseOf :to;
+    rdfs:comment "Connects a transformed concept to an input concept.";
     rdfs:domain :TransformedConcept;
     rdfs:range :Concept.
+
+:to
+    a rdf:Property;
+    owl:inverseOf :from;
+    rdfs:comment "Connects an input concept to a transformed concept. However, `:from` is the canonical way to do so.";
+    rdfs:domain :Concept;
+    rdfs:range :TransformedConcept.
 
 :Atom
     a rdfs:Class;

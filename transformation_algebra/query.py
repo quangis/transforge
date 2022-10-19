@@ -317,11 +317,11 @@ class TransformationQuery(object):
                 # succession, or if the after node has no information at
                 # all
                 if not self.operator.get(c) and (not self.type.get(c) or (
-                        self.operator.get(current) and
-                        not self.type.get(current))):
-                    yield f"{current.n3()} :to* {c.n3()}."
+                        self.operator.get(current)
+                        and not self.type.get(current))):
+                    yield f"{c.n3()} :from* {current.n3()}."
                 else:
-                    yield f"{current.n3()} :to+ {c.n3()}."
+                    yield f"{c.n3()} :from+ {current.n3()}."
 
             # Write operator/type properties of this step
             yield from union(f"{current.n3()} :via",
