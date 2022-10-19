@@ -14,16 +14,16 @@ from itertools import chain
 from glob import glob
 
 from plumbum import cli  # type: ignore
-from rdflib import Graph
+from rdflib import Graph, Dataset
 from rdflib.term import Node, Literal
 from rdflib.util import guess_format
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph
 from transformation_algebra.query import TransformationQuery
-from transformation_algebra.namespace import TA, EX
+from transformation_algebra.namespace import TA, EX, WF, TOOLS
 from transformation_algebra.workflow import WorkflowGraph
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.util.common import (to_store, to_file)
+from transformation_algebra.util.common import to_store
 from typing import NamedTuple, Iterable
 
 
@@ -71,8 +71,52 @@ class WithRDF:
     output_path = cli.SwitchAttr(["-o", "--output"],
         help="file which to write to, or - for stdout")
     output_format = cli.SwitchAttr(["-t", "--to"],
-        cli.Set("rdf", "ttl", "trig", "json-ld", "dot"), default="trig",
-        requires=["-o"])
+        cli.Set("rdf", "ttl", "trig", "json-ld", "dot"), default="trig")
+
+    def write(self, *graphs: TransformationGraph):
+        """
+        Convenience method to write one or more graphs to the given file.
+        """
+        path = str(self.output_path) if self.output_path != "-" else None
+        result: str | None
+        if self.output_format == "dot":
+            if len(graphs) == 1:
+                result = graphs[0].visualize(path)
+            else:
+                raise RuntimeError("there must be exactly one graph")
+        else:
+            all_g: Graph
+            if len(graphs) == 1:
+                all_g = graphs[0]
+            elif format == "trig":
+                all_g = Dataset()
+                for g in graphs:
+                    subgraph = all_g.graph(g.base, g.base)
+                    subgraph += g
+            else:
+                all_g = Graph()
+                for g in graphs:
+                    all_g += g
+
+            all_g.bind("ta", TA)
+            all_g.bind("wf", WF)
+            all_g.bind("tools", TOOLS)
+            all_g.bind("ex", EX)
+
+            for g in graphs:
+                if isinstance(g, TransformationGraph):
+                    if g.language.prefix:
+                        all_g.bind(g.language.prefix, g.language.namespace)
+
+            if path:
+                all_g.serialize(path,
+                    format=self.output_format or guess_format(path))
+            else:
+                result = all_g.serialize(
+                    format=self.output_format or guess_format(path))
+
+        if not path:
+            print(result)
 
 
 class WithServer:
@@ -187,10 +231,8 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         if self.server:
             to_store(*results, backend=self.backend, url=self.server,
                 cred=self.cred)
-        if self.output_path:
-            path = self.output_path
-            path = None if path == "-" else path
-            to_file(*results, path=path, format=self.output_format)
+
+        self.write(*results)
 
 
 class Task(NamedTuple):
@@ -201,16 +243,11 @@ class Task(NamedTuple):
 
 
 @CLI.subcommand("query")
-class QueryRunner(Application, WithServer):
+class QueryRunner(Application, WithServer, WithRDF):
     """
     Run transformation queries against a SPARQL endpoint. If no endpoint is
     given, just output the query instead.
     """
-
-    output_path = cli.SwitchAttr(["-o", "--output"], cli.NonexistentPath,
-        help="Output file")
-    output_format = cli.SwitchAttr(["-t", "--to"], cli.Set("sparql", "csv"),
-        default="csv", help="Output format")
 
     chronological = cli.Flag(["--chronological"],
         default=False, help="Take into account order")
@@ -297,8 +334,7 @@ class QueryRunner(Application, WithServer):
                 by_chronology=self.chronological and not self.blackbox)
                 for task_file in QUERY_FILE]
 
-            for t in tasks:
-                print(t.serialize(format="ttl"))
+            self.write(*tasks)
 
             # if self.output_path:
             #     path = self.output_path
