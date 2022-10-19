@@ -15,6 +15,8 @@ from transformation_algebra.namespace import WF, RDF, EX
 from transformation_algebra.lang import Language
 
 
+# TODO: Ideally, this should be a protocol, not an abstract method. That way,
+# workflow graphs do not need to explicitly inherit from it
 class Workflow(object):
     """
     This is the interface that workflows must follow: they consist of
