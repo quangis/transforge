@@ -163,15 +163,13 @@ class Type(ABC):
 
     def concretize(self, replace: bool = False) -> TypeOperation:
         """
-        Make sure that this type contains no variables. Replace wildcard
-        variables with the catch-all `Top` type, and optionally other
-        unconstrained variables too.
+        Make sure that this type contains no variables. Optionally replace
+        unconstrained variables with the catch-all `Top` type.
         """
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
             return a.operator(*(p.concretize(replace) for p in a.params))
-        elif isinstance(a, TypeVariable) and (replace or a.wildcard) \
-                and not a._constraints:
+        elif replace and isinstance(a, TypeVariable) and not a._constraints:
             return Top()
         else:
             raise RuntimeError(

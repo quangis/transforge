@@ -466,7 +466,7 @@ class TestType(unittest.TestCase):
     def test_concretization(self):
         F = TypeOperator('F', params=1)
         G = TypeSchema(lambda x: F(x))
-        self.assertEqual(F(F(_)).concretize(), F(F(Top)))
+        self.assertEqual(F(F(_)).concretize(True), F(F(Top)))
         self.assertRaises(RuntimeError, G.concretize)
 
     def test_top_type_is_usable_as_a_function(self):
