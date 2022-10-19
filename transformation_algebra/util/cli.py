@@ -23,7 +23,6 @@ from transformation_algebra.query import TransformationQuery
 from transformation_algebra.namespace import TA, EX, WF, TOOLS
 from transformation_algebra.workflow import WorkflowGraph
 from transformation_algebra.util.store import TransformationStore
-from transformation_algebra.util.common import to_store
 from typing import NamedTuple, Iterable
 
 
@@ -126,6 +125,15 @@ class WithServer:
         help="server to which to send the graph to", requires=["-b"])
     cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
 
+    def upload(self, *graphs: Graph, **kwargs):
+        """
+        Convenience method to send one or more graphs to the given store,
+        overwriting old ones if they exist.
+        """
+        ds = TransformationStore.backend(self.backend, self.server, self.cred)
+        for g in graphs:
+            ds.put(g)
+
 
 class CLI(cli.Application):
     """
@@ -159,12 +167,8 @@ class VocabBuilder(Application, WithRDF, WithServer):
             vocab.add_vocabulary()
         vocab.base = self.language.namespace
 
-        if self.server:
-            to_store(vocab, backend=self.backend, url=self.server,
-                cred=self.cred)
-
-        if self.output_path:
-            to_file(vocab, path=self.output_path, format=self.output_format)
+        self.upload(vocab)
+        self.write(vocab)
 
 
 @CLI.subcommand("graph")
@@ -228,10 +232,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 tg += wf
                 results.append(tg)
 
-        if self.server:
-            to_store(*results, backend=self.backend, url=self.server,
-                cred=self.cred)
-
+        self.upload(*results)
         self.write(*results)
 
 
@@ -321,6 +322,12 @@ class QueryRunner(Application, WithServer, WithRDF):
             self.help()
             return 1
         else:
+
+            # Windows does not interpret asterisks as globs
+            if platform.system() == 'Windows':
+                QUERY_FILE = [globbed
+                    for original in QUERY_FILE.copy()
+                    for globbed in glob(original)]
 
             if self.server:
                 self.store = TransformationStore(self.backend, self.server,
