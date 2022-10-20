@@ -35,5 +35,5 @@ warning.**
 
 This package was developed for the [CCT](https://github.com/quangis/cct) 
 algebra for geographical information, which may act as an example. You 
-can find a cursory user's guide [here](manual.md).
+may also consult our cursory [tutorial](tutorial.md).
 

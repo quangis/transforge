@@ -1,12 +1,16 @@
 # Table of contents
 
 1.  [Introduction](#introduction)
-    1. [Concept types](#concept-types)
-    2. [Transformation operators](#transformation-operators)
-    3. [Workflow annotation](#workflow-annotation)
-2.  [Types](#types)
-3.  [Expressions](#language-and-expressions)
-4.  [Querying](#graphs-and-queries)
+    1.  [Concept types](#concept-types)
+    2.  [Transformation operators](#transformation-operators)
+    3.  [Workflow annotation](#workflow-annotation)
+2.  [Internal operators](#internal-operators)
+3.  [Type inference](#type-inference)
+    1.  [Subtype polymorphism](#subtype-polymorphism)
+    2.  [Parametric polymorphism](#parametric-polymorphism)
+    3.  [Constraints](#constraints)
+3.  [Composite operators](#composite-operators)
+4.  [Querying](#queries)
 
 
 # Introduction
@@ -193,11 +197,16 @@ advanced features.
     to `minimum`, which indeed it does: `distance` needs to know about 
     the incident location as well as the hospital locations.
 
-* * *
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 What follows is work-in-progress.
 
-# Polymorphism
+# Internal operators
+
+(to-do)
+
+
+# Type inference
 
 ### Subtype polymorphism
 
@@ -281,27 +290,22 @@ interdependencies between types:
     Int
 
 
-### Type inference
-
-In the presence of subtypes, type inference can be less than straightforward. 
-Consider that, when you apply a function of type `τ ** τ ** τ` to an argument 
-with a concrete type, say `A`, then we cannot immediately bind `τ` to `A`: what 
-if the second argument to the function is a supertype of `A`? We can, however, 
-deduce that `τ >= A`, since any more specific type would certainly be too 
-restrictive. This does not suggest that providing a *value* of a more specific 
-type is illegal --- just that the signature should be more general. Only once 
-all arguments have been supplied can `τ` be fixed to the most specific type 
-possible.
+In the presence of subtypes, type inference can be less than 
+straightforward. Consider that, when you apply a function of type `τ ** 
+τ ** τ` to an argument with a concrete type, say `A`, then we cannot 
+immediately bind `τ` to `A`: what if the second argument to the function 
+is a supertype of `A`? We can, however, deduce that `τ >= A`, since any 
+more specific type would certainly be too restrictive. This does not 
+suggest that providing a *value* of a more specific type is illegal --- 
+just that the signature should be more general. Only once all arguments 
+have been supplied can `τ` be fixed to the most specific type possible.
 
 This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]` rather than 
 just `A ** A ** A`: while the two are identical in what types they *accept*, 
 the former can produce an *output type* that is more specific than `A`.
 
 
-# Language and expressions
-
-
-### Composite operators
+# Composite operators
 
 It is possible to define *composite* transformations: transformations that are 
 derived from other, simpler ones. This should not necessarily be thought of as 
@@ -333,7 +337,7 @@ expression using `.primitive()`:
      └─╼ - : Nat
 
 
-# Graphs and queries
+# Queries
 
 Beyond *expressing* transformations, an additional goal of the library is to 
 enable *querying* them for their constituent operations and data types.
