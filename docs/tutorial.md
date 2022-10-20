@@ -3,7 +3,8 @@
 1.  [Introduction](#introduction)
     1.  [Concept types](#concept-types)
     2.  [Transformation operators](#transformation-operators)
-    3.  [Workflow annotation](#workflow-annotation)
+    3.  [Transformation expressions](#transformation-expressions)
+    4.  [Workflow annotation](#workflow-annotation)
 2.  [Internal operators](#internal-operators)
 3.  [Type inference](#type-inference)
     1.  [Subtype polymorphism](#subtype-polymorphism)
@@ -104,23 +105,28 @@ class to declare transformation operators, we would end up with:
 [^2]: A function that takes multiple arguments can be 
     [rewritten][w:currying] to a sequence of functions.
 
+
+### Transformation expressions
+
 Now, we bundle up our types and operators into a transformation language 
 with the `Language` class. For convenience, you can simply incorporate 
 all types and operators in local scope:
 
     >>> sl = ct.Language(scope=locals())
 
-Now we have an object that represents the language, which we have called 
-`sl`. We can now use the language's `.parse()` method to parse 
-transformation *expressions*: complex combinations of operators.
+We now have an object that represents our language. We have called tha 
+language `sl`, for 'simple language'. We can use `sl`'s `.parse()` 
+method to parse transformation *expressions*: complex combinations of 
+operators. The parser accepts both functional notation, like `f(x, y)`, 
+and lambda-style notation, like `f x y`.
 
-In addition to operators, such expressions may contain numbers. These 
+In addition to operators, the expressions may contain numbers. These 
 numbers indicate concepts that are to be provided as input. 
-Alternatively, a dash (`-`) may be used to indicate an concept that is 
+Alternatively, a dash (`-`) can be used to indicate an concept that is 
 not further specified. Finally, the notation `expression : type` is used 
 to explicitly indicate the type of a sub-expression.
 
-For example, the following expression represents a concept 
+As an example, the following expression represents a concept 
 transformation that selects, from an unspecified set of objects, the 
 object that is nearest in distance to some other unspecified object.
 
