@@ -164,13 +164,17 @@ expression.
 
 Save the transformation language into [`sl.py`](resource/sl.py), and the 
 workflow and tool description into [`wf.ttl`](resource/wf.ttl). We can 
-now use `transformation_algebra`'s command-line interface[^3] to 
-construct a transformation graph for our workflow.
+now use `transformation_algebra`'s command-line interface[^3] to enrich
+the original *workflow* graph with a *transformation* graph.
 
     python -m transformation_algebra graph \
         -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
 
-What we get back looks something like this:
+What we get back is a graph in which the transformation expression for 
+each tool application has been "unfolded": every input and every 
+operation applied to it becomes a node, representing the concept that is 
+involved at that particular step in the transformation. In this case, it 
+will look something like this:
 
 <p align="center" width="100%">
 <img
@@ -178,17 +182,17 @@ What we get back looks something like this:
     alt="A visualization of the transformation graph.">
 </p>
 
-This graph should represent what happens inside the workflow 
-*conceptually*.[^4] Chronologically, the distance is an ordinal value 
-that has to be considered *before* finding the minimum.
+The distance is an ordinal value that was considered before finding the 
+minimum. In other words, this graph tells us what happens inside the 
+workflow *conceptually*.[^4]
 
 Of course, the example is trivial: there is only one tool, and the 
 operators do not generalize well. In what follows, we will go into more 
 advanced features.
 
-[^3]: Run `python -m transformation_algebra -h` for information on how 
-    the command-line interface works. You can also interface with Python 
-    directly; checking out the source code for the command-line 
+[^3]: Consult `python -m transformation_algebra -h` for more information 
+    on how the command-line interface works. You can also interface with 
+    Python directly; checking out the source code for the command-line 
     interface should give you a headstart.
 
 [^4]: You might notice that there is a dashed node before the distance. 
@@ -341,35 +345,51 @@ primitive expression using `.primitive()`:
 
 # Queries
 
-Beyond *expressing* transformations, an additional goal of the library 
-is to enable *querying* them for their constituent operations and data 
-types.
+The goal of the library is not just to *express* transformations, but 
+also to *query* associated workflows for their constituent operations 
+and concept types.
 
-To turn an expression into a searchable structure, we convert it to an 
-RDF graph. Every data source and every operation applied to it becomes a 
-node, representing the type of data that is conceptualized at that 
-particular step in the transformation. Chains of nodes are thus obtained 
-that are easily subjected to queries along the lines of: 'find me a 
-transformation containing operations `f` and `g` that, somewhere 
-downstream, combine into data of type `t`'.
+RDF graphs are searchable structures that can be subjected to 
+[SPARQL][sparql] queries along the lines of: 'find me a workflow that 
+contains operations `f` and `g` that, somewhere downstream, combine into 
+a concept of type `t`'.[^5]
 
-The process is straightforward when operations only take data as input. 
-However, expressions in an algebra may also take other operations, in 
-which case the process is more involved; for now, consult the source 
-code.
+[^5]: The process is straightforward when operations only take data as 
+    input. However, expressions in an algebra may also take other 
+    operations, in which case the process is more involved; for now, 
+    consult the source code.
 
-In practical terms, to obtain a graph representation of the previous 
-expression, you may do:
+These queries can themselves be represented as (partial) transformation 
+graphs. We call such partial graphs *tasks*, because they are meant to 
+express what sort of conceptual properties we expect from a workflow 
+that solves a particular task. For example, the following graph captures 
+what we might expect of a workflow that finds the closest hospital:
 
-    >>> g = ct.TransformationGraph()
-    >>> g.add_expr(expr)
-    >>> g.serialize("graph.ttl", format="ttl")
+    @prefix : <https://github.com/quangis/transformation-algebra#>.
+    @prefix x: <https://example.com/#>.
 
-These graphs can be queried via constructs from the [SPARQL 1.1 
-specification](https://www.w3.org/TR/sparql11-query/).
+    _:Hospitals x:type "C(Obj)".
+    _:Incident x:type "Obj".
+    [] a :Task;
+        :input _:HospitalPoints, _:IncidentLocations;
+        :output [
+            x:via "minimum";
+            x:type "Obj";
+            :from [
+                x:via "distance";
+                :from _:Hospitals;
+                :from _:Incident
+            ]
+        ].
+
+To convert this graph into a SPARQL query, you can once again use the 
+command-line interface:
+
+    python -m transformation_algebra query -L sl.py task.ttl
 
 
 [cct]: https://github.com/quangis/cct
 [wf]: http://geographicknowledge.de/vocab/Workflow.rdf
+[sparql]: https://www.w3.org/TR/sparql11-query/
 [w:ttl]: https://en.wikipedia.org/wiki/Turtle_(syntax)
 [w:currying]: https://en.wikipedia.org/wiki/Currying
