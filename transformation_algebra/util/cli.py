@@ -231,7 +231,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 tg.add_workflow(wf)
             except Exception as e:
                 if self.skip_error:
-                    print(f"Skipping {wf_path}:", e, file=stderr)
+                    print(f"Skipping {wf_path}:\n\t{e}", file=stderr)
                 else:
                     raise
             else:

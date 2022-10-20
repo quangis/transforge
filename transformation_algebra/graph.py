@@ -5,12 +5,13 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
+from transformation_algebra.base import TransformationError
 from transformation_algebra.namespace import TA, RDF, RDFS, WF, shorten
 from transformation_algebra.type import (Type, TypeOperation, Function,
-    TypeInstance)
+    TypeInstance, TypingError)
 from transformation_algebra.expr import (Expr, Operation, Application,
     Abstraction, Source)
-from transformation_algebra.lang import Language
+from transformation_algebra.lang import Language, ParseError
 from transformation_algebra.workflow import Workflow
 
 import html
@@ -380,8 +381,14 @@ class TransformationGraph(Graph):
                             e = input_exprs[i]
                             s = input_exprs[i] = Source()
                             indirection[s] = e
-                exprs[wfnode] = expr = self.language.parse(
-                    wf.expression(wfnode), *input_exprs)
+
+                try:
+                    exprs[wfnode] = expr = self.language.parse(
+                        wf.expression(wfnode), *input_exprs)
+                except TypingError as e:
+                    raise WorkflowCompositionError(wf, wfnode) from e
+                except ParseError:
+                    raise
                 return expr
 
         # 2. Convert individual transformation expressions to nodes and add
@@ -550,3 +557,21 @@ class TransformationGraph(Graph):
 
         finally:
             h.close()
+
+
+class WorkflowCompositionError(TransformationError):
+    def __init__(self, wf: Workflow, node: Node):
+        self.wf = wf
+        self.node = node
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must be caused by another error"
+        tool = self.wf.tool(self.node)
+        return (
+            f"In workflow {shorten(self.wf.root)}, "
+            f"in an application of {shorten(tool)}:\n"
+            f"\t{self.__cause__}"
+        )
+
+
+

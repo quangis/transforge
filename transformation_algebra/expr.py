@@ -11,6 +11,7 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Callable, Iterator
 
+from transformation_algebra.base import TransformationError
 from transformation_algebra.label import Labels
 from transformation_algebra.type import (Type, TypeVariable, TypeSchema,
     TypeInstance, Function, _, TypingError, TypeOperation)
@@ -196,10 +197,7 @@ class Expr(ABC):
             return f"╼ {self.text(with_type=True)}"
 
     def apply(self, arg: Expr) -> Expr:
-        try:
-            return Application(self, arg).normalize(recursive=False)
-        except TypingError as e:
-            raise ApplicationError(self, arg) from e
+        return Application(self, arg).normalize(recursive=False)
 
     def normalize(self, recursive: bool = True) -> Expr:
         """
@@ -325,7 +323,13 @@ class Application(Expr):
     def __init__(self, f: Expr, x: Expr):
         self.f: Expr = f
         self.x: Expr = x
-        super().__init__(type=f.type.apply(x.type))
+
+        try:
+            t = f.type.apply(x.type)
+        except TypingError as e:
+            raise ApplicationError(f, x) from e
+
+        super().__init__(type=t)
 
 
 class Abstraction(Expr):
@@ -365,28 +369,32 @@ class Variable(Expr):
 
 # Errors #####################################################################
 
-class DeclarationError(Exception):
+class DeclarationError(TransformationError):
     def __init__(self, operator: Operator):
         self.operator = operator
 
     def __str__(self) -> str:
         assert self.__cause__, "must be caused by another error"
-        return f"While validating the declared operator '{self.operator}': " \
-            f"{self.__cause__}"
+        return (
+            f"While validating the declared operator '{self.operator}': "
+            f"\t{self.__cause__}"
+        )
 
 
-class ApplicationError(Exception):
+class ApplicationError(TransformationError):
     def __init__(self, operation: Expr, argument: Expr):
         self.operation = operation
         self.argument = argument
 
     def __str__(self) -> str:
         assert self.__cause__, "must be caused by another error"
-        return f"Could not apply `{self.operation}` to `{self.argument}`: " \
-            f"{self.__cause__}"
+        return (
+            f"Could not apply `{self.operation}` to `{self.argument}`: "
+            f"\t{self.__cause__}"
+        )
 
 
-class DeclaredTypeTooGeneral(Exception):
+class DeclaredTypeTooGeneral(TransformationError):
     """
     Raised when the declared type of a composite transformation is unifiable
     with the type inferred from its derivation, but it is too general.
@@ -402,7 +410,7 @@ class DeclaredTypeTooGeneral(Exception):
             f"inferred type {self.inferred}."
 
 
-class NonSchematicVariables(Exception):
+class NonSchematicVariables(TransformationError):
     def __init__(self, type: Type):
         self.type = type
 

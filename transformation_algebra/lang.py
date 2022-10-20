@@ -10,10 +10,11 @@ from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
 
+from transformation_algebra.base import TransformationError
 from transformation_algebra.namespace import TA, EX
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
-    TypeSchema, Top)
+    TypeSchema, Top, TypingError)
 from transformation_algebra.expr import Operator, Expr, Application, Source
 
 
@@ -231,6 +232,7 @@ class Language(object):
         return self.parse_expr(string, *args)
 
     def parse_expr(self, val: str | Iterator[str], *args: Expr) -> Expr:
+        previous_token = ""
         tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
 
@@ -252,10 +254,17 @@ class Language(object):
                 assert isinstance(previous, Expr)
                 t = self.parse_type(tokens)
                 pt = previous.type
-                if isinstance(pt, TypeVariable) and pt.wildcard:
-                    pt.unify(t)
-                else:
-                    pt.unify(t, subtype=True)
+                try:
+                    if isinstance(pt, TypeVariable) and pt.wildcard:
+                        pt.unify(t)
+                    else:
+                        pt.unify(t, subtype=True)
+                except TypingError as e:
+                    if previous_token.isnumeric():
+                        input = int(previous_token)
+                    else:
+                        input = None
+                    raise TypeDeclarationError(previous, t, input) from e
             elif token == ";":
                 stack.clear()
                 stack.append(None)
@@ -276,6 +285,8 @@ class Language(object):
                 if previous:
                     current = Application(previous, current)
                 stack.append(current)
+
+            previous_token = token
 
         if len(stack) == 1:
             result = stack[0]
@@ -422,7 +433,7 @@ class LanguageNamespace(ClosedNamespace):
 
 # Errors #####################################################################
 
-class ParseError(RuntimeError):
+class ParseError(TransformationError):
     pass
 
 
@@ -442,3 +453,25 @@ class UndefinedToken(ParseError):
 
     def __str__(self) -> str:
         return f"Operator or type operator '{self.token}' is undefined."
+
+
+class TypeDeclarationError(TypingError):
+    def __init__(self, expr: Expr, type: Type, input: int | None = None):
+        self.expr = expr
+        self.type = type
+        self.input = input
+
+    def __str__(self) -> str:
+        assert self.__cause__, "must be caused by another error"
+        if self.input:
+            source = f"Input #{self.input}"
+        elif isinstance(self.expr, Source):
+            source = "The anonymous source"
+        else:
+            source = f"The expression `{self.expr}`"
+
+        return (
+            f"{source} was declared `{self.type}`, "
+            f"but it is actually `{self.expr.type}`. \n"
+            f"\t{self.__cause__}"
+        )

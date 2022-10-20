@@ -1104,7 +1104,7 @@ class TypingError(TransformationError):
 
 
 class TypeMismatch(TypingError):
-    "Raised when compound types cannot be unified."
+    "Raised when types cannot be unified."
 
     def __init__(self, left: Type, right: Type):
         self.left = left
