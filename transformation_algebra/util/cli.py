@@ -77,10 +77,13 @@ class WithRDF:
         """
         Convenience method to write one or more graphs to the given file.
         """
-        if not self.output_path or self.output_path == "-":
+
+        if self.output_path == "-":
             path = None
+            to_stdout = True
         else:
             path = self.output_path
+            to_stdout = False
 
         result: str | None
         if self.output_format == "dot":
@@ -112,14 +115,11 @@ class WithRDF:
                     if g.language.prefix:
                         all_g.bind(g.language.prefix, g.language.namespace)
 
-            if path:
-                all_g.serialize(path,
-                    format=self.output_format or guess_format(path))
-            else:
-                result = all_g.serialize(
-                    format=self.output_format or guess_format(path))
+            result = all_g.serialize(path,
+                format=self.output_format or guess_format(path))
 
-        if not path:
+        if to_stdout:
+            assert result
             print(result)
 
 
