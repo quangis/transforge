@@ -11,6 +11,7 @@ from itertools import chain, count
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Callable
 
+from transformation_algebra.base import TransformationError
 from transformation_algebra.label import Labels
 
 
@@ -1098,7 +1099,7 @@ def with_parameters(
 
 # Errors #####################################################################
 
-class TypingError(Exception):
+class TypingError(TransformationError):
     "There is a typechecking issue."
 
 
