@@ -76,7 +76,11 @@ class WithRDF:
         """
         Convenience method to write one or more graphs to the given file.
         """
-        path = str(self.output_path) if self.output_path != "-" else None
+        if not self.output_path or self.output_path == "-":
+            path = None
+        else:
+            path = self.output_path
+
         result: str | None
         if self.output_format == "dot":
             if len(graphs) == 1:
@@ -120,7 +124,7 @@ class WithRDF:
 
 class WithServer:
     backend = cli.SwitchAttr(["-b", "--backend"],
-        cli.Set("fuseki", "marklogic"))
+        cli.Set("fuseki", "marklogic"), requires=["-s"])
     server = cli.SwitchAttr(["-s", "--server"],
         help="server to which to send the graph to", requires=["-b"])
     cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
@@ -130,9 +134,11 @@ class WithServer:
         Convenience method to send one or more graphs to the given store,
         overwriting old ones if they exist.
         """
-        ds = TransformationStore.backend(self.backend, self.server, self.cred)
-        for g in graphs:
-            ds.put(g)
+        if self.server:
+            ds = TransformationStore.backend(
+                self.backend, self.server, self.cred)
+            for g in graphs:
+                ds.put(g)
 
 
 class CLI(cli.Application):
