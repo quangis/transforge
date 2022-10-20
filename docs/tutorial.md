@@ -11,6 +11,8 @@
     3.  [Subtype constraints](#subtype-constraints)
     4.  [Elimination constraints](#elimination-constraints)
     5.  [Wildcard variables](#wildcard-variables)
+    6.  [Top, bottom and unit types](#top-bottom-and-unit-types)
+    7.  [Union and intersection types](#union-and-intersection-types)
 3.  [Composite operators](#composite-operators)
 4.  [Querying](#queries)
 
@@ -318,6 +320,16 @@ imported:
 
     >>> from transformation_algebra import _
     >>> f = Set(_) ** Int
+
+
+### Top, bottom and unit types
+
+(todo)
+
+
+### Union and intersection types
+
+(todo)
 
 
 # Composite operators
