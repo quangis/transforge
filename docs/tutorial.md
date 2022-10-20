@@ -8,7 +8,9 @@
 3.  [Type inference](#type-inference)
     1.  [Subtype polymorphism](#subtype-polymorphism)
     2.  [Parametric polymorphism](#parametric-polymorphism)
-    3.  [Constraints](#constraints)
+    3.  [Subtype constraints](#subtype-constraints)
+    4.  [Elimination constraints](#elimination-constraints)
+    5.  [Wildcard variables](#wildcard-variables)
 3.  [Composite operators](#composite-operators)
 4.  [Querying](#queries)
 
@@ -262,38 +264,12 @@ its body. When the type schema is used somewhere, the schematic
 variables are automatically instantiated with *concrete* variables.
 
 
-### Constraints
+### Subtype constraints
 
 Often, variables in a schema cannot be just *any* type. We can abuse 
 indexing notation (`x [...]`) to *constrain* a type. A constraint can be 
 a *subtype* constraint, written `x <= y`, meaning that `x`, once it is 
-unified, must be a subtype of the given type `y`. It can also be an 
-*elimination* constraint, written `x << {y, z}`, meaning that `x` will 
-be unified to a subtype one of the options as soon as the alternatives 
-have been eliminated. For instance, we might want a function signature 
-that applies to both single integers and sets of integers:
-
-    >>> f = TypeSchema(lambda α: α ** α [α << {Int, Set(Int)}])
-    >>> f.apply(Set(Nat))
-    Set(Nat)
-
-As an aside: when you need a type variable, but you don't care how it 
-relates to others, you may use the *wildcard variable* `_`. The purpose 
-goes beyond convenience: it communicates to the type system that it can 
-always be a sub- and supertype of *anything*. It must be explicitly 
-imported:
-
-    >>> from transformation_algebra import _
-    >>> f = Set(_) ** Int
-
-Typeclass constraints and wildcards can often aid in inference, figuring 
-out interdependencies between types:
-
-    >>> Map = ct.TypeOperator('Map', params=2)
-    >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
-    >>> f.apply(Set(Int))
-    Int
-
+unified, must be a subtype of the given type `y`. 
 
 In the presence of subtypes, type inference can be less than 
 straightforward. Consider that, when you apply a function of type `τ ** 
@@ -309,6 +285,39 @@ This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]`
 rather than just `A ** A ** A`: while the two are identical in what 
 types they *accept*, the former can produce an *output type* that is 
 more specific than `A`.
+
+
+### Elimination constraints
+
+It can also be an *elimination* constraint, written `x << {y, z}`, 
+meaning that `x` will be unified to a subtype one of the options as soon 
+as the alternatives have been eliminated. For instance, we might want a 
+function signature that applies to both single integers and sets of 
+integers:
+
+    >>> f = TypeSchema(lambda α: α ** α [α << {Int, Set(Int)}])
+    >>> f.apply(Set(Nat))
+    Set(Nat)
+
+Typeclass constraints and wildcards can often aid in inference, figuring 
+out interdependencies between types:
+
+    >>> Map = ct.TypeOperator('Map', params=2)
+    >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
+    >>> f.apply(Set(Int))
+    Int
+
+
+### Wildcard variables
+
+As an aside: when you need a type variable, but you don't care how it 
+relates to others, you may use the *wildcard variable* `_`. The purpose 
+goes beyond convenience: it communicates to the type system that it can 
+always be a sub- and supertype of *anything*. It must be explicitly 
+imported:
+
+    >>> from transformation_algebra import _
+    >>> f = Set(_) ** Int
 
 
 # Composite operators
