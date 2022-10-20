@@ -252,37 +252,38 @@ substituting its type variables:
     Int ** Real
 
 Don't be fooled by the `lambda` keyword: it has little to do with lambda 
-abstraction. It is there because we use an anonymous Python function, whose 
-parameters declare the *schematic* type variables that occur in its body. When 
-the type schema is used somewhere, the schematic variables are automatically 
-instantiated with *concrete* variables.
+abstraction. It is there because we use an anonymous Python function, 
+whose parameters declare the *schematic* type variables that occur in 
+its body. When the type schema is used somewhere, the schematic 
+variables are automatically instantiated with *concrete* variables.
 
 
 ### Constraints
 
-Often, variables in a schema cannot be just *any* type. We can abuse indexing 
-notation (`x [...]`) to *constrain* a type. A constraint can be a *subtype* 
-constraint, written `x <= y`, meaning that `x`, once it is unified, must be a 
-subtype of the given type `y`. It can also be an *elimination* constraint, 
-written `x << {y, z}`, meaning that `x` will be unified to a subtype one of the 
-options as soon as the alternatives have been eliminated. For instance, we 
-might want a function signature that applies to both single integers and sets 
-of integers:
+Often, variables in a schema cannot be just *any* type. We can abuse 
+indexing notation (`x [...]`) to *constrain* a type. A constraint can be 
+a *subtype* constraint, written `x <= y`, meaning that `x`, once it is 
+unified, must be a subtype of the given type `y`. It can also be an 
+*elimination* constraint, written `x << {y, z}`, meaning that `x` will 
+be unified to a subtype one of the options as soon as the alternatives 
+have been eliminated. For instance, we might want a function signature 
+that applies to both single integers and sets of integers:
 
     >>> f = TypeSchema(lambda α: α ** α [α << {Int, Set(Int)}])
     >>> f.apply(Set(Nat))
     Set(Nat)
 
-As an aside: when you need a type variable, but you don't care how it relates 
-to others, you may use the *wildcard variable* `_`. The purpose goes beyond 
-convenience: it communicates to the type system that it can always be a sub- 
-and supertype of *anything*. It must be explicitly imported:
+As an aside: when you need a type variable, but you don't care how it 
+relates to others, you may use the *wildcard variable* `_`. The purpose 
+goes beyond convenience: it communicates to the type system that it can 
+always be a sub- and supertype of *anything*. It must be explicitly 
+imported:
 
     >>> from transformation_algebra import _
     >>> f = Set(_) ** Int
 
-Typeclass constraints and wildcards can often aid in inference, figuring out 
-interdependencies between types:
+Typeclass constraints and wildcards can often aid in inference, figuring 
+out interdependencies between types:
 
     >>> Map = ct.TypeOperator('Map', params=2)
     >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
@@ -300,17 +301,18 @@ suggest that providing a *value* of a more specific type is illegal ---
 just that the signature should be more general. Only once all arguments 
 have been supplied can `τ` be fixed to the most specific type possible.
 
-This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]` rather than 
-just `A ** A ** A`: while the two are identical in what types they *accept*, 
-the former can produce an *output type* that is more specific than `A`.
+This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]` 
+rather than just `A ** A ** A`: while the two are identical in what 
+types they *accept*, the former can produce an *output type* that is 
+more specific than `A`.
 
 
 # Composite operators
 
-It is possible to define *composite* transformations: transformations that are 
-derived from other, simpler ones. This should not necessarily be thought of as 
-providing an *implementation*: it merely represents a decomposition into more 
-primitive conceptual building blocks.
+It is possible to define *composite* transformations: transformations 
+that are derived from other, simpler ones. This should not necessarily 
+be thought of as providing an *implementation*: it merely represents a 
+decomposition into more primitive conceptual building blocks.
 
     >>> add1 = ct.Operator(
             type=Int ** Int,
@@ -321,8 +323,8 @@ primitive conceptual building blocks.
             define=lambda f, g, x: f(g(x))
         )
 
-When we use such composite operations, we can derive the underlying primitive 
-expression using `.primitive()`:
+When we use such composite operations, we can derive the underlying 
+primitive expression using `.primitive()`:
 
     >>> expr = lang.parse("compose add1 add1 (-: Nat)")
     >>> print(expr.primitive().tree())
@@ -339,19 +341,22 @@ expression using `.primitive()`:
 
 # Queries
 
-Beyond *expressing* transformations, an additional goal of the library is to 
-enable *querying* them for their constituent operations and data types.
+Beyond *expressing* transformations, an additional goal of the library 
+is to enable *querying* them for their constituent operations and data 
+types.
 
-To turn an expression into a searchable structure, we convert it to an RDF 
-graph. Every data source and every operation applied to it becomes a node, 
-representing the type of data that is conceptualized at that particular step in 
-the transformation. Chains of nodes are thus obtained that are easily subjected 
-to queries along the lines of: 'find me a transformation containing operations 
-`f` and `g` that, somewhere downstream, combine into data of type `t`'.
+To turn an expression into a searchable structure, we convert it to an 
+RDF graph. Every data source and every operation applied to it becomes a 
+node, representing the type of data that is conceptualized at that 
+particular step in the transformation. Chains of nodes are thus obtained 
+that are easily subjected to queries along the lines of: 'find me a 
+transformation containing operations `f` and `g` that, somewhere 
+downstream, combine into data of type `t`'.
 
 The process is straightforward when operations only take data as input. 
-However, expressions in an algebra may also take other operations, in which 
-case the process is more involved; for now, consult the source code.
+However, expressions in an algebra may also take other operations, in 
+which case the process is more involved; for now, consult the source 
+code.
 
 In practical terms, to obtain a graph representation of the previous 
 expression, you may do:
@@ -365,6 +370,6 @@ specification](https://www.w3.org/TR/sparql11-query/).
 
 
 [cct]: https://github.com/quangis/cct
-[wf]: http://geographicknowledge.de/vocab/Workflow.rdf#
+[wf]: http://geographicknowledge.de/vocab/Workflow.rdf
 [w:ttl]: https://en.wikipedia.org/wiki/Turtle_(syntax)
 [w:currying]: https://en.wikipedia.org/wiki/Currying
