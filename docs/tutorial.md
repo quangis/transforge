@@ -14,8 +14,9 @@
     5.  [Wildcard variables](#wildcard-variables)
     6.  [Top, bottom and unit types](#top-bottom-and-unit-types)
     7.  [Union and intersection types](#union-and-intersection-types)
-3.  [Composite operators](#composite-operators)
-4.  [Querying](#queries)
+4.  [Vocabulary and type taxonomy](#vocabulary-and-type-taxonomy)
+5.  [Composite operators](#composite-operators)
+6.  [Querying](#queries)
 
 
 # Introduction
@@ -334,6 +335,11 @@ imported:
 
 
 ### Union and intersection types
+
+(todo)
+
+
+# Vocabulary and type taxonomy
 
 (todo)
 
