@@ -173,8 +173,8 @@ class Type(ABC):
         elif replace and isinstance(a, TypeVariable) and not a._constraints:
             return Top()
         else:
-            raise RuntimeError(
-                "encountered a variable, but expected concrete type")
+            raise UnexpectedVariableError(
+                "Types containing constrained variables cannot be concretized")
 
 
 class TypeSchema(Type):
@@ -287,13 +287,13 @@ class TypeOperator(Type):
     @property
     def name(self) -> str:
         if self._name is None:
-            raise RuntimeError("Unnamed operator.")
+            raise ValueError("Type operator must have a name.")
         return self._name
 
     @name.setter
     def name(self, value: str) -> None:
         if value is None or (self._name is not None and value != self._name):
-            raise RuntimeError(
+            raise ValueError(
                 f"Cannot name operator {value}; already named {self._name}.")
         self._name = value
 
@@ -316,7 +316,7 @@ class TypeInstance(Type):
         The maximum nesting level of type parameters.
         """
         if isinstance(self, TypeVariable):
-            raise ValueError("Attempted to calculate nesting for variable")
+            raise ValueError("A variable can not have a nesting level.")
         assert isinstance(self, TypeOperation)
         return max(p.nesting() for p in self.params) + 1 if self.params else 0
 
@@ -665,7 +665,7 @@ class TypeOperation(TypeInstance):
         self.params = tuple(params)
 
         if len(self.params) != self.operator.arity:
-            raise ValueError(
+            raise TypeParameterError(
                 f"{self.operator} takes {self.operator.arity} "
                 f"parameter{'' if self.operator.arity == 1 else 's'}; "
                 f"{len(self.params)} given"
@@ -740,7 +740,9 @@ class TypeOperation(TypeInstance):
                         yield op(*(q if i == j else p
                             for j, p in enumerate(self.params)))
                 else:
-                    raise RuntimeError("encountered variable")
+                    raise UnexpectedVariableError(
+                        "Only concrete types can have parents or children."
+                    )
 
             if empty:
                 if include_bottom and dir is Direction.DOWN:
@@ -881,12 +883,13 @@ class TypeAlias(Type):
             len(signature(alias).parameters)
 
         if isinstance(alias, Type) and any(alias.instance().variables()):
-            raise RuntimeError("type alias must not contain variables")
+            raise UnexpectedVariableError(
+                f"Type alias {name} must not contain variables")
 
     def instance(self) -> TypeInstance:
         if self.arity > 0:
-            raise ValueError("type alias expects arguments")
-            return self.alias(*self.args)
+            raise TypeParameterError(
+                f"Type alias {self.name} requires parameters")
         else:
             assert isinstance(self.alias, Type)
             return self.alias.instance()
@@ -1166,3 +1169,16 @@ class ConstrainFreeVariable(TypingError):
 
     def __str__(self) -> str:
         return f"A free variable occurs in constraint {self.constraint}"
+
+
+class UnexpectedVariableError(TypingError):
+    """
+    Raised when a variable is encountered in what should be a concrete type.
+    """
+
+
+class TypeParameterError(TypingError):
+    """
+    Raised when too many or not enough parameters are passed to a type
+    operator, or when an instance is taken of a parameterized type.
+    """

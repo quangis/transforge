@@ -93,7 +93,7 @@ class Language(object):
             return self.namespace[
                 x.text(sep="-", lparen="-", rparen="", prod="")]
         else:
-            raise ValueError(f"non-canonical type {x}")
+            raise NonCanonicalTypeError(x)
 
     def expand_canon(self) -> None:
         """
@@ -183,13 +183,10 @@ class Language(object):
         elif item.name:
             name = item.name
         else:
-            raise RuntimeError("unnamed")
+            raise ValueError("Unnamed operator")
 
         if name in self or name in reserved:
-            raise ValueError(f"symbol {name} already exists in the language")
-
-        if isinstance(item, TypeOperation) and any(item.variables()):
-            raise ValueError("synonyms must not contain variable instance")
+            raise ValueError(f"Symbol {name} already exists in the language")
 
         if isinstance(item, Operator):
             self.operators[name] = item
@@ -223,7 +220,7 @@ class Language(object):
             # Check that every type is known to the algebra
             for t in op.type.instance().operators():
                 if t not in self:
-                    raise ValueError
+                    raise ValueError(f"Operator {op} contains unknown type {t}")
 
     def parse(self, string: str, *args: Expr) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple
@@ -273,12 +270,11 @@ class Language(object):
                 if token == "-":
                     current = Source()
                 elif token.isnumeric():
+                    input = int(token)
                     try:
-                        current = args[int(token) - 1]
+                        current = args[input - 1]
                     except KeyError:
-                        raise RuntimeError(
-                            f"{token} should be replaced with expression, but "
-                            f"none was given")
+                        raise MissingInputError(input)
                 else:
                     current = self.parse_operator(token).instance()
                 previous = stack.pop()
@@ -330,17 +326,13 @@ class Language(object):
                         stack.append(args[0])
                         return
                     else:
-                        raise RuntimeError
+                        raise ParseError("Could not parse type instance")
                 elif isinstance(arg, (TypeOperator, TypeAlias)):
-                    if not len(args) == arg.arity:
-                        raise RuntimeError(
-                            f"Tried to apply {len(args)} arguments to "
-                            f"operator {arg} of arity {arg.arity}")
                     stack.append(arg(*reversed(args)))
                     args = []
                 else:
                     args.append(arg)
-            raise RuntimeError(args)
+            raise BracketMismatch
 
         level = 0
         while token := next(tokens, None):
@@ -384,7 +376,7 @@ class Language(object):
         if len(stack) == 1 and isinstance(stack[0], TypeInstance):
             return stack[0]
         else:
-            raise RuntimeError(stack)
+            raise ParseError("Could not parse as type instance")
 
 
 def tokenize(string: str, specials: str = "") -> Iterator[str]:
@@ -455,6 +447,10 @@ class UndefinedToken(ParseError):
         return f"Operator or type operator '{self.token}' is undefined."
 
 
+class MissingInputError(ParseError):
+    "Raised when an input is referenced but no input was provided as argument."
+
+
 class TypeDeclarationError(TypingError):
     def __init__(self, expr: Expr, type: Type, input: int | None = None):
         self.expr = expr
@@ -475,3 +471,10 @@ class TypeDeclarationError(TypingError):
             f"but it is actually `{self.expr.type}`. \n"
             f"\t{self.__cause__}"
         )
+
+
+class NonCanonicalTypeError(TransformationError):
+    "Raised when a non-canonical type is referenced"
+
+    def __init__(self, type: Type):
+        self.type = type

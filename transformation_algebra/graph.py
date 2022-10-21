@@ -385,10 +385,8 @@ class TransformationGraph(Graph):
                 try:
                     exprs[wfnode] = expr = self.language.parse(
                         wf.expression(wfnode), *input_exprs)
-                except TypingError as e:
+                except (TypingError, ParseError) as e:
                     raise WorkflowCompositionError(wf, wfnode) from e
-                except ParseError:
-                    raise
                 return expr
 
         # 2. Convert individual transformation expressions to nodes and add
@@ -560,6 +558,11 @@ class TransformationGraph(Graph):
 
 
 class WorkflowCompositionError(TransformationError):
+    """
+    Raised when an errors occurs while trying to compose a transformation graph
+    for a workflow.
+    """
+
     def __init__(self, wf: Workflow, node: Node):
         self.wf = wf
         self.node = node
@@ -574,4 +577,7 @@ class WorkflowCompositionError(TransformationError):
         )
 
 
-
+class CyclicTransformationGraphError(TransformationError):
+    """
+    Raised when a transformation is cyclical.
+    """

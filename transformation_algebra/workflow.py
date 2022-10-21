@@ -86,7 +86,7 @@ class Workflow(object):
             target, = targets
             return target
         else:
-            raise RuntimeError("must have exactly one final tool application")
+            raise ValueError("must have exactly one final tool application")
 
     @staticmethod
     def from_rdf(self, language: Language, graph: Graph) -> Workflow:
@@ -100,7 +100,7 @@ class Workflow(object):
             g.refresh()
             return g
         else:
-            raise RuntimeError("did not recognize workflow graph")
+            raise ValueError("did not recognize workflow graph")
 
 
 class WorkflowDict(Workflow):
@@ -159,7 +159,7 @@ class WorkflowGraph(Graph, Workflow):
         if root:
             self._root = root
         else:
-            raise RuntimeError("there must be exactly 1 Workflow in the graph")
+            raise ValueError("there must be exactly 1 Workflow in the graph")
 
         self._sources = set(self.objects(self.root, WF.source))
         self._tool_outputs = set()
@@ -196,7 +196,7 @@ class WorkflowGraph(Graph, Workflow):
         tool = self.value(app, WF.applicationOf, any=False)
 
         if not tool:
-            raise RuntimeError(f"{app} has no associated tool")
+            raise ValueError(f"{app} has no associated tool")
         assert isinstance(tool, URIRef)
         return tool
 
@@ -210,6 +210,6 @@ class WorkflowGraph(Graph, Workflow):
         expr = self.tools.value(tool, self.language.namespace.expression,
             any=False)
         if not expr:
-            raise RuntimeError(f"{tool} has no algebra expression")
+            raise ValueError(f"{tool} has no algebra expression")
         assert isinstance(expr, Literal)
         return str(expr)

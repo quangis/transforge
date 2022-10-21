@@ -416,17 +416,3 @@ class NonSchematicVariables(TransformationError):
 
     def __str__(self) -> str:
         return f"Type {self.type} contains a non-schematic variable."
-
-
-# class SourceError(Exception):
-#     "Raised when a source is attached to a non-matching input."
-
-#     def __init__(self, source: Expr, attachment: Expr):
-#         self.source = source
-#         self.attachment = attachment
-
-#     def __str__(self) -> str:
-#         assert self.__cause__, "must be caused by another error"
-#         return f"Could not attach {self.attachment} to a source of type " \
-#             f"{self.source.type}: " \
-#             f"{self.__cause__}"

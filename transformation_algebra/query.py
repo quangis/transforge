@@ -17,7 +17,8 @@ from transformation_algebra.namespace import RDF, TA
 from transformation_algebra.type import Type
 from transformation_algebra.expr import Operator
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph
+from transformation_algebra.graph import (
+    TransformationGraph, CyclicTransformationGraphError)
 
 
 def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
@@ -62,7 +63,7 @@ class TransformationQuery(object):
 
         self.lang = lang
 
-        self.root = graph.value(predicate=RDF.type, object=TA.Task, any=False)
+        self.root: Node = graph.value(predicate=RDF.type, object=TA.Task, any=False)
 
         if not self.root:
             raise ValueError(f"No {TA.Task.n3()} found in the graph.")
@@ -168,7 +169,7 @@ class TransformationQuery(object):
         variables to each step node. Raises error when encountering a cycle.
         """
         if node in path:
-            raise ValueError("cycle")
+            raise CyclicTransformationGraphError
 
         if self.unfold_tree:
             var = next(self.generator)
