@@ -214,7 +214,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
-                with_noncanonical_types=False,
+                with_noncanonical_types=True,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
             tg.uri = root = EX[f"expr{i}"]
@@ -237,7 +237,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
             wf.refresh()
 
             tg = TransformationGraph(self.language,
-                with_noncanonical_types=False,
+                with_noncanonical_types=True,
                 with_intermediate_types=not self.opaque,
                 passthrough=not self.blocked)
 
