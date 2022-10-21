@@ -5,7 +5,8 @@ from transformation_algebra.type import TypeOperator, _, \
     TypeMismatch, SubtypeMismatch
 from transformation_algebra.expr import Operator, Source, \
     DeclaredTypeTooGeneral, DeclarationError
-from transformation_algebra.lang import Language
+from transformation_algebra.lang import Language, \
+    TypeAnnotationError
 
 
 class TestAlgebra(TestCase):
@@ -139,7 +140,7 @@ class TestAlgebra(TestCase):
         lang = Language(locals())
 
         lang.parse("f (1 : A) (2 : B)", Source(), Source())
-        self.assertRaises(TypeMismatch, lang.parse, "f (1 : A) (1 : B)",
+        self.assertRaises(TypeAnnotationError, lang.parse, "f (1 : A) (1 : B)",
             Source())
 
 

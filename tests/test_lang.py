@@ -1,9 +1,9 @@
 import unittest
 
 from transformation_algebra.type import TypeOperator, TypeAlias, \
-    SubtypeMismatch, _, Top, TypeVariable
+    _, Top, TypeVariable, TypeParameterError
 from transformation_algebra.expr import Operator, Source
-from transformation_algebra.lang import Language
+from transformation_algebra.lang import Language, TypeAnnotationError
 from collections import defaultdict
 
 
@@ -50,7 +50,7 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals())
 
         lang.parse("f 1 : A", Source())
-        self.assertRaises(SubtypeMismatch, lang.parse, "1 : B; f 1 : A", Source())
+        self.assertRaises(TypeAnnotationError, lang.parse, "1 : B; f 1 : A", Source())
 
     def test_parse_anonymous_source(self):
         A = TypeOperator()
@@ -93,7 +93,7 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(
             lang.parse("- : G(B)").match(Source(F(B, B)))
         )
-        self.assertRaises(RuntimeError, lang.parse, "- : G")
+        self.assertRaises(TypeParameterError, lang.parse, "- : G")
 
     def test_canon(self):
         A = TypeOperator()

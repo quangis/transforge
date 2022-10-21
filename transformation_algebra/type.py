@@ -889,14 +889,20 @@ class TypeAlias(Type):
     def instance(self) -> TypeInstance:
         if self.arity > 0:
             raise TypeParameterError(
-                f"Type alias {self.name} requires parameters")
+                f"Type alias {self.name} cannot be used as a type "
+                "without providing parameters")
         else:
             assert isinstance(self.alias, Type)
             return self.alias.instance()
 
     def __call__(self, *args: Type) -> TypeOperation:
         assert callable(self.alias)
-        return self.alias(*args)
+        if len(args) == self.arity:
+            return self.alias(*args)
+        else:
+            raise TypeParameterError(
+                f"Type alias {self.name} requires {self.arity} parameters, "
+                f"but {len(args)} were given")
 
 
 class Constraint(object):

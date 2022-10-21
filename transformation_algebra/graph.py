@@ -11,7 +11,8 @@ from transformation_algebra.type import (Type, TypeOperation, Function,
     TypeInstance, TypingError)
 from transformation_algebra.expr import (Expr, Operation, Application,
     Abstraction, Source)
-from transformation_algebra.lang import Language, ParseError
+from transformation_algebra.lang import (Language, ParseError,
+    NonCanonicalTypeError)
 from transformation_algebra.workflow import Workflow
 
 import html
@@ -164,8 +165,11 @@ class TransformationGraph(Graph):
             node: Node
             try:
                 node = self.language.uri(t)  # type: ignore
-            except ValueError:
-                node = BNode()
+            except NonCanonicalTypeError:
+                if self.with_noncanonical_types:
+                    node = BNode()
+                else:
+                    raise
 
             if self.with_classes:
                 self.add((node, RDF.type, TA.Type))

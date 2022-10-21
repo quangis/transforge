@@ -261,7 +261,7 @@ class Language(object):
                         input = int(previous_token)
                     else:
                         input = None
-                    raise TypeDeclarationError(previous, t, input) from e
+                    raise TypeAnnotationError(previous, t, input) from e
             elif token == ";":
                 stack.clear()
                 stack.append(None)
@@ -451,7 +451,7 @@ class MissingInputError(ParseError):
     "Raised when an input is referenced but no input was provided as argument."
 
 
-class TypeDeclarationError(TypingError):
+class TypeAnnotationError(TypingError):
     def __init__(self, expr: Expr, type: Type, input: int | None = None):
         self.expr = expr
         self.type = type

@@ -13,7 +13,8 @@ from rdflib.tools.rdf2dot import rdf2dot
 
 from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
     SubtypeMismatch, TypeAlias, TypeOperation, Top, Bottom
-from transformation_algebra.expr import Expr, Operator, Source
+from transformation_algebra.expr import Expr, Operator, Source, \
+    ApplicationError
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TA, TEST, TransformationGraph
 from transformation_algebra.workflow import WorkflowDict
@@ -48,7 +49,7 @@ def graph_auto(alg: Language, value: Expr | Type) -> Graph:
     Transform an expression to a transformation graph.
     """
     g = TransformationGraph(alg, minimal=True, with_operators=True,
-        with_type_parameters=True)
+        with_type_parameters=True, with_noncanonical_types=True)
     if isinstance(value, Expr):
         root = BNode()
         g.add_expr(value, root)
@@ -468,7 +469,7 @@ class TestAlgebraRDF(unittest.TestCase):
         # Mismatch
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        self.assertRaises(SubtypeMismatch, actual3.add_workflow, WorkflowDict(root, {
+        self.assertRaises(ApplicationError, actual3.add_workflow, WorkflowDict(root, {
             TEST.sourceA: ("-: A", []),
             TEST.sourceB: ("-: B", []),
             TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])

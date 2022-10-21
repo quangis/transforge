@@ -499,5 +499,6 @@ class TestAlgebra(unittest.TestCase):
         graph.add((C, TA["from"], A))
         self.assertRaises(Exception, TransformationQuery, lang, graph)
 
+
 if __name__ == '__main__':
     unittest.main()
