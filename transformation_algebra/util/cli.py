@@ -17,14 +17,18 @@ from plumbum import cli  # type: ignore
 from rdflib import Graph, Dataset
 from rdflib.term import Node, Literal
 from rdflib.util import guess_format
-from transformation_algebra.base import TransformationError
-from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph
+from transformation_algebra.expr import ApplicationError
+from transformation_algebra.lang import Language, ParseError
+from transformation_algebra.graph import TransformationGraph, \
+    WorkflowCompositionError
 from transformation_algebra.query import TransformationQuery
 from transformation_algebra.namespace import TA, EX, WF, TOOLS
 from transformation_algebra.workflow import WorkflowGraph
 from transformation_algebra.util.store import TransformationStore
 from typing import NamedTuple, Iterable
+
+
+caught_errors = (WorkflowCompositionError, ApplicationError, ParseError)
 
 
 def lang(path_or_module: str) -> Language:
@@ -217,7 +221,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
             try:
                 e = tg.add_expr(self.language.parse(expr), root)
-            except TransformationError as e:
+            except caught_errors as e:
                 if self.skip_error:
                     print(f"Skipping expression:\n\t{e}", file=stderr)
                 else:
@@ -239,7 +243,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
             try:
                 tg.add_workflow(wf)
-            except TransformationError as e:
+            except caught_errors as e:
                 if self.skip_error:
                     print(f"Skipping {wf_path}:\n\t{e}", file=stderr)
                 else:

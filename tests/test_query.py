@@ -8,7 +8,8 @@ from rdflib.namespace import RDF
 from transformation_algebra.type import TypeOperator, Type, _
 from transformation_algebra.expr import Operator, Expr, Source
 from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph, TA, TEST
+from transformation_algebra.graph import TransformationGraph, TA, TEST, \
+    CyclicTransformationGraphError
 from transformation_algebra.query import TransformationQuery
 
 make_query = TransformationQuery.from_list
@@ -467,7 +468,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, RDF.type, TA.Task))
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], A))
-        self.assertRaises(Exception, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -476,7 +477,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, TA.output, A))
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], A))
-        self.assertRaises(Exception, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -486,7 +487,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], C))
         graph.add((C, TA["from"], A))
-        self.assertRaises(Exception, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -497,7 +498,7 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TA["from"], B))
         graph.add((B, TA["from"], C))
         graph.add((C, TA["from"], A))
-        self.assertRaises(Exception, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
 
 if __name__ == '__main__':

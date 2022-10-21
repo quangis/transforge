@@ -5,7 +5,6 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.base import TransformationError
 from transformation_algebra.namespace import TA, RDF, RDFS, WF, shorten
 from transformation_algebra.type import (Type, TypeOperation, Function,
     TypeInstance, TypingError)
@@ -561,7 +560,7 @@ class TransformationGraph(Graph):
             h.close()
 
 
-class WorkflowCompositionError(TransformationError):
+class WorkflowCompositionError(Exception):
     """
     Raised when an errors occurs while trying to compose a transformation graph
     for a workflow.
@@ -581,7 +580,7 @@ class WorkflowCompositionError(TransformationError):
         )
 
 
-class CyclicTransformationGraphError(TransformationError):
+class CyclicTransformationGraphError(Exception):
     """
     Raised when a transformation is cyclical.
     """

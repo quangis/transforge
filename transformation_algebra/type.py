@@ -11,7 +11,6 @@ from itertools import chain, count
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Callable
 
-from transformation_algebra.base import TransformationError
 from transformation_algebra.label import Labels
 
 
@@ -207,7 +206,7 @@ class TypeSchema(Type):
         for constraint in context.constraints():
             if not all(v.wildcard or v in context
                     for v in constraint.variables(indirect=False)):
-                raise ConstrainFreeVariable(constraint, self)
+                raise ConstrainFreeVariableError(constraint, self)
 
     def only_schematic(self) -> bool:
         """
@@ -587,7 +586,7 @@ class TypeInstance(Type):
             if b.operator is Top:
                 return
             elif a in b:
-                raise RecursiveType(a, b)
+                raise RecursiveTypeError(a, b)
             elif b.basic:
                 if skip_basic or (skip_wildcard and a.wildcard):
                     pass
@@ -607,7 +606,7 @@ class TypeInstance(Type):
             if a.operator is Bottom:
                 return
             elif b in a:
-                raise RecursiveType(b, a)
+                raise RecursiveTypeError(b, a)
             elif a.basic:
                 if skip_basic or (skip_wildcard and b.wildcard):
                     pass
@@ -1108,7 +1107,7 @@ def with_parameters(
 
 # Errors #####################################################################
 
-class TypingError(TransformationError):
+class TypingError(Exception):
     "There is a typechecking issue."
 
 
@@ -1142,7 +1141,7 @@ class FunctionApplicationError(TypeMismatch):
             f"`{self.right}`."
 
 
-class RecursiveType(TypingError):
+class RecursiveTypeError(TypingError):
     "Raised for infinite types."
 
     def __init__(self, inner: TypeInstance, outer: TypeInstance):
@@ -1163,7 +1162,7 @@ class ConstraintViolation(TypingError):
         return f"Violated typeclass constraint {self.constraint}."
 
 
-class ConstrainFreeVariable(TypingError):
+class ConstrainFreeVariableError(TypingError):
     """
     Raised when a constraint refers to a variable that does not occur in its
     context.

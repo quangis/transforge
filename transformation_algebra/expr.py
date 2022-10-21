@@ -11,7 +11,6 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Callable, Iterator
 
-from transformation_algebra.base import TransformationError
 from transformation_algebra.label import Labels
 from transformation_algebra.type import (Type, TypeVariable, TypeSchema,
     TypeInstance, Function, _, TypingError, TypeOperation)
@@ -98,7 +97,7 @@ class Operator(object):
             t = self.type
             if (isinstance(t, TypeSchema) and not t.only_schematic()) or \
                     isinstance(t, TypeInstance) and any(t.variables()):
-                raise NonSchematicVariables(self.type)
+                raise NonSchematicVariablesError(self.type)
 
             # Check that constraints contain no free variables
             if isinstance(t, TypeSchema):
@@ -118,10 +117,10 @@ class Operator(object):
                 # variables --- otherwise we were too general
                 if not all(isinstance(v.follow(), TypeVariable)
                         for v in vars_decl):
-                    raise DeclaredTypeTooGeneral(
+                    raise DeclaredTypeTooGeneralError(
                         self.type, self.instance().primitive().type)
 
-        except (NonSchematicVariables, DeclaredTypeTooGeneral,
+        except (NonSchematicVariablesError, DeclaredTypeTooGeneralError,
                 ApplicationError, TypingError) as e:
             raise DeclarationError(self) from e
 
@@ -369,7 +368,11 @@ class Variable(Expr):
 
 # Errors #####################################################################
 
-class DeclarationError(TransformationError):
+class DeclarationError(Exception):
+    """
+    Raised when an operator that has been declared is invalid for some reason.
+    """
+
     def __init__(self, operator: Operator):
         self.operator = operator
 
@@ -381,7 +384,11 @@ class DeclarationError(TransformationError):
         )
 
 
-class ApplicationError(TransformationError):
+class ApplicationError(Exception):
+    """
+    Raised when an operator could not be applied to an argument.
+    """
+
     def __init__(self, operation: Expr, argument: Expr):
         self.operation = operation
         self.argument = argument
@@ -394,7 +401,7 @@ class ApplicationError(TransformationError):
         )
 
 
-class DeclaredTypeTooGeneral(TransformationError):
+class DeclaredTypeTooGeneralError(DeclarationError):
     """
     Raised when the declared type of a composite transformation is unifiable
     with the type inferred from its derivation, but it is too general.
@@ -410,7 +417,12 @@ class DeclaredTypeTooGeneral(TransformationError):
             f"inferred type {self.inferred}."
 
 
-class NonSchematicVariables(TransformationError):
+class NonSchematicVariablesError(DeclarationError):
+    """
+    Raised when an operator contains a type instance variable rather than
+    a schematic variable.
+    """
+
     def __init__(self, type: Type):
         self.type = type
 

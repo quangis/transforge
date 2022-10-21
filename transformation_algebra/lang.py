@@ -10,11 +10,10 @@ from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
 
-from transformation_algebra.base import TransformationError
 from transformation_algebra.namespace import TA, EX
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
-    TypeSchema, Top, TypingError)
+    TypeSchema, TypingError)
 from transformation_algebra.expr import Operator, Expr, Application, Source
 
 
@@ -298,14 +297,14 @@ class Language(object):
     def parse_atom(self, token: str) -> Operator | TypeInstance:
         try:
             return self.parse_operator(token)
-        except UndefinedToken:
+        except UndefinedTokenError:
             return self.parse_type(token)
 
     def parse_operator(self, token: str) -> Operator:
         try:
             return self.operators[token]
         except KeyError as e:
-            raise UndefinedToken(token) from e
+            raise UndefinedTokenError(token) from e
 
     def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
         if isinstance(value, str):
@@ -362,7 +361,7 @@ class Language(object):
                         t = self.synonyms[token]
                         t = t.instance() if t.arity == 0 else t
                     except KeyError as e:
-                        raise UndefinedToken(token) from e
+                        raise UndefinedTokenError(token) from e
                 stack.append(t)
 
             if not consume_all and (
@@ -425,7 +424,7 @@ class LanguageNamespace(ClosedNamespace):
 
 # Errors #####################################################################
 
-class ParseError(TransformationError):
+class ParseError(Exception):
     pass
 
 
@@ -439,7 +438,7 @@ class EmptyParse(ParseError):
         return "Empty parse."
 
 
-class UndefinedToken(ParseError):
+class UndefinedTokenError(ParseError):
     def __init__(self, token: str):
         self.token = token
 
@@ -473,7 +472,7 @@ class TypeAnnotationError(TypingError):
         )
 
 
-class NonCanonicalTypeError(TransformationError):
+class NonCanonicalTypeError(Exception):
     "Raised when a non-canonical type is referenced"
 
     def __init__(self, type: Type):

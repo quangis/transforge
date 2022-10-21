@@ -1,9 +1,10 @@
 import unittest
 
 from transformation_algebra.type import TypeOperator, TypeAlias, \
-    _, Top, TypeVariable, TypeParameterError
+    _, Top, TypeVariable, TypeParameterError, UnexpectedVariableError
 from transformation_algebra.expr import Operator, Source
-from transformation_algebra.lang import Language, TypeAnnotationError
+from transformation_algebra.lang import Language, TypeAnnotationError, \
+    UndefinedTokenError
 from collections import defaultdict
 
 
@@ -40,7 +41,7 @@ class TestAlgebra(unittest.TestCase):
 
     def test_type_synonyms_no_variables(self):
         F = TypeOperator(params=1)
-        self.assertRaises(RuntimeError, TypeAlias, F(_))
+        self.assertRaises(UnexpectedVariableError, TypeAlias, F(_))
 
     def test_parse_sources(self):
         A = TypeOperator()
@@ -81,7 +82,7 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(lang.parse_type("F((A), (A * A))").match(F(A, A * A)))
 
         self.assertTrue(lang.parse("- : (A * A)").match(Source(A * A)))
-        self.assertRaises(RuntimeError, lang.parse, "- : A * A")
+        self.assertRaises(UndefinedTokenError, lang.parse, "- : A * A")
 
     def test_parameterized_type_alias(self):
         # See issue #73

@@ -3,8 +3,8 @@ import unittest
 from transformation_algebra.type import \
     Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
     FunctionApplicationError, TypeMismatch, Top, Bottom, \
-    ConstraintViolation, ConstrainFreeVariable, EliminationConstraint, \
-    Direction
+    ConstraintViolation, ConstrainFreeVariableError, EliminationConstraint, \
+    Direction, UnexpectedVariableError
 
 
 Ω = TypeOperator('Ω')
@@ -210,9 +210,9 @@ class TestType(unittest.TestCase):
     def test_constrain_free_variable(self):
         f = TypeSchema(lambda x, y, z: x ** x [y << {x, z}])
         g = TypeSchema(lambda x, y, z: x ** x [x << {y, z}])
-        self.assertRaises(ConstrainFreeVariable,
+        self.assertRaises(ConstrainFreeVariableError,
             TypeSchema.validate_no_free_variables, f)
-        self.assertRaises(ConstrainFreeVariable,
+        self.assertRaises(ConstrainFreeVariableError,
             TypeSchema.validate_no_free_variables, g)
 
     def test_global_subtype_resolution(self):
@@ -467,7 +467,7 @@ class TestType(unittest.TestCase):
         F = TypeOperator('F', params=1)
         G = TypeSchema(lambda x: F(x))
         self.assertEqual(F(F(_)).concretize(True), F(F(Top)))
-        self.assertRaises(RuntimeError, G.concretize)
+        self.assertRaises(UnexpectedVariableError, G.concretize)
 
     def test_top_type_is_usable_as_a_function(self):
         # cf. <https://github.com/quangis/transformation-algebra/issues/100>
@@ -490,11 +490,11 @@ class TestType(unittest.TestCase):
 
         f = A ** A
         self.apply(f, Bottom, result=A)
-        self.apply(f, Top, result=Exception)
+        self.apply(f, Top, result=TypeMismatch)
 
         g = F(A) ** A
         self.apply(g, F(Bottom), result=A)
-        self.apply(g, F(Top), result=Exception)
+        self.apply(g, F(Top), result=TypeMismatch)
 
     def test_top_and_bottom_apply(self):
         # cf. <https://github.com/quangis/transformation-algebra/issues/107>

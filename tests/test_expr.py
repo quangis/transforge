@@ -2,9 +2,9 @@ import unittest
 from .testcase import TestCase  # type: ignore
 
 from transformation_algebra.type import TypeOperator, _, \
-    TypeMismatch, SubtypeMismatch
+    SubtypeMismatch
 from transformation_algebra.expr import Operator, Source, \
-    DeclaredTypeTooGeneral, DeclarationError
+    DeclaredTypeTooGeneralError, DeclarationError
 from transformation_algebra.lang import Language, \
     TypeAnnotationError
 
@@ -128,7 +128,7 @@ class TestAlgebra(TestCase):
         f, g = Operator(type=A ** B), Operator(type=lambda α: α ** B)
         Operator(type=lambda α: α ** B, body=lambda x: g(x)).validate()
         self.assertRaisesChain(
-            [DeclarationError, DeclaredTypeTooGeneral],
+            [DeclarationError, DeclaredTypeTooGeneralError],
             Operator.validate,
             Operator(type=lambda α: α ** B, body=lambda x: f(x)))
 

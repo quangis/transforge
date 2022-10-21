@@ -1,2 +1,0 @@
-class TransformationError(RuntimeError):
-    pass
