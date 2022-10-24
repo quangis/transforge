@@ -8,24 +8,24 @@ import csv
 import platform
 import importlib.machinery
 import importlib.util
-from sys import stderr
+from sys import stdout, stderr
 from pathlib import Path
 from itertools import chain
+from collections import defaultdict
 from glob import glob
 
 from plumbum import cli  # type: ignore
 from rdflib import Graph, Dataset
-from rdflib.term import Node, Literal
+from rdflib.term import Literal, Node, URIRef
 from rdflib.util import guess_format
 from transformation_algebra.expr import ApplicationError
 from transformation_algebra.lang import Language, ParseError
 from transformation_algebra.graph import TransformationGraph, \
     WorkflowCompositionError
 from transformation_algebra.query import TransformationQuery
-from transformation_algebra.namespace import TA, EX, WF, TOOLS
+from transformation_algebra.namespace import TA, EX, WF, TOOLS, RDF, shorten
 from transformation_algebra.workflow import WorkflowGraph
 from transformation_algebra.util.store import TransformationStore
-from typing import NamedTuple, Iterable
 
 
 caught_errors = (WorkflowCompositionError, ApplicationError, ParseError)
@@ -257,13 +257,6 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
         self.write(*results)
 
 
-class Task(NamedTuple):
-    name: str
-    query: TransformationQuery
-    expected: set[Node]
-    actual: set[Node]
-
-
 @CLI.subcommand("query")
 class QueryRunner(Application, WithServer, WithRDF):
     """
@@ -275,67 +268,89 @@ class QueryRunner(Application, WithServer, WithRDF):
         default=False, help="Take into account order")
     blackbox = cli.Flag(["--blackbox"],
         default=False, help="Only consider input and output of the workflows")
+    summary = cli.SwitchAttr(["--summary"], requires=["--server"],
+        help="Write a CSV with a summary of all queries")
 
-    def evaluate(self, path, **opts) -> Graph:
+    def evaluate(self, path: str) -> Graph:
         """
-        Parse and run a single task.
+        Parse and run a single task and add results to the task graph.
         """
         in_graph = Graph()
         in_graph.parse(path)
-        query = TransformationQuery(self.language, in_graph, **opts)
 
-        # expected = set(graph.objects(query.root, TA.implementation))
-        actual = query.run(self.store) if self.store else set()
-        sparql = query.sparql()
+        query = TransformationQuery(self.language, in_graph, by_io=True,
+            by_operators=False, by_types=not self.blackbox,
+            by_chronology=self.chronological and not self.blackbox)
 
         out_graph = query.graph
-        out_graph.add((query.root, TA.sparql, Literal(sparql)))
-        for match in actual:
-            out_graph.add((query.root, TA.match, match))
+        out_graph.add((query.root, TA.sparql, Literal(query.sparql())))
+
+        if self.store:
+            for match in query.run(self.store):
+                out_graph.add((query.root, TA.match, match))
         return out_graph
 
-        # return Task(name=path.stem, query=query,
-        #     expected=set(graph.objects(query.root, TA.implementation)),
-        #     actual=(query.run(self.graph) if self.graph else set()))
-
-    def summarize(self, tasks: Iterable[Task]) -> None:
+    def summarize(self, *task_graphs: Graph) -> None:
         """
         Write a CSV summary of the tasks to the output.
         """
 
-        workflows = set.union(*chain(
-            (t.actual for t in tasks),
-            (t.expected for t in tasks)))
+        # Collect all tasks
+        tasks: dict[URIRef, Graph] = {task: tg for tg in task_graphs
+            if (task := tg.value(None, RDF.type, TA.Task, any=False))}
 
-        header = ["Task", "Precision", "Recall"] + sorted([
-            str(wf)[len(EX):] for wf in workflows])
+        # Collect all possible workflows
+        workflows = set(wf for task, tg in tasks.items() for wf in chain(
+            tg.objects(task, TA.implementation), tg.objects(task, TA.match)))
 
-        with open(self.output, 'w', newline='') as h:
-            n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
-            w = csv.DictWriter(h, fieldnames=header)
-            w.writeheader()
-            for task in tasks:
-                result: dict[str, str] = {"Task": task.name}
-                expected, actual = task.expected, task.actual
-                for wf in workflows:
-                    s = "●" if wf in actual else "○"
-                    if not expected:
-                        s += "?"
-                    elif (wf in actual) ^ (wf in expected):
-                        s += "⨯"
-                    result[str(wf)[len(EX):]] = s
+        # Collect results
+        n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
+        results: dict[Node, dict[str, str]] = defaultdict(dict)
+        for task, tg in tasks.items():
+            expected = set(tg.objects(task, TA.implementation))
+            actual = set(tg.objects(task, TA.match))
+
+            if expected:
                 n_fpos += len(actual - expected)
                 n_fneg += len(expected - actual)
                 n_tpos += len(actual.intersection(expected))
                 n_tneg += len(workflows - expected - actual)
-                w.writerow(result)
-            try:
-                w.writerow({
-                    "Precision": "{0:.3f}".format(n_tpos / (n_tpos + n_fpos)),
-                    "Recall": "{0:.3f}".format(n_tpos / (n_tpos + n_fneg))
-                })
-            except ZeroDivisionError:
-                w.writerow({"Precision": "?", "Recall": "?"})
+
+            for wf in workflows:
+                assert isinstance(wf, URIRef)
+                s = "●" if wf in actual else "○"
+                if not expected:
+                    s += "?"
+                elif (wf in actual) ^ (wf in expected):
+                    s += "⨯"
+                results[wf]["Workflow"] = shorten(wf)
+                results[wf][shorten(task)] = s
+
+        # Statistics
+        try:
+            precision = "{0:.3f}".format(n_tpos / (n_tpos + n_fpos))
+        except ZeroDivisionError:
+            precision = "?"
+        try:
+            recall = "{0:.3f}".format(n_tpos / (n_tpos + n_fneg))
+        except ZeroDivisionError:
+            recall = "?"
+
+        # Write to csv
+        if self.summary == "-":
+            handle = stdout
+        else:
+            handle = open(self.summary, 'w', newline='')
+        try:
+            header = ["Workflow"] + sorted([shorten(t) for t in tasks])
+            w = csv.DictWriter(handle, fieldnames=header)
+            w.writeheader()
+            for wf in workflows:
+                w.writerow(results[wf])
+            w.writerow({header[0]: "Precision:", header[1]: precision})
+            w.writerow({header[0]: "Recall:", header[1]: recall})
+        finally:
+            handle.close()
 
     @cli.positional(cli.ExistingFile)
     def main(self, *QUERY_FILE):
@@ -357,32 +372,11 @@ class QueryRunner(Application, WithServer, WithRDF):
                 self.store = None
 
             # Parse tasks and optionally run associated queries
-            tasks = [self.evaluate(task_file, by_io=True,
-                by_operators=False, by_types=not self.blackbox,
-                by_chronology=self.chronological and not self.blackbox)
-                for task_file in QUERY_FILE]
+            tasks = [self.evaluate(task_file) for task_file in QUERY_FILE]
 
             self.write(*tasks)
-
-            # if self.output_path:
-            #     path = self.output_path
-            #     path = None if path == "-" else path
-            #     to_file(*tasks, path=path, format="ttl")
-
-            # # Summarize query results
-            # if self.output_format == "sparql":
-            #     with open(self.output, 'w', newline='') as h:
-            #         h.write("---\n")
-            #         for task in tasks:
-            #             h.write(task.query.sparql())
-            #             h.write("\n\nActual: ")
-            #             h.write(", ".join(t.n3() for t in task.actual))
-            #             h.write("\nExpected: ")
-            #             h.write(", ".join(t.n3() for t in task.expected))
-            #             h.write("\n---\n")
-            # else:
-            #     assert self.output_format == "csv"
-            #     self.summarize(tasks)
+            if self.summary:
+                self.summarize(*tasks)
 
 
 if __name__ == '__main__':
