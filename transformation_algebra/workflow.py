@@ -210,6 +210,8 @@ class WorkflowGraph(Graph, Workflow):
         expr = self.tools.value(tool, self.language.namespace.expression,
             any=False)
         if not expr:
-            raise ValueError(f"{tool} has no algebra expression")
+            raise ValueError(
+                f"{tool} has no algebra expression in the "
+                f"{self.language.namespace} namespace")
         assert isinstance(expr, Literal)
         return str(expr)
