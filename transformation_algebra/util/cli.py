@@ -285,8 +285,8 @@ class QueryRunner(Application, WithServer, WithRDF):
         out_graph = query.graph
         out_graph.add((query.root, TA.sparql, Literal(query.sparql())))
 
-        if self.store:
-            for match in query.run(self.store):
+        if self.server:
+            for match in self.store.run(query):
                 out_graph.add((query.root, TA.match, match))
         return out_graph
 
@@ -345,12 +345,13 @@ class QueryRunner(Application, WithServer, WithRDF):
             header = ["Workflow"] + sorted([shorten(t) for t in tasks])
             w = csv.DictWriter(handle, fieldnames=header)
             w.writeheader()
-            for wf in workflows:
+            for wf in sorted(workflows):
                 w.writerow(results[wf])
             w.writerow({header[0]: "Precision:", header[1]: precision})
             w.writerow({header[0]: "Recall:", header[1]: recall})
         finally:
-            handle.close()
+            if handle is not stdout:
+                handle.close()
 
     @cli.positional(cli.ExistingFile)
     def main(self, *QUERY_FILE):
@@ -366,8 +367,8 @@ class QueryRunner(Application, WithServer, WithRDF):
                     for globbed in glob(original)]
 
             if self.server:
-                self.store = TransformationStore(self.backend, self.server,
-                    cred=self.cred)
+                self.store = TransformationStore.backend(self.backend,
+                    self.server, cred=self.cred)
             else:
                 self.store = None
 

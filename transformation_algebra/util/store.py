@@ -60,16 +60,29 @@ class TransformationStore(Dataset):
         super().__init__(store)
 
     @staticmethod
-    def backend(backend: str, *nargs, **kwargs) -> TransformationStore:
-        backend = backend.lower()
+    def backend(backend: Literal["marklogic", "fuseki"],
+            url: str,
+            cred: tuple[str, str] | None = None,
+            auth: Literal["NONE", "BASIC", "DIGEST"] | None = None) \
+            -> TransformationStore:
+        """
+        For convenience, prefill paths to graph server protocol and SPARQL
+        endpoint for different graph store backends.
+        """
+        url = url.rstrip("/")
         if backend == "fuseki":
-            return Fuseki(*nargs, **kwargs)
+            url_gsp = url + "/data"
+            url_sparql = url + "/query"
         elif backend == "marklogic":
-            return MarkLogic(*nargs, **kwargs)
+            # cf. <https://docs.marklogic.com/guide/semantics/REST>
+            url_gsp = url + "/v1/graphs"
+            url_sparql = url + "/v1/graphs/sparql"
         else:
             raise RuntimeError
+        return TransformationStore(url_gsp=url_gsp,
+            url_sparql=url_sparql, cred=cred, auth=auth)
 
-    def query(self, query: TransformationQuery) -> set[Node]:
+    def run(self, query: TransformationQuery) -> set[Node]:
         return set(r.workflow for r in self.store.query(query.sparql()))
 
     def put(self, g: TransformationGraph) -> HTTPResponse:
@@ -100,20 +113,3 @@ class TransformationStore(Dataset):
         g = Graph()
         g.parse(data=data, format="xml")
         return g
-
-
-class MarkLogic(TransformationStore):
-    # cf. <https://docs.marklogic.com/guide/semantics/REST>
-    def __init__(self, url: str, **kwargs):
-        super().__init__(
-            url_gsp=url + "/v1/graphs",
-            url_sparql=url + "/v1/graphs/sparql",
-            **kwargs)
-
-
-class Fuseki(TransformationStore):
-    def __init__(self, url: str, **kwargs):
-        super().__init__(
-            url_gsp=url.rstrip("/") + "/data",
-            url_sparql=url.rstrip("/") + "/query"
-        )
