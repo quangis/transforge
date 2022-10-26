@@ -1,0 +1,19 @@
+@prefix : <https://example.com/>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix stl: <https://example.com/stl/>.
+@prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
+
+:RelativeSize stl:expression "ratio (size (1: Obj)) (size (2: Obj))".
+
+:SimpleWorkflow a wf:Workflow;
+    wf:source _:population2021, _:population2022;
+    wf:edge [
+        wf:applicationOf :RelativeSize;
+        wf:input1 _:population2021;
+        wf:input2 _:population2022;
+        wf:output _:population_increase
+    ].
+
+_:population2021 rdfs:label "Population in 2021".
+_:population2022 rdfs:label "Population in 2022".
+_:population_increase rdfs:label "Population increase".

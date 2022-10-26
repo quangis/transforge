@@ -14,7 +14,9 @@
     5.  [Wildcard variables](#wildcard-variables)
     6.  [Top, bottom and unit types](#top-bottom-and-unit-types)
     7.  [Union and intersection types](#union-and-intersection-types)
-4.  [Vocabulary and type taxonomy](#vocabulary-and-type-taxonomy)
+4.  [Vocabulary](#vocabulary)
+    1.  [Canonical types](#canonical-types)
+    2.  [Type taxonomy](#type-taxonomy)
 5.  [Composite operators](#composite-operators)
 6.  [Querying](#queries)
 
@@ -34,14 +36,14 @@ example, as it was the motivating use case for the library. However, you
 can apply it to any other domain.
 
 Transformation *operators* are the atomic steps with which more complex 
-procedures are described. For example, if you have a `NearObject` tool 
-for selecting the nearest object, you could describe it in terms of 
-operators like `minimum` and `distance`. Alternatively, you could 
-declare a monolithic operator `select_nearest_object` that describes the 
-entire tool 'atomically'. The amount of detail you go into is entirely 
-up to you, because the operators don't necessarily specify anything 
-about *implementation*: they instead represent *conceptual* steps at 
-whatever level of granularity is suitable for your purpose.
+procedures are described. For example, if you have a tool to measure the
+relative size of two objects, you could describe it in terms of 
+operators like `ratio` and `size`. Alternatively, you could make a 
+monolithic operator `relative_size` that describes the entire tool 
+'atomically'. The amount of detail you go into is entirely up to you, 
+because the operators don't need to specify anything about 
+*implementation*: they instead represent *conceptual* steps at whatever 
+level of granularity is suitable for your purpose.
 
 
 ### Concept types
@@ -49,20 +51,14 @@ whatever level of granularity is suitable for your purpose.
 The names of the operators should provide a hint to their intended 
 semantics. However, they have no formal content besides their *type 
 signature*. This signature indicates what sort of concepts it 
-transforms. For instance, the `distance` transformation might transform 
-two *objects* to a *value*. Such concepts are represented with *type 
-operators*. So, before going into transformation operators, we should 
-understand how these work.
+transforms. For instance, the `size` transformation might transform an 
+object to a value. Concepts like objects and ordinal values are 
+represented with *type operators*.
 
-Let's start by importing the library:
+Before going into transformation operators, we should therefore 
+understand how types work. Let's start by importing the library:
 
     >>> import transformation_algebra as ct
-
-[^1]: Just as with transformation operators, type operators don't 
-    necessarily correspond to concrete data types --- they only capture 
-    some important conceptual properties. That is, when a procedure 
-    involves a `Ratio` concept, that also covers `Object`s that happen 
-    to have a `Ratio` property.
 
 Base type operators can be thought of as atomic concepts. In our case, 
 that could be an *object* or an *ordinal value*. They are declared using 
@@ -78,10 +74,9 @@ the `TypeOperator` class:
 
 A `Function` is a special compound type, and it's quite an important 
 one: it describes a transformation from one type to another. For 
-convenience, the right-associative infix operator `**` has been 
-overloaded to act as a function arrow. When we apply a function to an 
-input, we get its output, or, if the input type was inappropriate, an 
-error:
+convenience, Python's infix operator `**` is abused to act as a function 
+arrow. When we apply a function to an input, we get its output, or, if 
+the input type was inappropriate, an error:
 
     >>> (Ord ** Obj).apply(Ord)
     Obj
@@ -91,101 +86,115 @@ error:
 
 ### Transformation operators
 
-We will revisit types at a later point. For now, we know enough to be 
-able to create our first simple transformation language, containing the 
-operators `minimum` and `distance`. We already mentioned that a 
-`distance` operator would perhaps take two objects and output a 
-value.[^2] The accompanying `minimum` operator might take a set of 
-objects, along with a transformation that associates an object with an 
-ordinal value, and outputs the smallest object. Using the `Operator` 
-class to declare transformation operators, we would end up with:
+We will revisit types at a later point. For now, we know enough to 
+create our first transformation language, containing the operators 
+`ratio` and `size`. The `Operator` class will be used to declare them. 
+We already mentioned that `size` could take an object and return an 
+ordinal, which would look like this:
 
-    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
-    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+    >>> size = ct.Operator(type=Obj ** Ord)
 
-[^2]: A function that takes multiple arguments can be 
-    [rewritten][w:currying] to a sequence of functions.
+The accompanying `ratio` operator might take two ordinal values and 
+output another: the ratio between them. Knowing that a function with 
+multiple arguments can be [rewritten][w:currying] into one that takes a 
+single argument and returns another function to deal with the rest, we 
+get:
+
+    >>> ratio = ct.Operator(type=Ord ** (Ord ** Ord))
+
+Since the `**` operator is right-associative, the parentheses are 
+optional.
+
+We can now bundle up our types and operators into a transformation 
+language, using the `Language` class. Let us call it `stl`, for 'simple 
+transformation language'.
+
+All the types and operators we declared need to be added to it. However, 
+for convenience, it is possible to simply incorporate all types and 
+operators in local scope:
+
+    >>> stl = ct.Language(scope=locals(),
+            namespace="https://example.com/stl/")
 
 
 ### Transformation expressions
 
-Now, we bundle up our types and operators into a transformation language 
-with the `Language` class. For convenience, you can simply incorporate 
-all types and operators in local scope:
-
-    >>> sl = ct.Language(scope=locals())
-
-We now have an object that represents our language. We have called tha 
-language `sl`, for 'simple language'. We can use `sl`'s `.parse()` 
-method to parse transformation *expressions*: complex combinations of 
-operators. The parser accepts both functional notation, like `f(x, y)`, 
-and lambda-style notation, like `f x y`.
+We now have an object that represents our language. We can use `stl`'s 
+`.parse()` method to parse transformation *expressions*: complex 
+combinations of operators. The parser accepts both functional notation, 
+like `f(x, y)`, and lambda-style notation, like `f x y`.
 
 In addition to operators, the expressions may contain numbers. These 
 numbers indicate concepts that are to be provided as input. 
-Alternatively, a dash (`-`) can be used to indicate an concept that is 
-not further specified. Finally, the notation `expression : type` is used 
-to explicitly indicate the type of a sub-expression.
+Alternatively, a dash (`-`) can be used to refer to an anonymous input: 
+a concept that is not further specified. Finally, the notation 
+`expression : type` is used to explicitly indicate the type of a 
+sub-expression.
 
 As an example, the following expression represents a concept 
 transformation that selects, from an unspecified set of objects, the 
 object that is nearest in distance to some other unspecified object.
 
-    >>> expr = sl.parse("minimum (distance (- : Obj)) (- : C(Obj))")
+    >>> expr = stl.parse("ratio (size -) (size -)")
 
 If the result typechecks, which it does, we obtain an `Expr` object. We 
 can inspect its inferred type and get a representation of its 
 sub-expressions:
 
     >>> print(expr.tree())
-    Obj
-     ├─C(Obj) → Obj
-     │  ├─╼ minimum : (Obj → Ord) → C(Obj) → Obj
-     │  └─Obj → Ord
-     │     ├─╼ distance : Obj → Obj → Ord
+    Ord
+     ├─Ord → Ord
+     │  ├─╼ ratio : Ord → Ord → Ord
+     │  └─Ord
+     │     ├─╼ size : Obj → Ord
      │     └─╼ - : Obj
-     └─╼ - : C(Obj)
-
+     └─Ord
+        ├─╼ size : Obj → Ord
+        └─╼ - : Obj
 
 ### Workflow annotation
 
 It is now time to construct a simple workflow. We will use RDF for that, 
 using [Turtle][w:ttl] syntax and the [Workflow][wf] vocabulary. First, 
-we describe the `NearObject` tool.
-
-    @prefix : <http://example.com/#>.
-    :NearObject
-        :expression "minimum (distance (1 : Obj)) (2 : C(Obj))".
-
-Now, we describe a workflow that uses this tool to find the hospital 
-that is nearest to some incident. Note that the concrete inputs 
+we describe the `RelativeSize` tool, and then we describe a workflow 
+that uses it. The concrete inputs in the tool application will 
 correspond to the conceptual inputs in the tool's transformation 
 expression.
 
+    @prefix : <https://example.com/>.
+    @prefix stl: <https://example.com/stl/>.
     @prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
 
+    :RelativeSize stl:expression "ratio (size 1) (size 2)".
+
     :SimpleWorkflow a wf:Workflow;
-        wf:source _:hospitals, _:incident;
+        wf:source _:population2021, _:population2022;
         wf:edge [
-            wf:applicationOf :NearObject;
-            wf:input1 _:incident;
-            wf:input2 _:hospitals;
-            wf:output _:nearest_hospital
+            wf:applicationOf :RelativeSize;
+            wf:input1 _:population2021;
+            wf:input2 _:population2022;
+            wf:output _:population_increase
         ].
 
-Save the transformation language into [`sl.py`](resource/sl.py), and the 
-workflow and tool description into [`wf.ttl`](resource/wf.ttl). We can 
-now use `transformation_algebra`'s command-line interface[^3] to enrich
-the original *workflow* graph with a *transformation* graph.
+We will now use `transformation_algebra`'s command-line interface to 
+enrich the original *workflow* graph with a *transformation* graph. 
+Consult `python -m transformation_algebra -h` for more information on 
+how the interface works. You can also interface with Python directly; 
+checking out the source code for the command-line interface should give 
+you a headstart.
+
+Save the transformation language into [`stl.py`](resource/stl.py), and 
+the workflow and tool description into [`wf1.ttl`](resource/wf1.ttl), 
+and run:
 
     python -m transformation_algebra graph \
-        -L sl.py -T wf.ttl wf.ttl -o output.ttl -t ttl
+        -L stl.py -T wf1.ttl wf1.ttl -o output.ttl -t ttl
 
-What we get back is a graph in which the transformation expression for 
-each tool application has been "unfolded": every input and every 
+What we get back is an RDF graph in which the transformation expression 
+for each tool application has been "unfolded": every input and every 
 operation applied to it becomes a node, representing the concept that is 
-involved at that particular step in the transformation. In this case, it 
-will look something like this:
+involved at that particular step in the transformation. It will look 
+something like this:
 
 <p align="center" width="100%">
 <img
@@ -193,24 +202,14 @@ will look something like this:
     alt="A visualization of the transformation graph.">
 </p>
 
-The distance is an ordinal value that was considered before finding the 
-minimum. In other words, this graph tells us what happens inside the 
-workflow *conceptually*.[^4]
+This graph tells us what happens inside the workflow *conceptually*: the 
+size is an ordinal value that was derived from our inputs and considered 
+before finding the ratio between them.
 
-Of course, the example is trivial: there is only one tool, and the 
-operators do not generalize well. In what follows, we will go into more 
-advanced features.
+Of course, this is a toy problem: the workflow contains only one trivial 
+tool, and the operators do not generalize well. In what follows, we will 
+go into more advanced features.
 
-[^3]: Consult `python -m transformation_algebra -h` for more information 
-    on how the command-line interface works. You can also interface with 
-    Python directly; checking out the source code for the command-line 
-    interface should give you a headstart.
-
-[^4]: You might notice that there is a dashed node before the distance. 
-    This is due to the fact that `distance` was an argument to another 
-    transformation, so it may internally use information that was passed 
-    to `minimum`, which indeed it does: `distance` needs to know about 
-    the incident location as well as the hospital locations.
 
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -218,8 +217,50 @@ What follows is work-in-progress.
 
 # Internal operators
 
-(to-do)
+<!-- work in progress
 
+We already mentioned that a `distance` operator would perhaps take two 
+objects and output a value.[^2]
+
+
+The accompanying `maximum` operator might take a set of objects and 
+outputs the largest among them according to some transformation that 
+associates each object with an ordinal value.
+
+
+, along with a transformation that associates an object with an ordinal 
+value, .
+
+A function type can serve as a
+
+As an example, the following expression represents a concept 
+transformation that selects, from an unspecified set of objects, the 
+object that is nearest in distance to some other unspecified object.
+
+    >>> expr = sl.parse("minimum (distance (- : Obj)) (- : C(Obj))")
+
+
+`NearestObject`
+
+    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
+    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+
+[^4]: You might notice that there is a dashed node before the distance. 
+    This is due to the fact that `distance` was an argument to another 
+    transformation, so it may internally use information that was passed 
+    to `minimum`, which indeed it does: `distance` needs to know about 
+    the incident location as well as the hospital locations.
+
+As an example, the following expression represents a concept 
+transformation that selects, from an unspecified set of objects, the 
+object that is nearest in distance to some other unspecified object.
+
+Now, we describe a workflow that uses this tool to find the hospital 
+that is nearest to some incident. Note that the concrete inputs 
+correspond to the conceptual inputs in the tool's transformation 
+expression.
+
+-->
 
 # Type inference
 
@@ -336,10 +377,25 @@ imported:
 
 ### Union and intersection types
 
+Just as transformation operators might not correspond to how the 
+procedure is *implemented*, type operators don't necessarily represent 
+*data* types. They only capture some relevant conceptual properties of 
+the entities they describe. For example, when a procedure takes an 
+ordinal as argument, that doesn't mean that some concrete number is 
+passed to it --- just that it operates on things that are, in some 
+aspect, ordinal-scaled.
+
+*Union and intersection types have not yet been implemented.*
+
+
+# Vocabulary
+
+### Canonical types
+
 (todo)
 
 
-# Vocabulary and type taxonomy
+### Type taxonomy
 
 (todo)
 
