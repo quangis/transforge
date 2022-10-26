@@ -529,5 +529,16 @@ class TestType(unittest.TestCase):
         G = TypeOperator(params=1)
         self.assertMatch(F(A) & G(A), Bottom)
 
+    def test_wildcard_status_lost_once_subtype_constraint_is_present(self):
+        A = TypeOperator()
+        w = _.instance()
+        self.assertTrue(w.wildcard)
+        self.assertEqual(w.upper, None)
+        (A ** A).apply(w)
+        self.assertIsInstance(w, TypeVariable)
+        self.assertNotEqual(w.upper, None)
+        self.assertFalse(w.wildcard)
+
+
 if __name__ == '__main__':
     unittest.main()
