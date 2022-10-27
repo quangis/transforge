@@ -420,27 +420,41 @@ class TestType(unittest.TestCase):
             (A1, A2) ** A
         )
 
-    def test_printing(self):
-        # Schematic types are printed with the names of their variables
+    def test_print_schematic_types_with_parameter_name(self):
         f = TypeSchema(lambda foo: foo)
         self.assertEqual(str(f), "foo")
 
-        # Subtype constraints
+    def test_print_subtype_bounds(self):
+        A = TypeOperator('A')
+        x, y = TypeVariable(), TypeVariable()
+        (A ** A).apply(x)
+        self.assertEqual(
+            x.text(with_constraints=True, labels={x: "x"}),
+            "x [x <= A]")
+        (y ** y ** y).apply(A)
+        self.assertEqual(
+            y.text(with_constraints=True, labels={y: "y"}),
+            "y [y >= A]")
+
+    def test_print_subtype_constraints(self):
         A = TypeOperator('A')
         f = TypeSchema(lambda x: x [x <= A])
         g = TypeSchema(lambda x: x [A <= x])
         self.assertEqual(str(f), "x [x <= A]")
         self.assertEqual(str(g), "x [A <= x]")
 
-        # Elimination constraints
+    def test_print_elimination_constraints(self):
+        A = TypeOperator('A')
         B = TypeOperator('B')
         f = TypeSchema(lambda x: x [x << (A, B)])
         self.assertEqual(str(f), "x [x << (A, B)]")
 
-        # Subtype bounds printed using same notation as elimination constraints
-        f = TypeSchema(lambda x: x [x << A])
+    def test_print_subtype_bounds_from_elimination_constraint(self):
+        A = TypeOperator('A')
+        f = TypeSchema(lambda x: x [x << A])  # TODO: since A has no subtypes,
+        # could bind already?
         g = TypeSchema(lambda x: x [A << x])
-        self.assertEqual(str(f), "x [x << A]")
+        self.assertEqual(str(f), "x [x <= A]")
         self.assertEqual(str(g), "A")  # this subtype bound should be fixed
 
     def test_inclusive_subtype(self):

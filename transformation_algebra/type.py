@@ -374,9 +374,9 @@ class TypeInstance(Type):
             result_aux = []
             for v in self.variables():
                 if v.lower:
-                    result_aux.append(f"{v.lower} << {v.text(*args)}")
+                    result_aux.append(f"{v.text(*args)} >= {v.lower}")
                 if v.upper:
-                    result_aux.append(f"{v.text(*args)} << {v.upper}")
+                    result_aux.append(f"{v.text(*args)} <= {v.upper}")
 
             result_aux.extend(
                 c.text(*args) for c in self.constraints())
