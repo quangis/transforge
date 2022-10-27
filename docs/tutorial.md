@@ -147,10 +147,10 @@ sub-expressions:
      │  ├─╼ ratio : Ord → Ord → Ord
      │  └─Ord
      │     ├─╼ size : Obj → Ord
-     │     └─╼ - : Obj
+     │     └─╼ - : τ2 [τ2 <= Obj]
      └─Ord
         ├─╼ size : Obj → Ord
-        └─╼ - : Obj
+        └─╼ - : τ2 [τ2 <= Obj]
 
 ### Workflow annotation
 
