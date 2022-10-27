@@ -5,7 +5,7 @@
     2.  [Transformation operators](#transformation-operators)
     3.  [Transformation expressions](#transformation-expressions)
     4.  [Workflow annotation](#workflow-annotation)
-2.  [Internal operators](#internal-operators)
+2.  [Internal transformations](#internal-transformations)
 3.  [Type inference](#type-inference)
     1.  [Subtype polymorphism](#subtype-polymorphism)
     2.  [Parametric polymorphism](#parametric-polymorphism)
@@ -121,7 +121,7 @@ operators in local scope:
 
 We now have an object that represents our language. We can use `stl`'s 
 `.parse()` method to parse transformation *expressions*: complex 
-combinations of operators. The parser accepts both functional notation, 
+combinations of operators. The parser accepts both function notation, 
 like `f(x, y)`, and lambda-style notation, like `f x y`.
 
 In addition to operators, the expressions may contain numbers. These 
@@ -152,6 +152,7 @@ sub-expressions:
         ├─╼ size : Obj → Ord
         └─╼ - : τ2 [τ2 <= Obj]
 
+
 ### Workflow annotation
 
 It is now time to construct a simple workflow. We will use RDF for that, 
@@ -179,16 +180,16 @@ expression.
 We will now use `transformation_algebra`'s command-line interface to 
 enrich the original *workflow* graph with a *transformation* graph. 
 Consult `python -m transformation_algebra -h` for more information on 
-how the interface works. You can also interface with Python directly; 
+how to use the command. You can also interface with Python directly; 
 checking out the source code for the command-line interface should give 
 you a headstart.
 
 Save the transformation language into [`stl.py`](resource/stl.py), and 
-the workflow and tool description into [`wf1.ttl`](resource/wf1.ttl), 
-and run:
+the workflow and tool description into 
+[`wf.ttl`](resource/wf-RelativeSize.ttl), and run:
 
     python -m transformation_algebra graph \
-        -L stl.py -T wf1.ttl wf1.ttl -o output.ttl -t ttl
+        -L stl.py -T wf.ttl wf.ttl -t ttl -o -
 
 What we get back is an RDF graph in which the transformation expression 
 for each tool application has been "unfolded": every input and every 
@@ -197,9 +198,7 @@ involved at that particular step in the transformation. It will look
 something like this:
 
 <p align="center" width="100%">
-<img
-    src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg.svg"
-    alt="A visualization of the transformation graph.">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg-RelativeSize.svg">
 </p>
 
 This graph tells us what happens inside the workflow *conceptually*: the 
@@ -211,56 +210,52 @@ tool, and the operators do not generalize well. In what follows, we will
 go into more advanced features.
 
 
+# Internal transformations
+
+Suppose we want to describe a `TallestBuilding` tool for selecting the 
+tallest among a collection of buildings. Of course, we could introduce 
+`highest` with a type of `C(Obj) ** Obj`, but this does not generalize 
+well: you are probably going to need a slew of operators that *maximize 
+something*. In such a case, we can introduce an operator that is 
+parameterized by *another operator*:
+
+    >>> maximum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+    >>> height = ct.Operator(type=Obj ** Ord)
+
+The expression `maximum height (- : C(Obj))` would use `height` to 
+associate each building with the value to be maximized. If we were to 
+unfold it into a graph, it would look like this:
+
+<p align="center" width="100%">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg-TallestBuilding.svg">
+</p>
+
+You might notice that a dotted node appeared. This is because a 
+transformation that is used as a parameter is a 'black box', in that we 
+haven't specified exactly how it is applied. The inner transformation 
+could need access to the resources available to the outer 
+transformation, and indeed, that is the case here: `height` is applied 
+to the buildings in the second argument to `maximum`. The dotted node 
+represents these internal operations.
+
+In this context, it is also possible to perform *partial application*. 
+Suppose that we want to describe a `NearObject` tool for finding, among 
+a collection of objects `2`, the one closest to some object `1`. It is 
+natural to do so in the following terms:
+
+    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
+
+This time, the `distance` transformation should already be anchored to 
+object `1` as its first operand. This is no problem:
+
+    :NearObject
+        :expression "minimum (distance (1: Obj)) (2: C(Obj))".
+
+
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 What follows is work-in-progress.
-
-# Internal operators
-
-<!-- work in progress
-
-We already mentioned that a `distance` operator would perhaps take two 
-objects and output a value.[^2]
-
-
-The accompanying `maximum` operator might take a set of objects and 
-outputs the largest among them according to some transformation that 
-associates each object with an ordinal value.
-
-
-, along with a transformation that associates an object with an ordinal 
-value, .
-
-A function type can serve as a
-
-As an example, the following expression represents a concept 
-transformation that selects, from an unspecified set of objects, the 
-object that is nearest in distance to some other unspecified object.
-
-    >>> expr = sl.parse("minimum (distance (- : Obj)) (- : C(Obj))")
-
-
-`NearestObject`
-
-    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
-    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
-
-[^4]: You might notice that there is a dashed node before the distance. 
-    This is due to the fact that `distance` was an argument to another 
-    transformation, so it may internally use information that was passed 
-    to `minimum`, which indeed it does: `distance` needs to know about 
-    the incident location as well as the hospital locations.
-
-As an example, the following expression represents a concept 
-transformation that selects, from an unspecified set of objects, the 
-object that is nearest in distance to some other unspecified object.
-
-Now, we describe a workflow that uses this tool to find the hospital 
-that is nearest to some incident. Note that the concrete inputs 
-correspond to the conceptual inputs in the tool's transformation 
-expression.
-
--->
 
 # Type inference
 
