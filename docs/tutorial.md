@@ -198,7 +198,7 @@ involved at that particular step in the transformation. It will look
 something like this:
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg-RelativeSize.svg">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/RelativeSize-tg.svg">
 </p>
 
 This graph tells us what happens inside the workflow *conceptually*: the 
@@ -227,7 +227,7 @@ associate each building with the value to be maximized. If we were to
 unfold it into a graph, it would look like this:
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/tg-TallestBuilding.svg">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/TallestBuilding-tg.svg">
 </p>
 
 You might notice that a dotted node appeared. This is because a 
