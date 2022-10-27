@@ -774,9 +774,7 @@ class TypeVariable(TypeInstance):
     def bind(self, t: TypeInstance) -> None:
         assert not self.unification, "variable cannot be unified twice"
 
-        # Once a wildcard variable is bound, it is no longer wildcard
-        self.wildcard = False
-
+        self.wildcard = False  # once bound, lose wildcard status
         if self is not t:
             self.unification = t
 
@@ -819,7 +817,7 @@ class TypeVariable(TypeInstance):
         if new is Top:
             self.bind(Top())
             return
-
+        self.wildcard = False  # once constrained, lose wildcard status
         a = self.follow()
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
@@ -846,7 +844,7 @@ class TypeVariable(TypeInstance):
         if new is Bottom:
             self.bind(Bottom())
             return
-
+        self.wildcard = False
         a = self.follow()
         assert isinstance(a, TypeVariable)
         lower, upper = a.lower or new, a.upper or new
