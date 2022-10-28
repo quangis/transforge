@@ -466,10 +466,18 @@ what we might expect of a workflow that finds the closest hospital:
             ]
         ].
 
-To convert this graph into a SPARQL query, you can once again use the 
-command-line interface:
+To convert this graph into a SPARQL query, Assuming you have a SPARQL 
+server like Fuseki or MarkLogic running, try uploading some workflows to 
+it:
 
-    python -m transformation_algebra query -L sl.py task.ttl
+    python3 -m transformation_algebra graph -L sl.py -T wf.ttl wf.ttl \
+        -s fuseki@http://127.0.0.1:3030/cct
+
+You can once again use the command-line interface to query these 
+workflows:
+
+    python -m transformation_algebra query -L sl.py task.ttl \
+        -s fuseki@http://127.0.0.1:3030/cct
 
 
 [cct]: https://github.com/quangis/cct

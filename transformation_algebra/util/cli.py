@@ -51,11 +51,6 @@ def lang(path_or_module: str) -> Language:
         return languages[0]
 
 
-def cred(s: str) -> tuple[str, str]:
-    username, _, password = s.partition(":")
-    return username, password
-
-
 class Application(cli.Application):
     language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
         mandatory=True, help="Transformation language on which to operate")
@@ -128,20 +123,28 @@ class WithRDF:
 
 
 class WithServer:
-    backend = cli.SwitchAttr(["-b", "--backend"],
-        cli.Set("fuseki", "marklogic"), requires=["-s"])
     server = cli.SwitchAttr(["-s", "--server"],
-        help="server to which to send the graph to", requires=["-b"])
-    cred = cli.SwitchAttr(["-u", "--user"], argtype=cred, requires=["-s"])
+        help="server to send graphs to. "
+        "format: backend@host; "
+        "supported backends: fuseki, marklogic")
+    cred = cli.SwitchAttr(["-u", "--user"], requires=["-s"])
 
     def upload(self, *graphs: Graph, **kwargs):
         """
         Convenience method to send one or more graphs to the given store,
         overwriting old ones if they exist.
         """
+
         if self.server:
-            ds = TransformationStore.backend(
-                self.backend, self.server, self.cred)
+            backend, _, host = self.server.partition("@")
+
+            if self.cred:
+                username, _, password = self.cred.partition(":")
+                cred = username, password
+            else:
+                cred = None
+
+            ds = TransformationStore.backend(backend, host, cred)
             for g in graphs:
                 ds.put(g)
 
