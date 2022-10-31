@@ -249,7 +249,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                 if self.skip_error:
                     print(f"Skipping {wf_path}:\n\t{e}", file=stderr)
                 else:
-                    print(e, file=stderr)
+                    print(f"Error in {wf_path}:\n\t{e}", file=stderr)
                     return 1
             else:
                 tg += wf
