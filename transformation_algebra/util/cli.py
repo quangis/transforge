@@ -381,5 +381,9 @@ class QueryRunner(Application, WithServer, WithRDF):
                 self.summarize(*tasks)
 
 
+def main():
+    CLI.run()
+
+
 if __name__ == '__main__':
     CLI.run()

@@ -1,3 +1,3 @@
-from transformation_algebra.util.cli import CLI
+from transformation_algebra.util.cli import main
 
-CLI.run()
+main()
