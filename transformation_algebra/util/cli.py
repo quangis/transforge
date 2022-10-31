@@ -201,7 +201,6 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     skip_error = cli.Flag(["--skip-error"], default=False,
         help="Skip failed transformation graphs instead of exiting")
 
-    @cli.positional(cli.ExistingFile)
     def main(self, *WORKFLOW_FILE):
         results: list[Graph] = []
 
@@ -211,9 +210,9 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
         # Windows does not interpret asterisks as globs, so we do that manually
         if platform.system() == 'Windows':
-            WORKFLOW_FILE = [globbed
-                for original in WORKFLOW_FILE.copy()
-                for globbed in glob(original)]
+            WORKFLOW_FILE = tuple(globbed
+                for original in WORKFLOW_FILE
+                for globbed in glob(original))
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
@@ -356,7 +355,6 @@ class QueryRunner(Application, WithServer, WithRDF):
             if handle is not stdout:
                 handle.close()
 
-    @cli.positional(cli.ExistingFile)
     def main(self, *QUERY_FILE):
         if not QUERY_FILE:
             self.help()
@@ -365,9 +363,9 @@ class QueryRunner(Application, WithServer, WithRDF):
 
             # Windows does not interpret asterisks as globs
             if platform.system() == 'Windows':
-                QUERY_FILE = [globbed
-                    for original in QUERY_FILE.copy()
-                    for globbed in glob(original)]
+                QUERY_FILE = tuple(globbed
+                    for original in QUERY_FILE
+                    for globbed in glob(original))
 
             if self.server:
                 self.store = TransformationStore.backend(self.backend,
