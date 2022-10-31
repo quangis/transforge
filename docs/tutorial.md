@@ -206,8 +206,8 @@ size is an ordinal value that was derived from our inputs and considered
 before finding the ratio between them.
 
 Of course, this is a toy problem: the workflow contains only one trivial 
-tool, and the operators do not generalize well. In what follows, we will 
-go into more advanced features.
+tool, with operators that can only be combined in one way. In what 
+follows, we will go into more advanced features.
 
 
 # Internal transformations
@@ -253,43 +253,71 @@ object `1` as its first operand. This is no problem:
         :expression "minimum (distance (1: Obj)) (2: C(Obj))".
 
 
-* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-What follows is work-in-progress.
-
 # Type inference
+
+In the previous section, we have seen only transformations where the 
+input- and output types were fixed ahead of time.
+
+The information that gives us is quite limited, besides ensuring that 
+the output of one transformation fits the input of the next. Because the 
+input and output types are always the same, an expression that uses 
+transformations of this sort can only describe a specific interpretation 
+of a tool. If we wanted to use a transformation in another type context, 
+we would need to make a another variation of it, with a type signature 
+that is subtly different. Needless to say, this does not scale.
+
+Fortunately, the library supports *type inference*, allowing it to 
+handle *generic* transformations. Such transformations may accept more 
+than one input type, and the library can figure out the appropriate 
+output type for you.
+
 
 ### Subtype polymorphism
 
-Base types may have sub- and supertypes. For instance, an ratio-scaled 
-quality is also an ordinal value, but not vice versa:
+The first way in which *polymorphism* is supported is *subtyping*: any 
+type is also a representative any of its supertypes. For instance, a 
+ratio-scaled quality is also an ordinal quality:
 
+    >>> Qlt = ct.TypeOperator()
     >>> Ord = ct.TypeOperator(supertype=Qlt)
     >>> Ratio = ct.TypeOperator(supertype=Ord)
     >>> Ratio.subtype(Ord)
     True
+
+But not vice versa:
+
     >>> Ord.subtype(Ratio)
     False
 
-This automatically extends to compound types:
+Subtypes can only be attached to base types, and any base type may have 
+at most one supertype. This is then automatically extended to compound 
+types:
 
     >>> C(Ratio).subtype(C(Ord))
     True
 
-An operator may take another operator as an argument. An operator that 
-takes
+Functions, too, have sub- and supertypes. Consider that a function that 
+accepts values of type `Ord` would also accept values of the more 
+specific type `Ratio`, and a function that produces `Ord` values would, 
+by extension, also produce values of the more general type `Qlt`.
 
-Functional types, too, may be representative of any of its 
+So, for an operator that takes as argument another operator of type `Ord 
+** Ord`, we get the following behaviour:
 
-These types are *polymorphic* in that any type is also a representative 
-of any of its supertypes. That is, an operator that expects an argument 
-of type `Ord ** Ord` would also accept `Qlt ** Ord` or `Ord ** Ratio`.
+    >>> ((Ord ** Ord) ** Ord).apply(Qlt ** Ord)
+    Ord
+    >>> ((Ord ** Ord) ** Ord).apply(Ord ** Ratio)
+    Ord
+    >>> ((Ord ** Ord) ** Ord).apply(Ratio ** Ord)
+    Type mismatch.
+    >>> ((Ord ** Ord) ** Ord).apply(Ord ** Qlt)
+    Type mismatch.
 
 
-    >>> ((Ord ** Ord) ** Qlt).apply(Qlt ** Ord)
-    Qlt
-    >>> ((Ord ** Ord) ** Qlt).apply(Ord ** Ratio)
-    Qlt
+
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+What follows is work-in-progress.
 
 ### Parametric polymorphism
 
