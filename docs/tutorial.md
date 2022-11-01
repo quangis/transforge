@@ -296,46 +296,68 @@ types:
     >>> C(Ratio).subtype(C(Ord))
     True
 
-Functions, too, have sub- and supertypes. Consider that a function that 
-accepts values of type `Ord` would also accept values of the more 
-specific type `Ratio`, and a function that produces `Ord` values would, 
-by extension, also produce values of the more general type `Qlt`.
+Consequently, a function that accepts values of type `Ord` will also 
+accept values of the more specific type `Ratio`:
 
-So, for an operator that takes as argument another operator of type `Ord 
-** Ord`, we get the following behaviour:
-
-    >>> ((Ord ** Ord) ** Ord).apply(Qlt ** Ord)
+    >>> (Ord ** Ord).apply(Ratio)
     Ord
-    >>> ((Ord ** Ord) ** Ord).apply(Ord ** Ratio)
-    Ord
-    >>> ((Ord ** Ord) ** Ord).apply(Ratio ** Ord)
-    Type mismatch.
-    >>> ((Ord ** Ord) ** Ord).apply(Ord ** Qlt)
+    >>> (Ord ** Ord).apply(Qlt)
     Type mismatch.
 
+Function types, in turn, have sub- and supertypes themselves. Consider 
+that a function that produces `Ord` values would, by extension, also 
+produce values of the more general type `Qlt`. So, for an operator that 
+takes as argument another operator of type `Ord ** Ord`, we get the 
+following behaviour:
 
+    >>> (Ord ** Ord).subtype(Qlt ** Ord)
+    True
+    >>> (Ord ** Ord).subtype(Ord ** Ratio)
+    True
+    >>> (Ord ** Ord).subtype(Ratio ** Ord)
+    False
+    >>> (Ord ** Ord).subtype(Ord ** Qlt)
+    False
 
-* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-What follows is work-in-progress.
 
 ### Parametric polymorphism
 
-We additionally allow *parametric polymorphism* by means of the 
-`TypeSchema` class, which represents all types that can be obtained by 
-substituting its type variables:
+What if we want to make `maximum` work on collections of things other 
+than `Obj`s? With subtyping, we could introduce a universal supertype 
+`Val` and change `maximum`s type signature accordingly:
 
-    >>> compose = ct.TypeSchema(lambda α, β, γ:
-            (β ** γ) ** (α ** β) ** (α ** γ))
-    >>> compose.apply(f).apply(g)
-    Int ** Real
+    >>> Val = ct.TypeOperator()
+    >>> Obj = ct.TypeOperator(supertype=Val)
+    >>> Qlt = ct.TypeOperator(supertype=Val)
+    >>> maximum = ct.Operator(type=(Val ** Ord) ** C(Val) ** Val)
+
+However, we have now lost information on the relationship between the 
+types of arguments. You could pass a transformation that operates on 
+`Qlt`s along with a collection of `Obj`s, and `maximum` would be none 
+the wiser. In the end, it will always return a generic `Val`, no matter 
+what.
+
+Therefore, we additionally allow *parametric polymorphism* by means of a 
+type schema. A type schema represents all types that can be obtained by 
+substituting its variables. In our case:
+
+    >>> maximum = ct.Operator(type=lambda α: (α ** Ord) ** C(α) ** α)
 
 Don't be fooled by the `lambda` keyword: it has little to do with lambda 
 abstraction. It is there because we use an anonymous Python function, 
 whose parameters declare the *schematic* type variables that occur in 
 its body. When the type schema is used somewhere, the schematic 
-variables are automatically instantiated with *concrete* variables.
+variables are automatically instantiated with *concrete* variables. The 
+concrete variables are then bound to type operators as soon as possible.
 
+For example, once we pass arguments to the generic `maximum`, it's 
+possible to figure out what the output type is supposed to be:
+
+    >>> maximum.apply(height).apply(Source()).type
+    Obj
+
+
+<!-- What follows is work-in-progress --------------------------------->
 
 ### Subtype constraints
 
