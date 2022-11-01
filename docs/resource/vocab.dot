@@ -1,0 +1,35 @@
+digraph {
+	rankdir = BT;
+	charset="utf-8";
+
+	"RR-Ratio-Ratio" -> "RR-Ord-Ratio" ;
+	"RR-Ratio-Ratio" -> "RR-Ratio-Ord" ;
+	"RR-Ord-Ratio" -> "RR-Ord-Ord" ;
+	"RR-Ord-Ratio" -> "RR-Qlt-Ratio" ;
+	"RR-Ratio-Ord" -> "RR-Ord-Ord" ;
+	"RR-Ratio-Ord" -> "RR-Ratio-Qlt" ;
+	"RR-Qlt-Ratio" -> "RR-Qlt-Ord" ;
+	"RR-Ratio-Qlt" -> "RR-Ord-Qlt" ;
+	"RR-Ord-Ord" -> "RR-Ord-Qlt" ;
+	"RR-Ord-Ord" -> "RR-Qlt-Ord" ;
+	"RR-Ord-Qlt" -> "RR-Qlt-Qlt" ;
+	"RR-Qlt-Ord" -> "RR-Qlt-Qlt" ;
+	"ROrd" -> "RQlt" ;
+	"RRatio" -> "ROrd" ;
+	"RR-Qlt-Qlt" -> "RR" ;
+
+	// Resources
+	"RR-Ratio-Ratio" [ label="R(Ratio, Ratio)", shape = box ];
+	"RR-Ord-Ratio" [ label="R(Ord, Ratio)", shape = box ];
+	"RR-Ratio-Ord" [ label="R(Ratio, Ord)", shape = box ];
+	"RR-Ord-Ord" [ label="R(Ord, Ord)", shape = box ];
+	"RR-Qlt-Ratio" [ label="R(Qlt, Ratio)", shape = box ];
+	"RR-Ratio-Qlt" [ label="R(Ratio, Qlt)", shape = box ];
+	"RR-Qlt-Ord" [ label="R(Qlt, Ord)", shape = box ];
+	"RR-Ord-Qlt" [ label="R(Ord, Qlt)", shape = box ];
+	"RR-Qlt-Qlt" [ label="R(Qlt, Qlt)", shape = box ];
+	"ROrd" [ label="Ord", shape = box ];
+	"RQlt" [ label="Qlt", shape = box ];
+	"RRatio" [ label="Ratio", shape = box ];
+	"RR" [ label="R", shape = box ];
+}

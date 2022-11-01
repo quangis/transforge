@@ -1,0 +1,47 @@
+@base <https://example.com/stl/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ta: <https://github.com/quangis/transformation-algebra#> .
+
+<R-Ratio-Ratio>
+    rdfs:subClassOf
+        <R-Ord-Ratio>,
+        <R-Ratio-Ord>.
+
+<R-Ord-Ratio>
+    rdfs:subClassOf
+        <R-Ord-Ord>,
+        <R-Qlt-Ratio> .
+
+<R-Ratio-Ord>
+    rdfs:subClassOf
+        <R-Ord-Ord>,
+        <R-Ratio-Qlt> .
+
+<R-Qlt-Ratio>
+    rdfs:subClassOf
+        <R-Qlt-Ord> .
+
+<R-Ratio-Qlt>
+    rdfs:subClassOf
+        <R-Ord-Qlt>.
+
+<R-Ord-Ord>
+    rdfs:subClassOf
+        <R-Ord-Qlt>,
+        <R-Qlt-Ord>.
+
+<R-Ord-Qlt>
+    rdfs:subClassOf
+        <R-Qlt-Qlt> .
+
+<R-Qlt-Ord>
+    rdfs:subClassOf
+        <R-Qlt-Qlt> .
+
+<Ord> rdfs:subClassOf <Qlt>.
+<Ratio> rdfs:subClassOf <Ord>.
+
+<R-Qlt-Qlt>
+    rdfs:subClassOf <R> .
+

@@ -17,9 +17,7 @@
     8.  [Product, intersection and union types](#product-intersection-and-union-types)
 4.  [Composite operators](#composite-operators)
 5.  [Querying](#queries)
-6.  [Vocabulary](#vocabulary)
-    1.  [Canonical types](#canonical-types)
-    2.  [Type taxonomy](#type-taxonomy)
+6.  [Canonical types](#canonical-types)
 
 
 # Introduction
@@ -614,17 +612,37 @@ switch, a `.csv` file will be also be produced with an overview of all
 the matches.
 
 
-# Vocabulary
+# Canonical types
 
-### Canonical types
+Compound types can be nested --- think `C(C(C(...)))`. Therefore, there 
+exist infinite types. At the same time, the RDF graphs need to refer to 
+these types by URI, and all their sub- and supertypes must be known so 
+as to enable searching through them. For this reason, you can pass to 
+your `Language` a set of *canonical types* via the `canon` parameter. 
+This set of finite types, along with all their subtypes, is considered 
+relevant. Non-canonical types will not be recorded into the 
+transformation graph. For example:
 
-(todo)
+    R = ct.TypeOperator(params=2)
+    Qlt = ct.TypeOperator()
+    Ord = ct.TypeOperator(supertype=Qlt)
+    Ratio = ct.TypeOperator(supertype=Ord)
 
+    example_lang = ct.Language(scope=locals(),
+        canon={R(Qlt, Qlt)},
+        namespace="https://example.com/stl/")
 
-### Type taxonomy
+The `Top` and `Bottom` types may be added using the `include_top` and 
+`include_bottom` parameters.
 
-(todo)
+The command-line tool's `vocab` subcommand can generate an RDF 
+vocabulary containing a description of all the operations of your 
+language, as well as a *type taxonomy* of the canonical types. For the 
+above language, it looks as follows:
 
+<p align="center" width="100%">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/vocab.svg">
+</p>
 
 [cct]: https://github.com/quangis/cct
 [wf]: http://geographicknowledge.de/vocab/Workflow.rdf
