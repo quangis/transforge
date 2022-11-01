@@ -14,12 +14,12 @@
     5.  [Wildcard variables](#wildcard-variables)
     6.  [Type aliases](#type-aliases)
     7.  [Top, bottom and unit types](#top-bottom-and-unit-types)
-    8.  [Union and intersection types](#union-and-intersection-types)
-4.  [Vocabulary](#vocabulary)
+    8.  [Product, intersection and union types](#product-intersection-and-union-types)
+4.  [Composite operators](#composite-operators)
+5.  [Querying](#queries)
+6.  [Vocabulary](#vocabulary)
     1.  [Canonical types](#canonical-types)
     2.  [Type taxonomy](#type-taxonomy)
-5.  [Composite operators](#composite-operators)
-6.  [Querying](#queries)
 
 
 # Introduction
@@ -354,7 +354,7 @@ concrete variables are then bound to type operators as soon as possible.
 For example, once we pass arguments to the generic `maximum`, it's 
 possible to figure out what the output type is supposed to be:
 
-    >>> maximum.apply(height).apply(Source()).type
+    >>> maximum.apply(height).apply(ct.Source()).type
     Obj
 
 
@@ -384,11 +384,11 @@ written `x <= y`, meaning that `x`, once bound, must be a subtype of the
 given type `y`. For example:
 
     >>> smallest = ct.Operator(lambda α: α ** α ** α [α <= Ord])
-    >>> smallest.apply(Source(Ratio)).apply(Source(Ratio)).type
+    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Ratio)).type
     Ratio
-    >>> smallest.apply(Source(Ratio)).apply(Source(Ord)).type
+    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Ord)).type
     Ord
-    >>> smallest.apply(Source(Ratio)).apply(Source(Qlt)).type
+    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Qlt)).type
     Type mismatch.
 
 
@@ -401,7 +401,7 @@ want a function signature that applies to both single qualities and
 collections:
 
     >>> f = ct.Operator(type=lambda α: α ** α [α << {Qlt, C(Qlt)}])
-    >>> f.apply(Source(C(Ord))).type
+    >>> f.apply(ct.Source(C(Ord))).type
     C(Ord)
 
 
@@ -422,7 +422,7 @@ figuring out interdependencies between types:
     >>> R = ct.TypeOperator(params=2)
     >>> keys = ct.Operator(
             type=lambda α, β: α ** C(β) [α << {C(β), R(β, _)}])
-    >>> keys.apply(Source(R(Ord, Obj)))
+    >>> keys.apply(ct.Source(R(Ord, Obj)))
     C(Ord)
 
 
@@ -441,9 +441,9 @@ themselves be parameterized.
 
 ### Top, bottom and unit types
 
-Three types are built-in because of the special properties they have. 
-First, we meet the universal type `Top`. This type contains all possible 
-values, and therefore it is a supertype of everything.
+Three base types are built-in because of the special properties they 
+have. First, we meet the universal type `Top`. This type contains all 
+possible values, and therefore it is a supertype of everything.
 
     >>> from transformation_algebra import Top
     >>> (C(Top) ** Obj).apply(C(Ord))
@@ -472,9 +472,9 @@ wildcard variables. Note also the difference between `Top` and `_`:
     Type mismatch.
 
 In between `Top` and `Bottom` sits the `Unit` type. This type has one 
-unique value. To appreciate its value as a technical tool, imagine that 
-you have modelled mappings between types using the `R` operator (as is 
-the case for the [CCT][cct] algebra):
+unique value, like a 0-tuple. To appreciate its value as a technical 
+tool, imagine that you have modelled mappings between types using the 
+`R` operator (as is the case for the [CCT][cct] algebra):
 
     >>> R = ct.TypeOperator(params=2)
 
@@ -488,34 +488,32 @@ The benefit is that transformations on relations will automatically also
 work on collections.
 
 
-### Union and intersection types
+### Product, intersection and union types
 
-Just as transformation operators might not correspond to how the 
-procedure is *implemented*, type operators don't necessarily represent 
-*data* types. They only capture some relevant conceptual properties of 
-the entities they describe. For example, when a procedure takes an 
-ordinal as argument, that doesn't mean that some concrete number is 
-passed to it --- just that it operates on things that are, in some 
-aspect, ordinal-scaled.
+Three additional compound types are built-in. To *bundle* multiple 
+types, you can use the `Product` type. It is written `A * B`.
 
-Therefore, it makes sense that the things you operate on 
+    >>> first = ct.Operator(type=lambda α: (α * _) ** α)
+    >>> first.apply(ct.Source(Ratio * Obj)).type
+    Ratio
 
+When you obtain a `Product` from a transformation, that means you got 
+multiple 'things'. However, just as transformation operators might not 
+correspond to how a the procedure is *implemented*, type operators don't 
+necessarily represent *data* types. They only capture some relevant 
+conceptual properties of the entities they describe. For example, when a 
+transformation takes an ordinal as argument, that doesn't mean that a 
+concrete number is passed to it --- just that it operates on things that 
+are, in some aspect, ordinal-scaled.
 
-to 
+Therefore, it makes sense that a *single thing* can have *multiple 
+attributes*. If your transformation operates on things that have 
+attributes of *both* `A` and `B`, we use an `Intersection` type, written 
+`A & B`. If it operates on things that have attributes of *either* `A` 
+or `B`, we use a `Union` type, written `A | B`.
 
-*Union and intersection types have not yet been implemented.*
-
-
-# Vocabulary
-
-### Canonical types
-
-(todo)
-
-
-### Type taxonomy
-
-(todo)
+**Union and intersection types have not yet been implemented. Product 
+types capture some of their use cases.**
 
 
 # Composite operators
@@ -601,6 +599,18 @@ workflows:
 
     python -m transformation_algebra query -L sl.py task.ttl \
         -s fuseki@http://127.0.0.1:3030/cct
+
+
+# Vocabulary
+
+### Canonical types
+
+(todo)
+
+
+### Type taxonomy
+
+(todo)
 
 
 [cct]: https://github.com/quangis/cct
