@@ -357,30 +357,41 @@ possible to figure out what the output type is supposed to be:
     Obj
 
 
-<!-- What follows is work-in-progress --------------------------------->
-
 ### Subtype constraints
 
-Often, variables in a schema cannot be just *any* type. We can abuse 
-indexing notation (`x [...]`) to *constrain* a type. A constraint can be 
-a *subtype* constraint, written `x <= y`, meaning that `x`, once it is 
-unified, must be a subtype of the given type `y`. 
+In the joint presence of type parameters and subtypes, inference can be 
+less than straightforward. Consider that, when you apply a function of 
+type `τ ** τ ** τ` to an argument with a concrete type, say `Ord`, then 
+the type system cannot immediately fix `τ` to `Ord`: what if the second 
+argument to the function is a `Qlt`? It can, however, deduce that `τ >= 
+Ord`, since any more specific type would certainly be too restrictive. 
+This does not suggest that providing a *value* of a more specific type 
+is illegal --- just that the signature has to be more general. Only once 
+all arguments have been supplied can `τ` be fixed to the most specific 
+type possible.
 
-In the presence of subtypes, type inference can be less than 
-straightforward. Consider that, when you apply a function of type `τ ** 
-τ ** τ` to an argument with a concrete type, say `A`, then we cannot 
-immediately bind `τ` to `A`: what if the second argument to the function 
-is a supertype of `A`? We can, however, deduce that `τ >= A`, since any 
-more specific type would certainly be too restrictive. This does not 
-suggest that providing a *value* of a more specific type is illegal --- 
-just that the signature should be more general. Only once all arguments 
-have been supplied can `τ` be fixed to the most specific type possible.
+The above is not only relevant to the type system: sometimes *you*, as a 
+language author, want to use a schematic type in which the variables 
+cannot be just *any* type. Rather than just `Ord ** Ord ** Ord`, you 
+might want `τ ** τ ** τ` where `τ <= Ord`. While the two are identical 
+in what types they *accept*, the former can produce an *output type* 
+that is more specific than `Ord`.
 
-This is why it's sometimes necessary to say `τ ** τ ** τ [τ <= A]` 
-rather than just `A ** A ** A`: while the two are identical in what 
-types they *accept*, the former can produce an *output type* that is 
-more specific than `A`.
+To facilitate this use case, we can use *constraints*, for which 
+indexing notation (`x [...]`) is abused. A *subtype* constraint is 
+written `x <= y`, meaning that `x`, once bound, must be a subtype of the 
+given type `y`. For example:
 
+    >>> smallest = ct.Operator(lambda α: α ** α ** α [α <= Ord])
+    >>> smallest.apply(Source(Ratio)).apply(Source(Ratio)).type
+    Ratio
+    >>> smallest.apply(Source(Ratio)).apply(Source(Ord)).type
+    Ord
+    >>> smallest.apply(Source(Ratio)).apply(Source(Qlt)).type
+    Type mismatch.
+
+
+<!-- What follows is work-in-progress --------------------------------->
 
 ### Elimination constraints
 
