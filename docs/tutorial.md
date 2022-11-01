@@ -391,39 +391,38 @@ given type `y`. For example:
     Type mismatch.
 
 
-<!-- What follows is work-in-progress --------------------------------->
-
 ### Elimination constraints
 
-It can also be an *elimination* constraint, written `x << {y, z}`, 
-meaning that `x` will be unified to a subtype one of the options as soon 
-as the alternatives have been eliminated. For instance, we might want a 
-function signature that applies to both single integers and sets of 
-integers:
+A constraint can also be an *elimination* constraint, written `x << {y, 
+z}`, meaning that `x` will be bound to (a subtype of) one of the options 
+as soon as the alternatives have been eliminated. For instance, we might 
+want a function signature that applies to both single qualities and 
+collections:
 
-    >>> f = TypeSchema(lambda α: α ** α [α << {Int, Set(Int)}])
-    >>> f.apply(Set(Nat))
-    Set(Nat)
-
-Typeclass constraints and wildcards can often aid in inference, figuring 
-out interdependencies between types:
-
-    >>> Map = ct.TypeOperator('Map', params=2)
-    >>> f = TypeSchema(lambda α, β: α ** β [α << {Set(β), Map(β, _)}])
-    >>> f.apply(Set(Int))
-    Int
+    >>> f = ct.Operator(type=lambda α: α ** α [α << {Qlt, C(Qlt)}])
+    >>> f.apply(Source(C(Ord))).type
+    C(Ord)
 
 
 ### Wildcard variables
 
-As an aside: when you need a type variable, but you don't care how it 
-relates to others, you may use the *wildcard variable* `_`. The purpose 
-goes beyond convenience: it communicates to the type system that it can 
-always be a sub- and supertype of *anything*. It must be explicitly 
-imported:
+When you need a type variable, but you don't care how it relates to 
+others, you may use the *wildcard variable* `_`. The purpose goes beyond 
+convenience: it communicates to the type system that it can always be a 
+sub- and supertype of *anything*. It must be explicitly imported:
 
     >>> from transformation_algebra import _
-    >>> f = Set(_) ** Int
+    >>> (C(_) ** Obj).apply(C(Ord))
+    Obj
+
+Elimination constraints and wildcards can often aid in inference, 
+figuring out interdependencies between types:
+
+    >>> R = ct.TypeOperator(params=2)
+    >>> keys = ct.Operator(lambda α, β: α ** C(β) [α << {C(β), R(β, 
+    >>> _)}])
+    >>> keys.apply(Source(R(Ord, Obj)))
+    C(Ord)
 
 
 ### Top, bottom and unit types
