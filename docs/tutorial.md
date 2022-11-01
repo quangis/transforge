@@ -12,8 +12,9 @@
     3.  [Subtype constraints](#subtype-constraints)
     4.  [Elimination constraints](#elimination-constraints)
     5.  [Wildcard variables](#wildcard-variables)
-    6.  [Top, bottom and unit types](#top-bottom-and-unit-types)
-    7.  [Union and intersection types](#union-and-intersection-types)
+    6.  [Type aliases](#type-aliases)
+    7.  [Top, bottom and unit types](#top-bottom-and-unit-types)
+    8.  [Union and intersection types](#union-and-intersection-types)
 4.  [Vocabulary](#vocabulary)
     1.  [Canonical types](#canonical-types)
     2.  [Type taxonomy](#type-taxonomy)
@@ -419,15 +420,72 @@ Elimination constraints and wildcards can often aid in inference,
 figuring out interdependencies between types:
 
     >>> R = ct.TypeOperator(params=2)
-    >>> keys = ct.Operator(lambda α, β: α ** C(β) [α << {C(β), R(β, 
-    >>> _)}])
+    >>> keys = ct.Operator(
+            type=lambda α, β: α ** C(β) [α << {C(β), R(β, _)}])
     >>> keys.apply(Source(R(Ord, Obj)))
     C(Ord)
 
 
+### Type aliases
+
+Complex types may be given alternate names. Such `TypeAlias`es may 
+themselves be parameterized.
+
+    >>> Collection = ct.TypeAlias(C)
+    >>> Collection(Ord)
+    C(Ord)
+    >>> Ternary = ct.TypeAlias(lambda x: x ** x ** x ** x)
+    >>> Ternary(Ord)
+    Ord ** Ord ** Ord ** Ord
+
+
 ### Top, bottom and unit types
 
-(todo)
+Three types are built-in because of the special properties they have. 
+First, we meet the universal type `Top`. This type contains all possible 
+values, and therefore it is a supertype of everything.
+
+    >>> from transformation_algebra import Top
+    >>> (C(Top) ** Obj).apply(C(Ord))
+    Obj
+    >>> (C(Top) ** Obj).apply(C(C(Ord)))
+    Obj
+    >>> (C(Top) ** Obj).apply(Ord)
+    Type mismatch.
+
+Its evil twin is the `Bottom` type: the type that contains *no* values 
+and that is a *subtype* of everything.
+
+    >>> from transformation_algebra import Bottom
+    >>> (C(Ord) ** Obj).apply(C(Bottom))
+    Obj
+    >>> (C(Bottom) ** Obj).apply(C(Ord))
+    Type mismatch.
+
+`Top` and `Bottom` can be used as technical tools when the type 
+signature should be permissive, or when you need a concrete type without 
+wildcard variables. Note also the difference between `Top` and `_`:
+
+    >>> (Obj ** Obj).apply(_)
+    Obj
+    >>> (Obj ** Obj).apply(Top)
+    Type mismatch.
+
+In between `Top` and `Bottom` sits the `Unit` type. This type has one 
+unique value. To appreciate its value as a technical tool, imagine that 
+you have modelled mappings between types using the `R` operator (as is 
+the case for the [CCT][cct] algebra):
+
+    >>> R = ct.TypeOperator(params=2)
+
+Now, when every value is mapped to the same element, it essentially 
+turns into a set. Instead of having a dedicated `C` operator, we can 
+make it an alias.
+
+    >>> C = ct.TypeAlias(lambda x: R(x, Unit))
+
+The benefit is that transformations on relations will automatically also 
+work on collections.
 
 
 ### Union and intersection types
@@ -439,6 +497,11 @@ the entities they describe. For example, when a procedure takes an
 ordinal as argument, that doesn't mean that some concrete number is 
 passed to it --- just that it operates on things that are, in some 
 aspect, ordinal-scaled.
+
+Therefore, it makes sense that the things you operate on 
+
+
+to 
 
 *Union and intersection types have not yet been implemented.*
 
