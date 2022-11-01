@@ -523,29 +523,36 @@ that are derived from other, simpler ones. This should not necessarily
 be thought of as providing an *implementation*: it merely represents a 
 decomposition into more primitive conceptual building blocks.
 
+    >>> add = ct.Operator(type=Ratio ** Ratio ** Ratio)
     >>> add1 = ct.Operator(
-            type=Int ** Int,
-            define=lambda x: add(x, ct.Source(Int))
+            type=Ratio ** Ratio,
+            define=lambda x: add(x, ct.Source(Ratio))
         )
     >>> compose = ct.Operation(
             type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
             define=lambda f, g, x: f(g(x))
         )
 
-When we use such composite operations, we can derive the underlying 
-primitive expression using `.primitive()`:
+When we use such composite operations, the underlying primitive 
+expression can be derived using `Expr.primitive()`:
 
-    >>> expr = lang.parse("compose add1 add1 (-: Nat)")
+    >>> expr = lang.parse("compose add1 add1 -")
     >>> print(expr.primitive().tree())
-    Int
-     ├─Int ** Int
-     │  ├─╼ add : Int ** Int ** Int
-     │  └─Int
-     │     ├─Int ** Int
-     │     │  ├─╼ add : Int ** Int ** Int
-     │     │  └─╼ - : Int
-     │     └─╼ - : Int
-     └─╼ - : Nat
+    Ratio
+     ├─Ratio ** Ratio
+     │  ├─╼ add : Ratio ** Ratio ** Ratio
+     │  └─Ratio
+     │     ├─Ratio ** Ratio
+     │     │  ├─╼ add : Ratio ** Ratio ** Ratio
+     │     │  └─╼ - : Ratio
+     │     └─╼ - : Ratio
+     └─╼ - : Ratio
+
+Composite expressions can be partially applied, which can further 
+complicate the representation of [internal 
+transformations](#internal-transformations). Furthermore, transformation 
+graphs for composite expressions have not been fully implemented; see 
+issue #40.
 
 
 # Queries
@@ -561,35 +568,37 @@ a concept of type `t`'.[^5]
 
 [^5]: The process is straightforward when operations only take data as 
     input. However, expressions in an algebra may also take other 
-    operations, in which case the process is more involved; for now, 
-    consult the source code.
+    operations, in which case the process is more involved. Consult the 
+    chapter on [internal transformations](#internal-transformations).
 
 These queries can themselves be represented as (partial) transformation 
 graphs. We call such partial graphs *tasks*, because they are meant to 
-express what sort of conceptual properties we expect from a workflow 
-that solves a particular task. For example, the following graph captures 
-what we might expect of a workflow that finds the closest hospital:
+express the conceptual properties we expect from a workflow that solves 
+a particular task. For example, the following graph captures what we 
+might want to see in a workflow that finds the closest hospital:
 
     @prefix : <https://github.com/quangis/transformation-algebra#>.
-    @prefix x: <https://example.com/#>.
+    @prefix stl: <https://example.com/stl/>.
 
-    _:Hospitals x:type "C(Obj)".
-    _:Incident x:type "Obj".
+    _:Hospitals stl:type "C(Obj)".
+    _:Incident stl:type "Obj".
     [] a :Task;
         :input _:HospitalPoints, _:IncidentLocations;
         :output [
-            x:via "minimum";
-            x:type "Obj";
+            stl:via "minimum";
+            stl:type "Obj";
             :from [
-                x:via "distance";
+                stl:via "distance";
                 :from _:Hospitals;
                 :from _:Incident
             ]
         ].
 
-To convert this graph into a SPARQL query, Assuming you have a SPARQL 
-server like Fuseki or MarkLogic running, try uploading some workflows to 
-it:
+We would like to match this partial transformation graph to the 
+*complete* transformation graph for a workflow. First, we need a SPARQL 
+store containing workflows to match against. Assuming you have a SPARQL 
+server like Fuseki or MarkLogic running, the command-line interface can 
+help you upload your workflows:
 
     python3 -m transformation_algebra graph -L sl.py -T wf.ttl wf.ttl \
         -s fuseki@http://127.0.0.1:3030/cct
@@ -597,8 +606,12 @@ it:
 You can once again use the command-line interface to query these 
 workflows:
 
-    python -m transformation_algebra query -L sl.py task.ttl \
-        -s fuseki@http://127.0.0.1:3030/cct
+    python3 -m transformation_algebra query -L sl.py task.ttl \
+        -s fuseki@http://127.0.0.1:3030/cct -o -
+
+This will add `:match` predicates to the task. With the `--summary` 
+switch, a `.csv` file will be also be produced with an overview of all 
+the matches.
 
 
 # Vocabulary
