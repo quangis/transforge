@@ -1,9 +1,9 @@
-@prefix : <https://example.com/#>.
+@prefix : <https://example.com/stl/>.
 @prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 
 :NearObject
-    :expression "minimum (distance (1: Obj)) (2: C(Obj))".
+    :expression "minimum (distance 1) 2".
 
 <https://example.com/wf> a wf:Workflow;
     wf:source _:hospitals, _:incident;

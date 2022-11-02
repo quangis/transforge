@@ -1,0 +1,25 @@
+digraph G {
+	compound=true;
+	node [shape=rectangle];
+	subgraph clusterN92ed1478d8004b68ac14f604626db46c {
+		label=<<u><i>Hospitals</i></u>>;
+		N92ed1478d8004b68ac14f604626db46c [shape=none, label=<C(Obj)> ];
+	}
+	subgraph clusterNa7893b6ff6714dc8b0f8f5507ca45ae0 {
+		label=<<u><i>Incident</i></u>>;
+		Na7893b6ff6714dc8b0f8f5507ca45ae0 [shape=none, label=<Obj> ];
+	}
+	subgraph clustern905b22b74d01407fbb1292cf03307a34b3 {
+		label=<<b>NearObject</b><br/><i>Nearest hospital</i>>;
+		N9235bfe3fc9f4c9d919a7709bfcebea4 [label=<Obj<br/>via minimum>];
+		N75797f080f9b4d10a3b8dcec1e3227c1 [shape=circle, style=dashed, label=""];
+		N04d186eee38f44a4a588346526d0a4b3 [label=<Ratio<br/>via distance>];
+	}
+	Na7893b6ff6714dc8b0f8f5507ca45ae0 -> N04d186eee38f44a4a588346526d0a4b3 [ltail=clusterNa7893b6ff6714dc8b0f8f5507ca45ae0];
+	N75797f080f9b4d10a3b8dcec1e3227c1 -> N04d186eee38f44a4a588346526d0a4b3;
+	N04d186eee38f44a4a588346526d0a4b3 -> N9235bfe3fc9f4c9d919a7709bfcebea4;
+	N92ed1478d8004b68ac14f604626db46c -> N9235bfe3fc9f4c9d919a7709bfcebea4 [ltail=clusterN92ed1478d8004b68ac14f604626db46c];
+	N92ed1478d8004b68ac14f604626db46c -> N75797f080f9b4d10a3b8dcec1e3227c1 [ltail=clusterN92ed1478d8004b68ac14f604626db46c];
+}
+
+

@@ -321,18 +321,18 @@ following behaviour:
 
 ### Parametric polymorphism
 
-What if we want to make `maximum` work on collections of things other 
+What if we want to make `minimum` work on collections of things other 
 than `Obj`s? With subtyping, we could introduce a universal supertype 
-`Val` and change `maximum`s type signature accordingly:
+`Val` and change `minimum`s type signature accordingly:
 
     >>> Val = ct.TypeOperator()
     >>> Obj = ct.TypeOperator(supertype=Val)
     >>> Qlt = ct.TypeOperator(supertype=Val)
-    >>> maximum = ct.Operator(type=(Val ** Ord) ** C(Val) ** Val)
+    >>> minimum = ct.Operator(type=(Val ** Ord) ** C(Val) ** Val)
 
 However, we have now lost information on the relationship between the 
 types of arguments. You could pass a transformation that operates on 
-`Qlt`s along with a collection of `Obj`s, and `maximum` would be none 
+`Qlt`s along with a collection of `Obj`s, and `minimum` would be none 
 the wiser. In the end, it will always return a generic `Val`, no matter 
 what.
 
@@ -340,7 +340,7 @@ Therefore, we additionally allow *parametric polymorphism* by means of a
 type schema. A type schema represents all types that can be obtained by 
 substituting its variables. In our case:
 
-    >>> maximum = ct.Operator(type=lambda α: (α ** Ord) ** C(α) ** α)
+    >>> minimum = ct.Operator(type=lambda α: (α ** Ord) ** C(α) ** α)
 
 Don't be fooled by the `lambda` keyword: it has little to do with lambda 
 abstraction. It is there because we use an anonymous Python function, 
@@ -349,11 +349,46 @@ its body. When the type schema is used somewhere, the schematic
 variables are automatically instantiated with *concrete* variables. The 
 concrete variables are then bound to type operators as soon as possible.
 
-For example, once we pass arguments to the generic `maximum`, it's 
+For example, once we pass arguments to the generic `minimum`, it's 
 possible to figure out what the output type is supposed to be:
 
-    >>> maximum.apply(height).apply(ct.Source()).type
+    >>> minimum.apply(distance.apply(ct.Source(Obj))).apply(ct.Source(C(Obj))).type
     Obj
+
+In order to appreciate how this all falls into place, let's take a 
+moment to use this in a workflow. We make a workflow that uses our 
+`NearObject` tool to find the hospital closest to some incident, and 
+inspect the resulting transformation graph:
+
+    @prefix : <https://example.com/>
+    @prefix stl: <https://example.com/stl/>.
+    @prefix wf: <http://geographicknowledge.de/vocab/Workflow.rdf#>.
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+    :NearObject
+        stl:expression "minimum (distance 1) 2".
+
+    :Workflow a wf:Workflow;
+        wf:source _:Hospitals, _:Incident;
+        wf:edge [
+            wf:applicationOf :NearObject;
+            wf:input1 _:Incident;
+            wf:input2 _:Hospitals;
+            wf:output _:NearestHospital
+        ].
+
+While we're at it, let's also change the type of the `distance` operator 
+to produce a `Ratio`.
+
+    >>> distance = ct.Operator(type=Obj ** Obj ** Ratio)
+
+`minimum` will still accept this interpretation of `distance`, because 
+`Ratio <= Ord`. The resulting transformation graph looks as follows --- 
+the library has figured out the correct types.
+
+<p align="center" width="100%">
+<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/NearObject-tg.svg">
+</p>
 
 
 ### Subtype constraints
