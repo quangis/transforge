@@ -11,8 +11,8 @@ from itertools import chain
 from inspect import signature
 from typing import Optional, Callable, Iterator
 
-from transformation_algebra.label import Labels
-from transformation_algebra.type import (Type, TypeVariable, TypeSchema,
+from transforge.label import Labels
+from transforge.type import (Type, TypeVariable, TypeSchema,
     TypeInstance, Function, _, TypingError, TypeOperation)
 
 

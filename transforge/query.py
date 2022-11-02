@@ -13,11 +13,11 @@ from itertools import count, chain
 from typing import Iterable, Iterator
 from collections import deque, defaultdict
 
-from transformation_algebra.namespace import RDF, TA
-from transformation_algebra.type import Type
-from transformation_algebra.expr import Operator
-from transformation_algebra.lang import Language
-from transformation_algebra.graph import (
+from transforge.namespace import RDF, TF
+from transforge.type import Type
+from transforge.expr import Operator
+from transforge.lang import Language
+from transforge.graph import (
     TransformationGraph, CyclicTransformationGraphError)
 
 
@@ -63,10 +63,10 @@ class TransformationQuery(object):
 
         self.lang = lang
 
-        self.root: Node = graph.value(predicate=RDF.type, object=TA.Task, any=False)
+        self.root: Node = graph.value(predicate=RDF.type, object=TF.Task, any=False)
 
         if not self.root:
-            raise ValueError(f"No {TA.Task.n3()} found in the graph.")
+            raise ValueError(f"No {TF.Task.n3()} found in the graph.")
 
         self.graph = TransformationGraph(language=lang)
         self.graph += graph
@@ -102,7 +102,7 @@ class TransformationQuery(object):
         self.after: dict[Variable, list[Variable]] = defaultdict(list)
 
         # Traverse the graph
-        for node in self.graph.objects(self.root, TA.output):
+        for node in self.graph.objects(self.root, TF.output):
             self.outputs.append(self.assign_variables(node))
 
     @staticmethod
@@ -120,7 +120,7 @@ class TransformationQuery(object):
         … gets turned into a `TransformationQuery` based on a graph like this:
 
             @base <https://language.namespace/>
-            @prefix : <https://github.com/quangis/transformation-algebra#>
+            @prefix : <https://github.com/quangis/transforge#>
             [] a :Task; :output [
                 :type <D>;
                 :via <cb2d_option1>, <cb2d_option2>;
@@ -140,17 +140,17 @@ class TransformationQuery(object):
         """
         g = TransformationGraph(lang)
         root = BNode()
-        g.add((root, RDF.type, TA.Task))
+        g.add((root, RDF.type, TF.Task))
 
         def f(node, aspect) -> Node:
             if isinstance(aspect, Type):
-                g.add((node, TA.type, lang.uri(aspect)))
+                g.add((node, TF.type, lang.uri(aspect)))
             elif isinstance(aspect, Operator):
-                g.add((node, TA.via, lang.uri(aspect)))
+                g.add((node, TF.via, lang.uri(aspect)))
             else:
                 assert isinstance(aspect, list)
                 predecessor = BNode()
-                g.add((node, TA["from"], predecessor))
+                g.add((node, TF["from"], predecessor))
                 for a in aspect:
                     f(predecessor, a)
             return node
@@ -159,7 +159,7 @@ class TransformationQuery(object):
         for a in aspects:
             f(output, a)
 
-        g.add((root, TA.output, output))
+        g.add((root, TF.output, output))
 
         return TransformationQuery(lang, g, *nargs, **kwargs)
 
@@ -182,10 +182,10 @@ class TransformationQuery(object):
 
         assert var not in self.steps or self.steps[var] == node
         self.steps[var] = node
-        self.type[var] = list(self.graph.objects(node, TA.type))
-        self.operator[var] = list(self.graph.objects(node, TA.via))
+        self.type[var] = list(self.graph.objects(node, TF.type))
+        self.operator[var] = list(self.graph.objects(node, TF.via))
 
-        for next_node in self.graph.objects(node, TA["from"]):
+        for next_node in self.graph.objects(node, TF["from"]):
             next_var = self.assign_variables(next_node, path + [node])
             self.before[var].append(next_var)
             self.after[next_var].append(var)
@@ -204,7 +204,7 @@ class TransformationQuery(object):
 
         result = sparql(
             f"BASE <{self.lang.namespace}>",
-            "PREFIX : <https://github.com/quangis/transformation-algebra#>",
+            "PREFIX : <https://github.com/quangis/transforge#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
@@ -265,13 +265,13 @@ class TransformationQuery(object):
         """
         Conditions for matching on input and outputs of the query.
         """
-        for output in self.graph.objects(self.root, TA.output):
+        for output in self.graph.objects(self.root, TF.output):
             yield from union("?workflow :output/:type/rdfs:subClassOf*",
-                self.graph.objects(output, TA.type))
+                self.graph.objects(output, TF.type))
 
-        for input in self.graph.objects(self.root, TA.input):
+        for input in self.graph.objects(self.root, TF.input):
             yield from union("?workflow :input/:type/rdfs:subClassOf*",
-                self.graph.objects(input, TA.type))
+                self.graph.objects(input, TF.type))
 
     def chronology(self) -> Iterator[str]:
         """

@@ -11,7 +11,7 @@ from itertools import chain, count
 from inspect import signature
 from typing import Optional, Iterator, Iterable, Callable
 
-from transformation_algebra.label import Labels
+from transforge.label import Labels
 
 
 class Direction(Enum):

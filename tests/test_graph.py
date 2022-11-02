@@ -11,13 +11,13 @@ from rdflib.term import Node, Literal
 from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
-from transformation_algebra.type import Type, TypeOperator, TypeVariable, \
+from transforge.type import Type, TypeOperator, TypeVariable, \
     SubtypeMismatch, TypeAlias, TypeOperation, Top, Bottom
-from transformation_algebra.expr import Expr, Operator, Source, \
+from transforge.expr import Expr, Operator, Source, \
     ApplicationError
-from transformation_algebra.lang import Language
-from transformation_algebra.graph import TA, TEST, TransformationGraph
-from transformation_algebra.workflow import WorkflowDict
+from transforge.lang import Language
+from transforge.graph import TF, TEST, TransformationGraph
+from transforge.workflow import WorkflowDict
 
 from typing import Union
 
@@ -67,25 +67,25 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
     g = Graph()
     nodes = {i: BNode() for i in steps}
     if with_classes:
-        g.add((root, RDF.type, TA.Transformation))
+        g.add((root, RDF.type, TF.Transformation))
 
     for i, step in steps.items():
         if step.via:
-            g.add((nodes[i], TA.via, step.via))
+            g.add((nodes[i], TF.via, step.via))
         elif step.internal:
-            g.add((nodes[step.internal], TA.internal, nodes[i]))
+            g.add((nodes[step.internal], TF.internal, nodes[i]))
 
         if step.origin:
-            g.add((nodes[i], TA.origin, step.origin))
+            g.add((nodes[i], TF.origin, step.origin))
 
         if step.is_output:
-            g.add((root, TA.output, nodes[i]))
+            g.add((root, TF.output, nodes[i]))
 
         if step.type:
-            g.add((nodes[i], TA.type, step.type))
+            g.add((nodes[i], TF.type, step.type))
 
         for j in step.inputs:
-            g.add((nodes[i], TA["from"], nodes[j]))
+            g.add((nodes[i], TF["from"], nodes[j]))
     return g
 
 
@@ -642,8 +642,8 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.parse_shortcuts()
 
         expected = TransformationGraph(lang)
-        expected.add((root, TA.type, lang.uri(F(A))))
-        expected.add((root, TA.via, lang.uri(f)))
+        expected.add((root, TF.type, lang.uri(F(A))))
+        expected.add((root, TF.via, lang.uri(f)))
 
         self.assertIsomorphic(actual, expected)
 

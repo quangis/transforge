@@ -14,8 +14,8 @@ from rdflib.term import Node
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
 from typing import Literal
 
-from transformation_algebra.graph import TransformationGraph
-from transformation_algebra.query import TransformationQuery
+from transforge.graph import TransformationGraph
+from transforge.query import TransformationQuery
 
 
 class TransformationStore(Dataset):

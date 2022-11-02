@@ -4,7 +4,7 @@ import rdflib
 from rdflib import Namespace
 from rdflib.term import URIRef
 
-TA = Namespace('https://github.com/quangis/transformation-algebra#')
+TF = Namespace('https://github.com/quangis/transforge#')
 WF = Namespace('http://geographicknowledge.de/vocab/Workflow.rdf#')
 TOOLS = Namespace(
     'https://github.com/quangis/cct/blob/master/tools/tools.ttl#')

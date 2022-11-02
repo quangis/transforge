@@ -1,6 +1,6 @@
 import unittest
 
-from transformation_algebra.type import \
+from transforge.type import \
     Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
     FunctionApplicationError, TypeMismatch, Top, Bottom, \
     ConstraintViolation, ConstrainFreeVariableError, EliminationConstraint, \

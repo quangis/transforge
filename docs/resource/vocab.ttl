@@ -1,7 +1,7 @@
 @base <https://example.com/stl/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix ta: <https://github.com/quangis/transformation-algebra#> .
+@prefix tf: <https://github.com/quangis/transforge#> .
 
 <R-Ratio-Ratio>
     rdfs:subClassOf

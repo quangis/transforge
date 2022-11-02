@@ -1,9 +1,9 @@
 import unittest
 
-from transformation_algebra.type import TypeOperator, TypeAlias, \
+from transforge.type import TypeOperator, TypeAlias, \
     _, Top, TypeVariable, TypeParameterError, UnexpectedVariableError
-from transformation_algebra.expr import Operator, Source
-from transformation_algebra.lang import Language, TypeAnnotationError, \
+from transforge.expr import Operator, Source
+from transforge.lang import Language, TypeAnnotationError, \
     UndefinedTokenError
 from collections import defaultdict
 

@@ -5,12 +5,12 @@ from rdflib import Dataset
 from rdflib.term import BNode, Node, URIRef
 from rdflib.namespace import RDF
 
-from transformation_algebra.type import TypeOperator, Type, _, Top
-from transformation_algebra.expr import Operator, Expr, Source
-from transformation_algebra.lang import Language
-from transformation_algebra.graph import TransformationGraph, TA, TEST, \
+from transforge.type import TypeOperator, Type, _, Top
+from transforge.expr import Operator, Expr, Source
+from transforge.lang import Language
+from transforge.graph import TransformationGraph, TF, TEST, \
     CyclicTransformationGraphError
-from transformation_algebra.query import TransformationQuery
+from transforge.query import TransformationQuery
 
 make_query = TransformationQuery.from_list
 
@@ -23,8 +23,8 @@ def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> Dataset:
     for wfnode, content in workflows.items():
         graph = TransformationGraph(lang)
         e = graph.add_expr(content, wfnode)
-        graph.add((wfnode, RDF.type, TA.Transformation))
-        graph.add((wfnode, TA.output, e))
+        graph.add((wfnode, RDF.type, TF.Transformation))
+        graph.add((wfnode, TF.output, e))
         g = ds.add_graph(wfnode)
         g += graph
     return ds
@@ -314,16 +314,16 @@ class TestAlgebra(unittest.TestCase):
         g = TransformationGraph(lang)
         root = BNode()
         a, b, c, d = (BNode() for _ in "abcd")
-        g.add((root, RDF.type, TA.Task))
-        g.add((root, TA.output, a))
-        g.add((a, TA["from"], b))
-        g.add((a, TA["from"], c))
-        g.add((b, TA["from"], d))
-        g.add((c, TA["from"], d))
-        g.add((a, TA.type, TEST.A))
-        g.add((b, TA.type, TEST.B))
-        g.add((c, TA.type, TEST.C))
-        g.add((d, TA.type, TEST.D))
+        g.add((root, RDF.type, TF.Task))
+        g.add((root, TF.output, a))
+        g.add((a, TF["from"], b))
+        g.add((a, TF["from"], c))
+        g.add((b, TF["from"], d))
+        g.add((c, TF["from"], d))
+        g.add((a, TF.type, TEST.A))
+        g.add((b, TF.type, TEST.B))
+        g.add((c, TF.type, TEST.C))
+        g.add((d, TF.type, TEST.D))
         query1 = TransformationQuery(lang, g, unfold_tree=False)
         query2 = TransformationQuery(lang, g, unfold_tree=True)
         self.assertQuery(lang, wfgraph, query1, results=set())
@@ -400,11 +400,11 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A, B, C = BNode(), BNode(), BNode()
-        graph.add((root, RDF.type, TA.Task))
-        graph.add((root, TA.output, A))
-        graph.add((root, TA.output, B))
-        graph.add((A, TA["from"], C))
-        graph.add((B, TA["from"], C))
+        graph.add((root, RDF.type, TF.Task))
+        graph.add((root, TF.output, A))
+        graph.add((root, TF.output, B))
+        graph.add((A, TF["from"], C))
+        graph.add((B, TF["from"], C))
         query = TransformationQuery(lang, graph, unfold_tree=False)
         result = list(query.chronology())
         self.assertIn(result, [
@@ -437,11 +437,11 @@ class TestAlgebra(unittest.TestCase):
             graph = TransformationGraph(lang)
             root = BNode()
             A, B, C = BNode(), BNode(), BNode()
-            graph.add((root, RDF.type, TA.Task))
-            graph.add((root, TA.output, A))
-            graph.add((A, TA["from"], B))
-            graph.add((A, TA["from"], C))
-            graph.add((B, TA["from"], C))
+            graph.add((root, RDF.type, TF.Task))
+            graph.add((root, TF.output, A))
+            graph.add((A, TF["from"], B))
+            graph.add((A, TF["from"], C))
+            graph.add((B, TF["from"], C))
             query = TransformationQuery(lang, graph, unfold_tree=False)
             result = list(query.chronology())
             self.assertIn(result, [
@@ -465,39 +465,39 @@ class TestAlgebra(unittest.TestCase):
         graph = TransformationGraph(lang)
         root = BNode()
         A = BNode()
-        graph.add((root, RDF.type, TA.Task))
-        graph.add((root, TA.output, A))
-        graph.add((A, TA["from"], A))
+        graph.add((root, RDF.type, TF.Task))
+        graph.add((root, TF.output, A))
+        graph.add((A, TF["from"], A))
         self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
         A, B = BNode(), BNode()
-        graph.add((root, RDF.type, TA.Task))
-        graph.add((root, TA.output, A))
-        graph.add((A, TA["from"], B))
-        graph.add((B, TA["from"], A))
+        graph.add((root, RDF.type, TF.Task))
+        graph.add((root, TF.output, A))
+        graph.add((A, TF["from"], B))
+        graph.add((B, TF["from"], A))
         self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
         A, B, C = BNode(), BNode(), BNode()
-        graph.add((root, RDF.type, TA.Task))
-        graph.add((root, TA.output, A))
-        graph.add((A, TA["from"], B))
-        graph.add((B, TA["from"], C))
-        graph.add((C, TA["from"], A))
+        graph.add((root, RDF.type, TF.Task))
+        graph.add((root, TF.output, A))
+        graph.add((A, TF["from"], B))
+        graph.add((B, TF["from"], C))
+        graph.add((C, TF["from"], A))
         self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
         A, B, C, D = BNode(), BNode(), BNode(), BNode()
-        graph.add((root, RDF.type, TA.Task))
-        graph.add((root, TA.output, D))
-        graph.add((D, TA["from"], A))
-        graph.add((A, TA["from"], B))
-        graph.add((B, TA["from"], C))
-        graph.add((C, TA["from"], A))
+        graph.add((root, RDF.type, TF.Task))
+        graph.add((root, TF.output, D))
+        graph.add((D, TF["from"], A))
+        graph.add((A, TF["from"], B))
+        graph.add((B, TF["from"], C))
+        graph.add((C, TF["from"], A))
         self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
 
 

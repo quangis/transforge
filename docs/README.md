@@ -1,4 +1,4 @@
-# transformation-algebra
+# transforge
 
 [![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
 
@@ -9,9 +9,9 @@ and the descriptions may be independent from any particular
 implementation. The goal is only to capture some properties that are 
 deemed *conceptually* relevant, as a form of *procedural metadata*.
 
-The `transformation-algebra` library facilitates defining a 
-transformation language and parsing its expressions into semantic 
-graphs. It is written in pure Python with few dependencies.
+`transforge` facilitates defining a transformation language and parsing 
+its expressions into semantic graphs. It is written in pure Python with 
+few dependencies.
 
 In order to reason about about transformations, it also implements a 
 [type inference](https://en.wikipedia.org/wiki/Type_inference) module, 

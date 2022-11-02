@@ -10,11 +10,11 @@ from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
 
-from transformation_algebra.namespace import TA, EX
-from transformation_algebra.type import (builtins, Product, TypeOperator,
+from transforge.namespace import TF, EX
+from transforge.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
     TypeSchema, TypingError, Top, Bottom)
-from transformation_algebra.expr import Operator, Expr, Application, Source
+from transforge.expr import Operator, Expr, Application, Source
 
 
 class Language(object):
@@ -83,7 +83,7 @@ class Language(object):
         if isinstance(x, TypeOperation) and x.operator.arity == 0:
             x = x.operator
         if isinstance(x, (Operator, TypeOperator)):
-            return (TA if x in builtins else self.namespace)[x.name]
+            return (TF if x in builtins else self.namespace)[x.name]
 
         # handle compound operators
         if x in self.canon:

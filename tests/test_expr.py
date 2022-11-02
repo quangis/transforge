@@ -1,11 +1,11 @@
 import unittest
 from .testcase import TestCase  # type: ignore
 
-from transformation_algebra.type import TypeOperator, _, \
+from transforge.type import TypeOperator, _, \
     SubtypeMismatch
-from transformation_algebra.expr import Operator, Source, \
+from transforge.expr import Operator, Source, \
     DeclaredTypeTooGeneralError, DeclarationError
-from transformation_algebra.lang import Language, \
+from transforge.lang import Language, \
     TypeAnnotationError
 
 

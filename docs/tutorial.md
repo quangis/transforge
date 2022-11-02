@@ -22,12 +22,12 @@
 
 # Introduction
 
-`transformation_algebra` is a Python library that allows you to define a 
-language for semantically describing tools or procedures as 
-*transformations between concepts*. When you connect several such 
-procedures into a *workflow*, the library can construct an RDF graph for 
-you that describes it as a whole, automatically inferring the specific 
-concept type at every step.
+`transforge` is a Python library that allows you to define a language 
+for semantically describing tools or procedures as *transformations 
+between concepts*. When you connect several such procedures into a 
+*workflow*, the library can construct an RDF graph for you that 
+describes it as a whole, automatically inferring the specific concept 
+type at every step.
 
 Throughout this manual, we will use a simplified version of the [core 
 concept transformations of geographical information][cct] as a recurring 
@@ -57,19 +57,19 @@ represented with *type operators*.
 Before going into transformation operators, we should therefore 
 understand how types work. Let's start by importing the library:
 
-    >>> import transformation_algebra as ct
+    >>> import transforge as tf
 
 Base type operators can be thought of as atomic concepts. In our case, 
 that could be an *object* or an *ordinal value*. They are declared using 
 the `TypeOperator` class:
 
-    >>> Obj = ct.TypeOperator()
-    >>> Ord = ct.TypeOperator()
+    >>> Obj = tf.TypeOperator()
+    >>> Ord = tf.TypeOperator()
 
 *Compound* type operators take other types as parameters. For example, 
 `C(Obj)` could represent the type of collections of objects:
 
-    >>> C = ct.TypeOperator(params=1)
+    >>> C = tf.TypeOperator(params=1)
 
 A `Function` is a special compound type, and it's quite an important 
 one: it describes a transformation from one type to another. For 
@@ -91,7 +91,7 @@ create our first transformation language, containing the operators
 We already mentioned that `size` could take an object and return an 
 ordinal, which would look like this:
 
-    >>> size = ct.Operator(type=Obj ** Ord)
+    >>> size = tf.Operator(type=Obj ** Ord)
 
 The accompanying `ratio` operator might take two ordinal values and 
 output another: the ratio between them. Knowing that a function with 
@@ -99,7 +99,7 @@ multiple arguments can be [rewritten][w:currying] into one that takes a
 single argument and returns another function to deal with the rest, we 
 get:
 
-    >>> ratio = ct.Operator(type=Ord ** (Ord ** Ord))
+    >>> ratio = tf.Operator(type=Ord ** (Ord ** Ord))
 
 Since the `**` operator is right-associative, the parentheses are 
 optional.
@@ -112,7 +112,7 @@ All the types and operators we declared need to be added to it. However,
 for convenience, it is possible to simply incorporate all types and 
 operators in local scope:
 
-    >>> stl = ct.Language(scope=locals(),
+    >>> stl = tf.Language(scope=locals(),
             namespace="https://example.com/stl/")
 
 
@@ -176,18 +176,17 @@ expression.
             wf:output _:population_increase
         ].
 
-We will now use `transformation_algebra`'s command-line interface to 
-enrich the original *workflow* graph with a *transformation* graph. 
-Consult `python -m transformation_algebra -h` for more information on 
-how to use the command. You can also interface with Python directly; 
-checking out the source code for the command-line interface should give 
-you a headstart.
+We will now use `transforge`'s command-line interface to enrich the 
+original *workflow* graph with a *transformation* graph. Consult 
+`transforge -h` for more information on how to use the command. You can 
+also interface with Python directly; checking out the source code for 
+the command-line interface should give you a headstart.
 
 Save the transformation language into [`stl.py`](resource/stl.py), and 
 the workflow and tool description into 
 [`wf.ttl`](resource/wf-RelativeSize.ttl), and run:
 
-    python -m transformation_algebra graph \
+    transforge graph \
         -L stl.py -T wf.ttl wf.ttl -t ttl -o -
 
 What we get back is an RDF graph in which the transformation expression 
@@ -197,7 +196,7 @@ involved at that particular step in the transformation. It will look
 something like this:
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/RelativeSize-tg.svg">
+<img src="https://raw.githubusercontent.com/quangis/transforge/develop/docs/resource/RelativeSize-tg.svg">
 </p>
 
 This graph tells us what happens inside the workflow *conceptually*: the 
@@ -218,15 +217,15 @@ well: you are probably going to need a slew of operators that *maximize
 something*. In such a case, we can introduce an operator that is 
 parameterized by *another operator*:
 
-    >>> maximum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
-    >>> height = ct.Operator(type=Obj ** Ord)
+    >>> maximum = tf.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+    >>> height = tf.Operator(type=Obj ** Ord)
 
 The expression `maximum height (- : C(Obj))` would use `height` to 
 associate each building with the value to be maximized. If we were to 
 unfold it into a graph, it would look like this:
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/TallestBuilding-tg.svg">
+<img src="https://raw.githubusercontent.com/quangis/transforge/develop/docs/resource/TallestBuilding-tg.svg">
 </p>
 
 You might notice that a dotted node appeared. This is because a 
@@ -242,8 +241,8 @@ Suppose that we want to describe a `NearObject` tool for finding, among
 a collection of objects `2`, the one closest to some object `1`. It is 
 natural to do so in the following terms:
 
-    >>> minimum = ct.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
-    >>> distance = ct.Operator(type=Obj ** Obj ** Ord)
+    >>> minimum = tf.Operator(type=(Obj ** Ord) ** C(Obj) ** Obj)
+    >>> distance = tf.Operator(type=Obj ** Obj ** Ord)
 
 This time, the `distance` transformation should already be anchored to 
 object `1` as its first operand. This is no problem:
@@ -277,9 +276,9 @@ The first way in which *polymorphism* is supported is *subtyping*: any
 type is also a representative any of its supertypes. For instance, a 
 ratio-scaled quality is also an ordinal quality:
 
-    >>> Qlt = ct.TypeOperator()
-    >>> Ord = ct.TypeOperator(supertype=Qlt)
-    >>> Ratio = ct.TypeOperator(supertype=Ord)
+    >>> Qlt = tf.TypeOperator()
+    >>> Ord = tf.TypeOperator(supertype=Qlt)
+    >>> Ratio = tf.TypeOperator(supertype=Ord)
     >>> Ratio.subtype(Ord)
     True
 
@@ -325,10 +324,10 @@ What if we want to make `minimum` work on collections of things other
 than `Obj`s? With subtyping, we could introduce a universal supertype 
 `Val` and change `minimum`s type signature accordingly:
 
-    >>> Val = ct.TypeOperator()
-    >>> Obj = ct.TypeOperator(supertype=Val)
-    >>> Qlt = ct.TypeOperator(supertype=Val)
-    >>> minimum = ct.Operator(type=(Val ** Ord) ** C(Val) ** Val)
+    >>> Val = tf.TypeOperator()
+    >>> Obj = tf.TypeOperator(supertype=Val)
+    >>> Qlt = tf.TypeOperator(supertype=Val)
+    >>> minimum = tf.Operator(type=(Val ** Ord) ** C(Val) ** Val)
 
 However, we have now lost information on the relationship between the 
 types of arguments. You could pass a transformation that operates on 
@@ -340,7 +339,7 @@ Therefore, we additionally allow *parametric polymorphism* by means of a
 type schema. A type schema represents all types that can be obtained by 
 substituting its variables. In our case:
 
-    >>> minimum = ct.Operator(type=lambda α: (α ** Ord) ** C(α) ** α)
+    >>> minimum = tf.Operator(type=lambda α: (α ** Ord) ** C(α) ** α)
 
 Don't be fooled by the `lambda` keyword: it has little to do with lambda 
 abstraction. It is there because we use an anonymous Python function, 
@@ -352,8 +351,7 @@ concrete variables are then bound to type operators as soon as possible.
 For example, once we pass arguments to the generic `minimum`, it's 
 possible to figure out what the output type is supposed to be:
 
-    >>> minimum.apply(distance.apply(ct.Source(Obj))).apply(ct.Source(C(Obj))).type
-    Obj
+    >>> minimum.apply(distance.apply(tf.Source(Obj))).apply(tf.Source(C(Obj))).type Obj
 
 In order to appreciate how this all falls into place, let's take a 
 moment to use this in a workflow. We make a workflow that uses our 
@@ -380,14 +378,14 @@ inspect the resulting transformation graph:
 While we're at it, let's also change the type of the `distance` operator 
 to produce a `Ratio`.
 
-    >>> distance = ct.Operator(type=Obj ** Obj ** Ratio)
+    >>> distance = tf.Operator(type=Obj ** Obj ** Ratio)
 
 `minimum` will still accept this interpretation of `distance`, because 
 `Ratio <= Ord`. The resulting transformation graph looks as follows --- 
 the library has figured out the correct types.
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/NearObject-tg.svg">
+<img src="https://raw.githubusercontent.com/quangis/transforge/develop/docs/resource/NearObject-tg.svg">
 </p>
 
 
@@ -416,12 +414,12 @@ indexing notation (`x [...]`) is abused. A *subtype* constraint is
 written `x <= y`, meaning that `x`, once bound, must be a subtype of the 
 given type `y`. For example:
 
-    >>> smallest = ct.Operator(lambda α: α ** α ** α [α <= Ord])
-    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Ratio)).type
+    >>> smallest = tf.Operator(lambda α: α ** α ** α [α <= Ord])
+    >>> smallest.apply(tf.Source(Ratio)).apply(tf.Source(Ratio)).type
     Ratio
-    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Ord)).type
+    >>> smallest.apply(tf.Source(Ratio)).apply(tf.Source(Ord)).type
     Ord
-    >>> smallest.apply(ct.Source(Ratio)).apply(ct.Source(Qlt)).type
+    >>> smallest.apply(tf.Source(Ratio)).apply(tf.Source(Qlt)).type
     Type mismatch.
 
 
@@ -433,8 +431,8 @@ as soon as the alternatives have been eliminated. For instance, we might
 want a function signature that applies to both single qualities and 
 collections:
 
-    >>> f = ct.Operator(type=lambda α: α ** α [α << {Qlt, C(Qlt)}])
-    >>> f.apply(ct.Source(C(Ord))).type
+    >>> f = tf.Operator(type=lambda α: α ** α [α << {Qlt, C(Qlt)}])
+    >>> f.apply(tf.Source(C(Ord))).type
     C(Ord)
 
 
@@ -445,17 +443,17 @@ others, you may use the *wildcard variable* `_`. The purpose goes beyond
 convenience: it communicates to the type system that it can always be a 
 sub- and supertype of *anything*. It must be explicitly imported:
 
-    >>> from transformation_algebra import _
+    >>> from transforge import _
     >>> (C(_) ** Obj).apply(C(Ord))
     Obj
 
 Elimination constraints and wildcards can often aid in inference, 
 figuring out interdependencies between types:
 
-    >>> R = ct.TypeOperator(params=2)
-    >>> keys = ct.Operator(
+    >>> R = tf.TypeOperator(params=2)
+    >>> keys = tf.Operator(
             type=lambda α, β: α ** C(β) [α << {C(β), R(β, _)}])
-    >>> keys.apply(ct.Source(R(Ord, Obj)))
+    >>> keys.apply(tf.Source(R(Ord, Obj)))
     C(Ord)
 
 
@@ -464,10 +462,10 @@ figuring out interdependencies between types:
 Complex types may be given alternate names. Such `TypeAlias`es may 
 themselves be parameterized.
 
-    >>> Collection = ct.TypeAlias(C)
+    >>> Collection = tf.TypeAlias(C)
     >>> Collection(Ord)
     C(Ord)
-    >>> Ternary = ct.TypeAlias(lambda x: x ** x ** x ** x)
+    >>> Ternary = tf.TypeAlias(lambda x: x ** x ** x ** x)
     >>> Ternary(Ord)
     Ord ** Ord ** Ord ** Ord
 
@@ -478,7 +476,7 @@ Three base types are built-in because of the special properties they
 have. First, we meet the universal type `Top`. This type contains all 
 possible values, and therefore it is a supertype of everything.
 
-    >>> from transformation_algebra import Top
+    >>> from transforge import Top
     >>> (C(Top) ** Obj).apply(C(Ord))
     Obj
     >>> (C(Top) ** Obj).apply(C(C(Ord)))
@@ -489,7 +487,7 @@ possible values, and therefore it is a supertype of everything.
 Its evil twin is the `Bottom` type: the type that contains *no* values 
 and that is a *subtype* of everything.
 
-    >>> from transformation_algebra import Bottom
+    >>> from transforge import Bottom
     >>> (C(Ord) ** Obj).apply(C(Bottom))
     Obj
     >>> (C(Bottom) ** Obj).apply(C(Ord))
@@ -509,13 +507,13 @@ unique value, like a 0-tuple. To appreciate its value as a technical
 tool, imagine that you have modelled mappings between types using the 
 `R` operator (as is the case for the [CCT][cct] algebra):
 
-    >>> R = ct.TypeOperator(params=2)
+    >>> R = tf.TypeOperator(params=2)
 
 Now, when every value is mapped to the same element, it essentially 
 turns into a set. Instead of having a dedicated `C` operator, we can 
 make it an alias.
 
-    >>> C = ct.TypeAlias(lambda x: R(x, Unit))
+    >>> C = tf.TypeAlias(lambda x: R(x, Unit))
 
 The benefit is that transformations on relations will automatically also 
 work on collections. For example, we can model regions as *collections 
@@ -528,8 +526,8 @@ boolean fields), and they will both match the type `R(Loc, _)`.
 Three additional compound types are built-in. To *bundle* multiple 
 types, you can use the `Product` type. It is written `A * B`.
 
-    >>> first = ct.Operator(type=lambda α: (α * _) ** α)
-    >>> first.apply(ct.Source(Ratio * Obj)).type
+    >>> first = tf.Operator(type=lambda α: (α * _) ** α)
+    >>> first.apply(tf.Source(Ratio * Obj)).type
     Ratio
 
 When you obtain a `Product` from a transformation, that means you got 
@@ -562,12 +560,12 @@ that are derived from other, simpler ones. This should not necessarily
 be thought of as providing an *implementation*: it merely represents a 
 decomposition into more primitive conceptual building blocks.
 
-    >>> add = ct.Operator(type=Ratio ** Ratio ** Ratio)
-    >>> add1 = ct.Operator(
+    >>> add = tf.Operator(type=Ratio ** Ratio ** Ratio)
+    >>> add1 = tf.Operator(
             type=Ratio ** Ratio,
-            define=lambda x: add(x, ct.Source(Ratio))
+            define=lambda x: add(x, tf.Source(Ratio))
         )
-    >>> compose = ct.Operation(
+    >>> compose = tf.Operation(
             type=lambda α, β, γ: (β ** γ) ** (α ** β) ** (α ** γ),
             define=lambda f, g, x: f(g(x))
         )
@@ -616,7 +614,7 @@ express the conceptual properties we expect from a workflow that solves
 a particular task. For example, the following graph captures what we 
 might want to see in a workflow that finds the closest hospital:
 
-    @prefix : <https://github.com/quangis/transformation-algebra#>.
+    @prefix : <https://github.com/quangis/transforge#>.
     @prefix stl: <https://example.com/stl/>.
 
     _:Hospitals stl:type "C(Obj)".
@@ -639,13 +637,13 @@ store containing workflows to match against. Assuming you have a SPARQL
 server like Fuseki or MarkLogic running, the command-line interface can 
 help you upload your workflows:
 
-    python3 -m transformation_algebra graph -L sl.py -T wf.ttl wf.ttl \
+    transforge graph -L sl.py -T wf.ttl wf.ttl \
         -s fuseki@http://127.0.0.1:3030/cct
 
 You can once again use the command-line interface to query these 
 workflows:
 
-    python3 -m transformation_algebra query -L sl.py task.ttl \
+    transforge query -L sl.py task.ttl \
         -s fuseki@http://127.0.0.1:3030/cct -o -
 
 This will add `:match` predicates to the task. With the `--summary` 
@@ -664,12 +662,12 @@ This set of finite types, along with all their subtypes, is considered
 relevant. Non-canonical types will not be recorded into the 
 transformation graph. For example:
 
-    R = ct.TypeOperator(params=2)
-    Qlt = ct.TypeOperator()
-    Ord = ct.TypeOperator(supertype=Qlt)
-    Ratio = ct.TypeOperator(supertype=Ord)
+    R = tf.TypeOperator(params=2)
+    Qlt = tf.TypeOperator()
+    Ord = tf.TypeOperator(supertype=Qlt)
+    Ratio = tf.TypeOperator(supertype=Ord)
 
-    example_lang = ct.Language(scope=locals(),
+    example_lang = tf.Language(scope=locals(),
         canon={R(Qlt, Qlt)},
         namespace="https://example.com/stl/")
 
@@ -682,7 +680,7 @@ language, as well as a *type taxonomy* of the canonical types. For the
 above language, it looks as follows:
 
 <p align="center" width="100%">
-<img src="https://raw.githubusercontent.com/quangis/transformation-algebra/develop/docs/resource/vocab.svg">
+<img src="https://raw.githubusercontent.com/quangis/transforge/develop/docs/resource/vocab.svg">
 </p>
 
 [cct]: https://github.com/quangis/cct

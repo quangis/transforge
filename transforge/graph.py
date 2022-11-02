@@ -5,14 +5,14 @@ parsed as RDF graphs.
 
 from __future__ import annotations
 
-from transformation_algebra.namespace import TA, RDF, RDFS, WF, shorten
-from transformation_algebra.type import (Type, TypeOperation, Function,
+from transforge.namespace import TF, RDF, RDFS, WF, shorten
+from transforge.type import (Type, TypeOperation, Function,
     TypeInstance, TypingError)
-from transformation_algebra.expr import (Expr, Operation, Application,
+from transforge.expr import (Expr, Operation, Application,
     Abstraction, Source)
-from transformation_algebra.lang import (Language, ParseError,
+from transforge.lang import (Language, ParseError,
     NonCanonicalTypeError)
-from transformation_algebra.workflow import Workflow
+from transforge.workflow import Workflow
 
 import html
 from pathlib import Path
@@ -79,7 +79,7 @@ class TransformationGraph(Graph):
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
-        self.bind("", TA)
+        self.bind("", TF)
         if self.language.prefix and self.language.namespace:
             self.bind(self.language.prefix, self.language.namespace)
 
@@ -95,10 +95,10 @@ class TransformationGraph(Graph):
         ns = self.language.namespace
         self.add_taxonomy()
         self.add_operators()
-        self.add((ns["signature"], RDFS.subPropertyOf, TA["signature"]))
-        self.add((ns["expression"], RDFS.subPropertyOf, TA["expression"]))
-        self.add((ns["type"], RDFS.subPropertyOf, TA["type"]))
-        self.add((ns["via"], RDFS.subPropertyOf, TA["via"]))
+        self.add((ns["signature"], RDFS.subPropertyOf, TF["signature"]))
+        self.add((ns["expression"], RDFS.subPropertyOf, TF["expression"]))
+        self.add((ns["type"], RDFS.subPropertyOf, TF["type"]))
+        self.add((ns["via"], RDFS.subPropertyOf, TF["via"]))
 
     def add_supertypes(self, t: TypeOperation, recursive: bool = False) -> None:
         if t not in self.supertyped:
@@ -142,7 +142,7 @@ class TransformationGraph(Graph):
             node = self.language.uri(op)
 
             if self.with_classes:
-                self.add((node, RDF.type, TA.Operation))
+                self.add((node, RDF.type, TF.Operation))
 
             if self.with_labels:
                 self.add((node, RDFS.label, Literal(str(op.name))))
@@ -171,7 +171,7 @@ class TransformationGraph(Graph):
                     raise
 
             if self.with_classes:
-                self.add((node, RDF.type, TA.Type))
+                self.add((node, RDF.type, TF.Type))
 
             if self.with_labels:
                 self.add((node, RDFS.label, Literal(t.text())))
@@ -228,10 +228,10 @@ class TransformationGraph(Graph):
                     or expr.type in self.language.canon):
 
                 type_node = self.add_type(expr.type)
-                self.add((current, TA.type, type_node))
+                self.add((current, TF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TA.contains, type_node))
+                    self.add((root, TF.contains, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
@@ -251,18 +251,18 @@ class TransformationGraph(Graph):
 
             if self.with_operators:
                 op_node = self.language.namespace[expr.operator.name]
-                self.add((current, TA.via, op_node))
+                self.add((current, TF.via, op_node))
 
                 if self.with_membership:
-                    self.add((root, TA.contains, op_node))
+                    self.add((root, TF.contains, op_node))
 
             if self.with_types and canonical and essential:
 
                 type_node = self.add_type(output_type)
-                self.add((current, TA.type, type_node))
+                self.add((current, TF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TA.contains, type_node))
+                    self.add((root, TF.contains, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label, Literal(
@@ -305,7 +305,7 @@ class TransformationGraph(Graph):
                     expr.x.type.operator == Function:
                 internal: Node = BNode()
                 current_internal = internal
-                self.add((f, TA.internal, internal))
+                self.add((f, TF.internal, internal))
 
                 if self.with_labels:
                     self.add((internal, RDFS.label, Literal(
@@ -320,38 +320,38 @@ class TransformationGraph(Graph):
                 else:
                     x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                         origin=origin)
-                    self.add((x, TA["from"], internal))
+                    self.add((x, TF["from"], internal))
             else:
                 x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                     origin=origin)
-            self.add((f, TA["from"], x))
+            self.add((f, TF["from"], x))
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
             # operation, which has access to additional parameters that may be
             # used by the inner one. See issues #37 and #41.
             if current_internal:
-                for internal in self.objects(x, TA.internal):
-                    self.add((internal, TA["from"], current_internal))
+                for internal in self.objects(x, TF.internal):
+                    self.add((internal, TF["from"], current_internal))
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
-            for internal in self.objects(f, TA.internal):
+            for internal in self.objects(f, TF.internal):
                 if internal != current_internal:
-                    self.add((internal, TA["from"], x))
+                    self.add((internal, TF["from"], x))
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
-                for f_input in self.objects(f, TA["from"]):
+                for f_input in self.objects(f, TF["from"]):
                     if x != f_input:
-                        self.add((current_internal, TA["from"], f_input))
+                        self.add((current_internal, TF["from"], f_input))
 
                 if origin and self.with_workflow_origin:
-                    self.add((current_internal, TA["origin"], origin))
+                    self.add((current_internal, TF["origin"], origin))
 
         if origin and self.with_workflow_origin:
-            self.add((current, TA["origin"], origin))
+            self.add((current, TF["origin"], origin))
         return current
 
     def add_workflow(self, wf: Workflow) -> dict[Node, Node]:
@@ -419,21 +419,21 @@ class TransformationGraph(Graph):
         for source_expr, ref_expr in indirection.items():
             src_tfmnode = self.add_expr(source_expr, wf.root)
             ref_tfmnode = self.expr_nodes[ref_expr]
-            self.add((src_tfmnode, TA["from"], ref_tfmnode))
+            self.add((src_tfmnode, TF["from"], ref_tfmnode))
 
         if self.with_inputs:
             for wfnode in wf.sources:
                 tfmnode = wfnode2tfmnode(wfnode)
-                self.add((wf.root, TA.input, tfmnode))
+                self.add((wf.root, TF.input, tfmnode))
 
         if self.with_output:
-            self.add((wf.root, TA.output, result_node))
+            self.add((wf.root, TF.output, result_node))
 
         assert not self.uri
         self.uri = wf.root
 
         if self.with_classes:
-            self.add((wf.root, RDF.type, TA.Transformation))
+            self.add((wf.root, RDF.type, TF.Transformation))
 
         return {wfnode: self.expr_nodes[expr]
             for wfnode, expr in exprs.items()}
@@ -443,24 +443,24 @@ class TransformationGraph(Graph):
         For convenience, types and operators may be specified as string
         literals in RDF using the `type` and `via` predicates in the language's
         own namespace. This method automatically parses these strings and
-        replaces them with `ta:type` and `ta:via` predicates with the
+        replaces them with `tf:type` and `tf:via` predicates with the
         corresponding nodes as object. Example:
 
             [] lang:type "F(A, _)".
 
         Becomes:
 
-            [] ta:type lang:F-A-Top.
+            [] tf:type lang:F-A-Top.
         """
         ns = self.language.namespace
 
         for subj, obj in self[:ns.type:]:
             t = self.language.parse_type(str(obj))
-            self.add((subj, TA.type, self.language.uri(t)))
+            self.add((subj, TF.type, self.language.uri(t)))
 
         for subj, obj in self[:ns.via:]:
             operator = self.language.parse_operator(str(obj))
-            self.add((subj, TA.via, self.language.uri(operator)))
+            self.add((subj, TF.via, self.language.uri(operator)))
 
         if remove:
             self.remove((None, ns.type, None))
@@ -476,8 +476,8 @@ class TransformationGraph(Graph):
 
         # TODO maybe use a dedicated graph library for this
         # TODO separate from WF.output
-        concepts_in: set[Node] = set(self.objects(self.uri, TA.input))
-        concepts_app: set[Node] = set(self.subjects(TA["from"])).union(
+        concepts_in: set[Node] = set(self.objects(self.uri, TF.input))
+        concepts_app: set[Node] = set(self.subjects(TF["from"])).union(
             self.objects(self.uri, TA.output))
         concepts_in_internal: set[Node] = set(x
             for x in self.objects(None, TA["from"])

@@ -11,8 +11,8 @@ from rdflib.term import Node, URIRef, Literal
 from abc import ABCMeta, abstractmethod
 from typing import Iterator
 
-from transformation_algebra.namespace import WF, RDF, EX
-from transformation_algebra.lang import Language
+from transforge.namespace import WF, RDF, EX
+from transforge.lang import Language
 
 
 # TODO: Ideally, this should be a protocol, not an abstract method. That way,

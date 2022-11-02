@@ -18,14 +18,14 @@ from plumbum import cli  # type: ignore
 from rdflib import Graph, Dataset
 from rdflib.term import Literal, Node, URIRef
 from rdflib.util import guess_format
-from transformation_algebra.expr import ApplicationError
-from transformation_algebra.lang import Language, ParseError
-from transformation_algebra.graph import TransformationGraph, \
+from transforge.expr import ApplicationError
+from transforge.lang import Language, ParseError
+from transforge.graph import TransformationGraph, \
     WorkflowCompositionError
-from transformation_algebra.query import TransformationQuery
-from transformation_algebra.namespace import TA, EX, WF, TOOLS, RDF, shorten
-from transformation_algebra.workflow import WorkflowGraph
-from transformation_algebra.util.store import TransformationStore
+from transforge.query import TransformationQuery
+from transforge.namespace import TF, EX, WF, TOOLS, RDF, shorten
+from transforge.workflow import WorkflowGraph
+from transforge.util.store import TransformationStore
 
 
 caught_errors = (WorkflowCompositionError, ApplicationError, ParseError)
@@ -104,7 +104,7 @@ class WithRDF:
                 for g in graphs:
                     all_g += g
 
-            all_g.bind("ta", TA)
+            all_g.bind("tf", TF)
             all_g.bind("wf", WF)
             all_g.bind("tools", TOOLS)
             all_g.bind("ex", EX)
@@ -156,7 +156,7 @@ class CLI(cli.Application):
     transformation language
     """
 
-    PROGNAME = "transformation_algebra"
+    PROGNAME = "transforge"
 
     def main(self, *args):
         if args:
@@ -230,7 +230,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
                     print(e, file=stderr)
                     return 1
 
-            tg.add((root, TA.output, e))
+            tg.add((root, TF.output, e))
             results.append(tg)
 
         for wf_path in WORKFLOW_FILE:
@@ -285,11 +285,11 @@ class QueryRunner(Application, WithServer, WithRDF):
             by_chronology=self.chronological and not self.blackbox)
 
         out_graph = query.graph
-        out_graph.add((query.root, TA.sparql, Literal(query.sparql())))
+        out_graph.add((query.root, TF.sparql, Literal(query.sparql())))
 
         if self.server:
             for match in self.store.run(query):
-                out_graph.add((query.root, TA.match, match))
+                out_graph.add((query.root, TF.match, match))
         return out_graph
 
     def summarize(self, *task_graphs: Graph) -> None:
@@ -299,18 +299,18 @@ class QueryRunner(Application, WithServer, WithRDF):
 
         # Collect all tasks
         tasks: dict[URIRef, Graph] = {task: tg for tg in task_graphs
-            if (task := tg.value(None, RDF.type, TA.Task, any=False))}
+            if (task := tg.value(None, RDF.type, TF.Task, any=False))}
 
         # Collect all possible workflows
         workflows = set(wf for task, tg in tasks.items() for wf in chain(
-            tg.objects(task, TA.implementation), tg.objects(task, TA.match)))
+            tg.objects(task, TF.implementation), tg.objects(task, TF.match)))
 
         # Collect results
         n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
         results: dict[Node, dict[str, str]] = defaultdict(dict)
         for task, tg in tasks.items():
-            expected = set(tg.objects(task, TA.implementation))
-            actual = set(tg.objects(task, TA.match))
+            expected = set(tg.objects(task, TF.implementation))
+            actual = set(tg.objects(task, TF.match))
 
             if expected:
                 n_fpos += len(actual - expected)
