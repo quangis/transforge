@@ -483,7 +483,9 @@ make it an alias.
     >>> C = ct.TypeAlias(lambda x: R(x, Unit))
 
 The benefit is that transformations on relations will automatically also 
-work on collections.
+work on collections. For example, we can model regions as *collections 
+of locations* or as *relations between locations and booleans* (ie. 
+boolean fields), and they will both match the type `R(Loc, _)`.
 
 
 ### Product, intersection and union types
@@ -496,19 +498,23 @@ types, you can use the `Product` type. It is written `A * B`.
     Ratio
 
 When you obtain a `Product` from a transformation, that means you got 
-multiple 'things'. However, just as transformation operators might not 
-correspond to how a the procedure is *implemented*, type operators don't 
-necessarily represent *data* types. They only capture some relevant 
-conceptual properties of the entities they describe. For example, when a 
-transformation takes an ordinal as argument, that doesn't mean that a 
-concrete number is passed to it --- just that it operates on things that 
-are, in some aspect, ordinal-scaled.
+multiple 'things', each with their own type. However, even *one* thing 
+might have multiple types.
 
-Therefore, it makes sense that a *single thing* can have *multiple 
-attributes*. If your transformation operates on things that have 
-attributes of *both* `A` and `B`, we use an `Intersection` type, written 
-`A & B`. If it operates on things that have attributes of *either* `A` 
-or `B`, we use a `Union` type, written `A | B`.
+Just as transformation operators might not correspond to how a the 
+procedure is *implemented*, type operators don't necessarily represent 
+*data*. They only capture some relevant conceptual properties of the 
+entities they describe. For example, when a transformation takes an 
+ratio as argument, that doesn't mean that a concrete number is passed to 
+it --- just that it operates on things that are, in some aspect, 
+ratio-scaled.
+
+Therefore, the intersection of the set of rational values and objects is 
+not empty --- it just contains the entities that *attributes* of both. 
+If your transformation operates on the intersection of `A` and `B`, we 
+use an `Intersection` type, written `A & B`. If it operates on things 
+that have attributes of *either* `A` or `B`, we use a `Union` type, 
+written `A | B`.
 
 **Union and intersection types have not yet been implemented. Product 
 types capture some of their use cases.**
