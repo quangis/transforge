@@ -1,6 +1,6 @@
 # transforge
 
-[![](https://img.shields.io/pypi/v/transformation-algebra)](https://pypi.org/project/transformation-algebra/)
+[![](https://img.shields.io/pypi/v/transforge)](https://pypi.org/project/transforge/)
 
 A transformation language is used to describe *processes*, like the ones 
 implicit in workflows or software tools, as *transformations between 
@@ -34,6 +34,6 @@ warning.**
 ### Usage
 
 This package was developed for the [CCT](https://github.com/quangis/cct) 
-algebra for geographical information, which may act as an example. You 
-may also consult our cursory [tutorial](tutorial.md).
+algebra for geographical information, which may act as an example.
 
+Click here for a [tutorial](docs/tutorial.md).
