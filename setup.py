@@ -17,10 +17,10 @@ readme = ''
 
 setup(
     long_description=readme,
-    name='transformation_algebra',
+    name='transforge',
     version='0.0.0',
-    packages=['transformation_algebra'],
+    packages=['transforge'],
     package_dir={"": "."},
-    package_data={"transformation_algebra": ["*.typed"]},
+    package_data={"transforge": ["*.typed"]},
     install_requires=['setuptools>=42', 'wheel'],
 )
