@@ -632,8 +632,8 @@ transformation graph. For example:
         canon={R(Qlt, Qlt)},
         namespace="https://example.com/stl/")
 
-The `Top` and `Bottom` types may be added using the `include_top` and 
-`include_bottom` parameters.
+The `Top` and `Bottom` types may be included by adding them to the 
+`canon`.
 
 The command-line tool's `vocab` subcommand can generate an RDF 
 vocabulary containing a description of all the operations of your 

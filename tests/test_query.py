@@ -5,7 +5,7 @@ from rdflib import Dataset
 from rdflib.term import BNode, Node, URIRef
 from rdflib.namespace import RDF
 
-from transformation_algebra.type import TypeOperator, Type, _
+from transformation_algebra.type import TypeOperator, Type, _, Top
 from transformation_algebra.expr import Operator, Expr, Source
 from transformation_algebra.lang import Language
 from transformation_algebra.graph import TransformationGraph, TA, TEST, \
@@ -279,8 +279,8 @@ class TestAlgebra(unittest.TestCase):
         X = TypeOperator()
         Y = TypeOperator(supertype=X)
         F = TypeOperator(params=2)
-        lang = Language(locals(), namespace=TEST, include_top=True,
-            canon={X, F(F(X, Y), Y), F(Y, Y)})
+        lang = Language(locals(), namespace=TEST,
+            canon={Top, X, F(F(X, Y), Y), F(Y, Y)})
 
         graph = make_graph(lang, {
             TEST.x: Source(X),

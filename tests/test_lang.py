@@ -100,7 +100,7 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        lang = Language(scope=locals(), include_top=True, canon={A, F(A, B)})
+        lang = Language(scope=locals(), canon={Top, A, F(A, B)})
         self.assertEqual(lang.canon, {Top(), A(), B(), F(A, B), F(B, B),
             F(A, Top), F(B, Top), F(Top, B), F(Top, Top)})
 
@@ -111,8 +111,7 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        lang = Language(scope=locals(), include_top=True,
-            canon={A, F(A, B)})
+        lang = Language(scope=locals(), canon={Top, A, F(A, B)})
 
         tree = {
             Top: [A, F(Top, Top)],

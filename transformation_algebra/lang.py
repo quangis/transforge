@@ -13,15 +13,13 @@ from rdflib.namespace import ClosedNamespace
 from transformation_algebra.namespace import TA, EX
 from transformation_algebra.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
-    TypeSchema, TypingError)
+    TypeSchema, TypingError, Top, Bottom)
 from transformation_algebra.expr import Operator, Expr, Application, Source
 
 
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
             namespace: tuple[str, str] | str | None = None,
-            include_top: bool = False,
-            include_bottom: bool = False,
             canon: Iterable[TypeOperator | TypeOperation] = ()):
         """
         The canonical types consist of all base types, plus those compound
@@ -32,8 +30,8 @@ class Language(object):
         self.operators: dict[str, Operator] = dict()
         self.types: dict[str, TypeOperator] = dict()
         self.synonyms: dict[str, TypeAlias] = dict()
-        self.include_top: bool = include_top
-        self.include_bottom: bool = include_bottom
+        self.include_top: bool = Top in canon
+        self.include_bottom: bool = Bottom in canon
 
         self._closed = False
         self.prefix: None | str = None
@@ -50,7 +48,8 @@ class Language(object):
         if canon:
             for t in canon:
                 if isinstance(t, TypeOperator):
-                    self.canon.add(t())
+                    if t not in (Top, Bottom):
+                        self.canon.add(t())
                 else:
                     assert isinstance(t, TypeOperation)
                     self.canon.add(t)

@@ -689,8 +689,7 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        lang = Language(scope=locals(), namespace=TEST, include_top=True,
-            canon={A, F(A, B)})
+        lang = Language(scope=locals(), namespace=TEST, canon={Top, A, F(A, B)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -712,7 +711,7 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         lang = Language(scope=locals(), namespace=TEST,
-            include_top=True, include_bottom=True, canon={A, F(A, A)})
+            canon={Top, Bottom, A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
@@ -745,7 +744,7 @@ class TestAlgebraRDF(unittest.TestCase):
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
         lang = Language(scope=locals(), namespace=TEST,
-            include_top=True, canon={A, F(A, A)})
+            canon={Top, A, F(A, A)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()
