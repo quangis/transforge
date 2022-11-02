@@ -1,5 +1,26 @@
 # Changelog
 
+### v0.2.0
+
+This is a major update, with over 630 commits since the last version. 
+The library's scope has changed. A lot of the original API still works, 
+but since there's probably no users other than internal ones right now, 
+I haven't put work into guaranteeing that all of it does. I'll give only 
+a brief summary.
+
+-   The library has been renamed to `transforge`.
+-   It no longer accommodates only type inference and expression 
+    parsing. Expressions can now also be converted into RDF graphs. As a 
+    consequence, `rdflib` has become a dependency. Graphs for workflows, 
+    in which each tool has an associated transformation expression, can 
+    be converted into complex transformation graphs.
+-   Transformation graphs can be converted into SPARQL queries to be 
+    matched against other transformation graphs.
+-   There is a command-line interface to facilitate creating 
+    transformation graphs, uploading to graph stores, and querying from 
+    those graph stores. As a consequence, `plumbum` has become a 
+    dependency.
+
 ### v0.1.3
 
 -   Partial primitives are now allowed in the final expression tree. They are 
