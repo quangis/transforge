@@ -186,8 +186,7 @@ Save the transformation language into [`stl.py`](resource/stl.py), and
 the workflow and tool description into 
 [`wf.ttl`](resource/wf-RelativeSize.ttl), and run:
 
-    transforge graph \
-        -L stl.py -T wf.ttl wf.ttl -t ttl -o -
+    transforge graph stl.py -T wf.ttl wf.ttl -t ttl -o -
 
 What we get back is an RDF graph in which the transformation expression 
 for each tool application has been "unfolded": every input and every 
@@ -637,13 +636,13 @@ store containing workflows to match against. Assuming you have a SPARQL
 server like Fuseki or MarkLogic running, the command-line interface can 
 help you upload your workflows:
 
-    transforge graph -L sl.py -T wf.ttl wf.ttl \
+    transforge graph stl.py -T wf.ttl wf.ttl \
         -s fuseki@http://127.0.0.1:3030/cct
 
 You can once again use the command-line interface to query these 
 workflows:
 
-    transforge query -L sl.py task.ttl \
+    transforge query stl.py task.ttl \
         -s fuseki@http://127.0.0.1:3030/cct -o -
 
 This will add `:match` predicates to the task. With the `--summary` 

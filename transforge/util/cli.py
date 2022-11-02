@@ -51,12 +51,9 @@ def lang(path_or_module: str) -> Language:
         return languages[0]
 
 
-class Application(cli.Application):
-    language = cli.SwitchAttr(["-L", "--language"], argtype=lang,
-        mandatory=True, help="Transformation language on which to operate")
-
-
 class WithTools:
+    tools = Graph()
+
     @cli.switch(["-T", "--tools"], list=True, argtype=str,
         help="RDF graph(s) containing the tool ontology")
     def _tools(self, urls: list[str]) -> Graph:
@@ -168,10 +165,11 @@ class CLI(cli.Application):
 
 
 @CLI.subcommand("vocab")
-class VocabBuilder(Application, WithRDF, WithServer):
+class VocabBuilder(cli.Application, WithRDF, WithServer):
     "Build vocabulary file for the transformation language"
 
-    def main(self):
+    def main(self, LANG):
+        self.language = lang(LANG)
         if self.output_format == "dot":
             vocab = TransformationGraph(self.language, minimal=True,
                 with_labels=True)
@@ -186,7 +184,7 @@ class VocabBuilder(Application, WithRDF, WithServer):
 
 
 @CLI.subcommand("graph")
-class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
+class TransformationGraphBuilder(cli.Application, WithTools, WithRDF, WithServer):
     """
     Generate transformation graphs for entire workflows, concatenating the
     algebra expressions for each individual use of a tool
@@ -201,7 +199,8 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
     skip_error = cli.Flag(["--skip-error"], default=False,
         help="Skip failed transformation graphs instead of exiting")
 
-    def main(self, *WORKFLOW_FILE):
+    def main(self, LANG, *WORKFLOW_FILE):
+        self.language = lang(LANG)
         results: list[Graph] = []
 
         if not (WORKFLOW_FILE or self.expressions):
@@ -260,7 +259,7 @@ class TransformationGraphBuilder(Application, WithTools, WithRDF, WithServer):
 
 
 @CLI.subcommand("query")
-class QueryRunner(Application, WithServer, WithRDF):
+class QueryRunner(cli.Application, WithServer, WithRDF):
     """
     Run transformation queries against a SPARQL endpoint. If no endpoint is
     given, just output the query instead.
@@ -355,11 +354,12 @@ class QueryRunner(Application, WithServer, WithRDF):
             if handle is not stdout:
                 handle.close()
 
-    def main(self, *QUERY_FILE):
+    def main(self, LANG, *QUERY_FILE):
         if not QUERY_FILE:
             self.help()
             return 1
         else:
+            self.language = lang(LANG)
 
             # Windows does not interpret asterisks as globs
             if platform.system() == 'Windows':
@@ -386,4 +386,4 @@ def main():
 
 
 if __name__ == '__main__':
-    CLI.run()
+    main()
