@@ -213,13 +213,6 @@ class TransformationGraph(Graph):
         if isinstance(expr, Source):
             intermediate = False
 
-            # Once we arrive at a data source, we just assume its type to be
-            # the most general possible. This is so that we don't have to give
-            # a specific type for data source 1 when we have a tool with
-            # expression `f (1: A)`. See also issue #72. The type inference has
-            # already run its course at this point, so it should be safe.
-            expr.type = expr.type.fix(prefer_lower=False).normalize()
-
             # Sources are always saved since they must always be reused when
             # used multiple times, especially if passthrough is disabled
             self.expr_nodes[expr] = current
@@ -387,7 +380,7 @@ class TransformationGraph(Graph):
 
                 try:
                     exprs[wfnode] = expr = self.language.parse(
-                        wf.expression(wfnode), *input_exprs)
+                        wf.expression(wfnode), *input_exprs).fix()
                 except (TypingError, ParseError) as e:
                     raise WorkflowCompositionError(wf, wfnode) from e
                 return expr
@@ -478,15 +471,15 @@ class TransformationGraph(Graph):
         # TODO separate from WF.output
         concepts_in: set[Node] = set(self.objects(self.uri, TF.input))
         concepts_app: set[Node] = set(self.subjects(TF["from"])).union(
-            self.objects(self.uri, TA.output))
+            self.objects(self.uri, TF.output))
         concepts_in_internal: set[Node] = set(x
-            for x in self.objects(None, TA["from"])
+            for x in self.objects(None, TF["from"])
             if x not in concepts_in)
 
         # Map tool applications to constituent concepts.
         app2concepts: dict[Node | None, set[Node]] = defaultdict(set)
         for c in chain(concepts_app, concepts_in_internal):
-            app = self.value(c, TA.origin, any=False)
+            app = self.value(c, TF.origin, any=False)
             app2concepts[app].add(c)
 
         h = open(path, 'w', encoding="utf-8") if path else StringIO()
@@ -498,8 +491,8 @@ class TransformationGraph(Graph):
 
             # Input concepts
             for c in concepts_in:
-                type = self.value(c, TA.type, any=False)
-                origin = self.value(c, TA.origin, any=False)
+                type = self.value(c, TF.type, any=False)
+                origin = self.value(c, TF.origin, any=False)
                 typelabel = escape(self.value(type, RDFS.label, any=False))
                 datalabel = escape(self.value(origin, RDFS.label, any=False))
                 h.write(f"\tsubgraph cluster{c} {{\n")
@@ -519,14 +512,14 @@ class TransformationGraph(Graph):
                     h.write("\t\tlabel=<<b>anonymous tool</b>>;\n")
                 for c in tfm_concepts:
                     label = self.value(c, RDFS.label, any=False)
-                    type = self.value(c, TA.type, any=False)
+                    type = self.value(c, TF.type, any=False)
                     if "internal" in label:
                         h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
                         # Show which node is internal to which
-                        # for x in self.subjects(TA.internal, c):
+                        # for x in self.subjects(TF.internal, c):
                         #     h.write(f"\t\t{x} -> {c} [style=dashed];\n")
                     else:
-                        via = self.value(c, TA.via, any=False)
+                        via = self.value(c, TF.via, any=False)
                         op = shorten(escape(via))
                         if type:
                             typelabel = escape(self.value(type, RDFS.label, any=False))
@@ -543,7 +536,7 @@ class TransformationGraph(Graph):
                 h.write("\t}\n")
 
             # Connect all the nodes
-            for node2, node1 in self.subject_objects(TA["from"]):
+            for node2, node1 in self.subject_objects(TF["from"]):
                 if node1 in concepts_in:
                     h.write(f"\t{node1} -> {node2} [ltail=cluster{node1}];\n")
                 else:
