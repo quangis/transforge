@@ -143,6 +143,17 @@ class TestAlgebra(TestCase):
         self.assertRaises(TypeAnnotationError, lang.parse, "f (1 : A) (1 : B)",
             Source())
 
+    def test_source_reuse_does_not_affect_type_fixing(self):
+        # See issue #110: Reusing sources may cause overly general types to be
+        # inferred the first time it's encountered, causing type mismatches
+        # the second time around. This is an issue both on the graph level and
+        # on the expression level.
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x ** x)
+        lang = Language(locals())
+        lang.parse("f (1: A) (1: B)", Source())
+
 
 if __name__ == '__main__':
     unittest.main()
