@@ -250,10 +250,7 @@ class Language(object):
                 t = self.parse_type(tokens)
                 pt = previous.type
                 try:
-                    if isinstance(pt, TypeVariable) and pt.wildcard:
-                        pt.unify(t)
-                    else:
-                        pt.unify(t, subtype=True)
+                    pt.unify(t, subtype=True)
                 except TypingError as e:
                     if previous_token.isnumeric():
                         input = int(previous_token)

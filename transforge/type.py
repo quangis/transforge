@@ -146,8 +146,7 @@ class Type(ABC):
         if isinstance(f, TypeOperation) and f.operator == Function:
             x.unify(f.params[0], subtype=True)
             left, right = f.params
-            left.fix(prefer_lower=False)
-            # f.fix()
+            # left.fix(prefer_lower=False)
             if isinstance(right, TypeOperation) and right.operator == Function:
                 return right
             else:

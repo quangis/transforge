@@ -59,10 +59,10 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=A ** F(A) ** A)
         lang = Language(scope=locals())
         self.assertTrue(
-            lang.parse("- : A").match(Source(A))
+            lang.parse("- : A").fix().match(Source(A))
         )
         self.assertTrue(
-            lang.parse("f (- : A) (- : F(A))").match(f(Source(A), Source(F(A))))
+            lang.parse("f (- : A) (- : F(A))").fix().match(f(Source(A), Source(F(A))))
         )
 
     def test_parse_tuple(self):
