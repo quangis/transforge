@@ -131,7 +131,7 @@ class Type(ABC):
         return a.match(b, accept_wildcard=True, subtype=True) \
             and (not strict or not a.match(b))
 
-    def apply(self, arg: Type) -> TypeInstance:
+    def apply(self, arg: Type, fix: bool = True) -> TypeInstance:
         """
         Apply an argument to a function type to get its output type.
         """
@@ -144,13 +144,13 @@ class Type(ABC):
             f = f.follow()
 
         if isinstance(f, TypeOperation) and f.operator == Function:
-            x.unify(f.params[0], subtype=True)
             left, right = f.params
-            # left.fix(prefer_lower=False)
-            if isinstance(right, TypeOperation) and right.operator == Function:
-                return right
-            else:
+            x.unify(left, subtype=True)
+            if fix and not (isinstance(right, TypeOperation)
+                    and right.operator == Function):
                 return right.fix()
+            else:
+                return right
         elif isinstance(f, TypeOperation) and f.operator == Top:
             return Top()
         else:
