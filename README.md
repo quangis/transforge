@@ -2,6 +2,9 @@
 
 [![](https://img.shields.io/pypi/v/transforge)](https://pypi.org/project/transforge/)
 
+The master branch tracks releases. For the latest version, see the 
+[`develop`][dev] branch.
+
 A transformation language is used to describe *processes*, like the ones 
 implicit in workflows or software tools, as *transformations between 
 types*. These types do not necessarily denote a concrete data structure, 
@@ -36,4 +39,7 @@ warning.**
 This package was developed for the [CCT](https://github.com/quangis/cct) 
 algebra for geographical information, which may act as an example.
 
-Click here for a [tutorial](docs/tutorial.md).
+[Click here for the tutorial][tut].
+
+[tut]: https://github.com/quangis/transforge/blob/develop/docs/tutorial.md
+[dev]: https://github.com/quangis/transforge/tree/develop
