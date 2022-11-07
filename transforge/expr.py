@@ -240,25 +240,24 @@ class Expr(ABC):
 
         return self
 
-    def fix(self) -> Expr:
+    def fix(self) -> None:
         """
-        Fix the types of sources to be the most general possible.
+        Fix the types of sources to be the most general possible. Assume that
+        the expression is normalized.
         """
         # This is so that we don't have to give a specific type for source 1
         # when we have a tool with expression `f (1: A)`.See also issue #72.
         # Before fixing an expression, make sure that type inference has fully
         # run its course; see also issue #110.
 
-        a = self.normalize(recursive=False)
-        if isinstance(a, Source):
-            a.type = a.type.fix(prefer_lower=False)
-        elif isinstance(a, Abstraction):
-            a.body = a.body.fix()
-        elif isinstance(a, Application):
-            a.f = a.f.fix()
-            a.x = a.x.fix()
-        a.type = a.type.normalize()
-        return a
+        if isinstance(self, Source):
+            self.type = self.type.fix(prefer_lower=False)
+        elif isinstance(self, Abstraction):
+            self.body.fix()
+        elif isinstance(self, Application):
+            self.f.fix()
+            self.x.fix()
+        self.type = self.type.normalize()
 
     def primitive(self, normalize: bool = True, unify: bool = True) -> Expr:
         """
