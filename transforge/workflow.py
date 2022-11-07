@@ -136,7 +136,8 @@ class WorkflowDict(Workflow):
         return iter(self._tool_apps[resource][1])
 
     def tool(self, resource: Node) -> URIRef:
-        return EX.SomeTool
+        assert isinstance(resource, URIRef)
+        return resource
 
 
 class WorkflowGraph(Graph, Workflow):
