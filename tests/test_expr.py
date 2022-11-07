@@ -153,6 +153,7 @@ class TestAlgebra(TestCase):
         f = Operator(type=lambda x: x ** x ** x)
         lang = Language(locals())
         lang.parse("f (1: A) (1: B)", Source())
+        lang.parse("f (f (1: A) (1: A)) (1: B)", Source())
 
 
 if __name__ == '__main__':
