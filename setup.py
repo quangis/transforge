@@ -22,5 +22,5 @@ setup(
     packages=['transforge'],
     package_dir={"": "."},
     package_data={"transforge": ["*.typed"]},
-    install_requires=['setuptools>=42', 'wheel'],
+    install_requires=['setuptools>=42', 'wheel', 'plumbum>=1.7.2', 'rdflib>=6.1.1'],
 )
