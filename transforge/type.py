@@ -304,7 +304,7 @@ class TypeInstance(Type):
     """
 
     def normalized(self) -> bool:
-        return not (isinstance(self, TypeVariable) and self.unification)
+        return not (isinstance(self, TypeVariable) and self.bound)
 
     def __str__(self):
         return self.text(with_constraints=True)
@@ -351,8 +351,8 @@ class TypeInstance(Type):
                     result = str(self.operator)
         else:
             assert isinstance(self, TypeVariable)
-            if self.unification:
-                result = self.unification.text(*args)
+            if self.bound:
+                result = self.bound.text(*args)
             elif self.wildcard:
                 result = "_"
             else:
@@ -481,8 +481,8 @@ class TypeInstance(Type):
         Follow a unification until bumping into a type that is not yet bound.
         """
         a = self
-        while isinstance(a, TypeVariable) and a.unification:
-            a = a.unification
+        while isinstance(a, TypeVariable) and a.bound:
+            a = a.bound
         return a
 
     def match(self, other: TypeInstance, subtype: bool = False,
@@ -756,7 +756,7 @@ class TypeVariable(TypeInstance):
 
     def __init__(self, wildcard: bool = False, origin=None):
         self.wildcard = wildcard
-        self.unification: Optional[TypeInstance] = None
+        self.bound: Optional[TypeInstance] = None
         self.lower: Optional[TypeOperator] = None
         self.upper: Optional[TypeOperator] = None
         self._constraints: set[Constraint] = set()
@@ -771,11 +771,11 @@ class TypeVariable(TypeInstance):
                     pass
 
     def bind(self, t: TypeInstance) -> None:
-        assert not self.unification, "variable cannot be unified twice"
+        assert not self.bound, "variable cannot be unified twice"
 
         self.wildcard = False  # once bound, lose wildcard status
         if self is not t:
-            self.unification = t
+            self.bound = t
 
             if isinstance(t, TypeVariable):
                 t._constraints.update(self._constraints)
@@ -936,7 +936,7 @@ class Constraint(object):
         Inform relevant variables that this constraint is present.
         """
         for v in self.variables():
-            assert not v.unification
+            assert not v.bound
             v._constraints.add(self)
 
 
