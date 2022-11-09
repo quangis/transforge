@@ -817,22 +817,27 @@ class TypeVariable(TypeInstance):
             self.bind(Top())
             return
         self.wildcard = False  # once constrained, lose wildcard status
-        a = self.follow()
-        assert isinstance(a, TypeVariable)
-        lower, upper = a.lower or new, a.upper or new
-        if upper.subtype(new, True):  # fail when lower bound exceeds upper
-            raise SubtypeMismatch(new, upper)
-        elif not new.subtype(upper):  # new type must be in same 'family line'
-            raise SubtypeMismatch(new, upper)
-        elif new.subtype(lower, True):  # ignore lower bound lower than current
+        assert not self.bound
+        # fail when lower bound exceeds upper
+        if self.upper and self.upper.subtype(new, True):
+            raise SubtypeMismatch(new, self.upper)
+        # new type must be in same 'family line'
+        elif self.upper and not new.subtype(self.upper):
+            raise SubtypeMismatch(new, self.upper)
+        # ignore lower bound lower than current
+        elif self.lower and new.subtype(self.lower, True):
             pass
-        elif lower.subtype(new):  # tighten the lower bound
-            a.lower = new
-            a.check_constraints()
-        else:  # fail on bound from other lineage (neither sub- nor supertype)
-            raise SubtypeMismatch(lower, new)
-        if a.lower and a.lower == a.upper and a.lower is not None:
-            self.bind(a.lower())  # if A <= x <= A, immediately bind x to A
+        # tighten the lower bound
+        elif self.lower and self.lower.subtype(new):
+            self.lower = new
+            self.check_constraints()
+        # fail on bound from other lineage (neither sub- nor supertype)
+        else:
+            assert self.lower
+            raise SubtypeMismatch(self.lower, new)
+        # if A <= x <= A, immediately bind x to A
+        if self.lower and self.lower == self.upper and self.lower is not None:
+            self.bind(self.lower())
 
     def below(self, new: TypeOperator) -> None:
         """
@@ -844,22 +849,21 @@ class TypeVariable(TypeInstance):
             self.bind(Bottom())
             return
         self.wildcard = False
-        a = self.follow()
-        assert isinstance(a, TypeVariable)
-        lower, upper = a.lower or new, a.upper or new
-        if new.subtype(lower, True):
-            raise SubtypeMismatch(lower, new)
-        elif not lower.subtype(new):
-            raise SubtypeMismatch(new, upper)
-        elif upper.subtype(new, True):
+        assert not self.bound
+        if self.lower and new.subtype(self.lower, True):
+            raise SubtypeMismatch(self.lower, new)
+        elif self.lower and not self.lower.subtype(new):
+            raise SubtypeMismatch(new, self.lower)
+        elif self.upper and self.upper.subtype(new, True):
             pass
-        elif new.subtype(upper):
-            a.upper = new
-            a.check_constraints()
+        elif self.upper and new.subtype(self.upper):
+            self.upper = new
+            self.check_constraints()
         else:
-            raise SubtypeMismatch(new, upper)
-        if a.upper and a.upper == a.lower and a.upper is not None:
-            self.bind(a.upper())
+            assert self.upper
+            raise SubtypeMismatch(new, self.upper)
+        if self.upper and self.upper == self.lower and self.upper is not None:
+            self.bind(self.upper())
 
 
 class TypeAlias(Type):
