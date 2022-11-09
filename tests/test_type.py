@@ -92,6 +92,20 @@ class TestType(unittest.TestCase):
         wrap = TypeSchema(lambda α: α ** Z(α))
         self.apply(wrap, A, result=Z(A))
 
+    def test_deduce_variable_types(self):
+        # When we apply an `x ** x` to an `A`, deduce `x >= A`; when we apply
+        # an `A ** A` to an `x`, deduce `x <= A`.
+        A = TypeOperator('A')
+        x = TypeVariable()
+        (A ** A).apply(x)
+        self.assertEqual(x.upper, A)
+        self.assertEqual(x.lower, None)
+
+        y = TypeVariable()
+        (y ** y).apply(A)
+        self.assertEqual(y.upper, None)
+        self.assertEqual(y.lower, A)
+
     def test_compose(self):
         A, B = TypeOperator('A'), TypeOperator('B')
         A1 = TypeOperator('A1', supertype=A)

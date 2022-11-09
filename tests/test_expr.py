@@ -2,14 +2,24 @@ import unittest
 from .testcase import TestCase  # type: ignore
 
 from transforge.type import TypeOperator, _, \
-    SubtypeMismatch
-from transforge.expr import Operator, Source, \
+    SubtypeMismatch, TypingError
+from transforge.expr import Expr, Operator, Source, \
     DeclaredTypeTooGeneralError, DeclarationError
 from transforge.lang import Language, \
     TypeAnnotationError
 
 
 class TestAlgebra(TestCase):
+
+    def assertMatch(self, *es: Expr, fix: bool = False):
+        if fix:
+            for e in es:
+                e.fix()
+        es2 = iter(es)
+        next(es2)
+        for e1, e2 in zip(es, es2):
+            with self.subTest(msg=f"{e1} != {e2}"):
+                self.assertTrue(e1.match(e2))
 
     def test_currying(self):
         """
@@ -154,6 +164,68 @@ class TestAlgebra(TestCase):
         lang = Language(locals())
         lang.parse("f (1: A) (1: B)", Source())
         lang.parse("f (f (1: A) (1: A)) (1: B)", Source())
+
+    def test_type_annotations_carry_over(self):
+        # What do type annotations really mean? If it just means that an
+        # expression 'is of a certain type', we can simply unify the type of
+        # the expression with the given type. But usually it does not *just*
+        # mean that. For example, if we annotate input `1` with a type `B`, we
+        # still want to be able to connect a source of a more specific type
+        # (say `C`) to input `1`. Not only that, we would also like the more
+        # specific type to *carry over* to the rest of the expression. See
+        # issue #110 for where this used to cause problems.
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        C = TypeOperator(supertype=B)
+        f = Operator(type=A ** A)
+        g = Operator(type=lambda x: x ** x)
+        lang = Language(locals())
+
+        # For `1: B`, it should still be valid to provide a subtype...
+        self.assertMatch(
+            lang.parse("1", Source(C)),
+            lang.parse("1: B", Source(C)),
+            Source(C),
+        )
+        # ... but not a supertype.
+        self.assertRaises(TypingError, lang.parse, "1: B", Source(A))
+        # If the source type is not known but fixed via the annotations:
+        self.assertMatch(
+            lang.parse("1: B", Source()),
+            lang.parse("1", Source(B)),
+            Source(B),
+            fix=True)
+
+        # Now in a function. Keep in mind: When we apply `g: x ** x` to an `A`,
+        # deduce `x >= A`; when we apply `f: A ** A` to an `x`, deduce `x <=
+        # A`: more specific/general types would mismatch. So, for `f 1`, we
+        # know that the type `x` of `1` is at most `x <= A`. For `f (1: B)`, we
+        # still have `x <= A`; `1: B` simply lowers that upper bound to `B`.
+        self.assertMatch(
+            lang.parse("f 1", Source(C)),
+            lang.parse("f (1: B)", Source(C)),
+            f(Source(C))
+        )
+        self.assertMatch(
+            lang.parse("g 1", Source(C)),
+            lang.parse("g (1: B)", Source(C)),
+            g(Source(C))
+        )
+        self.assertRaises(TypingError, lang.parse, "f (1: B)", Source(A))
+        self.assertRaises(TypingError, lang.parse, "g (1: B)", Source(A))
+        # Crucially, when we figure out sources via annotations, we get B
+        # again, not the more general A:
+        self.assertMatch(
+            lang.parse("f (1: B)", Source()),
+            lang.parse("f 1", Source(B)),
+            f(Source(B)),
+            fix=True)
+        self.assertMatch(
+            lang.parse("g (1: B)", Source()),
+            lang.parse("g 1", Source(B)),
+            g(Source(B)),
+            fix=True
+        )
 
 
 if __name__ == '__main__':

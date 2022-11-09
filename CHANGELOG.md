@@ -1,5 +1,17 @@
 # Changelog
 
+### Develop
+
+-   Fixed bug that would cause `f (-: A)` to fail if `f` actually takes 
+    a supertype of `A`.
+-   Expression types are now fixed using a separate method.
+-   Use the first argument instead of the `-L` switch on the CLI.
+-   `install_requires` added to package.
+
+### v0.2.1
+
+-   Fixed link to README.
+
 ### v0.2.0
 
 This is a major update, with over 630 commits since the last version. 

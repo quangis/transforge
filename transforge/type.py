@@ -849,7 +849,7 @@ class TypeVariable(TypeInstance):
         lower, upper = a.lower or new, a.upper or new
         if new.subtype(lower, True):
             raise SubtypeMismatch(lower, new)
-        elif not lower.subtype(upper):
+        elif not lower.subtype(new):
             raise SubtypeMismatch(new, upper)
         elif upper.subtype(new, True):
             pass
