@@ -762,7 +762,7 @@ class TestAlgebraRDF(unittest.TestCase):
         })
         self.assertIsomorphic(expected, actual)
 
-    def test_source_reuse_does_not_affect_type_fixing(self):
+    def test_source_reuse_does_not_affect_type_fixing_for_sources(self):
         # See issue #110: Reusing sources may cause overly general types to be
         # inferred the first time it's encountered, causing type mismatches
         # the second time around. This is an issue both on the graph and on the
@@ -773,10 +773,36 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(locals(), namespace=TEST)
 
         expected = graph_manual(
-            s1a=Step(type=TEST.B),
-            s1b=Step(type=TEST.A),
-            s2=Step(TEST.f, input=["s1a", "s1b"], type=TEST.B),
-            s3=Step(TEST.f, input=["s2", "s1a"], type=TEST.B),
+            anon=Step(type=TEST.A),
+            src=Step(type=TEST.B),
+            app1=Step(TEST.f, input=["anon", "src"], type=TEST.B),
+            app2=Step(TEST.f, input=["app1", "src"], type=TEST.B),
+        )
+
+        actual = TransformationGraph(lang,
+            minimal=True, with_operators=True, with_types=True)
+        root = BNode()
+        actual.add_workflow(WorkflowDict(root, {
+            TEST.app1: ("f (-: A) (1: A)", [TEST.src]),
+            TEST.app2: ("f (1: B) (2: B)", [TEST.app1, TEST.src])
+        }, {TEST.src}))
+
+        self.assertIsomorphic(actual, expected)
+
+    def test_source_reuse_does_not_affect_type_fixing_for_apps(self):
+        # See issue #110 and the previous test. Type fixing gets even more
+        # precarious when the output types of tool applications are derived
+        # from the input types.
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x ** x)
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            anon=Step(type=TEST.A),
+            src=Step(type=TEST.B),
+            app1=Step(TEST.f, input=["anon", "src"], type=TEST.B),
+            app2=Step(TEST.f, input=["app1", "src"], type=TEST.B),
         )
 
         actual = TransformationGraph(lang,
