@@ -828,7 +828,7 @@ class TypeVariable(TypeInstance):
         elif self.lower and new.subtype(self.lower, True):
             pass
         # tighten the lower bound
-        elif self.lower and self.lower.subtype(new):
+        elif not self.lower or self.lower.subtype(new):
             self.lower = new
             self.check_constraints()
         # fail on bound from other lineage (neither sub- nor supertype)
@@ -856,7 +856,7 @@ class TypeVariable(TypeInstance):
             raise SubtypeMismatch(new, self.lower)
         elif self.upper and self.upper.subtype(new, True):
             pass
-        elif self.upper and new.subtype(self.upper):
+        elif not self.upper or new.subtype(self.upper):
             self.upper = new
             self.check_constraints()
         else:
