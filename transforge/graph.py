@@ -376,14 +376,17 @@ class TransformationGraph(Graph):
                         if input_nodes[i] not in wf.sources:
                             e = input_exprs[i]
                             s = input_exprs[i] = Source()
+                            e.fix()
                             indirection[s] = e
 
                 try:
                     exprs[wfnode] = expr = self.language.parse(
-                        wf.expression(wfnode), *input_exprs).fix()
+                        wf.expression(wfnode), *input_exprs)
                 except (TypingError, ParseError) as e:
                     raise WorkflowCompositionError(wf, wfnode) from e
                 return expr
+
+        wfnode2expr(wf.target()).fix()
 
         # 2. Convert individual transformation expressions to nodes and add
         # them. We must do this in the proper order, so that expression nodes
