@@ -286,9 +286,10 @@ But not vice versa:
     >>> Ord.subtype(Ratio)
     False
 
-Subtypes can only be attached to base types, and any base type may have 
-at most one supertype. This is then automatically extended to compound 
-types:
+Supertypes cannot be explicitly attached to compound types, only to base 
+types (see [#112](https://github.com/quangis/transforge/issues/112)). 
+Furthermore, any type may have at most one supertype. This is then 
+automatically extended to compound types:
 
     >>> C(Ratio).subtype(C(Ord))
     True
@@ -548,8 +549,10 @@ use an `Intersection` type, written `A & B`. If it operates on things
 that have attributes of *either* `A` or `B`, we use a `Union` type, 
 written `A | B`.
 
-**Union and intersection types have not yet been implemented. Product 
-types capture some of their use cases.**
+**Union and intersection types have not yet been implemented; see issues 
+[#79](https://github.com/quangis/transforge/issues/79) and 
+[#106](https://github.com/quangis/transforge/issues/106) respectively. 
+Product types capture some of their use cases.**
 
 
 # Composite operators
@@ -588,7 +591,7 @@ Composite expressions can be partially applied, which can further
 complicate the representation of [internal 
 transformations](#internal-transformations). Furthermore, transformation 
 graphs for composite expressions have not been fully implemented; see 
-issue #40.
+issue [#40](https://github.com/quangis/transforge/issues/40).
 
 
 # Queries
@@ -671,7 +674,8 @@ transformation graph. For example:
         namespace="https://example.com/stl/")
 
 The `Top` and `Bottom` types may be included by adding them to the 
-`canon`.
+`canon`. Type aliases are not included; see issue 
+[#111](https://github.com/quangis/transforge/issues/111).
 
 The command-line tool's `vocab` subcommand can generate an RDF 
 vocabulary containing a description of all the operations of your 
