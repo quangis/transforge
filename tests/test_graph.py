@@ -792,7 +792,10 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_source_reuse_does_not_affect_type_fixing_for_apps(self):
         # See issue #110 and the previous test. Type fixing gets even more
         # precarious when the output types of tool applications are derived
-        # from the input types.
+        # from the input types. An obvious solution: if every source is
+        # explicitly annotated, we can just read every expression once (without
+        # caring about passing previous outputs to inputs) and select the most
+        # specific option.
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         f = Operator(type=lambda x: x ** x ** x)
@@ -811,6 +814,34 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.add_workflow(WorkflowDict(root, {
             TEST.app1: ("f (-: A) (1: A)", [TEST.src]),
             TEST.app2: ("f (1: B) (2: B)", [TEST.app1, TEST.src])
+        }, {TEST.src}))
+
+        self.assertIsomorphic(actual, expected)
+
+    def test_source_reuse_does_not_affect_type_fixing_for_apps_variable(self):
+        # See issue #110 and the previous test. If we have an expression in
+        # which the sources are *not* all annotated, we are still able to craft
+        # problems that can't be solved by parsing each expression
+        # individually.
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        C = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x ** x)
+        g = Operator(type=lambda x, y: x ** y [(x * y) << {A * B, C * C}])
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            src=Step(type=TEST.A),
+            appg=Step(TEST.g, input=["src"], type=TEST.B),
+            appf=Step(TEST.f, input=["appg", "src"], type=TEST.B),
+        )
+
+        actual = TransformationGraph(lang,
+            minimal=True, with_operators=True, with_types=True)
+        root = BNode()
+        actual.add_workflow(WorkflowDict(root, {
+            TEST.appg: ("g 1", [TEST.src]),
+            TEST.appf: ("f 1 (2: B)", [TEST.src, TEST.appg])
         }, {TEST.src}))
 
         self.assertIsomorphic(actual, expected)
