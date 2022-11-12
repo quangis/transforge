@@ -226,7 +226,8 @@ class Language(object):
 
         return self.parse_expr(string, *args)
 
-    def parse_expr(self, val: str | Iterator[str], *args: Expr) -> Expr:
+    def parse_expr(self, val: str | Iterator[str], *args: Expr,
+            fix: bool = True) -> Expr:
         previous_token = ""
         tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
@@ -239,7 +240,7 @@ class Language(object):
                         y = stack.pop()
                         if y:
                             x = stack.pop()
-                            stack.append(Application(x, y) if x else y)
+                            stack.append(Application(x, y, fix) if x else y)
                     except IndexError as e:
                         raise BracketMismatch('(') from e
                 if token in "(,":
@@ -248,9 +249,14 @@ class Language(object):
                 previous = stack[-1]
                 assert isinstance(previous, Expr)
                 t = self.parse_type(tokens)
-                pt = previous.type
+
+                # Anonymous sources are immediately treated as the given type
+                # (not just a subtype), as it can't be specified elsewhere
+                if previous_token == "-":
+                    previous.type = t
+
                 try:
-                    pt.unify(t, subtype=True)
+                    previous.type.unify(t, subtype=True)
                 except TypingError as e:
                     if previous_token.isnumeric():
                         input = int(previous_token)
@@ -274,7 +280,7 @@ class Language(object):
                     current = self.parse_operator(token).instance()
                 previous = stack.pop()
                 if previous:
-                    current = Application(previous, current)
+                    current = Application(previous, current, fix)
                 stack.append(current)
 
             previous_token = token

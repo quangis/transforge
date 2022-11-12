@@ -132,7 +132,10 @@ class Expr(ABC):
         self.type = type
 
     def __call__(self, *args: Expr | Operator) -> Expr:
-        return reduce(Expr.apply, (Expr.shorthand(e) for e in args), self)
+        def apply(self, arg: Expr) -> Expr:
+            return Application(self, arg).normalize(recursive=False)
+
+        return reduce(apply, (Expr.shorthand(e) for e in args), self)
 
     @staticmethod
     def shorthand(value: Expr | Operator) -> Expr:
@@ -195,9 +198,6 @@ class Expr(ABC):
         else:
             return f"╼ {self.text(with_type=True)}"
 
-    def apply(self, arg: Expr) -> Expr:
-        return Application(self, arg).normalize(recursive=False)
-
     def normalize(self, recursive: bool = True) -> Expr:
         """
         -   Follow bound variables to their bindings.
@@ -257,6 +257,7 @@ class Expr(ABC):
         elif isinstance(self, Application):
             self.f.fix()
             self.x.fix()
+            self.type = self.type.fix()
         self.type = self.type.normalize()
 
     def primitive(self, normalize: bool = True, unify: bool = True) -> Expr:
@@ -338,12 +339,12 @@ class Source(Expr):
 class Application(Expr):
     "A complex expression, applying one expression to another."
 
-    def __init__(self, f: Expr, x: Expr):
+    def __init__(self, f: Expr, x: Expr, fix: bool = True):
         self.f: Expr = f
         self.x: Expr = x
 
         try:
-            t = f.type.apply(x.type)
+            t = f.type.apply(x.type, fix=fix)
         except TypingError as e:
             raise ApplicationError(f, x) from e
 

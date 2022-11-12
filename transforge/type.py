@@ -788,9 +788,6 @@ class TypeVariable(TypeInstance):
                 if self.upper:
                     t.below(self.upper)
 
-                if t.lower == t.upper and t.lower is not None:
-                    t.bind(t.lower())
-
             elif isinstance(t, TypeOperation):
                 if t.basic:
                     if self.lower and t.operator.subtype(self.lower, True):
@@ -836,7 +833,7 @@ class TypeVariable(TypeInstance):
             assert self.lower
             raise SubtypeMismatch(self.lower, new)
         # if A <= x <= A, immediately bind x to A
-        if self.lower and self.lower == self.upper and self.lower is not None:
+        if self.lower and self.lower == self.upper:
             self.bind(self.lower())
 
     def below(self, new: TypeOperator) -> None:
@@ -862,7 +859,7 @@ class TypeVariable(TypeInstance):
         else:
             assert self.upper
             raise SubtypeMismatch(new, self.upper)
-        if self.upper and self.upper == self.lower and self.upper is not None:
+        if self.upper and self.upper == self.lower:
             self.bind(self.upper())
 
 
