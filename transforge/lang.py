@@ -227,7 +227,7 @@ class Language(object):
         return self.parse_expr(string, *args)
 
     def parse_expr(self, val: str | Iterator[str], *args: Expr,
-            fix: bool = True) -> Expr:
+            fix: bool = True, unify: bool = True) -> Expr:
         previous_token = ""
         tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
@@ -240,7 +240,8 @@ class Language(object):
                         y = stack.pop()
                         if y:
                             x = stack.pop()
-                            stack.append(Application(x, y, fix) if x else y)
+                            stack.append(
+                                Application(x, y, fix, unify) if x else y)
                     except IndexError as e:
                         raise BracketMismatch('(') from e
                 if token in "(,":
@@ -251,12 +252,13 @@ class Language(object):
                 t = self.parse_type(tokens)
 
                 # Anonymous sources are immediately treated as the given type
-                # (not just a subtype), as it can't be specified elsewhere
+                # (not just a subtype), as it can't be specified anywhere else
                 if previous_token == "-":
                     previous.type = t
 
                 try:
-                    previous.type.unify(t, subtype=True)
+                    if unify or isinstance(previous, Source):
+                        previous.type.unify(t, subtype=True)
                 except TypingError as e:
                     if previous_token.isnumeric():
                         input = int(previous_token)
@@ -280,7 +282,7 @@ class Language(object):
                     current = self.parse_operator(token).instance()
                 previous = stack.pop()
                 if previous:
-                    current = Application(previous, current, fix)
+                    current = Application(previous, current, fix, unify)
                 stack.append(current)
 
             previous_token = token

@@ -11,6 +11,8 @@ from rdflib.term import Node, URIRef, Literal
 from abc import ABCMeta, abstractmethod
 from typing import Iterator
 
+from transforge.type import TypeInstance, TypeVariable
+from transforge.expr import Source
 from transforge.namespace import WF, RDF, EX
 from transforge.lang import Language
 
@@ -101,6 +103,33 @@ class Workflow(object):
             return g
         else:
             raise ValueError("did not recognize workflow graph")
+
+    def source_types(self, lang: Language) \
+            -> Iterator[tuple[Node, TypeInstance]]:
+        """
+        Find the types associated with each source node, either by parsing the
+        associated node (unimplemented, see issue #88) or by deriving it from
+        the expressions in which they are used. This has to be done for the
+        workflow as a whole; see issue #110 for details.
+        """
+        min_type: dict[Node, TypeInstance] = dict()
+
+        for app in self.tool_outputs:
+            inputs = [(node, Source()) for node in self.inputs(app)]
+            e = lang.parse_expr(self.expression(app), *(e for _, e in inputs),
+                unify=False)
+            e.fix()
+            for node, expr in inputs:
+                t = min_type.get(node, None)
+                if node in self.sources and (not t
+                        or expr.type.is_subtype(t, True) is not False):
+                    min_type[node] = expr.type
+
+        for src in self.sources:
+            if src in min_type:
+                yield src, min_type[src]
+            else:
+                yield src, TypeVariable()
 
 
 class WorkflowDict(Workflow):

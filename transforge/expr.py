@@ -339,14 +339,17 @@ class Source(Expr):
 class Application(Expr):
     "A complex expression, applying one expression to another."
 
-    def __init__(self, f: Expr, x: Expr, fix: bool = True):
+    def __init__(self, f: Expr, x: Expr, fix: bool = True, unify: bool = True):
         self.f: Expr = f
         self.x: Expr = x
 
-        try:
-            t = f.type.apply(x.type, fix=fix)
-        except TypingError as e:
-            raise ApplicationError(f, x) from e
+        if unify:
+            try:
+                t = f.type.apply(x.type, fix=fix)
+            except TypingError as e:
+                raise ApplicationError(f, x) from e
+        else:
+            t = TypeVariable()
 
         super().__init__(type=t)
 

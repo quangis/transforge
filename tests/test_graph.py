@@ -765,8 +765,8 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_source_reuse_does_not_affect_type_fixing_for_sources(self):
         # See issue #110: Reusing sources may cause overly general types to be
         # inferred the first time it's encountered, causing type mismatches
-        # the second time around. This is an issue both on the graph and on the
-        # expression level.
+        # the second time around. This was an issue both on the graph and on
+        # the expression level.
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         f = Operator(type=A ** A ** B)
@@ -792,10 +792,7 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_source_reuse_does_not_affect_type_fixing_for_apps(self):
         # See issue #110 and the previous test. Type fixing gets even more
         # precarious when the output types of tool applications are derived
-        # from the input types. An obvious solution: if every source is
-        # explicitly annotated, we can just read every expression once (without
-        # caring about passing previous outputs to inputs) and select the most
-        # specific option.
+        # from the input types.
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         f = Operator(type=lambda x: x ** x ** x)
@@ -804,44 +801,18 @@ class TestAlgebraRDF(unittest.TestCase):
         expected = graph_manual(
             anon=Step(type=TEST.A),
             src=Step(type=TEST.B),
-            app1=Step(TEST.f, input=["anon", "src"], type=TEST.B),
-            app2=Step(TEST.f, input=["app1", "src"], type=TEST.B),
+            app1=Step(TEST.f, input=["anon", "src"], type=TEST.A),
+            app2=Step(TEST.f, input=["app1", "src"], type=TEST.A),
         )
 
-        actual = TransformationGraph(lang,
-            minimal=True, with_operators=True, with_types=True)
         root = BNode()
-        actual.add_workflow(WorkflowDict(root, {
+        wf = WorkflowDict(root, {
             TEST.app1: ("f (-: A) (1: A)", [TEST.src]),
-            TEST.app2: ("f (1: B) (2: B)", [TEST.app1, TEST.src])
-        }, {TEST.src}))
-
-        self.assertIsomorphic(actual, expected)
-
-    def test_source_reuse_does_not_affect_type_fixing_for_apps_variable(self):
-        # See issue #110 and the previous test. If we have an expression in
-        # which the sources are *not* all annotated, we are still able to craft
-        # problems that can't be solved by parsing each expression
-        # individually.
-        A = TypeOperator()
-        B = TypeOperator(supertype=A)
-        C = TypeOperator(supertype=A)
-        f = Operator(type=lambda x: x ** x ** x)
-        g = Operator(type=lambda x, y: x ** y [(x * y) << {A * B, C * C}])
-        lang = Language(locals(), namespace=TEST)
-
-        expected = graph_manual(
-            src=Step(type=TEST.A),
-            appg=Step(TEST.g, input=["src"], type=TEST.B),
-            appf=Step(TEST.f, input=["appg", "src"], type=TEST.B),
-        )
+            TEST.app2: ("f (1: A) (2: B)", [TEST.app1, TEST.src])
+        }, {TEST.src})
 
         actual = TransformationGraph(lang,
             minimal=True, with_operators=True, with_types=True)
-        root = BNode()
-        actual.add_workflow(WorkflowDict(root, {
-            TEST.appg: ("g 1", [TEST.src]),
-            TEST.appf: ("f 1 (2: B)", [TEST.src, TEST.appg])
-        }, {TEST.src}))
+        actual.add_workflow(wf)
 
         self.assertIsomorphic(actual, expected)

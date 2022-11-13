@@ -361,8 +361,8 @@ class TransformationGraph(Graph):
         # the expressions they are derived from (which may be more specific)
         indirection: dict[Source, Expr] = dict()
 
-        for source in wf.sources:
-            exprs[source] = Source()
+        for source, type in wf.source_types(self.language):
+            exprs[source] = Source(type)
 
         def wfnode2expr(wfnode: Node) -> Expr:
             try:
