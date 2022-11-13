@@ -100,7 +100,8 @@ class TransformationGraph(Graph):
         self.add((ns["type"], RDFS.subPropertyOf, TF["type"]))
         self.add((ns["via"], RDFS.subPropertyOf, TF["via"]))
 
-    def add_supertypes(self, t: TypeOperation, recursive: bool = False) -> None:
+    def add_supertypes(self, t: TypeOperation,
+            recursive: bool = False) -> None:
         if t not in self.supertyped:
             ref = self.language.uri(t)
             for s in self.language.supertypes(t):
@@ -181,7 +182,8 @@ class TransformationGraph(Graph):
                 self.add((node, RDFS.subClassOf,
                     self.language.uri(t.operator)))
                 for i, param in enumerate(t.params, start=1):
-                    self.add((node, RDF[f"_{i}"], self.add_type(param)))
+                    pred = RDF[f"_{i}"]  # type: ignore
+                    self.add((node, pred, self.add_type(param)))
 
             if self.with_supertypes and t in self.language.canon:
                 assert isinstance(t, TypeOperation)
@@ -510,14 +512,16 @@ class TransformationGraph(Graph):
                 tool = self.value(wf_app, WF.applicationOf, any=False)
                 h.write(f"\tsubgraph cluster{wf_app} {{\n")
                 if tool:
-                    h.write(f"\t\tlabel=<<b>{shorten(tool)}</b><br/><i>{datalabel}</i>>;\n")
+                    h.write(f"\t\tlabel=<<b>{shorten(tool)}</b><br/>"
+                        f"<i>{datalabel}</i>>;\n")
                 else:
                     h.write("\t\tlabel=<<b>anonymous tool</b>>;\n")
                 for c in tfm_concepts:
                     label = self.value(c, RDFS.label, any=False)
                     type = self.value(c, TF.type, any=False)
                     if "internal" in label:
-                        h.write(f"\t\t{c} [shape=circle, style=dashed, label=\"\"];\n")
+                        h.write(f"\t\t{c} [shape=circle, "
+                            f"style=dashed, label=\"\"];\n")
                         # Show which node is internal to which
                         # for x in self.subjects(TF.internal, c):
                         #     h.write(f"\t\t{x} -> {c} [style=dashed];\n")
@@ -525,17 +529,22 @@ class TransformationGraph(Graph):
                         via = self.value(c, TF.via, any=False)
                         op = shorten(escape(via))
                         if type:
-                            typelabel = escape(self.value(type, RDFS.label, any=False))
+                            typelabel = escape(
+                                self.value(type, RDFS.label, any=False))
                             if via:
-                                h.write(f"\t\t{c} [label=<{typelabel}<br/>via {op}>];\n")
+                                h.write(f"\t\t{c} [label=<{typelabel}<br/>"
+                                    f"via {op}>];\n")
                             else:
                                 h.write(f"\t\t{c} [label=<{typelabel}>];\n")
                         else:
                             # If no type is found, then this must have been a
                             # non-canonical type. We use the label on the
                             # resource as a fallback and make it red
-                            errorlabel = escape(label).replace(' via ', '<br/>via ')
-                            h.write(f"\t\t{c} [label=<<font color=\"red\">non-canonical<br/>{errorlabel}</font>>];\n")
+                            errorlabel = escape(label).replace(' via ',
+                                '<br/>via ')
+                            h.write(f"\t\t{c} [label=<"
+                                f"<font color=\"red\">non-canonical<br/>"
+                                f"{errorlabel}</font>>];\n")
                 h.write("\t}\n")
 
             # Connect all the nodes

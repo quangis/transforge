@@ -36,8 +36,8 @@ class Operator(object):
         self.body = body  # a transformation may be non-primitive
 
         t = self.type.instance()
-        self.is_function = (isinstance(t, TypeOperation) and
-            t.operator == Function)
+        self.is_function = (isinstance(t, TypeOperation)
+            and t.operator == Function)
 
         assert not self.description or isinstance(self.description, str)
 

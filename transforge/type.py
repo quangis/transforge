@@ -249,8 +249,8 @@ class TypeOperator(Type):
     def subtype(self, other: TypeOperator, strict: bool = False) -> bool:
         assert isinstance(other, TypeOperator)
         return (not strict and self is other) or (
-            self is Bottom or other is Top or
-            bool(self.parent and self.parent.subtype(other))
+            self is Bottom or other is Top
+            or bool(self.parent and self.parent.subtype(other))
         )
 
     def floor(self) -> Iterator[TypeOperation]:
@@ -342,11 +342,13 @@ class TypeInstance(Type):
                     result = f"{i.text(*args)}{arrow}{o.text(*args)}"
             elif self.operator == Product and prod:
                 a, b = self.params
-                result = f"{lparen}{a.text(*args)}{prod}{b.text(*args)}{rparen}"
+                result = f"{lparen}{a.text(*args)}{prod}" \
+                    f"{b.text(*args)}{rparen}"
             else:
                 if self.params:
                     result = f"{self.operator}{lparen}" \
-                        f"{sep.join(t.text(*args) for t in self.params)}{rparen}"
+                        f"{sep.join(t.text(*args) for t in self.params)}" \
+                        f"{rparen}"
                 else:
                     result = str(self.operator)
         else:
@@ -430,8 +432,8 @@ class TypeInstance(Type):
         a = self.follow()
         b = value.follow()
         return a.match(b) is True or (
-            isinstance(a, TypeOperation) and
-            any(b in t for t in a.params))
+            isinstance(a, TypeOperation)
+            and any(b in t for t in a.params))
 
     def variables(self, indirect: bool = True,
             target: Optional[set[TypeVariable]] = None) -> set[TypeVariable]:
@@ -626,10 +628,18 @@ class TypeInstance(Type):
         """
         Find the common structure between multiple types.
         """
-        ftypes = [t.follow() for t in types]
-        if not ftypes:
+        if not types:
             return None
-        operators = [t.operator for t in ftypes if isinstance(t, TypeOperation)]
+
+        ftypes: list[TypeOperation] = []
+        for t in types:
+            t2 = t.follow()
+            if isinstance(t2, TypeOperation):
+                ftypes.append(t2)
+            else:
+                return None
+        operators = [t.operator for t in ftypes
+            if isinstance(t, TypeOperation)]
         operator = operators[0]
 
         if operator is None or not all(o == operator for o in operators):

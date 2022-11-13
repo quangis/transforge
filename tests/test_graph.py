@@ -12,7 +12,7 @@ from rdflib.compare import to_isomorphic
 from rdflib.tools.rdf2dot import rdf2dot
 
 from transforge.type import Type, TypeOperator, TypeVariable, \
-    SubtypeMismatch, TypeAlias, TypeOperation, Top, Bottom
+    TypeOperation, Top, Bottom
 from transforge.expr import Expr, Operator, Source, \
     ApplicationError
 from transforge.lang import Language
@@ -20,6 +20,7 @@ from transforge.graph import TF, TEST, TransformationGraph
 from transforge.workflow import WorkflowDict
 
 from typing import Union
+
 
 class Step(object):
     """
@@ -92,6 +93,7 @@ def graph_manual(with_classes: bool = False, **steps: Step) -> Graph:
 TypeOp = Union[TypeOperator, TypeOperation]
 Types = Union[TypeOp, tuple[TypeOp]]
 
+
 def make_taxonomy(lang: Language, d: dict[Types, Types]) -> Graph:
     """
     Manually construct a taxonomy graph.
@@ -104,6 +106,7 @@ def make_taxonomy(lang: Language, d: dict[Types, Types]) -> Graph:
                 g.add((lang.uri(sub), RDFS.subClassOf, lang.uri(sup)))
 
     return g
+
 
 class TestAlgebraRDF(unittest.TestCase):
 
@@ -469,11 +472,12 @@ class TestAlgebraRDF(unittest.TestCase):
         # Mismatch
         actual3 = TransformationGraph(ℒ,
             minimal=True, with_types=True, with_operators=True)
-        self.assertRaises(ApplicationError, actual3.add_workflow, WorkflowDict(root, {
-            TEST.sourceA: ("-: A", []),
-            TEST.sourceB: ("-: B", []),
-            TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
-        }))
+        self.assertRaises(ApplicationError, actual3.add_workflow,
+            WorkflowDict(root, {
+                TEST.sourceA: ("-: A", []),
+                TEST.sourceB: ("-: B", []),
+                TEST.app: ("f 1 2", [TEST.sourceA, TEST.sourceB])
+            }))
 
     def test_reuse_sources(self):
         # Test that the same source can be reused.
@@ -519,8 +523,8 @@ class TestAlgebraRDF(unittest.TestCase):
     def test_inter_tool_types(self):
         # Types should work between tools, not just inside tools. Say that we
         # have a function f : x ** x | x << Ratio and a tool T that implements
-        # that function. We then write the algebra expression for T as
-        # f(-: Ratio), but that should mean that `f` still produces a subtype of
+        # that function. We then write the algebra expression for T as f(-:
+        # Ratio), but that should mean that `f` still produces a subtype of
         # Ratio if presented with a subtype of Ratio. See issue #72.
 
         A = TypeOperator()
@@ -689,7 +693,8 @@ class TestAlgebraRDF(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        lang = Language(scope=locals(), namespace=TEST, canon={Top, A, F(A, B)})
+        lang = Language(scope=locals(), namespace=TEST,
+            canon={Top, A, F(A, B)})
 
         actual = TransformationGraph(lang, minimal=True)
         actual.add_taxonomy()

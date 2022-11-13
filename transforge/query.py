@@ -63,7 +63,8 @@ class TransformationQuery(object):
 
         self.lang = lang
 
-        self.root: Node = graph.value(predicate=RDF.type, object=TF.Task, any=False)
+        self.root: Node = graph.value(predicate=RDF.type, object=TF.Task,
+            any=False)
 
         if not self.root:
             raise ValueError(f"No {TF.Task.n3()} found in the graph.")
@@ -235,7 +236,8 @@ class TransformationQuery(object):
 
         for type in types:
             yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
-            # yield f"{next(self.generator).n3()} {next(self.generator).n3()} {type.n3()}."
+            # yield f"{next(self.generator).n3()} {next(self.generator).n3()}
+            # {type.n3()}."
 
         # Also include union types. TODO this is temporary until #79 is
         # resolved; see also:

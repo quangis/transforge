@@ -1,10 +1,10 @@
 import unittest
 
-from transforge.type import \
-    Type, TypeOperator, TypeSchema, TypeOperation, TypeVariable, _, with_parameters, \
-    FunctionApplicationError, TypeMismatch, Top, Bottom, \
-    ConstraintViolation, ConstrainFreeVariableError, EliminationConstraint, \
-    Direction, UnexpectedVariableError
+from transforge.type import (
+    Type, TypeOperator, TypeSchema, TypeVariable, _, with_parameters,
+    FunctionApplicationError, TypeMismatch, Top, Bottom,
+    ConstraintViolation, ConstrainFreeVariableError, EliminationConstraint,
+    Direction, UnexpectedVariableError)
 
 
 Ω = TypeOperator('Ω')
@@ -125,8 +125,8 @@ class TestType(unittest.TestCase):
         A, R = TypeOperator('A'), TypeOperator('R', params=2)
         select = TypeSchema(lambda x, y, rel: (x ** y ** A) ** rel ** y ** rel
                 [rel << (R(x, _), R(_, x))]).instance()
-        compose2 = TypeSchema(lambda α, β, γ, δ: (β ** γ) ** (δ ** α ** β) **
-                (δ ** α ** γ)).instance()
+        compose2 = TypeSchema(lambda α, β, γ, δ: (β ** γ) ** (δ ** α ** β)
+            ** (δ ** α ** γ)).instance()
         notj = A ** A
         leq = A ** A ** A
         select.apply(compose2.apply(notj).apply(leq))
@@ -170,7 +170,6 @@ class TestType(unittest.TestCase):
 
     def test_order_of_subtype_application_with_elimination_constraint(self):
         # The above is true even in the presence of an elimination constraint
-        # which may 
         A = TypeOperator('A')
         A1 = TypeOperator('A1', supertype=A)
         B = TypeOperator('B')
@@ -353,20 +352,20 @@ class TestType(unittest.TestCase):
         self.apply(g, result=A)
 
     # def test_asdf3(self):
-    #     # See #85
-    #     # When there is only a single remaining option in a constraint left, we
-    #     # used to unify with its skeleton. That is, if the remaining option is
-    #     # F(A), we unified with F(_). Instead, at least for compound types, we
-    #     # should unify with the entire type and just pass the subtype
-    #     # constraints along. So we would unify with F(x) where x is constrained
-    #     # by A. I think.
-    #     A = TypeOperator()
-    #     TypeOperator(supertype=A)
-    #     F = TypeOperator(params=2)
-    #     f = TypeSchema(lambda x: x[F(A)])
-    #     fi = f.instance()
-    #     self.assertEqual(fi.operator, F)
-    #     self.assertEqual(fi.params[0], TypeVariable)
+        # See #85
+        # When there is only a single remaining option in a constraint left, we
+        # used to unify with its skeleton. That is, if the remaining option is
+        # F(A), we unified with F(_). Instead, at least for compound types, we
+        # should unify with the entire type and just pass the subtype
+        # constraints along. So we would unify with F(x) where x is constrained
+        # by A. I think.
+        # A = TypeOperator()
+        # TypeOperator(supertype=A)
+        # F = TypeOperator(params=2)
+        # f = TypeSchema(lambda x: x[F(A)])
+        # fi = f.instance()
+        # self.assertEqual(fi.operator, F)
+        # self.assertEqual(fi.params[0], TypeVariable)
 
     def test_overeager_unification_of_constraint_options(self):
         # See issue #17
@@ -376,20 +375,6 @@ class TestType(unittest.TestCase):
         self.assertEqual(len(c.alternatives), 2)
         c = EliminationConstraint(x, [F(_, _), F(_, _)])
         self.assertEqual(len(c.alternatives), 1)
-
-
-    # No longer relevant after acd78d3d681fecbc76751030407af54f8b18d5d6
-    # def test_constraints_extraneous_alternatives(self):
-    #     # Subtypes should be considered extraneous in constraint alternatives,
-    #     # see issue #58
-    #     x = TypeVariable()
-    #     c = EliminationConstraint(x, [A1, A])
-    #     self.assertEqual(c.alternatives, [A()])
-
-    #     # ... regardless of order, see issue #57
-    #     x = TypeVariable()
-    #     c = Constraint(x, [A, A1])
-    #     self.assertEqual(c.alternatives, [A()])
 
     @unittest.skip("later")
     def test_unification_of_constraint_option_subtypes(self):
@@ -417,14 +402,12 @@ class TestType(unittest.TestCase):
 
     def test_reach_all_constraints(self):
         f = TypeSchema(lambda a, b, c:
-            a ** b ** c [c << {b, _}, b << {c, a}, a << {b, c}]
-        ).instance()
+            a ** b ** c [c << {b, _}, b << {c, a}, a << {b, c}]).instance()
         self.assertEqual(len(f.params[1].params[1].constraints()), 3)
 
     def test_reach_all_operators(self):
         f = TypeSchema(lambda a, b, c:
-            a ** b ** c [c << {b, _}, b << {a, _}, a << {A, _}]
-        ).instance()
+            a ** b ** c [c << {b, _}, b << {a, _}, a << {A, _}]).instance()
         self.assertEqual(f.params[1].params[1].operators(), {A})
 
     def test_curried_function_signature_same_as_uncurried(self):
@@ -483,7 +466,8 @@ class TestType(unittest.TestCase):
             {F(Bottom, Bottom)}
         )
         self.assertEqual(
-            set(F(Bottom, Bottom).successors(Direction.DOWN, include_bottom=True)),
+            set(F(Bottom, Bottom).successors(Direction.DOWN,
+                include_bottom=True)),
             {Bottom()}
         )
         self.assertEqual(

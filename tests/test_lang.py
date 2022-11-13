@@ -51,7 +51,8 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals())
 
         lang.parse("f 1 : A", Source())
-        self.assertRaises(TypeAnnotationError, lang.parse, "1 : B; f 1 : A", Source())
+        self.assertRaises(TypeAnnotationError, lang.parse, "1 : B; f 1 : A",
+            Source())
 
     def test_parse_anonymous_source(self):
         A = TypeOperator()

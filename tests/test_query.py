@@ -133,7 +133,8 @@ class TestAlgebra(unittest.TestCase):
     #     self.assertQuery(lang, graph, [D, bc2d, OR(B, C)],
     #         results={TEST.wf1, TEST.wf2})
 
-    #     self.assertQuery(lang, graph, STEPS(D, bc2d, OR(STEPS(B, a2b), STEPS(C, a2b))),
+    #     self.assertQuery(lang, graph, STEPS(D, bc2d, OR(STEPS(B, a2b),
+    #     STEPS(C, a2b))),
     #         results={TEST.wf1})
 
     #     # Choice between operations in non-last place
@@ -163,12 +164,12 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(lang, graph, [[A]], results={TEST.wf1, TEST.wf2})
 
     # def test_multiple_usage_of_units(self):
-    #     # The same unit may be used multiple times, so simply assigning a
-    #     # variable to a unit will lead to problems: one unit may have multiple
-    #     # variables, and multiple variables may refer to the same unit. Adding
-    #     # skips as a property of units poses a problem for the same reason: if
-    #     # a unit is used once in a series WITH a skip, all subsequent uses of
-    #     # that unit would also have that skip.
+        # The same unit may be used multiple times, so simply assigning a
+        # variable to a unit will lead to problems: one unit may have multiple
+        # variables, and multiple variables may refer to the same unit. Adding
+        # skips as a property of units poses a problem for the same reason: if
+        # a unit is used once in a series WITH a skip, all subsequent uses of
+        # that unit would also have that skip.
 
     #     A, B, C, D = (TypeOperator() for _ in range(4))
     #     a2b1 = Operator(type=A ** B)
@@ -341,58 +342,58 @@ class TestAlgebra(unittest.TestCase):
         self.assertQuery(lang, graph, [A], results={TEST.wf1, TEST.wf2})
         self.assertQuery(lang, graph, [A, [A]], results={TEST.wf2})
 
-    # # def test_that_sources_with_nonnormalized_type_get_type_in_graph(self):
-    # #     # There was an issue where the type of a source would not be saved in
-    # #     # the graphs if it was not yet normalized, causing a subtle bug.
-    # #     # I commented the test out for now since figuring out a MWE was
-    # #     # taking too much time; the issue was with not normalizing the source
-    # #     T = TypeOperator()
-    # #     S = TypeOperator()
-    # #     F = Operator(type=T ** S)
-    # #     lang = Language(locals(), namespace=TEST)
-    # #     graph = TransformationGraph(lang)
-    # #     graph.add_vocabulary()
-    # #     graph.add_workflow(TEST.wf1, {TEST.x: ("F(1)", [TEST.y])}, {TEST.y})
-    # #     graph.serialize("test.ttl")
-    # #     self.assertQuery(lang, graph, [S, T], results={TEST.wf1})
+    # def test_that_sources_with_nonnormalized_type_get_type_in_graph(self):
+        # There was an issue where the type of a source would not be saved in
+        # the graphs if it was not yet normalized, causing a subtle bug.
+        # I commented the test out for now since figuring out a MWE was
+        # taking too much time; the issue was with not normalizing the source
+    #     T = TypeOperator()
+    #     S = TypeOperator()
+    #     F = Operator(type=T ** S)
+    #     lang = Language(locals(), namespace=TEST)
+    #     graph = TransformationGraph(lang)
+    #     graph.add_vocabulary()
+    #     graph.add_workflow(TEST.wf1, {TEST.x: ("F(1)", [TEST.y])}, {TEST.y})
+    #     graph.serialize("test.ttl")
+    #     self.assertQuery(lang, graph, [S, T], results={TEST.wf1})
 
-    # # @unittest.skip("Obsoleted since it is no longer possible to skip at "
-    # #         "the beginning of a flow.")
-    # # def test_distribution_of_skips(self):
-    # #     # See issue #61:
-    # #     # Test that [A, ..., AND(f, g)] is not interpreted the same as [A,
-    # #     # AND([..., f], [..., g])]: the first says that, before A, there
-    # #     # should be a particular node that takes the outputs of both f and g
-    # #     # as input; the second simply says that f and g occur sometime before
-    # #     # A.
+    # @unittest.skip("Obsoleted since it is no longer possible to skip at "
+    #         "the beginning of a flow.")
+    # def test_distribution_of_skips(self):
+        # See issue #61:
+        # Test that [A, ..., AND(f, g)] is not interpreted the same as [A,
+        # AND([..., f], [..., g])]: the first says that, before A, there
+        # should be a particular node that takes the outputs of both f and g
+        # as input; the second simply says that f and g occur sometime before
+        # A.
 
-    # #     A, B, C, D = (TypeOperator() for _ in range(4))
-    # #     a2a = Operator(type=A ** A)
-    # #     a2b = Operator(type=A ** B)
-    # #     ab2c = Operator(type=A ** B ** C)
-    # #     c2d = Operator(type=C ** D)
-    # #     lang = Language(locals())
+    #     A, B, C, D = (TypeOperator() for _ in range(4))
+    #     a2a = Operator(type=A ** A)
+    #     a2b = Operator(type=A ** B)
+    #     ab2c = Operator(type=A ** B ** C)
+    #     c2d = Operator(type=C ** D)
+    #     lang = Language(locals())
 
-    # #     graph = make_graph(lang,
-    # #             direct=c2d(ab2c(a2a(~A), a2b(~A))),
-    # #             indirect=c2d(ab2c(~A, a2b(a2a(~A)))))
+    #     graph = make_graph(lang,
+    #             direct=c2d(ab2c(a2a(~A), a2b(~A))),
+    #             indirect=c2d(ab2c(~A, a2b(a2a(~A)))))
 
-    # #     self.assertQuery(lang, graph, [D, ..., AND(a2a, a2b)],
-    # #         results={TEST.direct})
-    # #     self.assertQuery(lang, graph, [D, AND([..., a2a], [..., a2b])],
-    # #         results={TEST.direct, TEST.indirect})
+    #     self.assertQuery(lang, graph, [D, ..., AND(a2a, a2b)],
+    #         results={TEST.direct})
+    #     self.assertQuery(lang, graph, [D, AND([..., a2a], [..., a2b])],
+    #         results={TEST.direct, TEST.indirect})
 
-    # # @unittest.skip("unsupported flows")
-    # # def test_unsupported(self):
+    # @unittest.skip("unsupported flows")
+    # def test_unsupported(self):
 
-    # #     graph = make_graph(lang,
-    # #         wf1=f2(f(~A), g(~B)),
-    # #         wf2=f2(~B, g(f(~A)))
-    # #     )
+    #     graph = make_graph(lang,
+    #         wf1=f2(f(~A), g(~B)),
+    #         wf2=f2(~B, g(f(~A)))
+    #     )
 
-    # #     # Choice between sequences outside of last place
-    # #     self.assertQuery(lang, graph, [D, f2, OR([g, f], [m, n]), A],
-    # #         results={TEST.wf1})
+    #     # Choice between sequences outside of last place
+    #     self.assertQuery(lang, graph, [D, f2, OR([g, f], [m, n]), A],
+    #         results={TEST.wf1})
 
     def test_multiple_outputs(self):
         # Test that a transformation can have multiple outputs
@@ -468,7 +469,8 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, RDF.type, TF.Task))
         graph.add((root, TF.output, A))
         graph.add((A, TF["from"], A))
-        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery,
+            lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -477,7 +479,8 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, TF.output, A))
         graph.add((A, TF["from"], B))
         graph.add((B, TF["from"], A))
-        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery,
+            lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -487,7 +490,8 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TF["from"], B))
         graph.add((B, TF["from"], C))
         graph.add((C, TF["from"], A))
-        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery,
+            lang, graph)
 
         graph = TransformationGraph(lang)
         root = BNode()
@@ -498,7 +502,8 @@ class TestAlgebra(unittest.TestCase):
         graph.add((A, TF["from"], B))
         graph.add((B, TF["from"], C))
         graph.add((C, TF["from"], A))
-        self.assertRaises(CyclicTransformationGraphError, TransformationQuery, lang, graph)
+        self.assertRaises(CyclicTransformationGraphError, TransformationQuery,
+            lang, graph)
 
 
 if __name__ == '__main__':

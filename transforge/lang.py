@@ -218,7 +218,8 @@ class Language(object):
             # Check that every type is known to the algebra
             for t in op.type.instance().operators():
                 if t not in self:
-                    raise ValueError(f"Operator {op} contains unknown type {t}")
+                    raise ValueError(
+                        f"Operator {op} contains unknown type {t}")
 
     def parse(self, string: str, *args: Expr) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple

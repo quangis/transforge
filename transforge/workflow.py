@@ -13,7 +13,7 @@ from typing import Iterator
 
 from transforge.type import TypeInstance, TypeVariable
 from transforge.expr import Source
-from transforge.namespace import WF, RDF, EX
+from transforge.namespace import WF, RDF
 from transforge.lang import Language
 
 
