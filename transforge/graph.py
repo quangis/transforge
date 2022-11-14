@@ -383,7 +383,7 @@ class TransformationGraph(Graph):
 
                 try:
                     exprs[wfnode] = expr = self.language.parse_expr(
-                        wf.expression(wfnode), *input_exprs, fix=False)
+                        wf.expression(wfnode), *input_exprs, fix=True)
                 except (TypingError, ParseError) as e:
                     raise WorkflowCompositionError(wf, wfnode) from e
                 return expr

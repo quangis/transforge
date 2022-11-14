@@ -821,3 +821,45 @@ class TestAlgebraRDF(unittest.TestCase):
         actual.add_workflow(wf)
 
         self.assertIsomorphic(actual, expected)
+
+    def test_avoid_variable_subtype_interaction_by_fixing_after_apply(self):
+        # See issues #110. By fixing the type after application in a timely
+        # fashion, the underlying issue addressed by the next test (see #113)
+        # can be avoided
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x [x <= B])
+        g = Operator(type=lambda x: x ** x ** x)
+        lang = Language(locals(), namespace=TEST)
+        wf = WorkflowDict(BNode(), {
+            TEST.app1: ("f (-: B)", []),
+            TEST.app2: ("g (1: A)", [TEST.app1]),
+        }, {})
+        TransformationGraph(lang).add_workflow(wf)
+
+    @unittest.skip("Issue #113 needs to be addressed.")
+    def test_type_variable_subtype_interaction(self):
+        # See issue #113
+        A = TypeOperator()
+        B = TypeOperator(supertype=A)
+        f = Operator(type=lambda x: x ** x ** x)
+        g = Operator(type=lambda x: x ** x [x <= B])
+        lang = Language(locals(), namespace=TEST)
+
+        expected = graph_manual(
+            anon1=Step(type=TEST.B),
+            anon2=Step(type=TEST.A),
+            app1=Step(TEST.g, input=["anon1"], type=TEST.B),
+            app2=Step(TEST.f, input=["app1", "anon2"], type=TEST.A),
+        )
+
+        root = BNode()
+        wf = WorkflowDict(root, {
+            TEST.app1: ("f (-: A) (g -)", []),
+        }, {})
+
+        actual = TransformationGraph(lang,
+            minimal=True, with_operators=True, with_types=True)
+        actual.add_workflow(wf)
+
+        self.assertIsomorphic(actual, expected)
