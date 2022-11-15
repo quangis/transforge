@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import rdflib
 from rdflib import Namespace
-from rdflib.term import URIRef
+from rdflib.term import URIRef, BNode, Node
 
 TF = Namespace('https://github.com/quangis/transforge#')
 WF = Namespace('http://geographicknowledge.de/vocab/Workflow.rdf#')
@@ -14,10 +14,12 @@ RDF = rdflib.RDF
 RDFS = rdflib.RDFS
 
 
-def shorten(uri: URIRef | str) -> str:
+def shorten(uri: Node | str) -> str:
     """
     Return the part after the last #, or if that is empty, after the last /.
     """
+    if isinstance(uri, BNode):
+        return "blank node"
     s = str(uri)
     last = "#".join(s.split("#")[-1:])
     if last == s:

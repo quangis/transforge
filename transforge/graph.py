@@ -11,7 +11,7 @@ from transforge.type import (Type, TypeOperation, Function,
 from transforge.expr import (Expr, Operation, Application,
     Abstraction, Source)
 from transforge.lang import (Language, ParseError,
-    NonCanonicalTypeError)
+    NonCanonicalTypeError, TypeAnnotationError)
 from transforge.workflow import Workflow
 
 import html
@@ -578,9 +578,24 @@ class WorkflowCompositionError(Exception):
     def __str__(self) -> str:
         assert self.__cause__, "must be caused by another error"
         tool = self.wf.tool(self.node)
+
+        # Add information on where it came from
+        origin = ""
+        if isinstance(self.__cause__, TypeAnnotationError):
+            input_number = self.__cause__.input
+            if input_number:
+                input_node = list(self.wf.inputs(self.node))[input_number - 1]
+                if input_node in self.wf.sources:
+                    origin = f"source <{shorten(input_node)}>"
+                else:
+                    app = self.wf.tool(input_node)
+                    origin = f"an application of <{shorten(app)}>"
+            if origin:
+                origin = f"\n\tthat gets input #{input_number} from {origin}, "
+
         return (
-            f"In workflow {shorten(self.wf.root)}, "
-            f"in an application of {shorten(tool)}:\n"
+            f"In workflow <{shorten(self.wf.root)}>\n"
+            f"\tin an application of <{shorten(tool)}>{origin}\n"
             f"\t{self.__cause__}"
         )
 
