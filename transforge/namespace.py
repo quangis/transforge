@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import rdflib
 from rdflib import Namespace
-from rdflib.term import URIRef, BNode, Node
+from rdflib.term import BNode, Node
 
 TF = Namespace('https://github.com/quangis/transforge#')
 WF = Namespace('http://geographicknowledge.de/vocab/Workflow.rdf#')
