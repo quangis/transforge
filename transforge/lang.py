@@ -47,6 +47,8 @@ class Language(object):
         self.canon: set[TypeOperation] = set()
         if canon:
             for t in canon:
+                if isinstance(t, TypeAlias):
+                    t = t()
                 if isinstance(t, TypeOperator):
                     if t not in (Top, Bottom):
                         self.canon.add(t())
