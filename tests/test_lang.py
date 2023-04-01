@@ -101,9 +101,19 @@ class TestAlgebra(unittest.TestCase):
         A = TypeOperator()
         B = TypeOperator(supertype=A)
         F = TypeOperator(params=2)
-        lang = Language(scope=locals(), canon={Top, A, F(A, B)})
+        G = TypeAlias(F(A, B))
+        lang = Language(scope=locals(), canon={Top, A, G})
         self.assertEqual(lang.canon, {Top(), A(), B(), F(A, B), F(B, B),
             F(A, Top), F(B, Top), F(Top, B), F(Top, Top)})
+
+    def test_canon_parameterized_operator(self):
+        A = TypeOperator()
+        F = TypeOperator(params=2)
+        self.assertRaises(ValueError, Language, scope=locals(), canon={F})
+
+    def test_canon_parameterized_alias(self):
+        F = TypeAlias(lambda x: x)
+        self.assertRaises(ValueError, Language, scope=locals(), canon={F})
 
     def test_subtypes_and_supertypes(self):
         # Make sure that direct subtypes and supertypes are available for

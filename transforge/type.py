@@ -903,8 +903,10 @@ class TypeAlias(Type):
             return self.alias.instance()
 
     def __call__(self, *args: Type) -> TypeOperation:
-        assert callable(self.alias)
-        if len(args) == self.arity:
+        if isinstance(self.alias, TypeOperation):
+            return self.alias
+        elif len(args) == self.arity:
+            assert callable(self.alias)
             return self.alias(*args)
         else:
             raise TypeParameterError(
@@ -1094,7 +1096,7 @@ builtins = (Unit, Top, Bottom, Product, Function)
 def with_parameters(
         *type_operators: TypeOperator | Callable[..., TypeOperation],
         param: Optional[Type] = None,
-        at: int = None) -> list[TypeInstance]:
+        at: int | None = None) -> list[TypeInstance]:
     """
     Generate a list of instances of type operations. Optionally, the generated
     type operations must contain a certain parameter (at some index, if given).

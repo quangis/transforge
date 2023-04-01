@@ -20,7 +20,7 @@ from transforge.expr import Operator, Expr, Application, Source
 class Language(object):
     def __init__(self, scope: dict[str, Any] = {},
             namespace: tuple[str, str] | str | None = None,
-            canon: Iterable[TypeOperator | TypeOperation] = ()):
+            canon: Iterable[TypeOperator | TypeOperation | TypeAlias] = ()):
         """
         The canonical types consist of all base types, plus those compound
         types that have an explicit synonym, or that are subtypes or parameters
@@ -47,10 +47,12 @@ class Language(object):
         self.canon: set[TypeOperation] = set()
         if canon:
             for t in canon:
-                if isinstance(t, TypeAlias):
-                    t = t()
-                if isinstance(t, TypeOperator):
-                    if t not in (Top, Bottom):
+                if isinstance(t, (TypeOperator, TypeAlias)):
+                    if t.arity > 0:
+                        raise ValueError(
+                            "Cannot add parameterized type operators "
+                            "without providing the parameters")
+                    elif t not in (Top, Bottom):
                         self.canon.add(t())
                 else:
                     assert isinstance(t, TypeOperation)
@@ -323,7 +325,7 @@ class Language(object):
 
         stack: list[None | TypeInstance | TypeOperator | TypeAlias] = [None]
 
-        def backtrack():
+        def backtrack() -> None:
             args: list[TypeInstance] = []
             while stack:
                 arg = stack.pop()
