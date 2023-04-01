@@ -188,9 +188,11 @@ class TypeSchema(Type):
     def __str__(self) -> str:
         names = signature(self.schema).parameters
         variables = [TypeVariable() for _ in names]
-        return self.schema(*variables).fix(prefer_lower=True).text(
-            with_constraints=True,
-            labels={v: k for k, v in zip(names, variables)})
+        labels = Labels("τ")
+        for k, v in zip(names, variables):
+            labels[v] = k
+        return self.schema(*variables).instance().fix(prefer_lower=True).text(
+            with_constraints=True, labels=labels)
 
     def instance(self, origin=None) -> TypeInstance:
         return self.schema(*(TypeVariable(origin=origin)
@@ -369,7 +371,8 @@ class TypeInstance(Type):
                         if var.follow() is self:
                             result = labels[var]
                             break
-                    assert result
+                    # if not result:
+                    #     result = "?"
 
         if with_constraints:
             result_aux = []

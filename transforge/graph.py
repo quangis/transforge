@@ -136,6 +136,7 @@ class TransformationGraph(Graph):
             for t in self.language.canon:
                 ref = self.language.uri(t)
                 for sub in self.transitive_subjects(RDFS.subClassOf, ref):
+                    assert sub is not None
                     self.add((sub, RDFS.subClassOf, ref))
 
     def add_operators(self) -> None:
