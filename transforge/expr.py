@@ -293,7 +293,9 @@ class Expr(ABC):
         don't conflict).
         """
         # TODO: Perhaps, instead of non-strict matching, allow establishing an 
-        # isomorphism between `Source`s.
+        # isomorphism between `Source`s. This would be better than only testing 
+        # whether the types conflict, because an expression `f (1: A) 2` should 
+        # probably be different from an expression `f (2: _) (1: B)`
         a = self.normalize(recursive=False)
         b = other.normalize(recursive=False)
         if isinstance(a, Source) and isinstance(b, Source):
@@ -301,7 +303,6 @@ class Expr(ABC):
             return m is True or (not strict and m is None)
         elif isinstance(a, Operation) and isinstance(b, Operation):
             return a.operator == b.operator
-            # TODO ... why is that the end of it?
         elif isinstance(a, Application) and isinstance(b, Application):
             return a.f.match(b.f, strict) and a.x.match(b.x, strict)
         elif isinstance(a, Abstraction) and isinstance(b, Abstraction):
