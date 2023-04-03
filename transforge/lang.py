@@ -9,6 +9,7 @@ from itertools import groupby, chain
 from typing import Optional, Iterator, Any, Iterable
 from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
+from collections import defaultdict
 
 from transforge.namespace import TF, EX
 from transforge.type import (builtins, Product, TypeOperator,
@@ -225,17 +226,29 @@ class Language(object):
                     raise ValueError(
                         f"Operator {op} contains unknown type {t}")
 
-    def parse(self, string: str, *args: Expr) -> Expr:
+    def parse(self, string: str, *args: Expr, **kwargs) -> Expr:
         # This used to be done via pyparsing, but the structure is so simple
         # that I opted to remove the dependency --- this is *much* faster
 
-        return self.parse_expr(string, *args)
+        return self.parse_expr(string, *args, **kwargs)
 
     def parse_expr(self, val: str | Iterator[str], *args: Expr,
-            fix: bool = True, unify: bool = True) -> Expr:
+            fix: bool = True, unify: bool = True,
+            defaults: bool = False) -> Expr:
+
         previous_token = ""
         tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
+
+        # Give default Source expressions when argument expressions aren't 
+        # explicitly given
+        args_map: list[Expr] | dict[int, Expr]
+        if defaults:
+            args_map = defaultdict(Source)
+            for i, arg in enumerate(args):
+                args_map[i] = arg
+        else:
+            args_map = list(args)
 
         while token := next(tokens, None):
 
@@ -280,8 +293,8 @@ class Language(object):
                 elif token.isnumeric():
                     input = int(token)
                     try:
-                        current = args[input - 1]
-                    except KeyError:
+                        current = args_map[input - 1]
+                    except (KeyError, IndexError):
                         raise MissingInputError(input)
                 else:
                     current = self.parse_operator(token).instance()

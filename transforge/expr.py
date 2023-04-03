@@ -285,22 +285,28 @@ class Expr(ABC):
 
         return expr.normalize(recursive=normalize)
 
-    def match(self, other: Expr) -> bool:
+    def match(self, other: Expr, strict: bool = True) -> bool:
         """
-        Check that the normalized expressions are the same.
+        Check that the normalized expressions are the same. Strict matching 
+        means that the types of `Source`s must match; non-strict means that 
+        uncertain matches are also allowed (such as when two type variables 
+        don't conflict).
         """
+        # TODO: Perhaps, instead of non-strict matching, allow establishing an 
+        # isomorphism between `Source`s.
         a = self.normalize(recursive=False)
         b = other.normalize(recursive=False)
         if isinstance(a, Source) and isinstance(b, Source):
-            return bool(a.type.match(b.type))
-        elif isinstance(a, Operation) and isinstance(b,
-                Operation):
+            m = a.type.match(b.type)
+            return m is True or (not strict and m is None)
+        elif isinstance(a, Operation) and isinstance(b, Operation):
             return a.operator == b.operator
+            # TODO ... why is that the end of it?
         elif isinstance(a, Application) and isinstance(b, Application):
-            return a.f.match(b.f) and a.x.match(b.x)
+            return a.f.match(b.f, strict) and a.x.match(b.x, strict)
         elif isinstance(a, Abstraction) and isinstance(b, Abstraction):
-            return all(x.match(y) for x, y in zip(a.params, b.params)) and \
-                a.body.match(b.body)
+            return a.body.match(b.body, strict) and all(
+                x.match(y, strict) for x, y in zip(a.params, b.params))
         return a == b
 
     def leaves(self) -> Iterator[Expr]:

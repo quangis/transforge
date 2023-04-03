@@ -4,7 +4,7 @@ from transforge.type import TypeOperator, TypeAlias, \
     _, Top, TypeVariable, TypeParameterError, UnexpectedVariableError
 from transforge.expr import Operator, Source
 from transforge.lang import Language, TypeAnnotationError, \
-    UndefinedTokenError
+    UndefinedTokenError, MissingInputError
 from collections import defaultdict
 
 
@@ -163,6 +163,17 @@ class TestAlgebra(unittest.TestCase):
         f = Operator(type=F(A) ** A)
         lang = Language(scope=locals())
         lang.parse("f (-: F(_))")
+
+    def test_missing_input_default_sources(self):
+        # Test that parsing can be done either with explicit arguments given or 
+        # with default sources substituting for inputs
+        A = TypeOperator()
+        f = Operator(type=A ** A)
+        lang = Language(scope=locals())
+        self.assertRaises(MissingInputError, lang.parse, "f 1")
+        self.assertTrue(
+            lang.parse("f 1", defaults=True).match(f(Source()), strict=False)
+        )
 
 
 if __name__ == '__main__':
