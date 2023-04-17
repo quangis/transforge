@@ -660,10 +660,18 @@ class TypeInstance(Type):
         """
         Obtain the final uncurried output type of a given function type.
         """
-        if isinstance(self, TypeOperation) and self.operator is Function:
-            return self.params[1].output()
-        else:
-            return self
+        return self.io()[1]
+
+    def io(self) -> tuple[list[TypeInstance], TypeInstance]:
+        """
+        Obtain the uncurried inputs and output types of a function type.
+        """
+        t = self
+        inputs: list[TypeInstance] = []
+        while isinstance(t, TypeOperation) and t.operator is Function:
+            inputs.append(t.params[0])
+            t = t.params[1]
+        return inputs, t
 
 
 class TypeOperation(TypeInstance):
