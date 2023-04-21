@@ -507,7 +507,7 @@ class TypeInstance(Type):
                 return a.operator == b.operator or \
                     (subtype and a.operator.subtype(b.operator))
             elif a.operator != b.operator:
-                return a.operator is Bottom or b.operator is Top
+                return subtype and (a.operator is Bottom or b.operator is Top)
             else:
                 result: Optional[bool] = True
                 for v, s, t in zip(a.operator.variance, a.params, b.params):

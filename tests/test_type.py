@@ -495,6 +495,13 @@ class TestType(unittest.TestCase):
         self.assertTrue(Top().match(Top(), subtype=True))
         self.assertTrue(Bottom().match(Bottom(), subtype=True))
 
+    def test_top_is_not_contained(self):
+        F = TypeOperator()
+        G = TypeOperator(params=1)
+        self.assertFalse(Top() in G(F()))
+        self.assertFalse(Bottom() in G(F()))
+        self.assertTrue(F() in G(F()))
+
     def test_top_and_bottom_apply_in_compound_types(self):
         # cf. <https://github.com/quangis/transformation-algebra/issues/108>
         A = TypeOperator()
