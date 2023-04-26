@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from rdflib import Graph, RDF
 from rdflib.term import BNode, Node
-from typing import Sequence, Iterator
+from typing import Iterable, Iterator
 
 
 class GraphList(Graph):
@@ -16,7 +16,9 @@ class GraphList(Graph):
     def __init__(self) -> None:
         super().__init__()
 
-    def add_list(self, items: Sequence[Node]) -> Node:
+    def add_list(self, items: Iterable[Node]) -> Node:
+        if not isinstance(items, (list, slice)):
+            items = list(items)
         if not items:
             return RDF.nil
         node = BNode()
