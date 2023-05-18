@@ -10,6 +10,18 @@ from collections import defaultdict
 
 class TestAlgebra(unittest.TestCase):
 
+    def test_comments(self):
+        A = TypeOperator()
+        f = Operator(type=lambda x: x ** x)
+        lang = Language(scope=locals())
+
+        # Comments in types probably won't work at the moment
+        self.assertTrue(lang.parse("f (- : A) # Test").match(f(Source(A))))
+        self.assertTrue(lang.parse("""
+                f # Test
+                    (- : A)
+                """).match(f(Source(A))))
+
     def test_parse_inline_typing(self):
         A = TypeOperator()
         x = Operator(type=A)

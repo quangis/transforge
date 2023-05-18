@@ -236,8 +236,9 @@ class Language(object):
             fix: bool = True, unify: bool = True,
             defaults: bool = False) -> Expr:
 
+        comment = False
         previous_token = ""
-        tokens = tokenize(val, "*(,):;~") if isinstance(val, str) else val
+        tokens = tokenize(val, "*(,):;~#\n") if isinstance(val, str) else val
         stack: list[Expr | None] = [None]
 
         # Give default Source expressions when argument expressions aren't 
@@ -251,8 +252,13 @@ class Language(object):
             args_map = list(args)
 
         while token := next(tokens, None):
-
-            if token in "(,)":
+            if token == "#":
+                comment = True
+            elif token == "\n":
+                comment = False
+            elif comment:
+                pass
+            elif token in "(,)":
                 if token in "),":
                     try:
                         y = stack.pop()
@@ -406,7 +412,7 @@ def tokenize(string: str, specials: str = "") -> Iterator[str]:
     sequence of non-special characters). Skip spaces.
     """
     for group, tokens in groupby(string,
-            lambda x: -2 if x.isspace() else specials.find(x)):
+            lambda x: -2 if x in " \r\t" else specials.find(x)):
         if group == -1:
             yield "".join(tokens)
         elif group >= 0:
