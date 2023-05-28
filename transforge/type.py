@@ -325,8 +325,8 @@ class TypeInstance(Type):
             sep: str = ", ",
             lparen: str = "(",
             rparen: str = ")",
-            arrow: str = " → ",
-            prod: str = " × ",
+            arrow: str = " ** ",
+            prod: str = " * ",
             with_constraints: bool = False) -> str:
         """
         Convert the given type to a textual representation.
