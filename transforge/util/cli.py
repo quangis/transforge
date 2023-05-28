@@ -177,7 +177,7 @@ class VocabBuilder(cli.Application, WithRDF, WithServer):
         else:
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
-        vocab.base = self.language.namespace
+        vocab.bind("", self.language.namespace)
 
         self.upload(vocab)
         self.write(vocab)
