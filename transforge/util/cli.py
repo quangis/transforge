@@ -380,8 +380,16 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
                     for globbed in glob(original))
 
             if self.server:
-                self.store = TransformationStore.backend(self.backend,
-                    self.server, cred=self.cred)
+                backend, _, host = self.server.partition("@")
+
+                if self.cred:
+                    user, _, password = self.cred.partition(":")
+                    cred = user, password
+                else:
+                    cred = None
+
+                self.store = TransformationStore.backend(backend,
+                    host, cred=cred)
             else:
                 self.store = None
 
