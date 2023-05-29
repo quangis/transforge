@@ -111,8 +111,7 @@ class WithRDF:
                     if g.language.prefix:
                         all_g.bind(g.language.prefix, g.language.namespace)
 
-            result = all_g.serialize(path,
-                format=self.output_format or guess_format(path))
+            result = all_g.serialize(path, format=self.output_format)
 
         if to_stdout:
             assert result
@@ -177,14 +176,14 @@ class VocabBuilder(cli.Application, WithRDF, WithServer):
         else:
             vocab = TransformationGraph(self.language)
             vocab.add_vocabulary()
-        vocab.bind("", self.language.namespace)
 
         self.upload(vocab)
         self.write(vocab)
 
 
 @CLI.subcommand("graph")
-class TransformationGraphBuilder(cli.Application, WithTools, WithRDF, WithServer):
+class TransformationGraphBuilder(cli.Application, WithTools, WithRDF, 
+        WithServer):
     """
     Generate transformation graphs for entire workflows, concatenating the
     algebra expressions for each individual use of a tool
@@ -199,9 +198,9 @@ class TransformationGraphBuilder(cli.Application, WithTools, WithRDF, WithServer
     skip_error = cli.Flag(["--skip-error"], default=False,
         help="Skip failed transformation graphs instead of exiting")
 
-    def main(self, LANG, *WORKFLOW_FILE):
+    def main(self, LANG, *WORKFLOW_FILE) -> int:
         self.language = lang(LANG)
-        results: list[Graph] = []
+        results: list[TransformationGraph] = []
 
         if not (WORKFLOW_FILE or self.expressions):
             print("Error: missing expression or workflow graph", file=stderr)
@@ -256,6 +255,7 @@ class TransformationGraphBuilder(cli.Application, WithTools, WithRDF, WithServer
 
         self.upload(*results)
         self.write(*results)
+        return 0
 
 
 @CLI.subcommand("query")
@@ -297,19 +297,31 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
         """
 
         # Collect all tasks
-        tasks: dict[URIRef, Graph] = {task: tg for tg in task_graphs
+        tasks: dict[Node, Graph] = {task: tg for tg in task_graphs
             if (task := tg.value(None, RDF.type, TF.Task, any=False))}
 
         # Collect all possible workflows
-        workflows = set(wf for task, tg in tasks.items() for wf in chain(
-            tg.objects(task, TF.implementation), tg.objects(task, TF.match)))
+        workflows: set[URIRef] = set()
+        for task, tg in tasks.items():
+            for wf in chain(tg.objects(task, TF.implementation), 
+                            tg.objects(task, TF.match)):
+                assert isinstance(wf, URIRef)
+                workflows.add(wf)
 
         # Collect results
         n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
         results: dict[Node, dict[str, str]] = defaultdict(dict)
         for task, tg in tasks.items():
-            expected = set(tg.objects(task, TF.implementation))
-            actual = set(tg.objects(task, TF.match))
+
+            expected: set[URIRef] = set()
+            for u in tg.objects(task, TF.implementation):
+                assert isinstance(u, URIRef)
+                expected.add(u)
+
+            actual: set[URIRef] = set()
+            for u in tg.objects(task, TF.match):
+                assert isinstance(u, URIRef)
+                actual.add(u)
 
             if expected:
                 n_fpos += len(actual - expected)
