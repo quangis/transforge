@@ -381,15 +381,20 @@ class Language(object):
                 stack.append(t1)
             else:
                 t: TypeInstance | TypeOperator | TypeAlias
-                try:
-                    op = self.types[token]
-                    t = op() if op.arity == 0 else op
-                except KeyError:
+                if token == "Top":
+                    t = Top()
+                elif token == "Bottom":
+                    t = Bottom()
+                else:
                     try:
-                        t = self.synonyms[token]
-                        t = t.instance() if t.arity == 0 else t
-                    except KeyError as e:
-                        raise UndefinedTokenError(token) from e
+                        op = self.types[token]
+                        t = op() if op.arity == 0 else op
+                    except KeyError:
+                        try:
+                            t = self.synonyms[token]
+                            t = t.instance() if t.arity == 0 else t
+                        except KeyError as e:
+                            raise UndefinedTokenError(token) from e
                 stack.append(t)
 
             if not consume_all and (
