@@ -4,6 +4,7 @@ Command-line interface for common tasks.
 
 from __future__ import annotations
 
+import sys
 import csv
 import platform
 import importlib.machinery
@@ -15,7 +16,7 @@ from collections import defaultdict
 from glob import glob
 
 from plumbum import cli  # type: ignore
-from rdflib import Graph, Dataset
+from rdflib import Graph
 from rdflib.term import Literal, Node, URIRef
 from rdflib.util import guess_format
 from transforge.expr import ApplicationError
@@ -23,9 +24,10 @@ from transforge.lang import Language, ParseError
 from transforge.graph import TransformationGraph, \
     WorkflowCompositionError
 from transforge.query import TransformationQuery
-from transforge.namespace import TF, EX, WF, TOOLS, RDF, shorten
+from transforge.namespace import TF, EX, RDF, shorten
 from transforge.workflow import WorkflowGraph
 from transforge.util.store import TransformationStore
+from transforge.util.utils import write_graphs
 
 
 caught_errors = (WorkflowCompositionError, ApplicationError, ParseError)
@@ -74,48 +76,10 @@ class WithRDF:
         Convenience method to write one or more graphs to the given file.
         """
 
-        if self.output_path == "-":
-            path = None
-            to_stdout = True
-        else:
-            path = self.output_path
-            to_stdout = False
-
-        result: str | None
-        if self.output_format == "dot":
-            if len(graphs) == 1:
-                result = graphs[0].visualize(path)
-            else:
-                raise RuntimeError("there must be exactly one graph")
-        else:
-            all_g: Graph
-            if len(graphs) == 1:
-                all_g = graphs[0]
-            elif format == "trig":
-                all_g = Dataset()
-                for g in graphs:
-                    subgraph = all_g.graph(g.base, g.base)
-                    subgraph += g
-            else:
-                all_g = Graph()
-                for g in graphs:
-                    all_g += g
-
-            all_g.bind("tf", TF)
-            all_g.bind("wf", WF)
-            all_g.bind("tools", TOOLS)
-            all_g.bind("ex", EX)
-
-            for g in graphs:
-                if isinstance(g, TransformationGraph):
-                    if g.language.prefix:
-                        all_g.bind(g.language.prefix, g.language.namespace)
-
-            result = all_g.serialize(path, format=self.output_format)
-
-        if to_stdout:
-            assert result
-            print(result)
+        path = self.output_path
+        write_graphs(*graphs,
+            file=sys.stdout if path else Path(path),
+            format=self.output_format)
 
 
 class WithServer:
