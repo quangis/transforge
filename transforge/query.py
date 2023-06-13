@@ -63,11 +63,15 @@ class TransformationQuery(object):
 
         self.lang = lang
 
-        self.root: Node = graph.value(predicate=RDF.type, object=TF.Task,
+        root = graph.value(predicate=RDF.type, object=TF.Task,
             any=False)
 
-        if not self.root:
+        if root is None:
             raise ValueError(f"No {TF.Task.n3()} found in the graph.")
+        else:
+            assert isinstance(root, URIRef)
+
+        self.root: URIRef = root
 
         self.graph = TransformationGraph(language=lang)
         self.graph += graph
