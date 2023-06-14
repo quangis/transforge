@@ -491,7 +491,7 @@ class TransformationGraph(Graph):
         h = open(path, 'w', encoding="utf-8") if path else StringIO()
         try:
             h.write("digraph G {\n")
-            h.write(f"label = <<font face=\"monospace\">{self.uri}</font>>;\n")
+            h.write(f"label=<<font face=\"monospace\">{self.uri}</font>>;\n")
             h.write("\tcompound=true;\n")
             h.write("\tnode [shape=rectangle];\n")
 
