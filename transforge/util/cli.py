@@ -5,26 +5,23 @@ Command-line interface for common tasks.
 from __future__ import annotations
 
 import sys
-import csv
 import platform
 import importlib.machinery
 import importlib.util
-from sys import stdout, stderr
+from sys import stderr
 from pathlib import Path
-from itertools import chain
-from collections import defaultdict
 from glob import glob
 
 from plumbum import cli  # type: ignore
 from rdflib import Graph
-from rdflib.term import Literal, Node, URIRef
+from rdflib.term import Literal
 from rdflib.util import guess_format
 from transforge.expr import ApplicationError
 from transforge.lang import Language, ParseError
 from transforge.graph import TransformationGraph, \
     WorkflowCompositionError
 from transforge.query import TransformationQuery
-from transforge.namespace import TF, EX, RDF, shorten
+from transforge.namespace import TF, EX
 from transforge.workflow import WorkflowGraph
 from transforge.util.store import TransformationStore
 from transforge.util.utils import write_graphs
@@ -155,10 +152,6 @@ class TransformationGraphBuilder(cli.Application, WithTools, WithRDF,
 
     expressions = cli.SwitchAttr(["-e", "--expression"], list=True,
         help="Provide an expression to add to the graph.")
-    blocked = cli.Flag(["--blocked"], default=False,
-        help="Do not pass output type of one tool to the next")
-    opaque = cli.Flag(["--opaque"], default=False,
-        help="Do not annotate types internal to the tools")
     skip_error = cli.Flag(["--skip-error"], default=False,
         help="Skip failed transformation graphs instead of exiting")
 
@@ -178,9 +171,7 @@ class TransformationGraphBuilder(cli.Application, WithTools, WithRDF,
 
         for i, expr in enumerate(self.expressions):
             tg = TransformationGraph(self.language,
-                with_noncanonical_types=True,
-                with_intermediate_types=not self.opaque,
-                passthrough=not self.blocked)
+                with_noncanonical_types=True)
             tg.uri = root = EX[f"expr{i}"]
 
             try:
@@ -200,10 +191,7 @@ class TransformationGraphBuilder(cli.Application, WithTools, WithRDF,
             wf.parse(wf_path, format=guess_format(wf_path))
             wf.refresh()
 
-            tg = TransformationGraph(self.language,
-                with_noncanonical_types=True,
-                with_intermediate_types=not self.opaque,
-                passthrough=not self.blocked)
+            tg = TransformationGraph(self.language)
 
             try:
                 tg.add_workflow(wf)
@@ -229,12 +217,8 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
     given, just output the query instead.
     """
 
-    chronological = cli.Flag(["--chronological"],
+    ordered = cli.Flag(["--ordered"],
         default=False, help="Take into account order")
-    blackbox = cli.Flag(["--blackbox"],
-        default=False, help="Only consider input and output of the workflows")
-    summary = cli.SwitchAttr(["--summary"], requires=["--server"],
-        help="Write a CSV with a summary of all queries")
 
     def evaluate(self, path: str) -> Graph:
         """
@@ -244,8 +228,8 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
         in_graph.parse(path)
 
         query = TransformationQuery(self.language, in_graph, by_io=True,
-            by_operators=False, by_types=not self.blackbox,
-            by_chronology=self.chronological and not self.blackbox)
+            by_operators=False, by_types=True,
+            by_chronology=self.ordered)
 
         out_graph = query.graph
         out_graph.add((query.root, TF.sparql, Literal(query.sparql())))
@@ -254,81 +238,6 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
             for match in self.store.run(query):
                 out_graph.add((query.root, TF.match, match))
         return out_graph
-
-    def summarize(self, *task_graphs: Graph) -> None:
-        """
-        Write a CSV summary of the tasks to the output.
-        """
-
-        # Collect all tasks
-        tasks: dict[Node, Graph] = {task: tg for tg in task_graphs
-            if (task := tg.value(None, RDF.type, TF.Task, any=False))}
-
-        # Collect all possible workflows
-        workflows: set[URIRef] = set()
-        for task, tg in tasks.items():
-            for wf in chain(tg.objects(task, TF.implementation), 
-                            tg.objects(task, TF.match)):
-                assert isinstance(wf, URIRef)
-                workflows.add(wf)
-
-        # Collect results
-        n_tpos, n_tneg, n_fpos, n_fneg = 0, 0, 0, 0
-        results: dict[Node, dict[str, str]] = defaultdict(dict)
-        for task, tg in tasks.items():
-
-            expected: set[URIRef] = set()
-            for u in tg.objects(task, TF.implementation):
-                assert isinstance(u, URIRef)
-                expected.add(u)
-
-            actual: set[URIRef] = set()
-            for u in tg.objects(task, TF.match):
-                assert isinstance(u, URIRef)
-                actual.add(u)
-
-            if expected:
-                n_fpos += len(actual - expected)
-                n_fneg += len(expected - actual)
-                n_tpos += len(actual.intersection(expected))
-                n_tneg += len(workflows - expected - actual)
-
-            for wf in workflows:
-                assert isinstance(wf, URIRef)
-                s = "●" if wf in actual else "○"
-                if not expected:
-                    s += "?"
-                elif (wf in actual) ^ (wf in expected):
-                    s += "⨯"
-                results[wf]["Workflow"] = shorten(wf)
-                results[wf][shorten(task)] = s
-
-        # Statistics
-        try:
-            precision = "{0:.3f}".format(n_tpos / (n_tpos + n_fpos))
-        except ZeroDivisionError:
-            precision = "?"
-        try:
-            recall = "{0:.3f}".format(n_tpos / (n_tpos + n_fneg))
-        except ZeroDivisionError:
-            recall = "?"
-
-        # Write to csv
-        if self.summary == "-":
-            handle = stdout
-        else:
-            handle = open(self.summary, 'w', newline='')
-        try:
-            header = ["Workflow"] + sorted([shorten(t) for t in tasks])
-            w = csv.DictWriter(handle, fieldnames=header)
-            w.writeheader()
-            for wf in sorted(workflows):
-                w.writerow(results[wf])
-            w.writerow({header[0]: "Precision:", header[1]: precision})
-            w.writerow({header[0]: "Recall:", header[1]: recall})
-        finally:
-            if handle is not stdout:
-                handle.close()
 
     def main(self, LANG, *QUERY_FILE):
         if not QUERY_FILE:
@@ -361,8 +270,6 @@ class QueryRunner(cli.Application, WithServer, WithRDF):
             tasks = [self.evaluate(task_file) for task_file in QUERY_FILE]
 
             self.write(*tasks)
-            if self.summary:
-                self.summarize(*tasks)
 
 
 def main():
