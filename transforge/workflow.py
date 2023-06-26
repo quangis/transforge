@@ -218,7 +218,9 @@ class WorkflowGraph(Graph, Workflow):
             input_resource = self.value(self._app_for[resource], p, any=False)
             if input_resource:
                 assert (input_resource in self.tool_outputs
-                    or input_resource in self.sources)
+                    or input_resource in self.sources), (
+                        f"{input_resource} does not occur as a source or "
+                        f"an output of a tool")
                 yield input_resource
 
     def tool(self, resource: Node) -> URIRef:
