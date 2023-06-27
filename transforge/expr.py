@@ -41,8 +41,8 @@ class Operator(object):
 
         assert not self.description or isinstance(self.description, str)
 
-    def __repr__(self) -> str:
-        return str(self)
+    # def __repr__(self) -> str:
+    #     return str(self)
 
     def __str__(self) -> str:
         return self._name or object.__repr__(self)
@@ -144,9 +144,6 @@ class Expr(ABC):
         else:
             assert isinstance(value, Operator)
             return value.instance()
-
-    def __repr__(self) -> str:
-        return self.tree()
 
     def __str__(self) -> str:
         return self.text(with_type=True, with_parentheses=False)
