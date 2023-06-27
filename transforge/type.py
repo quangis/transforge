@@ -160,15 +160,18 @@ class Type(ABC):
     def instance(self) -> TypeInstance:
         return NotImplemented
 
-    def concretize(self, replace: bool = False) -> TypeOperation:
+    def concretize(self, replace: bool = False,
+            ignore_constraints: bool = False) -> TypeOperation:
         """
         Make sure that this type contains no variables. Optionally replace
         unconstrained variables with the catch-all `Top` type.
         """
         a = self.instance().follow()
         if isinstance(a, TypeOperation):
-            return a.operator(*(p.concretize(replace) for p in a.params))
-        elif replace and isinstance(a, TypeVariable) and not a._constraints:
+            return a.operator(*(p.concretize(replace, ignore_constraints)
+                for p in a.params))
+        elif replace and isinstance(a, TypeVariable) and (ignore_constraints or 
+                not a._constraints):
             return Top()
         else:
             raise UnexpectedVariableError(

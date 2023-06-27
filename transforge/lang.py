@@ -74,15 +74,18 @@ class Language(object):
 
         return self._namespace
 
-    def uri(self, x: Operator | Type) -> URIRef:
+    def uri(self, x: Operator | Type, generalize: bool = True) -> URIRef:
         """
         Convert an operator or a canonical type to its associated URI.
-        """
 
-        # concretize `F(x)` to `F(Top)` for unconstrained variables
+        If `generalize` is True, then any variable will be replaced with `Top`, 
+        even if there are technically constraints on that variable."""
+
+        # concretize `F(x)` to `F(Top)`
+        # TODO think through the effects of this generalization
         if ((isinstance(x, TypeOperation) and any(x.variables(indirect=False)))
                 or isinstance(x, (TypeVariable, TypeSchema))):
-            x = x.concretize(replace=True)
+            x = x.concretize(replace=True, ignore_constraints=generalize)
 
         # handle base (type) operators
         if isinstance(x, TypeOperation) and x.operator.arity == 0:
