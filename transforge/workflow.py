@@ -10,6 +10,7 @@ from rdflib import Graph
 from rdflib.term import Node, URIRef, Literal
 from abc import ABCMeta, abstractmethod
 from typing import Iterator
+from itertools import count
 
 from transforge.type import TypeInstance, TypeVariable
 from transforge.expr import Source
@@ -214,14 +215,17 @@ class WorkflowGraph(Graph, Workflow):
         return self._tool_outputs
 
     def inputs(self, resource: Node) -> Iterator[Node]:
-        for p in (WF.input1, WF.input2, WF.input3):
-            input_resource = self.value(self._app_for[resource], p, any=False)
-            if input_resource:
-                assert (input_resource in self.tool_outputs
-                    or input_resource in self.sources), (
-                        f"{input_resource} does not occur as a source or "
+        for i in count(start=1):
+            artefact = self.value(self._app_for[resource],
+                WF[f"input{i}"], any=False)
+            if artefact:
+                assert (artefact in self.tool_outputs
+                    or artefact in self.sources), (
+                        f"{artefact} does not occur as a source or "
                         f"an output of a tool")
-                yield input_resource
+                yield artefact
+            else:
+                break
 
     def tool(self, resource: Node) -> URIRef:
         app = self._app_for[resource]
