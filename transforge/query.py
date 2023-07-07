@@ -68,10 +68,8 @@ class TransformationQuery(object):
 
         if root is None:
             raise ValueError(f"No {TF.Task.n3()} found in the graph.")
-        else:
-            assert isinstance(root, URIRef)
 
-        self.root: URIRef = root
+        self.root: Node = root
 
         self.graph = TransformationGraph(language=lang)
         self.graph += graph
