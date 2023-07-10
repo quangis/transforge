@@ -35,6 +35,12 @@ def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
         yield statements[0]
 
 
+def transformation2sparql(g: TransformationGraph, **kwargs) -> str:
+    """Convert a transformation graph to SPARQL."""
+    q = TransformationQuery(g.language, g, **kwargs)
+    return q.sparql()
+
+
 class TransformationQuery(object):
     """
     A transformation can be used to query other transformations: it should then
@@ -57,17 +63,18 @@ class TransformationQuery(object):
     """
 
     def __init__(self, lang: Language, graph: Graph,
+            root: Node | None = None,
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
             by_chronology: bool = True, unfold_tree: bool = False):
 
         self.lang = lang
 
-        root = graph.value(predicate=RDF.type, object=TF.Task,
-            any=False)
-
-        if root is None:
-            raise ValueError(f"No {TF.Task.n3()} found in the graph.")
+        if not root:
+            root = graph.value(predicate=RDF.type, object=TF.Task,
+                any=False)
+            if root is None:
+                raise ValueError(f"No {TF.Task.n3()} found in the graph.")
 
         self.root: Node = root
 
