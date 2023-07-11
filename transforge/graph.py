@@ -531,7 +531,7 @@ class TransformationGraph(Graph):
                         op = shorten(escape(via))
                         if type:
                             typelabel = escape(
-                                self.value(type, RDFS.label, any=False))
+                                self.value(type, RDFS.label)) # TODO: any=True
                             if via:
                                 h.write(f"\t\t{c} [label=<{typelabel}<br/>"
                                     f"via {op}>];\n")
