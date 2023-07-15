@@ -342,10 +342,10 @@ class Language(object):
         `.uri()`."""
         ops = []
         for x in shorten(uri).split("-"):
-            if x == "Top":
-                ops.append(Top)
-            elif x == "Bottom":
-                ops.append(Bottom)
+            for y in builtins:
+                if x == y.name:
+                    ops.append(y)
+                    break
             else:
                 ops.append(self.types[x])
         types: list[TypeInstance] = []
