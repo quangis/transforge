@@ -19,6 +19,7 @@ from transforge.expr import Operator
 from transforge.lang import Language
 from transforge.graph import (
     TransformationGraph, CyclicTransformationGraphError)
+from transforge.bag import Bag
 
 
 def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
@@ -232,30 +233,21 @@ class TransformationQuery(object):
         return result
 
     def types(self) -> Iterator[str]:
-        """
-        Conditions for matching on the bag of types used in a query.
-        """
+        """Conditions for matching on the bag of types used in a query."""
+        # See also issues 79 and 77
 
-        # Only the types that *definitely* occur
-        types: set[URIRef] = set()
-        for type_choice in self.type.values():
-            if len(type_choice) == 1:
-                assert isinstance(type_choice[0], URIRef)
-                types.add(type_choice[0])
+        bag = Bag()
+        for tus in self.type.values():
+            bag.add(*(self.lang.parse_type_uri(tu) for tu in tus))
 
-        for type in types:
-            yield f"?workflow :contains/rdfs:subClassOf* {type.n3()}."
-            # yield f"{next(self.generator).n3()} {next(self.generator).n3()}
-            # {type.n3()}."
-
-        # Also include union types. TODO this is temporary until #79 is
-        # resolved; see also:
-        # https://github.com/quangis/transformation-algebra/issues/77#issuecomment-1215064807
-        for type_choice in self.type.values():
-            if len([t for t in type_choice if t not in types]) >= 2:
-                yield from union(
-                    f"{next(self.generator).n3()} {next(self.generator).n3()}",
-                    type_choice)
+        for ts in bag.content:
+            if len(ts) == 1:
+                yield (
+                    f"?workflow :contains/rdfs:subClassOf* "
+                    f"{self.lang.uri(next(iter(ts))).n3()}.")
+            elif len(ts) > 1:
+                yield from union("?workflow :contains/rdfs:subClassOf* ", 
+                    (self.lang.uri(t) for t in ts))
 
     def operators(self) -> Iterator[str]:
         """
