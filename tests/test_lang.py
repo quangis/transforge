@@ -1,5 +1,6 @@
 import unittest
 
+from transforge.namespace import EX
 from transforge.type import TypeOperator, TypeAlias, \
     _, Top, TypeVariable, TypeParameterError, UnexpectedVariableError
 from transforge.expr import Operator, Source
@@ -186,6 +187,16 @@ class TestAlgebra(unittest.TestCase):
         self.assertTrue(
             lang.parse("f 1", defaults=True).match(f(Source()), strict=False)
         )
+
+    def test_parse_type_uri(self):
+        F = TypeOperator(params=2)
+        A = TypeOperator()
+        lang = Language(scope=locals(), namespace=EX, canon={F(F(A, A), A)})
+        t = F(F(A, A), A)
+        s = F(A, F(A, A))
+        self.assertEqual(lang.uri(t), EX["F-F-A-A-A"])
+        self.assertEqual(lang.parse_type_uri(EX["F-F-A-A-A"]), t)
+        self.assertEqual(lang.parse_type_uri(EX["F-A-F-A-A"]), s)
 
 
 if __name__ == '__main__':

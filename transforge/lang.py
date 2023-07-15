@@ -337,6 +337,20 @@ class Language(object):
         except KeyError as e:
             raise UndefinedTokenError(token) from e
 
+    def parse_type_uri(self, uri: URIRef) -> TypeInstance:
+        """Parse an URI back to a concrete type instance. Inverse operation to 
+        `.uri()`."""
+        ops = [self.types[x] for x in uri[len(self.namespace):].split("-")]
+        types: list[TypeInstance] = []
+        while ops:
+            op = ops.pop()
+            assert len(types) >= op.arity
+            t = op(*reversed(types[:op.arity]))
+            types = types[op.arity:]
+            types.append(t)
+        assert len(types) == 1
+        return types[0]
+
     def parse_type(self, value: str | Iterator[str]) -> TypeInstance:
         if isinstance(value, str):
             consume_all = True
