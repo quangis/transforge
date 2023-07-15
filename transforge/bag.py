@@ -63,7 +63,7 @@ class Bag(object):
         # Any disjuncts that are covered already by other types in the bag can 
         # be dropped
         new = TypeUnion(nt for nt in new_types
-            if any(t.is_subtype(nt) for t in self.content))
+            if not any(t.is_subtype(nt) for t in self.content))
 
         if not new:
             return
