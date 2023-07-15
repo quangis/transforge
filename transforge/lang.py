@@ -11,7 +11,7 @@ from rdflib import URIRef
 from rdflib.namespace import ClosedNamespace
 from collections import defaultdict
 
-from transforge.namespace import TF, EX
+from transforge.namespace import TF, EX, shorten
 from transforge.type import (builtins, Product, TypeOperator,
     TypeInstance, TypeVariable, TypeOperation, TypeAlias, Direction, Type,
     TypeSchema, TypingError, Top, Bottom)
@@ -340,7 +340,14 @@ class Language(object):
     def parse_type_uri(self, uri: URIRef) -> TypeInstance:
         """Parse an URI back to a concrete type instance. Inverse operation to 
         `.uri()`."""
-        ops = [self.types[x] for x in uri[len(self.namespace):].split("-")]
+        ops = []
+        for x in shorten(uri).split("-"):
+            if x == "Top":
+                ops.append(Top)
+            elif x == "Bottom":
+                ops.append(Bottom)
+            else:
+                ops.append(self.types[x])
         types: list[TypeInstance] = []
         while ops:
             op = ops.pop()

@@ -194,9 +194,11 @@ class TestAlgebra(unittest.TestCase):
         lang = Language(scope=locals(), namespace=EX, canon={F(F(A, A), A)})
         t = F(F(A, A), A)
         s = F(A, F(A, A))
+        u = F(A, F(Top, A))
         self.assertEqual(lang.uri(t), EX["F-F-A-A-A"])
         self.assertEqual(lang.parse_type_uri(EX["F-F-A-A-A"]), t)
         self.assertEqual(lang.parse_type_uri(EX["F-A-F-A-A"]), s)
+        self.assertEqual(lang.parse_type_uri(EX["F-A-F-Top-A"]), u)
 
 
 if __name__ == '__main__':
