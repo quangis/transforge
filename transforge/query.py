@@ -67,7 +67,8 @@ class TransformationQuery(object):
             root: Node | None = None,
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
-            by_chronology: bool = True, unfold_tree: bool = False):
+            by_chronology: bool = True, by_penultimate: bool = True,
+            unfold_tree: bool = False) -> None:
 
         self.lang = lang
 
@@ -84,6 +85,7 @@ class TransformationQuery(object):
         self.graph.parse_shortcuts()
 
         self.by_io = by_io
+        self.by_penultimate = by_penultimate
         self.by_types = by_types
         self.by_operators = by_operators
         self.by_chronology = by_chronology
@@ -269,8 +271,12 @@ class TransformationQuery(object):
         Conditions for matching on input and outputs of the query.
         """
         for output in self.graph.objects(self.root, TF.output):
-            yield from union("?workflow :output/:type/rdfs:subClassOf*",
-                self.graph.objects(output, TF.type))
+            if self.by_penultimate:
+                path = "?workflow :output/:from?/:type/rdfs:subClassOf*"
+            else:
+                path = "?workflow :output/:type/rdfs:subClassOf*"
+
+            yield from union(path, self.graph.objects(output, TF.type))
 
         for input in self.graph.objects(self.root, TF.input):
             yield from union("?workflow :input/:type/rdfs:subClassOf*",
