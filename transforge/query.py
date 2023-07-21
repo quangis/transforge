@@ -19,7 +19,7 @@ from transforge.expr import Operator
 from transforge.lang import Language
 from transforge.graph import (
     TransformationGraph, CyclicTransformationGraphError)
-from transforge.bag import Bag
+from transforge.bag import Bag, TypeUnion
 
 
 def union(prefix: str, subjects: Iterable[Node]) -> Iterator[str]:
@@ -240,7 +240,8 @@ class TransformationQuery(object):
 
         bag = Bag()
         for tus in self.type.values():
-            bag.add(*(self.lang.parse_type_uri(tu) for tu in tus))
+            bag.add(*(self.lang.parse_type_uri(tu)
+                for tu in tus if isinstance(tu, URIRef)))
 
         for ts in bag.content:
             if len(ts) == 1:
@@ -334,10 +335,13 @@ class TransformationQuery(object):
                     yield f"{c.n3()} :from+ {current.n3()}."
 
             # Write operator/type properties of this step
+            type_set = TypeUnion(self.lang.parse_type_uri(t)
+                for t in self.type.get(current, ()) if isinstance(t, URIRef))
+
             yield from union(f"{current.n3()} :via",
                 self.operator.get(current, ()))
-            yield from union(f"{current.n3()} :type/rdfs:subClassOf*",
-                self.type.get(current, ()))
+            yield from union(f"{current.n3()} :type/rdfs:subClassOf*", 
+                (self.lang.uri(t) for t in type_set))
 
             # Make sure as early as possible that there is no earlier on the
             # same branch
