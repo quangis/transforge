@@ -213,10 +213,10 @@ class TestAlgebra(unittest.TestCase):
 
         self.assertQuery(lang, graph,
             [B], by_io=False, by_chronology=False,
-            results={TEST.wf1, TEST.wf2}
-        )
+            results={TEST.wf1, TEST.wf2})
+
         self.assertQuery(lang, graph,
-            [B], by_io=True, by_chronology=False,
+            [B], by_io=True, by_chronology=False, by_penultimate=False,
             results={TEST.wf1}
         )
         self.assertQuery(lang, graph,
