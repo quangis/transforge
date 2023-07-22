@@ -277,11 +277,23 @@ class TransformationQuery(object):
             else:
                 path = "?workflow :output/:type/rdfs:subClassOf*"
 
-            yield from union(path, self.graph.objects(output, TF.type))
+            # TODO general method for this
+            type_set = TypeUnion((self.lang.parse_type_uri(t)
+                for t in self.graph.objects(output, TF.type)
+                    if isinstance(t, URIRef)),
+                specific=False)
+
+            yield from union(path, (self.lang.uri(t) for t in type_set))
 
         for input in self.graph.objects(self.root, TF.input):
+
+            type_set = TypeUnion((self.lang.parse_type_uri(t)
+                for t in self.graph.objects(input, TF.type)
+                    if isinstance(t, URIRef)),
+                specific=False)
+
             yield from union("?workflow :input/:type/rdfs:subClassOf*",
-                self.graph.objects(input, TF.type))
+                (self.lang.uri(t) for t in type_set))
 
     def chronology(self) -> Iterator[str]:
         """
@@ -337,6 +349,10 @@ class TransformationQuery(object):
             # Write operator/type properties of this step
             type_set = TypeUnion(self.lang.parse_type_uri(t)
                 for t in self.type.get(current, ()) if isinstance(t, URIRef))
+
+            type_set = TypeUnion((self.lang.parse_type_uri(t)
+                for t in self.type.get(current, ()) if isinstance(t, URIRef)),
+                specific=False)
 
             yield from union(f"{current.n3()} :via",
                 self.operator.get(current, ()))

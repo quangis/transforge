@@ -5,8 +5,13 @@ from typing import Iterator, Iterable
 from collections.abc import MutableSet
 
 class TypeUnion(MutableSet[Type]):
+    """A disjunction of types. Can be either the most specific types (ie for a 
+    hierarchy with B, C subtypes of A, the disjunction B OR C OR A will be 
+    equivalent to B OR C) or the most general types (ie the disjunction B OR C 
+    OR A will be A)."""
 
-    def __init__(self, xs: Iterable[Type] = ()) -> None:
+    def __init__(self, xs: Iterable[Type] = (), specific: bool = True) -> None:
+        self.specific = specific
         self.data: set[Type] = set()
         for x in xs:
             self.add(x)
@@ -34,10 +39,16 @@ class TypeUnion(MutableSet[Type]):
     def add(self, new: Type) -> None:
         to_remove = set()
         for t in self.data:
-            if new.is_subtype(t):
-                to_remove.add(t)
-            elif t.is_subtype(new):
-                return
+            if self.specific:
+                if new.is_subtype(t):
+                    to_remove.add(t)
+                elif t.is_subtype(new):
+                    return
+            else:
+                if new.is_subtype(t):
+                    return
+                elif t.is_subtype(new):
+                    to_remove.add(t)
         self.data -= to_remove
         self.data.add(new)
 
