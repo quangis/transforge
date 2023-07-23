@@ -224,7 +224,7 @@ class TransformationQuery(object):
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "SELECT ?workflow WHERE {",
             "GRAPH ?workflow {",
-            "{SELECT ?workflow WHERE {",
+            "{SELECT DISTINCT ?workflow WHERE {",
             "?workflow a :Transformation.",
             self.operators() if self.by_operators else (),
             self.types() if self.by_types else (),
@@ -327,7 +327,7 @@ class TransformationQuery(object):
                 continue
 
             if self.skip_same_branch_matches:
-                yield f"\n{{SELECT {current.n3()} WHERE {{"
+                yield f"\n{{SELECT DISTINCT {current.n3()} WHERE {{"
 
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
