@@ -68,6 +68,7 @@ class TransformationQuery(object):
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
             by_chronology: bool = True, by_penultimate: bool = True,
+            skip_same_branch_matches: bool = True,
             unfold_tree: bool = False) -> None:
 
         self.lang = lang
@@ -90,6 +91,7 @@ class TransformationQuery(object):
         self.by_operators = by_operators
         self.by_chronology = by_chronology
         self.unfold_tree = unfold_tree
+        self.skip_same_branch_matches = skip_same_branch_matches
 
         # Keep track of the type and operator of each step
         self.type: dict[Variable, list[Node]] = dict()
@@ -324,13 +326,16 @@ class TransformationQuery(object):
             if current in visited:
                 continue
 
-            # afters = " ".join(a.n3() for a in self.after[current])
-            # yield f"{{SELECT DISTINCT {current.n3()} {afters} WHERE {{"
+            if self.skip_same_branch_matches:
+                yield f"\n{{SELECT {current.n3()} WHERE {{"
 
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
-                yield f"?workflow :output {current.n3()}."
+                if self.by_penultimate:
+                    yield f"?workflow :output/:from? {current.n3()}."
+                else:
+                    yield f"?workflow :output {current.n3()}."
 
             # Write connections to previous nodes (ie ones that come after)
             for c in self.after[current]:
@@ -361,20 +366,18 @@ class TransformationQuery(object):
 
             # Make sure as early as possible that there is no earlier on the
             # same branch
-            # for c in self.after[current]:
-            #     types = self.type.get(current) or []
-            #     if not len(types) == 1:
-            #         continue
-            #     between = next(self.generator)
-            #     yield "FILTER NOT EXISTS {"
-            #     yield f"{current.n3()} ^:to+ {between.n3()}."
-            #     yield f"{c.n3()} :to* {between.n3()}."
-            #     for t in types:
-            #         yield f"{between.n3()} :type/rdfs:subClassOf* {t.n3()}."
-            #     yield "}"
+            if self.skip_same_branch_matches and self.after[current]:
+                yield "FILTER NOT EXISTS {"
+                predecessor = next(self.generator)
+                for c in self.after[current]:
+                    yield f"{c.n3()} :from+ {predecessor.n3()}."
+                yield f"{predecessor.n3()} :from+ {current.n3()}."
+                yield from union(f"{predecessor.n3()} :type/rdfs:subClassOf*", 
+                    (self.lang.uri(t) for t in type_set))
+                yield "}"
 
-            # Make sure we don't check the same node
-            # yield "}}"
+            if self.skip_same_branch_matches:
+                yield "}}"
 
             visited.add(current)
 

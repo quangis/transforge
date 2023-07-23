@@ -223,9 +223,14 @@ class TestAlgebra(unittest.TestCase):
             [C, [A, [B]]], by_io=True, by_chronology=False,
             results={TEST.wf2}
         )
+
+        # print(graph.serialize(format="trig"))
+        # print(make_query(lang, [C, [A, [B]]], by_io=True, 
+        #                  by_chronology=True).sparql())
+        # I don't really understand why the below matches with wf2
+
         self.assertQuery(lang, graph,
-            [C, [A, [B]]], by_io=True, by_chronology=True,
-            results={}
+            [C, [A, [B]]], by_io=True, by_chronology=True, results={}
         )
 
     def test_multiple_options_accept_union(self):
@@ -242,7 +247,7 @@ class TestAlgebra(unittest.TestCase):
             TEST.wf3: Source(A)
         })
 
-        self.assertQuery(lang, workflows, [A],
+        self.assertQuery(lang, workflows, [A], by_penultimate=False,
             results={TEST.wf3})
         self.assertQuery(lang, workflows, [B],
             results={TEST.wf1, TEST.wf2})
@@ -325,8 +330,10 @@ class TestAlgebra(unittest.TestCase):
         g.add((b, TF.type, TEST.B))
         g.add((c, TF.type, TEST.C))
         g.add((d, TF.type, TEST.D))
-        query1 = TransformationQuery(lang, g, unfold_tree=False)
-        query2 = TransformationQuery(lang, g, unfold_tree=True)
+        query1 = TransformationQuery(lang, g, unfold_tree=False, 
+            skip_same_branch_matches=False)
+        query2 = TransformationQuery(lang, g, unfold_tree=True, 
+            skip_same_branch_matches=False)
         self.assertQuery(lang, wfgraph, query1, results=set())
         self.assertQuery(lang, wfgraph, query2, results={TEST.wf1})
 
@@ -406,7 +413,8 @@ class TestAlgebra(unittest.TestCase):
         graph.add((root, TF.output, B))
         graph.add((A, TF["from"], C))
         graph.add((B, TF["from"], C))
-        query = TransformationQuery(lang, graph, unfold_tree=False)
+        query = TransformationQuery(lang, graph, by_penultimate=False, 
+            unfold_tree=False, skip_same_branch_matches=False)
         result = list(query.chronology())
         self.assertIn(result, [
             ['?workflow :output ?_0.', '?workflow :output ?_1.',
@@ -443,7 +451,8 @@ class TestAlgebra(unittest.TestCase):
             graph.add((A, TF["from"], B))
             graph.add((A, TF["from"], C))
             graph.add((B, TF["from"], C))
-            query = TransformationQuery(lang, graph, unfold_tree=False)
+            query = TransformationQuery(lang, graph, by_penultimate=False, 
+                unfold_tree=False, skip_same_branch_matches=False)
             result = list(query.chronology())
             self.assertIn(result, [
                 ['?workflow :output ?_0.', '?_0 :from* ?_1.',
