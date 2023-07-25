@@ -13,12 +13,21 @@
     a rdfs:Class; rdfs:subClassOf :Transformation;
     rdfs:comment "A task is a transformation graph that represents a query; it describes pertinent aspects of a transformation, for the purpose of retrieving matching tools or workflows.".
 
-:contains
-    a rdf:Property;
+:contains a rdf:Property;
     rdfs:subPropertyOf rdfs:member;
     rdfs:comment "Identifies constituent elements of a transformation, in terms of its types and operations.";
     rdfs:domain :Transformation;
     rdfs:range :Atom.
+
+:containsType a rdf:Property;
+    rdfs:subPropertyOf :contains;
+    rdfs:domain :Transformation;
+    rdfs:range :Type.
+
+:containsOperation a rdf:Property;
+    rdfs:subPropertyOf :contains;
+    rdfs:domain :Transformation;
+    rdfs:range :Operation.
 
 :input
     a rdf:Property;

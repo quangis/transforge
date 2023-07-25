@@ -227,7 +227,7 @@ class TransformationGraph(Graph):
                 self.add((current, TF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TF.contains, type_node))
+                    self.add((root, TF.containsType, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
@@ -250,7 +250,7 @@ class TransformationGraph(Graph):
                 self.add((current, TF.via, op_node))
 
                 if self.with_membership:
-                    self.add((root, TF.contains, op_node))
+                    self.add((root, TF.containsOperator, op_node))
 
             if self.with_types and canonical and essential:
 
@@ -258,7 +258,7 @@ class TransformationGraph(Graph):
                 self.add((current, TF.type, type_node))
 
                 if self.with_membership:
-                    self.add((root, TF.contains, type_node))
+                    self.add((root, TF.containsType, type_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label, Literal(

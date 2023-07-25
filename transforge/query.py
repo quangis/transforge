@@ -255,7 +255,7 @@ class TransformationQuery(object):
                 if i:
                     yield "} UNION {"
                 v = self.fresh()
-                yield f"?workflow :contains {v.n3()}."
+                yield f"?workflow :containsType {v.n3()}."
                 yield (
                     f"GRAPH {self.lang.vocab.n3()} {{"
                     f"{v.n3()} rdfs:subClassOf {self.lang.uri(t).n3()} }}")
@@ -275,7 +275,7 @@ class TransformationQuery(object):
                 operators.add(operator_choice[0])
 
         for operator in operators:
-            yield f"?workflow :contains {operator.n3()}."
+            yield f"?workflow :containsOperation {operator.n3()}."
 
     def io(self) -> Iterator[str]:
         """
