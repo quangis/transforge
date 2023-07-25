@@ -411,7 +411,8 @@ class TestAlgebraRDF(unittest.TestCase):
         D = TypeOperator(supertype=C)
         lang = Language(locals(), namespace=TEST)
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
 
         expected = Graph()
@@ -567,7 +568,8 @@ class TestAlgebraRDF(unittest.TestCase):
 
         actual = TransformationGraph(lang,
             minimal=True, with_operators=True,
-            with_types=True, with_intermediate_types=False)
+            with_types=True, with_intermediate_types=False, 
+            with_canonical_types=True)
         actual.add_taxonomy()
 
         expected += actual
@@ -657,7 +659,8 @@ class TestAlgebraRDF(unittest.TestCase):
         F = TypeOperator(params=2)
         lang = Language(scope=locals(), namespace=TEST, canon={A, F(A, A)})
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
             A: B,
@@ -673,7 +676,8 @@ class TestAlgebraRDF(unittest.TestCase):
         F = TypeOperator(params=2)
         lang = Language(scope=locals(), namespace=TEST, canon={A, F(A, A)})
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
 
         expected = make_taxonomy(lang, {
@@ -696,7 +700,8 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(scope=locals(), namespace=TEST,
             canon={Top, A, F(A, B)})
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
 
         expected = make_taxonomy(lang, {
@@ -718,7 +723,8 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(scope=locals(), namespace=TEST,
             canon={Top, Bottom, A, F(A, A)})
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
             Top: (A, F(Top, Top)),
@@ -751,7 +757,8 @@ class TestAlgebraRDF(unittest.TestCase):
         lang = Language(scope=locals(), namespace=TEST,
             canon={Top, A, F(A, A)})
 
-        actual = TransformationGraph(lang, minimal=True)
+        actual = TransformationGraph(lang, minimal=True, 
+            with_canonical_types=True)
         actual.add_taxonomy()
         expected = make_taxonomy(lang, {
             Top: (A, F(Top, Top)),

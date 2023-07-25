@@ -48,6 +48,7 @@ class TransformationGraph(Graph):
             with_labels: bool | None = None,
             with_classes: bool | None = None,
             with_transitive_closure: bool | None = None,
+            with_canonical_types: bool | None = None,
             with_noncanonical_types: bool | None = None,
             with_supertypes: bool | None = None,
             passthrough: bool = True,
@@ -63,7 +64,7 @@ class TransformationGraph(Graph):
         self.passthrough = passthrough
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
-        self.with_supertypes = default(with_supertypes)
+        self.with_supertypes = default(with_supertypes, False)
         self.with_intermediate_types = default(with_intermediate_types,
             self.with_types)
         self.with_labels = default(with_labels)
@@ -73,19 +74,29 @@ class TransformationGraph(Graph):
         self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
         self.with_transitive_closure = default(with_transitive_closure)
+        self.with_canonical_types = default(with_canonical_types, False)
         self.with_noncanonical_types = default(with_noncanonical_types)
         self.with_workflow_origin = default(with_workflow_origin)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
 
-        self.bind("", TF)
+        self.bind("tf", TF)
         if self.language.prefix and self.language.namespace:
             self.bind(self.language.prefix, self.language.namespace)
 
         # types that are connected to all sub cq. supertypes
         self.subtyped: set[TypeOperation] = set()
         self.supertyped: set[TypeOperation] = set()
+
+        # In general, we can assume that the canonical types are defined in the 
+        # vocabulary of the transformation language, so we do not need to add 
+        # their structure to the transformation graph unless explicitly told to 
+        # do so with with_canonical_types
+        if not self.with_canonical_types:
+            self.language.expand_canon()
+            for t in self.language.canon:
+                self.type_nodes[t] = self.language.uri(t)
 
     def add_vocabulary(self) -> None:
         """
@@ -126,6 +137,7 @@ class TransformationGraph(Graph):
         Add a taxonomy of types.
         """
 
+        assert self.with_canonical_types
         self.language.expand_canon()
         for t in self.language.canon:
             self.add_type(t)
