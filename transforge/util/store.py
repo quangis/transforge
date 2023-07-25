@@ -85,15 +85,17 @@ class TransformationStore(Dataset):
     def run(self, query: TransformationQuery) -> set[Node]:
         return set(r.workflow for r in self.store.query(query.sparql()))
 
-    def put(self, g: TransformationGraph) -> HTTPResponse:
+    def put(self, g: TransformationGraph,
+            uri: URIRef | None = None) -> HTTPResponse:
         """
         Remove old graph (if any) and insert given one in its place.
         """
         # cf. <https://www.w3.org/TR/sparql11-http-rdf-update/#http-put>
         # TODO may throw errors etc
 
-        if g.uri:
-            url = f"{self.url_gsp}?graph={quote(str(g.uri))}"
+        uri = uri or g.uri
+        if uri:
+            url = f"{self.url_gsp}?graph={quote(str(uri))}"
         else:
             url = f"{self.url_gsp}?default"
 
