@@ -178,6 +178,9 @@ class TransformationQuery(object):
 
         return TransformationQuery(lang, g, *nargs, **kwargs)
 
+    def fresh(self) -> Variable:
+        return next(self.generator)
+
     def assign_variables(self, node: Node, path: list[Node] = []) -> Variable:
         """
         Depth-first traversal through the graph, assigning one or more
@@ -187,13 +190,13 @@ class TransformationQuery(object):
             raise CyclicTransformationGraphError
 
         if self.unfold_tree:
-            var = next(self.generator)
+            var = self.fresh()
         else:
             assert isinstance(self.variables, dict)
             if node in self.variables:
                 var = self.variables[node]
             else:
-                var = self.variables[node] = next(self.generator)
+                var = self.variables[node] = self.fresh()
 
         assert var not in self.steps or self.steps[var] == node
         self.steps[var] = node
@@ -368,7 +371,7 @@ class TransformationQuery(object):
             # same branch
             if self.skip_same_branch_matches and self.after[current]:
                 yield "FILTER NOT EXISTS {"
-                predecessor = next(self.generator)
+                predecessor = self.fresh()
                 for c in self.after[current]:
                     yield f"{c.n3()} :from+ {predecessor.n3()}."
                 yield f"{predecessor.n3()} :from+ {current.n3()}."
