@@ -282,10 +282,11 @@ class TransformationQuery(object):
         Conditions for matching on input and outputs of the query.
         """
         for output in self.graph.objects(self.root, TF.output):
+            type_var = self.fresh()
             if self.by_penultimate:
-                path = "?workflow :output/:from?/:type/rdfs:subClassOf*"
+                yield f"?workflow :output/:from?/:type {type_var.n3()}."
             else:
-                path = "?workflow :output/:type/rdfs:subClassOf*"
+                yield f"?workflow :output/:type {type_var.n3()}."
 
             # TODO general method for this
             type_set = TypeUnion((self.lang.parse_type_uri(t)
@@ -293,17 +294,23 @@ class TransformationQuery(object):
                     if isinstance(t, URIRef)),
                 specific=False)
 
-            yield from union(path, (self.lang.uri(t) for t in type_set))
+            yield f"GRAPH {self.lang.vocab.n3()} {{"
+            yield from union(f"{type_var.n3()} rdfs:subClassOf", 
+                (self.lang.uri(t) for t in type_set))
+            yield "}"
 
         for input in self.graph.objects(self.root, TF.input):
-
+            type_var = self.fresh()
             type_set = TypeUnion((self.lang.parse_type_uri(t)
                 for t in self.graph.objects(input, TF.type)
                     if isinstance(t, URIRef)),
                 specific=False)
 
-            yield from union("?workflow :input/:type/rdfs:subClassOf*",
+            yield f"?workflow :input/:type {type_var.n3()}."
+            yield f"GRAPH {self.lang.vocab.n3()} {{"
+            yield from union(f"{type_var.n3()} rdfs:subClassOf",
                 (self.lang.uri(t) for t in type_set))
+            yield "}"
 
     def chronology(self) -> Iterator[str]:
         """
