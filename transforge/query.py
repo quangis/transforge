@@ -249,13 +249,18 @@ class TransformationQuery(object):
                 for tu in tus if isinstance(tu, URIRef)))
 
         for ts in bag.content:
-            if len(ts) == 1:
+            if len(ts) > 1:
+                yield "{"
+            for i, t in enumerate(ts):
+                if i:
+                    yield "} UNION {"
+                v = self.fresh()
+                yield f"?workflow :contains {v.n3()}."
                 yield (
-                    f"?workflow :contains/rdfs:subClassOf* "
-                    f"{self.lang.uri(next(iter(ts))).n3()}.")
-            elif len(ts) > 1:
-                yield from union("?workflow :contains/rdfs:subClassOf* ", 
-                    (self.lang.uri(t) for t in ts))
+                    f"GRAPH {self.lang.vocab.n3()} {{"
+                    f"{v.n3()} rdfs:subClassOf {self.lang.uri(t).n3()} }}")
+            if len(ts) > 1:
+                yield "}"
 
     def operators(self) -> Iterator[str]:
         """

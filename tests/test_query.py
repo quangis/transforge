@@ -20,6 +20,10 @@ def make_graph(lang: Language, workflows: dict[URIRef, Expr]) -> Dataset:
     Convenience method for constructing a dataset containing workflow graphs.
     """
     ds = Dataset()
+    vocab = TransformationGraph(lang)
+    vocab.add_taxonomy()
+    g = ds.add_graph(lang.vocab)
+    g += vocab
     for wfnode, content in workflows.items():
         graph = TransformationGraph(lang)
         e = graph.add_expr(content, wfnode)

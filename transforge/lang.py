@@ -74,6 +74,10 @@ class Language(object):
 
         return self._namespace
 
+    @property
+    def vocab(self) -> URIRef:
+        return URIRef(str(self.namespace).rstrip("#/"))
+
     def uri(self, x: Operator | Type, generalize: bool = True) -> URIRef:
         """
         Convert an operator or a canonical type to its associated URI.
