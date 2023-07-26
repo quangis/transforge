@@ -109,8 +109,8 @@ class TransformationQuery(object):
             None if self.unfold_tree else dict()
 
         # Assigned variables to the outputs and inputs of the transformation
-        self.inputs: list[Variable] = []
-        self.outputs: list[Variable] = []
+        self.inputs: dict[Variable, Node] = dict()
+        self.outputs: dict[Variable, Node] = dict()
 
         # Connections between the variables
         self.before: dict[Variable, list[Variable]] = defaultdict(list)
@@ -118,7 +118,7 @@ class TransformationQuery(object):
 
         # Traverse the graph
         for node in self.graph.objects(self.root, TF.output):
-            self.outputs.append(self.assign_variables(node))
+            self.assign_variables(node)
 
     @staticmethod
     def from_list(lang: Language, aspects: list[Operator | Type | list],
@@ -203,6 +203,12 @@ class TransformationQuery(object):
         self.type[var] = list(self.graph.objects(node, TF.type))
         self.operator[var] = list(self.graph.objects(node, TF.via))
 
+        if (self.root, TF.output, node) in self.graph:
+            self.outputs[var] = node
+
+        if (self.root, TF.input, node) in self.graph:
+            self.inputs[var] = node
+
         for next_node in self.graph.objects(node, TF["from"]):
             next_var = self.assign_variables(next_node, path + [node])
             self.before[var].append(next_var)
@@ -281,12 +287,14 @@ class TransformationQuery(object):
         """
         Conditions for matching on input and outputs of the query.
         """
-        for output in self.graph.objects(self.root, TF.output):
-            type_var = self.fresh()
+        for outputv, output in self.outputs.items():
             if self.by_penultimate:
-                yield f"?workflow :output/:from?/:type {type_var.n3()}."
+                yield f"?workflow :output/:from? {outputv.n3()}."
             else:
-                yield f"?workflow :output/:type {type_var.n3()}."
+                yield f"?workflow :output {outputv.n3()}."
+
+            type_var = self.fresh()
+            yield f"{outputv.n3()} :type {type_var.n3()}."
 
             # TODO general method for this
             type_set = TypeUnion((self.lang.parse_type_uri(t)
@@ -299,14 +307,15 @@ class TransformationQuery(object):
                 (self.lang.uri(t) for t in type_set))
             yield "}"
 
-        for input in self.graph.objects(self.root, TF.input):
+        for inputv, input in self.inputs.items():
+            yield f"?workflow :input {inputv.n3()}."
             type_var = self.fresh()
             type_set = TypeUnion((self.lang.parse_type_uri(t)
                 for t in self.graph.objects(input, TF.type)
                     if isinstance(t, URIRef)),
                 specific=False)
 
-            yield f"?workflow :input/:type {type_var.n3()}."
+            yield f"{inputv.n3()} :type {type_var.n3()}."
             yield f"GRAPH {self.lang.vocab.n3()} {{"
             yield from union(f"{type_var.n3()} rdfs:subClassOf",
                 (self.lang.uri(t) for t in type_set))
@@ -340,6 +349,12 @@ class TransformationQuery(object):
 
             if current in visited:
                 continue
+
+            # Prepare for next round
+            visited.add(current)
+            for b in self.before[current]:
+                if b not in visited:
+                    waiting.append(b)
 
             if self.skip_same_branch_matches:
                 yield f"\n{{SELECT DISTINCT {current.n3()} WHERE {{"
@@ -402,10 +417,3 @@ class TransformationQuery(object):
 
             if self.skip_same_branch_matches:
                 yield "}}"
-
-            visited.add(current)
-
-            # Add successors to queue
-            for b in self.before[current]:
-                if b not in visited:
-                    waiting.append(b)
