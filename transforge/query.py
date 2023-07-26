@@ -289,33 +289,24 @@ class TransformationQuery(object):
             else:
                 yield f"?workflow :output {outputv.n3()}."
 
-            type_var = self.fresh()
-            yield f"{outputv.n3()} :type {type_var.n3()}."
-
             # TODO general method for this
             type_set = TypeUnion((self.lang.parse_type_uri(t)
                 for t in self.graph.objects(output, TF.type)
                     if isinstance(t, URIRef)),
                 specific=False)
 
-            yield f"GRAPH {self.lang.vocab.n3()} {{"
-            yield from union(f"{type_var.n3()} rdfs:subClassOf", 
-                (self.lang.uri(t) for t in type_set))
-            yield "}"
+            yield from union(f"{outputv.n3()} :subtypeOf", (self.lang.uri(t) 
+                for t in type_set))
 
         for inputv, input in self.inputs.items():
             yield f"?workflow :input {inputv.n3()}."
-            type_var = self.fresh()
             type_set = TypeUnion((self.lang.parse_type_uri(t)
                 for t in self.graph.objects(input, TF.type)
                     if isinstance(t, URIRef)),
                 specific=False)
 
-            yield f"{inputv.n3()} :type {type_var.n3()}."
-            yield f"GRAPH {self.lang.vocab.n3()} {{"
-            yield from union(f"{type_var.n3()} rdfs:subClassOf",
+            yield from union(f"{inputv.n3()} :subtypeOf",
                 (self.lang.uri(t) for t in type_set))
-            yield "}"
 
     def chronology(self) -> Iterator[str]:
         """
@@ -388,12 +379,8 @@ class TransformationQuery(object):
             yield from union(f"{current.n3()} :via",
                 self.operator.get(current, ()))
 
-            type_var = self.fresh()
-            yield f"{current.n3()} :type {type_var.n3()}."
-            yield f"GRAPH {self.lang.vocab.n3()} {{"
-            yield from union(f"{type_var.n3()} rdfs:subClassOf", 
-                (self.lang.uri(t) for t in type_set))
-            yield "}"
+            yield from union(f"{current.n3()} :subtypeOf", (self.lang.uri(t) 
+                for t in type_set))
 
             # Make sure as early as possible that there is no earlier on the
             # same branch
@@ -401,15 +388,12 @@ class TransformationQuery(object):
                     type_set):
                 yield "FILTER NOT EXISTS {"
                 predecessor = self.fresh()
-                type_var2 = self.fresh()
                 for c in self.after[current]:
                     yield f"{c.n3()} :from+ {predecessor.n3()}."
                 yield f"{predecessor.n3()} :from+ {current.n3()}."
-                yield f"{predecessor.n3()} :type {type_var2.n3()}."
-                yield f"GRAPH {self.lang.vocab.n3()} {{"
-                yield from union(f"{predecessor.n3()} rdfs:subClassOf", 
+                yield from union(f"{predecessor.n3()} :subtypeOf", 
                     (self.lang.uri(t) for t in type_set))
-                yield "}}"
+                yield "}"
 
             if self.skip_same_branch_matches:
                 yield "}}"
