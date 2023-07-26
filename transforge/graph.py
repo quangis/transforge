@@ -242,8 +242,9 @@ class TransformationGraph(Graph):
 
                 if self.with_membership:
                     self.add((root, TF.containsType, type_node))
-                    if (self.with_supertype_membership and 
-                            isinstance(expr.type, TypeOperation)):
+                    if (self.with_supertype_membership
+                            and isinstance(expr.type, TypeOperation)
+                            and expr.type in self.language.canon):
                         for stype in self.language.supertypes(expr.type, 
                                 transitive=True):
                             stype_node = self.add_type(stype)
