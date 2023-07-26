@@ -44,6 +44,7 @@ class TransformationGraph(Graph):
             with_inputs: bool | None = None,
             with_workflow_origin: bool | None = None,
             with_membership: bool | None = None,
+            with_supertype_membership: bool | None = None,
             with_type_parameters: bool | None = None,
             with_labels: bool | None = None,
             with_classes: bool | None = None,
@@ -71,6 +72,7 @@ class TransformationGraph(Graph):
         self.with_output = default(with_output)
         self.with_inputs = default(with_inputs)
         self.with_membership = default(with_membership)
+        self.with_supertype_membership = default(with_supertype_membership)
         self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
         self.with_transitive_closure = default(with_transitive_closure)
@@ -240,6 +242,12 @@ class TransformationGraph(Graph):
 
                 if self.with_membership:
                     self.add((root, TF.containsType, type_node))
+                    if (self.with_supertype_membership and 
+                            isinstance(expr.type, TypeOperation)):
+                        for stype in self.language.supertypes(expr.type, 
+                                transitive=True):
+                            stype_node = self.add_type(stype)
+                            self.add((root, TF.containsType, stype_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
