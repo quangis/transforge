@@ -260,11 +260,7 @@ class TransformationQuery(object):
             for i, t in enumerate(ts):
                 if i:
                     yield "} UNION {"
-                v = self.fresh()
-                yield f"?workflow :containsType {v.n3()}."
-                yield (
-                    f"GRAPH {self.lang.vocab.n3()} {{"
-                    f"{v.n3()} rdfs:subClassOf {self.lang.uri(t).n3()} }}")
+                yield f"?workflow :containsType {self.lang.uri(t).n3()}."
             if len(ts) > 1:
                 yield "}"
 
