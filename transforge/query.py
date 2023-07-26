@@ -68,7 +68,9 @@ class TransformationQuery(object):
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
             by_chronology: bool = True, by_penultimate: bool = True,
-            skip_same_branch_matches: bool = True,
+            # By default, we turn the skip_same_branch_matches feature
+            # off because it does not seem to actually improve performance.
+            skip_same_branch_matches: bool = False,
             unfold_tree: bool = False) -> None:
 
         self.lang = lang
