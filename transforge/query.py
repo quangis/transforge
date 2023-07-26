@@ -316,6 +316,8 @@ class TransformationQuery(object):
         """
         # We can assume at this point that there will not be any cycles
 
+        assert self.by_io
+
         visited: set[Variable] = set()
         waiting: list[Variable] = list(self.outputs)
         processing: deque[Variable] = deque()
@@ -351,10 +353,11 @@ class TransformationQuery(object):
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
-                if self.by_penultimate:
-                    yield f"?workflow :output/:from? {current.n3()}."
-                else:
-                    yield f"?workflow :output {current.n3()}."
+                assert self.by_io, ("the output node should have already "
+                    "been constrained earlier")
+                yield from union(f"{current.n3()} :via",
+                    self.operator.get(current, ()))
+                continue
 
             # Write connections to previous nodes (ie ones that come after)
             for c in self.after[current]:
