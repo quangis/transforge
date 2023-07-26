@@ -39,19 +39,20 @@ class TransformationGraph(Graph):
             minimal: bool = False,
             with_operators: bool | None = None,
             with_types: bool | None = None,
+            with_supertypes: bool | None = None,
             with_intermediate_types: bool | None = None,
             with_output: bool | None = None,
             with_inputs: bool | None = None,
             with_workflow_origin: bool | None = None,
             with_membership: bool | None = None,
-            with_supertype_membership: bool | None = None,
+            with_membership_supertypes: bool | None = None,
             with_type_parameters: bool | None = None,
             with_labels: bool | None = None,
             with_classes: bool | None = None,
             with_transitive_closure: bool | None = None,
             with_canonical_types: bool | None = None,
             with_noncanonical_types: bool | None = None,
-            with_supertypes: bool | None = None,
+            with_supertype_classes: bool | None = None,
             passthrough: bool = True,
             *nargs, **kwargs):
 
@@ -65,14 +66,15 @@ class TransformationGraph(Graph):
         self.passthrough = passthrough
         self.with_operators = default(with_operators)
         self.with_types = default(with_types)
-        self.with_supertypes = default(with_supertypes, False)
+        self.with_supertypes = default(with_supertypes)
+        self.with_supertype_classes = default(with_supertype_classes, False)
         self.with_intermediate_types = default(with_intermediate_types,
             self.with_types)
         self.with_labels = default(with_labels)
         self.with_output = default(with_output)
         self.with_inputs = default(with_inputs)
         self.with_membership = default(with_membership)
-        self.with_supertype_membership = default(with_supertype_membership)
+        self.with_membership_supertypes = default(with_membership_supertypes)
         self.with_type_parameters = default(with_type_parameters)
         self.with_classes = default(with_classes)
         self.with_transitive_closure = default(with_transitive_closure)
@@ -200,7 +202,7 @@ class TransformationGraph(Graph):
                     pred = RDF[f"_{i}"]  # type: ignore
                     self.add((node, pred, self.add_type(param)))
 
-            if self.with_supertypes and t in self.language.canon:
+            if self.with_supertype_classes and t in self.language.canon:
                 assert isinstance(t, TypeOperation)
                 self.add_supertypes(t, recursive=True)
 
@@ -219,6 +221,12 @@ class TransformationGraph(Graph):
 
         This is a lossy conversion, because the order of arguments and the
         exact structure of functions-as-arguments is not preserved.
+
+        Note also that, when recording supertypes in the `:subtypeOf` or 
+        `:containsType` predicates using the `with_supertypes` and 
+        `with_membership_supertypes` options respectively, these supertypes 
+        only include *canonical* supertypes, even if `with_noncanonical_types` 
+        is on.
         """
         assert isinstance(expr.type, TypeInstance)
 
@@ -234,21 +242,27 @@ class TransformationGraph(Graph):
             # used multiple times, especially if passthrough is disabled
             self.expr_nodes[expr] = current
 
-            if self.with_types and (self.with_noncanonical_types
-                    or expr.type in self.language.canon):
+            canonical = expr.type in self.language.canon
+
+            if self.with_types and (canonical or self.with_noncanonical_types):
 
                 type_node = self.add_type(expr.type)
                 self.add((current, TF.type, type_node))
 
+                if self.with_supertypes and canonical:
+                    self.add((current, TF.subtypeOf, type_node))
+
                 if self.with_membership:
                     self.add((root, TF.containsType, type_node))
-                    if (self.with_supertype_membership
-                            and isinstance(expr.type, TypeOperation)
-                            and expr.type in self.language.canon):
-                        for stype in self.language.supertypes(expr.type, 
-                                transitive=True):
-                            stype_node = self.add_type(stype)
+
+                if (isinstance(expr.type, TypeOperation) and canonical):
+                    for stype in self.language.supertypes(expr.type, 
+                            transitive=True):
+                        stype_node = self.add_type(stype)
+                        if self.with_membership_supertypes:
                             self.add((root, TF.containsType, stype_node))
+                        if self.with_supertypes:
+                            self.add((current, TF.subtypeOf, stype_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label,
@@ -278,8 +292,22 @@ class TransformationGraph(Graph):
                 type_node = self.add_type(output_type)
                 self.add((current, TF.type, type_node))
 
+                canonical = output_type in self.language.canon
+
                 if self.with_membership:
                     self.add((root, TF.containsType, type_node))
+
+                if self.with_supertypes and canonical:
+                    self.add((current, TF.subtypeOf, type_node))
+
+                if (isinstance(output_type, TypeOperation) and canonical):
+                    for stype in self.language.supertypes(output_type, 
+                            transitive=True):
+                        stype_node = self.add_type(stype)
+                        if self.with_membership_supertypes:
+                            self.add((root, TF.containsType, stype_node))
+                        if self.with_supertypes:
+                            self.add((current, TF.subtypeOf, stype_node))
 
             if self.with_labels:
                 self.add((current, RDFS.label, Literal(

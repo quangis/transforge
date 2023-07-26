@@ -118,6 +118,12 @@
     rdfs:range :Type;
     rdfs:comment "The type of some (conceptual) data.".
 
+:subtypeOf
+    a rdfs:Property; rdfs:subPropertyOf rdf:type;
+    rdfs:domain :Concept;
+    rdfs:range :Type;
+    rdfs:comment "A supertype of the type of some (conceptual) data.".
+
 :internal
     a rdf:Property;
     rdfs:comment "Indicate that the transformer that produced this data is involved in some internal process.";
