@@ -369,9 +369,9 @@ class TransformationQuery(object):
                 if not self.operator.get(c) and (not self.type.get(c) or (
                         self.operator.get(current)
                         and not self.type.get(current))):
-                    yield f"{c.n3()} :from* {current.n3()}."
+                    yield f"{c.n3()} :depends? {current.n3()}."
                 else:
-                    yield f"{c.n3()} :from+ {current.n3()}."
+                    yield f"{c.n3()} :depends {current.n3()}."
 
             # Write operator/type properties of this step
             type_set = TypeUnion(self.lang.parse_type_uri(t)
@@ -394,8 +394,8 @@ class TransformationQuery(object):
                 yield "FILTER NOT EXISTS {"
                 predecessor = self.fresh()
                 for c in self.after[current]:
-                    yield f"{c.n3()} :from+ {predecessor.n3()}."
-                yield f"{predecessor.n3()} :from+ {current.n3()}."
+                    yield f"{c.n3()} :depends {predecessor.n3()}."
+                yield f"{predecessor.n3()} :depends {current.n3()}."
                 yield from union(f"{predecessor.n3()} :subtypeOf", 
                     (self.lang.uri(t) for t in type_set))
                 yield "}"
