@@ -53,6 +53,7 @@ class TransformationGraph(Graph):
             with_canonical_types: bool | None = None,
             with_noncanonical_types: bool | None = None,
             with_supertype_classes: bool | None = None,
+            with_dependencies: bool | None = None,
             passthrough: bool = True,
             *nargs, **kwargs):
 
@@ -81,6 +82,7 @@ class TransformationGraph(Graph):
         self.with_canonical_types = default(with_canonical_types, False)
         self.with_noncanonical_types = default(with_noncanonical_types)
         self.with_workflow_origin = default(with_workflow_origin)
+        self.with_dependencies = default(with_dependencies)
 
         self.type_nodes: dict[TypeInstance, Node] = dict()
         self.expr_nodes: dict[Expr, Node] = dict()
@@ -365,11 +367,11 @@ class TransformationGraph(Graph):
                 else:
                     x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                         origin=origin)
-                    self.add((x, TF["from"], internal))
+                    self.add_from(x, internal)
             else:
                 x = self.add_expr(expr.x, root, BNode(), intermediate=True,
                     origin=origin)
-            self.add((f, TF["from"], x))
+            self.add_from(f, x)
 
             # If `x` has internal operations of its own, then those inner
             # operations should be fed by the current (outer) internal
@@ -377,20 +379,20 @@ class TransformationGraph(Graph):
             # used by the inner one. See issues #37 and #41.
             if current_internal:
                 for internal in self.objects(x, TF.internal):
-                    self.add((internal, TF["from"], current_internal))
+                    self.add_from(internal, current_internal)
 
             # Every operation that is internal to `f` should also take `x`'s
             # output as input
             for internal in self.objects(f, TF.internal):
                 if internal != current_internal:
-                    self.add((internal, TF["from"], x))
+                    self.add_from(internal, x)
 
             # ... and every input to `f` should be an input to this internal
             # operation
             if current_internal:
                 for f_input in self.objects(f, TF["from"]):
                     if x != f_input:
-                        self.add((current_internal, TF["from"], f_input))
+                        self.add_from(current_internal, f_input)
 
                 if origin and self.with_workflow_origin:
                     self.add((current_internal, TF["origin"], origin))
@@ -398,6 +400,15 @@ class TransformationGraph(Graph):
         if origin and self.with_workflow_origin:
             self.add((current, TF["origin"], origin))
         return current
+
+    def add_from(self, a: Node, b: Node) -> None:
+        """Add predicate to say that `b` feeds into `a`. If the option is on, 
+        all transitive dependencies will also be added."""
+        self.add((a, TF["from"], b))
+        if self.with_dependencies:
+            self.add((a, TF.depends, b))
+            for bdep in self.objects(b, TF.depends):
+                self.add((a, TF.depends, bdep))
 
     def add_workflow(self, wf: Workflow) -> dict[Node, Node]:
         """
@@ -467,7 +478,7 @@ class TransformationGraph(Graph):
         for source_expr, ref_expr in indirection.items():
             src_tfmnode = self.add_expr(source_expr, wf.root)
             ref_tfmnode = self.expr_nodes[ref_expr]
-            self.add((src_tfmnode, TF["from"], ref_tfmnode))
+            self.add_from(src_tfmnode, ref_tfmnode)
 
         if self.with_inputs:
             for wfnode in wf.sources:

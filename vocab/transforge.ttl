@@ -72,6 +72,12 @@
     rdfs:domain :Concept;
     rdfs:range :TransformedConcept.
 
+:depends
+    a rdf:Property; a owl:TransitiveProperty;
+    rdfs:comment "Transtive version of `tf:from`: connects a transformed concept to all its inputs, even indirect ones.";
+    rdfs:domain :TransformedConcept;
+    rdfs:range :Concept.
+
 :Atom
     a rdfs:Class;
     rdfs:comment "Class comprising both operations and types.".
