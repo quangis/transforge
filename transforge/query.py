@@ -347,9 +347,6 @@ class TransformationQuery(object):
                 if b not in visited:
                     waiting.append(b)
 
-            if self.skip_same_branch_matches:
-                yield f"\n{{SELECT DISTINCT {current.n3()} WHERE {{"
-
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
@@ -373,6 +370,9 @@ class TransformationQuery(object):
                 else:
                     yield f"{c.n3()} :depends {current.n3()}."
 
+            if self.skip_same_branch_matches:
+                yield f"\n{{SELECT DISTINCT {current.n3()} WHERE {{"
+
             # Write operator/type properties of this step
             type_set = TypeUnion(self.lang.parse_type_uri(t)
                 for t in self.type.get(current, ()) if isinstance(t, URIRef))
@@ -393,8 +393,6 @@ class TransformationQuery(object):
                     type_set):
                 yield "FILTER NOT EXISTS {"
                 predecessor = self.fresh()
-                for c in self.after[current]:
-                    yield f"{c.n3()} :depends {predecessor.n3()}."
                 yield f"{predecessor.n3()} :depends {current.n3()}."
                 yield from union(f"{predecessor.n3()} :subtypeOf", 
                     (self.lang.uri(t) for t in type_set))
