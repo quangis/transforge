@@ -401,14 +401,20 @@ class TransformationGraph(Graph):
             self.add((current, TF["origin"], origin))
         return current
 
-    def add_from(self, a: Node, b: Node) -> None:
+    def add_from(self, a: Node, b: Node, recursive: bool = False) -> None:
         """Add predicate to say that `b` feeds into `a`. If the option is on, 
         all transitive dependencies will also be added."""
         self.add((a, TF["from"], b))
         if self.with_dependencies:
+
             self.add((a, TF.depends, b))
-            for bdep in self.objects(b, TF.depends):
-                self.add((a, TF.depends, bdep))
+            if recursive:
+                for bdep in self.transitive_objects(b, TF["from"]):
+                    assert bdep
+                    self.add((a, TF.depends, bdep))
+            else:
+                for bdep in self.objects(b, TF.depends):
+                    self.add((a, TF.depends, bdep))
 
     def add_workflow(self, wf: Workflow) -> dict[Node, Node]:
         """
@@ -478,7 +484,7 @@ class TransformationGraph(Graph):
         for source_expr, ref_expr in indirection.items():
             src_tfmnode = self.add_expr(source_expr, wf.root)
             ref_tfmnode = self.expr_nodes[ref_expr]
-            self.add_from(src_tfmnode, ref_tfmnode)
+            self.add_from(src_tfmnode, ref_tfmnode, recursive=True)
 
         if self.with_inputs:
             for wfnode in wf.sources:
