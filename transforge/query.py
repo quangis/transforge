@@ -67,8 +67,9 @@ class TransformationQuery(object):
             root: Node | None = None,
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
-            by_chronology: bool = True, by_penultimate: bool = True,
-            by_second: bool = True,
+            by_chronology: bool = True,
+            by_penultimate_output: bool = True,
+            by_second_input: bool = False,
             # By default, we turn the skip_same_branch_matches feature
             # off because it does not seem to actually improve performance.
             skip_same_branch_matches: bool = False,
@@ -89,8 +90,8 @@ class TransformationQuery(object):
         self.graph.parse_shortcuts()
 
         self.by_io = by_io
-        self.by_penultimate = by_penultimate
-        self.by_second = by_second
+        self.by_penultimate_output = by_penultimate_output
+        self.by_second_input = by_second_input
         self.by_types = by_types
         self.by_operators = by_operators
         self.by_chronology = by_chronology
@@ -289,7 +290,7 @@ class TransformationQuery(object):
         Conditions for matching on input and outputs of the query.
         """
         for outputv, output in self.outputs.items():
-            if self.by_penultimate:
+            if self.by_penultimate_output:
                 yield f"?workflow :output/:from? {outputv.n3()}."
             else:
                 yield f"?workflow :output {outputv.n3()}."
@@ -305,7 +306,7 @@ class TransformationQuery(object):
 
     def input_nodes(self) -> Iterator[str]:
         for inputv, input in self.inputs.items():
-            if self.by_second:
+            if self.by_second_input:
                 yield f"?workflow :input/^:from? {inputv.n3()}."
             else:
                 yield f"?workflow :input {inputv.n3()}."
