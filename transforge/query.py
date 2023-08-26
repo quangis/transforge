@@ -68,6 +68,7 @@ class TransformationQuery(object):
             with_noncanonical_types: bool = False, by_io: bool = True,
             by_types: bool = True, by_operators: bool = True,
             by_chronology: bool = True, by_penultimate: bool = True,
+            by_second: bool = True,
             # By default, we turn the skip_same_branch_matches feature
             # off because it does not seem to actually improve performance.
             skip_same_branch_matches: bool = False,
@@ -89,6 +90,7 @@ class TransformationQuery(object):
 
         self.by_io = by_io
         self.by_penultimate = by_penultimate
+        self.by_second = by_second
         self.by_types = by_types
         self.by_operators = by_operators
         self.by_chronology = by_chronology
@@ -240,7 +242,8 @@ class TransformationQuery(object):
             self.operators() if self.by_operators else (),
             self.types() if self.by_types else (),
             "} GROUP BY ?workflow}",
-            self.io() if self.by_io else (),
+            self.output_nodes(),
+            self.input_nodes() if self.by_io else (),
             self.chronology() if self.by_chronology else (),
             "}",
             "} GROUP BY ?workflow"
@@ -281,7 +284,7 @@ class TransformationQuery(object):
         for operator in operators:
             yield f"?workflow :containsOperation {operator.n3()}."
 
-    def io(self) -> Iterator[str]:
+    def output_nodes(self) -> Iterator[str]:
         """
         Conditions for matching on input and outputs of the query.
         """
@@ -300,8 +303,12 @@ class TransformationQuery(object):
             yield from union(f"{outputv.n3()} :subtypeOf", (self.lang.uri(t) 
                 for t in type_set))
 
+    def input_nodes(self) -> Iterator[str]:
         for inputv, input in self.inputs.items():
-            yield f"?workflow :input {inputv.n3()}."
+            if self.by_second:
+                yield f"?workflow :input/^:from? {inputv.n3()}."
+            else:
+                yield f"?workflow :input {inputv.n3()}."
             type_set = TypeUnion((self.lang.parse_type_uri(t)
                 for t in self.graph.objects(input, TF.type)
                     if isinstance(t, URIRef)),
@@ -315,8 +322,6 @@ class TransformationQuery(object):
         Conditions for matching the specific order of a query.
         """
         # We can assume at this point that there will not be any cycles
-
-        assert self.by_io
 
         visited: set[Variable] = set()
         waiting: list[Variable] = list(self.outputs)
@@ -350,8 +355,8 @@ class TransformationQuery(object):
             # Connect the initial nodes (ie outputs)
             if not self.after[current]:
                 assert current in self.outputs
-                assert self.by_io, ("the output node should have already "
-                    "been constrained earlier")
+                # the type of the output node should have already been 
+                # constrained
                 yield from union(f"{current.n3()} :via",
                     self.operator.get(current, ()))
                 continue
