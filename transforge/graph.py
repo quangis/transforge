@@ -559,7 +559,9 @@ class TransformationGraph(Graph):
             for c in concepts_in:
                 type = self.value(c, TF.type, any=False)
                 origin = self.value(c, TF.origin, any=False)
-                typelabel = escape(self.value(type, RDFS.label, any=False))
+                assert type
+                # typelabel = escape(self.value(type, RDFS.label, any=False))
+                typelabel = escape(shorten(type))
                 datalabel = escape(self.value(origin, RDFS.label, any=False))
                 h.write(f"\tsubgraph cluster{c} {{\n")
                 h.write(f"\t\tlabel=<<u><i>{datalabel or origin}</i></u>>;\n")
@@ -590,8 +592,8 @@ class TransformationGraph(Graph):
                         via = self.value(c, TF.via, any=False)
                         op = shorten(escape(via))
                         if type:
-                            typelabel = escape(
-                                self.value(type, RDFS.label)) # TODO: any=True
+                            typelabel = escape(shorten(type))
+                            # self.value(type, RDFS.label))
                             if via:
                                 h.write(f"\t\t{c} [label=<{typelabel}<br/>"
                                     f"via {op}>];\n")
